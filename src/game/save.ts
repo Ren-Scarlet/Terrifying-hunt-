@@ -10,6 +10,8 @@ const DEFAULT_SAVE: SaveData = {
   wins: 0,
   killer: '迈克尔·迈尔斯',
   credits: 60,
+  darkCells: 3,
+  unlockedKillers: ['设陷者', '幽灵', '护士', '女猎手', '鬼面', '迈克尔·迈尔斯'],
 };
 
 export function loadSave(): SaveData {
@@ -24,6 +26,10 @@ export function loadSave(): SaveData {
       wins: typeof parsed.wins === 'number' ? parsed.wins : 0,
       killer: typeof parsed.killer === 'string' ? parsed.killer : DEFAULT_SAVE.killer,
       credits: typeof parsed.credits === 'number' ? parsed.credits : DEFAULT_SAVE.credits,
+      darkCells: typeof parsed.darkCells === 'number' ? parsed.darkCells : DEFAULT_SAVE.darkCells,
+      unlockedKillers: Array.isArray(parsed.unlockedKillers)
+        ? parsed.unlockedKillers
+        : [...DEFAULT_SAVE.unlockedKillers],
     };
   } catch {
     return { ...DEFAULT_SAVE };

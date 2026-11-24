@@ -137,6 +137,15 @@ export interface GameState {
   policeBlocked: boolean;
   /** 被处刑者锁住、无法逃离的目标 */
   pinnedPeople: string[];
+
+  /** 迈尔斯：尾随值 0–100，满值可进入恶魔附身 */
+  stalkMeter: number;
+  stalkTargetId: string | null;
+  possessed: boolean;
+  /** 图腾提供的下回合额外能量 */
+  bonusEnergyNextTurn: number;
+  /** 已被破坏的障碍物房间 */
+  clearedObstacles: RoomId[];
 }
 
 export interface SaveData {
@@ -145,6 +154,9 @@ export interface SaveData {
   bestScore: number;
   wins: number;
   killer?: string;
-  /** 商店货币，完成任务获得 */
+  /** 血点：商店货币，完成任务获得 */
   credits: number;
+  /** 暗金细胞：用于解锁额外杀手 */
+  darkCells: number;
+  unlockedKillers: string[];
 }

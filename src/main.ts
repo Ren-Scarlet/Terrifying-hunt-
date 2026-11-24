@@ -1,9 +1,11 @@
 import './style.css';
 import { CARD_MAP } from './game/cards';
 import {
+  basicAttack,
   beginOperation,
   createGame,
   endTurn,
+  enterPossession,
   giveUp,
   movePlayer,
   playCard,
@@ -18,6 +20,7 @@ import {
   personDetailHtml,
   renderDeckEditor,
   renderGame,
+  renderGuide,
   renderMenu,
   renderResult,
   renderSetup,
@@ -32,6 +35,7 @@ let game: GameState | null = null;
 let screen: Screen = 'menu';
 let editorOpen = false;
 let shopOpen = false;
+let guideOpen = false;
 let editorDeck: string[] = [...save.deck];
 let resultApplied = false;
 
@@ -51,6 +55,7 @@ function render(): void {
     html = renderGame(game, getKiller(save.killer));
     if (screen === 'result') html += renderResult(game);
   }
+  if (guideOpen) html += renderGuide();
   app.innerHTML = html;
 }
 
@@ -63,14 +68,16 @@ function afterAction(): void {
       const unlocked = [...save.unlockedCards];
       let wins = save.wins;
       let credits = save.credits;
+      let darkCells = save.darkCells;
       if (game.result === 'win') {
         wins += 1;
         credits += Math.max(10, Math.round(game.score / 5));
+        if (game.score >= 150) darkCells += 1;
         game.rewardCards.forEach((id) => {
           if (CARD_MAP[id] && !unlocked.includes(id)) unlocked.push(id);
         });
       }
-      save = { ...save, bestScore: newBest, wins, credits, unlockedCards: unlocked };
+      save = { ...save, bestScore: newBest, wins, credits, darkCells, unlockedCards: unlocked };
       writeSave(save);
     }
   }
@@ -99,6 +106,18 @@ app.addEventListener('click', (event) => {
     game = null;
     editorOpen = false;
     shopOpen = false;
+    render();
+    return;
+  }
+
+  if (action === 'guide') {
+    guideOpen = true;
+    render();
+    return;
+  }
+
+  if (action === 'guide-close') {
+    guideOpen = false;
     render();
     return;
   }
@@ -137,6 +156,21 @@ app.addEventListener('click', (event) => {
       writeSave(save);
       render();
     }
+    return;
+  }
+
+  if (action === 'unlock-killer') {
+    const owner = target.dataset.owner;
+    if (owner && !save.unlockedKillers.includes(owner) && save.darkCells >= 2) {
+      save = {
+        ...save,
+        darkCells: save.darkCells - 2,
+        unlockedKillers: [...save.unlockedKillers, owner],
+        killer: owner,
+      };
+      writeSave(save);
+    }
+    render();
     return;
   }
 
@@ -196,6 +230,14 @@ app.addEventListener('click', (event) => {
       const panel = document.getElementById('cardDetail');
       if (panel) panel.innerHTML = personDetailHtml(game, personId);
     }
+    return;
+  }
+
+  if (action === 'attack' || action === 'possess') {
+    if (!game || screen !== 'game') return;
+    if (action === 'possess') enterPossession(game);
+    else basicAttack(game, target.dataset.personId);
+    afterAction();
     return;
   }
 

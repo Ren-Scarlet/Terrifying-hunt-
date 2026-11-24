@@ -110,3 +110,10 @@ export const ROOM_MAP: Record<RoomId, Room> = ROOMS.reduce(
 export const ENTRY_ROOM: RoomId = 'hall';
 export const EXIT_ROOM: RoomId = 'garage';
 export const POLICE_START: RoomId = 'garden';
+
+/** 图腾：在此结束回合，下回合额外获得 1 点能量 */
+export const TOTEM_ROOMS: RoomId[] = ['attic', 'basement'];
+/** 柜子：藏在这里的平民不会被引诱类效果锁定 */
+export const CABINET_ROOMS: RoomId[] = ['bedroom', 'study'];
+/** 障碍物：进入前需要破坏；恶魔附身与破门卡可以直接清除 */
+export const OBSTACLE_ROOMS: RoomId[] = ['storage', 'basement'];

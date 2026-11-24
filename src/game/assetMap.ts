@@ -36,6 +36,18 @@ export const ASSET_PATHS: AssetPaths = {
     police: 'assets/ui/police.png',
     evidence: 'assets/ui/evidence.png',
     cardBack: 'assets/ui/card-back.png',
+    mission: 'assets/ui/mission.png',
+    missionTarget: 'assets/ui/mission-target.png',
+    escape: 'assets/ui/escape.png',
+    totem: 'assets/ui/totem.png',
+    cabinet: 'assets/ui/cabinet.png',
+    obstacle: 'assets/ui/obstacle.png',
+    darkCell: 'assets/ui/dark-cell.png',
+    bloodPoint: 'assets/ui/blood-point.png',
+    shard: 'assets/ui/shard.png',
+    bonusBrutal: 'assets/ui/bonus-brutal.png',
+    bonusHunt: 'assets/ui/bonus-hunt.png',
+    bonusCunning: 'assets/ui/bonus-cunning.png',
   },
 };
 
@@ -46,4 +58,8 @@ export function cardImage(defId: string): string | undefined {
 export function characterImage(id: string): string | undefined {
   if (SURVIVOR_MAP[id]) return survivorPortrait(id);
   return ASSET_PATHS.characters[id];
+}
+
+export function uiIcon(name: keyof AssetPaths['ui']): string {
+  return ASSET_PATHS.ui[name];
 }

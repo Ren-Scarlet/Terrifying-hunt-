@@ -1,7 +1,16 @@
 import { CARD_MAP, UNLOCK_REWARDS } from './cards';
 import { KILLER_MAP } from './killers';
 import { generateMission, roomName } from './missions';
-import { ENTRY_ROOM, EXIT_ROOM, POLICE_START, ROOM_MAP, ROOMS } from './rooms';
+import {
+  CABINET_ROOMS,
+  ENTRY_ROOM,
+  EXIT_ROOM,
+  OBSTACLE_ROOMS,
+  POLICE_START,
+  ROOM_MAP,
+  ROOMS,
+  TOTEM_ROOMS,
+} from './rooms';
 import { SETUP_CARDS, SETUP_MAP } from './setupCards';
 import { SPECIAL_SURVIVORS, SURVIVOR_MAP, SURVIVORS, type NpcThreat } from './survivors';
 import type {
@@ -86,8 +95,7 @@ function killPerson(state: GameState, person: Person, fromCurse = false): void {
 
   const id = mechanicId(state);
   const spiritualVictim = SURVIVOR_MAP[person.id]?.threat === 'spiritual';
-  const silentFirstKill =
-    (id === 'stalker' || id === 'nightfall') && !state.killerRuntime.killUsed && !spiritualVictim;
+  const silentFirstKill = id === 'nightfall' && !state.killerRuntime.killUsed && !spiritualVictim;
   if (silentFirstKill) {
     log(state, `${KILLER_MAP[state.killer].mechanic.name}：第一刀没有惊动任何人。`);
   } else {
@@ -110,8 +118,13 @@ function killPerson(state: GameState, person: Person, fromCurse = false): void {
   }
 }
 
-function damageVictim(state: GameState, amount: number, onlyWounded = false): boolean {
-  const victim = findVictim(state, state.playerRoom);
+function damageVictim(
+  state: GameState,
+  amount: number,
+  onlyWounded = false,
+  chosenVictim?: Person,
+): boolean {
+  const victim = chosenVictim ?? findVictim(state, state.playerRoom);
   if (!victim) {
     log(state, '当前房间没有可下手的目标。');
     return false;
@@ -268,6 +281,11 @@ export function createGame(
     luredRoom: null,
     policeBlocked: false,
     pinnedPeople: [],
+    stalkMeter: 0,
+    stalkTargetId: null,
+    possessed: false,
+    bonusEnergyNextTurn: 0,
+    clearedObstacles: [],
   };
   drawCards(state, 5);
   log(state, `契约已接取：${mission.title}`);
@@ -338,6 +356,9 @@ export function canMoveTo(state: GameState, room: RoomId): boolean {
   if (room === state.playerRoom) return false;
   if (state.freeMove) return true;
   const id = mechanicId(state);
+  if (OBSTACLE_ROOMS.includes(room) && !state.clearedObstacles.includes(room)) {
+    if (!(id === 'stalker' && state.possessed)) return false;
+  }
   if ((id === 'wraith' || id === 'rift') && !state.killerRuntime.moveUsed) return true;
   return ROOM_MAP[state.playerRoom].neighbors.includes(room);
 }
@@ -351,6 +372,11 @@ export function movePlayer(state: GameState, room: RoomId): boolean {
   const id = mechanicId(state);
   const firstMove = !state.killerRuntime.moveUsed;
   const phaseThroughWall = (id === 'wraith' || id === 'rift') && firstMove && !state.freeMove;
+
+  if (OBSTACLE_ROOMS.includes(room) && !state.clearedObstacles.includes(room) && id === 'stalker' && state.possessed) {
+    state.clearedObstacles.push(room);
+    log(state, `恶魔附身：你徒手拆开${roomName(room)}的障碍物，闯了进去。`);
+  }
   if (id === 'trapper' && firstMove) {
     const left = state.playerRoom;
     if (!state.lockedRooms.includes(left)) {
@@ -366,10 +392,72 @@ export function movePlayer(state: GameState, room: RoomId): boolean {
   if (!state.freeMove) state.steps -= 1;
   state.playerRoom = room;
   log(state, `你移动到${roomName(room)}。`);
+
+  if (id === 'stalker' && !state.possessed) {
+    const observed = peopleInRoom(state, room, 'target').concat(peopleInRoom(state, room, 'civilian'));
+    if (observed.length > 0) {
+      let gain = 12 + observed.length * 8;
+      if (state.stalkTargetId && observed.some((p) => p.id === state.stalkTargetId)) gain += 10;
+      state.stalkMeter = clamp(state.stalkMeter + gain, 0, 100);
+      state.stalkTargetId = randomOf(observed).id;
+      log(state, `恶魔附身：尾随值 +${gain}（当前 ${state.stalkMeter}/100）。`);
+      if (state.stalkMeter >= 100) log(state, '尾随值已满，你可以进入恶魔附身。');
+    }
+  }
+
   if (id === 'dream' && firstMove) {
     state.steps += 1;
     log(state, '梦中追猎：额外获得 1 点步数。');
   }
+  return true;
+}
+
+export function canEnterPossession(state: GameState): boolean {
+  return (
+    state.phase === 'playing' &&
+    mechanicId(state) === 'stalker' &&
+    !state.possessed &&
+    state.stalkMeter >= 100
+  );
+}
+
+export function enterPossession(state: GameState): boolean {
+  if (!canEnterPossession(state)) return false;
+  state.possessed = true;
+  log(state, '恶魔附身：面具合拢，你可以直接处决同房间的人类。');
+  return true;
+}
+
+/** 基础攻击：消耗 1 点能量，攻击当前房间的指定人物（默认优先标记目标）。 */
+export function basicAttack(state: GameState, personId?: string): boolean {
+  if (state.phase !== 'playing') return false;
+  if (state.energy < 1) {
+    log(state, '能量不足：基础攻击需要 1 点能量。');
+    return false;
+  }
+
+  const here = peopleInRoom(state, state.playerRoom).filter((p) => p.role !== 'police' && p.hp > 0);
+  const victim = (personId ? here.find((p) => p.id === personId) : findVictim(state, state.playerRoom));
+  if (!victim || victim.role === 'police') {
+    log(state, '当前房间没有可以攻击的人类。');
+    return false;
+  }
+
+  if (state.possessed && mechanicId(state) === 'stalker') {
+    killPerson(state, victim);
+    addWanted(state, 1);
+    state.possessed = false;
+    state.stalkMeter = 0;
+    state.stalkTargetId = null;
+    log(state, `恶魔附身：你处决了 ${victim.name}，附身结束，尾随值清零。`);
+    checkImmediateWin(state);
+    return true;
+  }
+
+  state.energy -= 1;
+  log(state, `基础攻击：你扑向 ${victim.name}（消耗 1 能量）。`);
+  damageVictim(state, 1, false, victim);
+  checkImmediateWin(state);
   return true;
 }
 
@@ -454,7 +542,9 @@ export function playCard(state: GameState, cardUid: string): boolean {
       break;
     case 'harvest':
       if (state.killsThisTurn > 0) {
-        const victims = peopleInRoom(state, state.playerRoom, 'target');
+        const victims = peopleInRoom(state, state.playerRoom, 'target').filter(
+          (v) => !(CABINET_ROOMS.includes(v.room) && v.role === 'civilian'),
+        );
         victims.forEach((v) => {
           v.hp -= 3 + state.bonusDamage;
           if (v.hp <= 0) killPerson(state, v);
@@ -465,10 +555,17 @@ export function playCard(state: GameState, cardUid: string): boolean {
         log(state, '本回合尚无击杀，连环收割没有发动。');
       }
       break;
-    case 'break_in':
+    case 'break_in': {
       state.freeMove = true;
-      log(state, '本回合移动无视相邻限制。');
+      const cleared = ROOM_MAP[state.playerRoom].neighbors.filter(
+        (room) => OBSTACLE_ROOMS.includes(room) && !state.clearedObstacles.includes(room),
+      );
+      cleared.forEach((room) => state.clearedObstacles.push(room));
+      log(state, cleared.length
+        ? `破门而入：障碍物已清除（${cleared.map(roomName).join('、')}），本回合移动无视相邻限制。`
+        : '本回合移动无视相邻限制。');
       break;
+    }
     case 'silence':
       state.discount = Math.min(2, state.discount + 1);
       log(state, '本回合后续卡牌费用 -1。');
@@ -487,7 +584,9 @@ export function playCard(state: GameState, cardUid: string): boolean {
       log(state, `你紧急撤离到${roomName(EXIT_ROOM)}。`);
       break;
     case 'mind_control': {
-      const target = state.people.find((p) => p.role === 'target' && p.room !== state.playerRoom);
+      const target = state.people.find(
+        (p) => p.role === 'target' && p.room !== state.playerRoom && !CABINET_ROOMS.includes(p.room),
+      );
       if (target) {
         target.room = state.playerRoom;
         log(state, `${target.name} 被引到${roomName(state.playerRoom)}。`);
@@ -655,9 +754,21 @@ export function endTurn(state: GameState): void {
     return;
   }
 
-  if (mechanicId(state) === 'stalker' && !state.killerRuntime.killUsed) {
-    addWanted(state, -1);
-    log(state, '无声尾随：这一回合没有出手，线索渐渐冷却，通缉值 -1。');
+  if (mechanicId(state) === 'stalker') {
+    if (state.possessed) {
+      state.possessed = false;
+      log(state, '恶魔附身：这一回合没有处决，附身自行消散。');
+    }
+    if (state.stalkMeter > 0) {
+      const decay = Math.min(state.stalkMeter, 8);
+      state.stalkMeter -= decay;
+      log(state, `尾随值随时间衰减 -${decay}（当前 ${state.stalkMeter}/100）。`);
+    }
+  }
+
+  if (TOTEM_ROOMS.includes(state.playerRoom)) {
+    state.bonusEnergyNextTurn = 1;
+    log(state, '图腾余响：下一回合额外获得 1 点能量。');
   }
 
   // 领路人会带一名同伴离开你的视线；被锁链钉住的人无法跟走。
@@ -700,7 +811,8 @@ export function endTurn(state: GameState): void {
   }
 
   state.turn += 1;
-  state.energy = state.maxEnergy;
+  state.energy = state.maxEnergy + state.bonusEnergyNextTurn;
+  state.bonusEnergyNextTurn = 0;
   state.steps = state.maxSteps;
   resetKillerRuntime(state);
   state.pinnedPeople = [];
