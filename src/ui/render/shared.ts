@@ -2,7 +2,7 @@ import { CARDS, CARD_MAP } from '../../game/cards';
 import { PERK_RARITY_BG, POWER_RARITY_BG, cardImage, characterImage, uiIcon } from '../../game/assetMap';
 import {
   ARCH_LABEL, BASE_AP, BLEEDOUT_TURNS, DOWNED_LOCK_TURNS, GOAL_LABEL, HEALTH_LABEL,
-  INTENT_LABEL, conditionOf, effectiveCost, isPersonVisible,
+  INTENT_LABEL, SURVIVOR_ITEM_LABEL, conditionOf, effectiveCost, isPersonVisible,
 } from '../../game/engine';
 import { KILLERS, type KillerProfile } from '../../game/killers';
 import { roomName } from '../../game/missions';

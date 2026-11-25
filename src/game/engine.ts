@@ -1,6 +1,9 @@
 import { random, randomOf, shuffle } from './random';
 import { nearestOf, roomDistance } from './navigation';
-import { ESCAPE_ROOMS } from './constants';
+import { ESCAPE_ROOMS, BASE_AP, SABOTAGE_COST, ITEM_BOX_CHARGES, GENERATOR_JAM_TURNS } from './constants';
+import { drawCards } from './deck';
+import { createGame } from './setup';
+export { drawCards, createGame } from './setup';
 import { createPeople, itemUsesFor } from './npc/factory';
 import { ARCH_DESC, ARCH_LABEL, GOAL_LABEL, HEALTH_LABEL, INTENT_LABEL, SITE_ITEM_LABEL, SURVIVOR_ITEM_LABEL } from './npc/catalog';
 export { ARCH_DESC, ARCH_LABEL, GOAL_LABEL, HEALTH_LABEL, INTENT_LABEL, SITE_ITEM_LABEL, SURVIVOR_ITEM_LABEL } from './npc/catalog';
@@ -21,7 +24,6 @@ import {
   ROOMS,
   TOTEM_ROOMS,
   WEAPON_ROOMS,
-  buildLayout,
 } from './rooms';
 import { SURVIVOR_MAP } from './survivors';
 import type {
@@ -63,8 +65,6 @@ export const ATTACK_COST = 1;
 export const SEARCH_COST = 1;
 /** 恶魔附身持续回合：期间挥刀伤害翻倍，健康的人一刀倒地 */
 export const POSSESS_TURNS = 3;
-/** 每回合基础行动点：走路、砍人、打牌、搜索全从这一个池子里扣 */
-export const BASE_AP = 4;
 /**
  * 一个人一回合最多能跑几间屋（含被砍后夺路而逃的那两步）。
  * 玩家一回合 4 点行动点，这个数字必须比它能走的格数小，否则永远追不上；
@@ -141,11 +141,8 @@ function teamWorkGain(state: GameState): number {
 }
 
 /* ---------- 场地物品：道具箱 / 发电机 ---------- */
-/** 砸掉一件设施要花 1 点行动点，算一次玩家行动 */
-export const SABOTAGE_COST = 1;
 /** 每局两个道具箱，每个能发三件东西 */
 const ITEM_BOX_COUNT = 2;
-export const ITEM_BOX_CHARGES = 3;
 /** 发电机每局随机 1~2 台 */
 const GENERATOR_MIN = 1;
 const GENERATOR_MAX = 2;
@@ -157,7 +154,6 @@ const GENERATOR_CHARGED_BONUS = 26;
 const SABOTAGE_GEN_LOSS = 45;
 const SABOTAGE_TEAM_LOSS = 22;
 /** 砸坏后停机几回合，这段时间修不了 */
-export const GENERATOR_JAM_TURNS = 2;
 
 /* ==================================================================== */
 /*  小工具                                                              */
@@ -2229,156 +2225,6 @@ function useSurvivorItem(state: GameState, person: Person): boolean {
       return false;
   }
   return false;
-}
-
-export function drawCards(state: GameState, count: number): void {
-  for (let i = 0; i < count; i++) {
-    if (state.drawPile.length === 0) {
-      if (state.discardPile.length === 0) break;
-      state.drawPile = shuffle(state.discardPile);
-      state.discardPile = [];
-      log(state, '弃牌堆重新洗入牌库。');
-    }
-    const card = state.drawPile.pop();
-    if (card) state.hand.push(card);
-  }
-}
-
-export function createGame(
-  deckIds: string[],
-  mission = generateMission(),
-  killer = '迈克尔·迈尔斯',
-): GameState {
-  // 先重新排一遍户型：每一局的房子都不一样，之后所有人都在新户型上出生
-  buildLayout();
-
-  const pile = shuffle(deckIds.filter((id) => CARD_MAP[id])).map<CardInstance>((defId) => ({
-    uid: uid('card'),
-    defId,
-  }));
-  const killerId = KILLER_MAP[killer] ? killer : '迈克尔·迈尔斯';
-  const state: GameState = {
-    phase: 'playing',
-    killer: killerId,
-    killerRuntime: { killUsed: false, moveUsed: false, attackUsed: false, witnessUsed: false },
-    // 逮捕阈值已废弃（警戒与逮捕合并），保留字段只为兼容旧存档
-    arrestThreshold: 5 + (mission.targetCount ?? 1),
-    turn: 1,
-    // 走路 / 砍人 / 打牌 / 搜索共用这一个池子，原来「能量 + 步数」两套资源合并
-    energy: BASE_AP,
-    maxEnergy: BASE_AP,
-    // 与初始 alarm:12 对齐：wanted 只是暴露度 /10 的镜像
-    wanted: 2,
-    heatTurn: 0,
-    policeLock: 0,
-    ambushTurn: 0,
-    senseTurn: 0,
-    attackReady: true,
-    trailClock: 0,
-    frenzy: 0,
-    trails: [],
-    playerRoom: ENTRY_ROOM,
-    people: createPeople(mission),
-    hand: [],
-    drawPile: pile,
-    discardPile: [],
-    mission,
-    log: [],
-    kills: 0,
-    killsThisTurn: 0,
-    evidence: 0,
-    markedKilled: 0,
-    decoyRoom: null,
-    freeMove: false,
-    discount: 0,
-    bonusDamage: 0,
-    noAlarmTurn: false,
-    alarmSilencedUntilTurn: 0,
-    lastCrimeRoom: null,
-    result: null,
-    score: 0,
-    scoreBreakdown: [],
-    rewardCards: [],
-    phoneCut: false,
-    wiretap: false,
-    poltergeist: false,
-    policeBlocked: false,
-    pinnedPeople: [],
-    stalkMeter: 0,
-    stalkTargetId: null,
-    possessed: false,
-    possessTurns: 0,
-    bonusEnergyNextTurn: 0,
-    clearedObstacles: [],
-    escaped: 0,
-    barricades: [],
-    exitBlockedTurns: 0,
-    stunTurns: 0,
-    blindTurns: 0,
-    chaseTargetId: null,
-    chaseTurns: 0,
-    guardingTurns: 0,
-    nightfallActive: false,
-    lastAttackedId: null,
-    policeAssaulted: false,
-    cooldowns: {},
-    roomLocks: {},
-    revealedThisTurn: false,
-    resultReason: '',
-    alarm: 12,
-    explored: [ENTRY_ROOM, ...ROOM_MAP[ENTRY_ROOM].neighbors],
-    scouted: {},
-    noiseRoom: null,
-    sabotage: [],
-    frenzyStreak: 0,
-    disturbances: [],
-    objectiveRooms: [],
-    teamProgress: 0,
-    teamGoalLabel: '',
-    siteItems: [],
-  };
-  // 团队目标：随机挑 3 间房作为「电闸 / 钥匙柜」，再给每个人派一个个人目的。
-  // 不定死：有人修装置、有人找钥匙，也有人只是想报警或躲起来。
-  const objPool = ROOMS.map((r) => r.id).filter(
-    (id) => id !== ENTRY_ROOM && id !== EXIT_ROOM && !ESCAPE_ROOMS.includes(id) && !isObstacle(id),
-  );
-  state.objectiveRooms = shuffle(objPool).slice(0, 3);
-  state.teamGoalLabel = randomOf(['修好电闸', '凑齐后门钥匙', '接通无线电']);
-
-  // 场地物品：道具箱固定 2 个，发电机随机 1~2 台，撒在能走的房间里。
-  // 杀手用不了它们，但能砸——去哪边、什么时候砸，多了一层取舍。
-  const sitePool = shuffle(objPool.filter((id) => !state.objectiveRooms.includes(id)));
-  const genCount = GENERATOR_MIN + Math.floor(random() * (GENERATOR_MAX - GENERATOR_MIN + 1));
-  const items: SiteItem[] = [];
-  for (let i = 0; i < ITEM_BOX_COUNT; i++) {
-    const room = sitePool.pop();
-    if (room) {
-      items.push({ id: `box-${i}`, kind: 'itemBox', room, broken: false, charges: ITEM_BOX_CHARGES, progress: 0, charged: false, jammedTurns: 0 });
-    }
-  }
-  for (let i = 0; i < genCount; i++) {
-    const room = sitePool.pop();
-    if (room) {
-      items.push({ id: `gen-${i}`, kind: 'generator', room, broken: false, charges: 0, progress: 0, charged: false, jammedTurns: 0 });
-    }
-  }
-  state.siteItems = items;
-
-  state.people
-    .filter((p) => p.role !== 'police')
-    .forEach((p) => {
-      const roll = random();
-      if (roll < 0.26) p.goal = 'supply';
-      else if (roll < 0.46) p.goal = 'generator';
-      else if (roll < 0.68) p.goal = 'objective';
-      else if (roll < 0.8) p.goal = 'key';
-    });
-  drawCards(state, 5);
-  log(state, `契约已接取：${mission.title}`);
-  log(state, `你以「${killerId}」的身份行动。每回合 ${BASE_AP} 点行动点：走路、挥刀、出牌、搜索柜子都从这里扣。`);
-  log(state, `他们也在忙自己的事：${state.teamGoalLabel}就会集体从后门逃走。留意乌鸦叫和地板响，那是有人刚经过。`);
-  log(state, `屋里有 ${items.filter((i) => i.kind === 'itemBox').length} 个道具箱、${genCount} 台发电机：他们会靠这些翻盘，你只能砸掉它们（${SABOTAGE_COST} 点行动点）。`);
-  return state;
 }
 
 /* ==================================================================== */
