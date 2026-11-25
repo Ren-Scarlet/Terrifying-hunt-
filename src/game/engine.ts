@@ -20,6 +20,7 @@ import type {
   PersonRole,
   ResultKind,
   RoomId,
+  ScoreLine,
 } from './types';
 
 let uidCounter = 0;
@@ -69,12 +70,13 @@ function witnessWanted(state: GameState, base: number): number {
   return Math.max(0, gain);
 }
 
-function peopleInRoom(state: GameState, room: RoomId, role?: 'target' | 'civilian' | 'police'): Person[] {
+function peopleInRoom(state: GameState, room: RoomId, role?: PersonRole): Person[] {
   return state.people.filter((p) => p.room === room && (!role || p.role === role));
 }
 
-function findVictim(state: GameState, room: RoomId): Person | undefined {
-  const here = peopleInRoom(state, room);
+/** 挑一个可以下手的对象：优先标记目标，其次普通目标，最后平民；maxHp 用于「最后一刀」这类限定条件。 */
+function findVictim(state: GameState, room: RoomId, maxHp = Infinity): Person | undefined {
+  const here = peopleInRoom(state, room).filter((p) => p.role !== 'police' && p.hp <= maxHp);
   return (
     here.find((p) => p.role === 'target' && p.marked) ??
     here.find((p) => p.role === 'target') ??
@@ -86,11 +88,19 @@ function addWanted(state: GameState, amount: number): void {
   state.wanted = clamp(state.wanted + amount, 0, 10);
 }
 
-/** 让一个人从当前房间逃向相邻房间（不进入玩家所在房间与封锁房间）。 */
+/** 障碍房间：只有被清除过，NPC 与玩家才能自由进出。 */
+function isObstacle(room: RoomId): boolean {
+  return OBSTACLE_ROOMS.includes(room);
+}
+
+/** 让一个人从当前房间逃向相邻房间（不进入玩家所在房间、封锁房间与未清除的障碍房）。 */
 function fleePerson(state: GameState, person: Person): boolean {
   if (state.pinnedPeople.includes(person.id)) return false;
   const options = ROOM_MAP[person.room].neighbors.filter(
-    (r) => r !== state.playerRoom && !state.lockedRooms.includes(r),
+    (r) =>
+      r !== state.playerRoom &&
+      !state.lockedRooms.includes(r) &&
+      (!isObstacle(r) || state.clearedObstacles.includes(r)),
   );
   if (!options.length) return false;
   const from = roomName(person.room);
@@ -104,7 +114,7 @@ function fleePerson(state: GameState, person: Person): boolean {
 /** 玩家当前是否处于不易被察觉的状态。 */
 function playerIsHidden(state: GameState): boolean {
   const id = mechanicId(state);
-  if (state.noAlarmTurn || state.firstTurnSilent) return true;
+  if (state.noAlarmTurn) return true;
   if ((id === 'wraith' || id === 'rift') && state.killerRuntime.moveUsed) return true;
   if ((id === 'nightfall' || id === 'shock') && !state.killerRuntime.witnessUsed) return true;
   return false;
@@ -152,6 +162,7 @@ function npcOnPlayerEnter(state: GameState): void {
 
 function killPerson(state: GameState, person: Person, fromCurse = false): void {
   state.people = state.people.filter((p) => p.id !== person.id);
+  state.pinnedPeople = state.pinnedPeople.filter((id) => id !== person.id);
   state.kills += 1;
   state.killsThisTurn += 1;
   if (person.marked) state.markedKilled += 1;
@@ -182,19 +193,11 @@ function killPerson(state: GameState, person: Person, fromCurse = false): void {
   }
 }
 
-function damageVictim(
-  state: GameState,
-  amount: number,
-  onlyWounded = false,
-  chosenVictim?: Person,
-): boolean {
-  const victim = chosenVictim ?? findVictim(state, state.playerRoom);
+/** maxHp 用于限定可选目标的生命上限（如「最后一刀」）。 */
+function damageVictim(state: GameState, amount: number, maxHp = Infinity): boolean {
+  const victim = findVictim(state, state.playerRoom, maxHp);
   if (!victim) {
-    log(state, '当前房间没有可下手的目标。');
-    return false;
-  }
-  if (onlyWounded && victim.hp > 2) {
-    log(state, `${victim.name} 伤势不重，最后一刀没有奏效。`);
+    log(state, maxHp === Infinity ? '当前房间没有可下手的目标。' : `当前房间没有生命值不高于 ${maxHp} 的目标。`);
     return false;
   }
   let damage = amount + state.bonusDamage;
@@ -259,7 +262,6 @@ function makePerson(s: (typeof SURVIVORS)[number], role: PersonRole, room: RoomI
 }
 
 function createPeople(mission: Mission): Person[] {
-  const rooms = shuffle(ROOMS.map((r) => r.id));
   const markedCount = mission.kind === 'assassinate' ? mission.targetCount ?? 2 : 1;
 
   // 每局至少安排两名知名角色，他们具备会改变局势的威胁能力。
@@ -267,15 +269,25 @@ function createPeople(mission: Mission): Person[] {
   const rest = shuffle(SURVIVORS.filter((s) => !featured.some((f) => f.id === s.id)));
   const cast = [...featured, ...rest];
 
+  // 障碍房间不能作为出生点：否则没有「破窗而入」的牌组会直接陷入无法通关的局面。
+  const spawnRooms = shuffle(ROOMS.map((r) => r.id).filter((id) => !isObstacle(id)));
+  const used: RoomId[] = [];
+  const nextRoom = (): RoomId => {
+    const pool = spawnRooms.filter((r) => !used.includes(r));
+    const room = pool.length ? randomOf(pool) : randomOf(spawnRooms);
+    if (!used.includes(room)) used.push(room);
+    return room;
+  };
+
   const people: Person[] = [];
-  cast.slice(0, markedCount).forEach((s, i) => {
-    people.push(makePerson(s, 'target', rooms[i + 2] ?? rooms[i], 4, true));
+  cast.slice(0, markedCount).forEach((s) => {
+    people.push(makePerson(s, 'target', nextRoom(), 4, true));
   });
-  cast.slice(markedCount, markedCount + 2).forEach((s, i) => {
-    people.push(makePerson(s, 'target', rooms[(i + 3) % rooms.length], 4, false));
+  cast.slice(markedCount, markedCount + 2).forEach((s) => {
+    people.push(makePerson(s, 'target', nextRoom(), 4, false));
   });
-  cast.slice(markedCount + 2, markedCount + 6).forEach((s, i) => {
-    people.push(makePerson(s, 'civilian', rooms[(i + 5) % rooms.length], 2, false));
+  cast.slice(markedCount + 2, markedCount + 6).forEach((s) => {
+    people.push(makePerson(s, 'civilian', nextRoom(), 2, false));
   });
 
   people.push({
@@ -310,7 +322,10 @@ export function createGame(
   mission = generateMission(),
   killer = '迈克尔·迈尔斯',
 ): GameState {
-  const pile = shuffle(deckIds).map<CardInstance>((defId) => ({ uid: uid('card'), defId }));
+  const pile = shuffle(deckIds.filter((id) => CARD_MAP[id])).map<CardInstance>((defId) => ({
+    uid: uid('card'),
+    defId,
+  }));
   const killerId = KILLER_MAP[killer] ? killer : '迈克尔·迈尔斯';
   const mid = KILLER_MAP[killerId].mechanic.id;
   const state: GameState = {
@@ -336,7 +351,6 @@ export function createGame(
     evidence: 0,
     ritualStreak: 0,
     markedKilled: 0,
-    targetEscaped: false,
     decoyRoom: null,
     lockedRooms: [],
     freeMove: false,
@@ -346,12 +360,11 @@ export function createGame(
     lastCrimeRoom: null,
     result: null,
     score: 0,
+    scoreBreakdown: [],
     rewardCards: [],
     phoneCut: false,
     wiretap: false,
     poltergeist: false,
-    firstTurnSilent: false,
-    luredRoom: null,
     policeBlocked: false,
     pinnedPeople: [],
     stalkMeter: 0,
@@ -379,7 +392,7 @@ export function canMoveTo(state: GameState, room: RoomId): boolean {
   if (room === state.playerRoom) return false;
   if (state.freeMove) return true;
   const id = mechanicId(state);
-  if (OBSTACLE_ROOMS.includes(room) && !state.clearedObstacles.includes(room)) {
+  if (isObstacle(room) && !state.clearedObstacles.includes(room)) {
     if (!(id === 'stalker' && state.possessed)) return false;
   }
   if ((id === 'wraith' || id === 'rift') && !state.killerRuntime.moveUsed) return true;
@@ -396,9 +409,9 @@ export function movePlayer(state: GameState, room: RoomId): boolean {
   const firstMove = !state.killerRuntime.moveUsed;
   const phaseThroughWall = (id === 'wraith' || id === 'rift') && firstMove && !state.freeMove;
 
-  if (OBSTACLE_ROOMS.includes(room) && !state.clearedObstacles.includes(room) && id === 'stalker' && state.possessed) {
+  if (isObstacle(room) && !state.clearedObstacles.includes(room)) {
     state.clearedObstacles.push(room);
-    log(state, `恶魔附身：你徒手拆开${roomName(room)}的障碍物，闯了进去。`);
+    log(state, `你弄开了${roomName(room)}的障碍物，闯了进去。`);
   }
   if (id === 'trapper' && firstMove) {
     const left = state.playerRoom;
@@ -418,7 +431,7 @@ export function movePlayer(state: GameState, room: RoomId): boolean {
   npcOnPlayerEnter(state);
 
   if (id === 'stalker' && !state.possessed) {
-    const observed = peopleInRoom(state, room, 'target').concat(peopleInRoom(state, room, 'civilian'));
+    const observed = peopleInRoom(state, room).filter((p) => p.role !== 'police' && p.hp > 0);
     if (observed.length > 0) {
       let gain = 12 + observed.length * 8;
       if (state.stalkTargetId && observed.some((p) => p.id === state.stalkTargetId)) gain += 10;
@@ -433,6 +446,9 @@ export function movePlayer(state: GameState, room: RoomId): boolean {
     state.steps += 1;
     log(state, '梦中追猎：额外获得 1 点步数。');
   }
+
+  // 走进撤离点本身就是完成条件，不必再等一个回合。
+  checkImmediateWin(state);
   return true;
 }
 
@@ -543,7 +559,7 @@ export function useKillerAbility(state: GameState): boolean {
       victims.forEach((v) => {
         if (!state.pinnedPeople.includes(v.id)) state.pinnedPeople.push(v.id);
       });
-      log(state, `锁链拷问：${victims.length} 人被钉在原地，下回合无法逃离。`);
+      log(state, `锁链拷问：${victims.length} 人被钉在原地，本回合无法逃离。`);
       return true;
     }
     default:
@@ -555,15 +571,50 @@ function randomNeighbor(room: RoomId): RoomId {
   return randomOf(ROOM_MAP[room].neighbors);
 }
 
+function lureTarget(state: GameState): Person | undefined {
+  return (
+    state.people.find((p) => p.role === 'target' && p.marked && !CABINET_ROOMS.includes(p.room)) ??
+    state.people.find((p) => p.role === 'target' && !CABINET_ROOMS.includes(p.room))
+  );
+}
+
+function controlTarget(state: GameState): Person | undefined {
+  return state.people.find(
+    (p) => p.role === 'target' && p.room !== state.playerRoom && !CABINET_ROOMS.includes(p.room),
+  );
+}
+
+/**
+ * 出牌前的条件检查：不满足时直接返回提示，既不消耗能量也不弃牌，
+ * 避免「最后一刀」「连环收割」这类有条件卡牌空放。
+ */
+const PRECHECKS: Record<string, (state: GameState) => string | null> = {
+  execute: (s) => (findVictim(s, s.playerRoom) ? null : '当前房间没有可以灭口的人。'),
+  final_blow: (s) =>
+    findVictim(s, s.playerRoom, 2) ? null : '当前房间没有生命值不高于 2 的目标，最后一刀没有出手。',
+  harvest: (s) => (s.killsThisTurn > 0 ? null : '本回合还没有击杀，连环收割无法发动。'),
+  mind_control: (s) => (controlTarget(s) ? null : '没有可以被操控的目标。'),
+  lure: (s) => (lureTarget(s) ? null : '现场已经没有可以被引开的目标。'),
+};
+
 export function playCard(state: GameState, cardUid: string): boolean {
   if (state.phase !== 'playing') return false;
   const index = state.hand.findIndex((c) => c.uid === cardUid);
   if (index < 0) return false;
   const card = state.hand[index];
   const def = CARD_MAP[card.defId];
+  if (!def) {
+    state.hand.splice(index, 1);
+    return false;
+  }
   const cost = effectiveCost(card.defId, state);
   if (cost > state.energy) {
     log(state, `能量不足：${def.name} 需要 ${cost} 点。`);
+    return false;
+  }
+  const blocked = PRECHECKS[card.defId]?.(state);
+  if (blocked) {
+    log(state, blocked);
     return false;
   }
 
@@ -598,14 +649,12 @@ export function playCard(state: GameState, cardUid: string): boolean {
       }
       break;
     case 'execute': {
-      const victim = findVictim(state, state.playerRoom);
-      if (victim) {
-        killPerson(state, victim);
-        addWanted(state, 3);
-        log(state, '灭口完成，但现场留下了明显痕迹。');
-      } else {
-        log(state, '当前房间没有目标，灭口失败。');
-      }
+      const victim = findVictim(state, state.playerRoom)!;
+      const before = state.wanted;
+      killPerson(state, victim);
+      // 卡面写「通缉值 +3」：补足击杀本身带来的增长，让净增正好是 3。
+      addWanted(state, Math.max(0, before + 3 - state.wanted));
+      log(state, '灭口完成，但现场留下了明显痕迹。');
       break;
     }
     case 'intimidate':
@@ -630,25 +679,21 @@ export function playCard(state: GameState, cardUid: string): boolean {
       drawCards(state, 1);
       log(state, '你抽了 1 张牌。');
       break;
-    case 'harvest':
-      if (state.killsThisTurn > 0) {
-        const victims = peopleInRoom(state, state.playerRoom, 'target').filter(
-          (v) => !(CABINET_ROOMS.includes(v.room) && v.role === 'civilian'),
-        );
-        victims.forEach((v) => {
-          v.hp -= 3 + state.bonusDamage;
-          if (v.hp <= 0) killPerson(state, v);
-        });
-        state.bonusDamage = 0;
-        log(state, `收割波及 ${victims.length} 名目标。`);
-      } else {
-        log(state, '本回合尚无击杀，连环收割没有发动。');
-      }
+    case 'harvest': {
+      const victims = peopleInRoom(state, state.playerRoom, 'target');
+      victims.forEach((v) => {
+        v.hp -= 3 + state.bonusDamage;
+        if (v.hp <= 0) killPerson(state, v);
+        else log(state, `收割波及 ${v.name}，剩余生命 ${v.hp}。`);
+      });
+      state.bonusDamage = 0;
+      log(state, `收割波及 ${victims.length} 名目标。`);
       break;
+    }
     case 'break_in': {
       state.freeMove = true;
       const cleared = ROOM_MAP[state.playerRoom].neighbors.filter(
-        (room) => OBSTACLE_ROOMS.includes(room) && !state.clearedObstacles.includes(room),
+        (room) => isObstacle(room) && !state.clearedObstacles.includes(room),
       );
       cleared.forEach((room) => state.clearedObstacles.push(room));
       log(state, cleared.length
@@ -660,10 +705,14 @@ export function playCard(state: GameState, cardUid: string): boolean {
       state.discount = Math.min(2, state.discount + 1);
       log(state, '本回合后续卡牌费用 -1。');
       break;
-    case 'fear':
+    case 'fear': {
       state.noAlarmTurn = true;
-      log(state, '恐惧在相邻房间蔓延，本回合无人报警。');
+      peopleInRoom(state, state.playerRoom).forEach((p) => {
+        p.alert = Math.max(0, p.alert - 20);
+      });
+      log(state, '恐惧在房子里蔓延：本回合无人报警，房间里的人警觉 -20。');
       break;
+    }
     case 'aim':
       state.bonusDamage += 2;
       log(state, '下次攻击伤害 +2。');
@@ -674,21 +723,15 @@ export function playCard(state: GameState, cardUid: string): boolean {
       log(state, `你紧急撤离到${roomName(EXIT_ROOM)}。`);
       break;
     case 'mind_control': {
-      const target = state.people.find(
-        (p) => p.role === 'target' && p.room !== state.playerRoom && !CABINET_ROOMS.includes(p.room),
-      );
-      if (target) {
-        target.room = state.playerRoom;
-        target.alert = 15;
-        target.activity = '被引到门边，还在犹豫';
-        log(state, `${target.name} 被引到${roomName(state.playerRoom)}，暂时没有察觉。`);
-      } else {
-        log(state, '没有可被操控的目标。');
-      }
+      const target = controlTarget(state)!;
+      target.room = state.playerRoom;
+      target.alert = 15;
+      target.activity = '被引到门边，还在犹豫';
+      log(state, `${target.name} 被引到${roomName(state.playerRoom)}，暂时没有察觉。`);
       break;
     }
     case 'final_blow':
-      damageVictim(state, 5, true);
+      damageVictim(state, 5, 2);
       break;
     case 'search':
       state.evidence += 1;
@@ -701,20 +744,14 @@ export function playCard(state: GameState, cardUid: string): boolean {
       log(state, '电话线被剪断：本局目击造成的通缉增长 -1。');
       break;
     case 'lure': {
-      const target =
-        state.people.find((p) => p.role === 'target' && p.marked) ??
-        state.people.find((p) => p.role === 'target');
+      const target = lureTarget(state)!;
       const options = (['attic', 'storage', 'kitchen', 'study'] as RoomId[]).filter(
         (r) => r !== state.playerRoom,
       );
-      if (target && options.length) {
-        target.room = randomOf(options);
-        target.alert = 0;
-        target.activity = '朝声响处张望';
-        log(state, `你在${roomName(target.room)}制造声响，${target.name}被吸引过去，警觉暂时降低。`);
-      } else {
-        log(state, '现场已经没有可以被引开的目标。');
-      }
+      target.room = randomOf(options);
+      target.alert = 0;
+      target.activity = '朝声响处张望';
+      log(state, `你在${roomName(target.room)}制造声响，${target.name}被吸引过去，警觉清零。`);
       break;
     }
     case 'wiretap':
@@ -775,7 +812,7 @@ function policeNextStep(state: GameState): RoomId {
       if (state.lockedRooms.includes(next) && next !== destination) continue;
       visited.add(next);
       const newPath = [...path, next];
-      if (next === destination) return path.length === 1 ? next : newPath[1];
+      if (next === destination) return newPath[1];
       queue.push(newPath);
     }
   }
@@ -799,7 +836,10 @@ function npcPatrolPhase(state: GameState): void {
       }
       if (person.alert < 25 && Math.random() < 0.35) {
         const options = ROOM_MAP[person.room].neighbors.filter(
-          (r) => r !== state.playerRoom && !state.lockedRooms.includes(r),
+          (r) =>
+            r !== state.playerRoom &&
+            !state.lockedRooms.includes(r) &&
+            (!isObstacle(r) || state.clearedObstacles.includes(r)),
         );
         if (options.length) {
           const from = roomName(person.room);
@@ -839,7 +879,7 @@ function policePhase(state: GameState): void {
 }
 
 function witnessPhase(state: GameState): void {
-  if (state.noAlarmTurn || (state.firstTurnSilent && state.turn === 1)) {
+  if (state.noAlarmTurn) {
     log(state, '目击者保持沉默。');
     return;
   }
@@ -873,13 +913,15 @@ function witnessPhase(state: GameState): void {
   const base = alarmWitness ? 3 : 2;
   const gain = witnessWanted(state, base);
   addWanted(state, gain);
+  // 现场就是最新犯罪现场，警察下一步会朝这里走（decoyRoom 只用于「伪造线索 / 诱饵」）。
   state.lastCrimeRoom = state.playerRoom;
   log(state, `${witness.name} 目击了你，通缉值 +${gain}${alarmWitness ? '（报警者）' : ''}。`);
   if (alarmWitness) {
-    state.decoyRoom = witness.room;
     log(state, `${witness.name} 直接报出了这间房，警察正在赶来。`);
   }
-  const escapeRooms = ROOM_MAP[witness.room].neighbors.filter((r) => r !== state.playerRoom);
+  const escapeRooms = ROOM_MAP[witness.room].neighbors.filter(
+    (r) => r !== state.playerRoom && (!isObstacle(r) || state.clearedObstacles.includes(r)),
+  );
   if (escapeRooms.length) witness.room = randomOf(escapeRooms);
 }
 
@@ -888,18 +930,30 @@ function finish(state: GameState, result: ResultKind): void {
   state.result = result;
   state.phase = 'gameover';
 
-  let score = state.mission.reward + state.kills * 10 - state.wanted * 3;
+  const lines: ScoreLine[] = [{ label: `契约基础分 · ${state.mission.title}`, value: state.mission.reward }];
+  lines.push({ label: `凶残 · 击杀 ${state.kills} 人`, value: state.kills * 10 });
+  if (state.wanted > 0) lines.push({ label: `通缉值 ${state.wanted} 的代价`, value: -state.wanted * 3 });
+
   if (result === 'win') {
-    score += (state.mission.turns - state.turn) * 5;
+    const bonus = (state.mission.turns - state.turn) * 5;
+    if (bonus > 0) lines.push({ label: `猎杀效率 · 剩余 ${state.mission.turns - state.turn} 回合`, value: bonus });
     state.rewardCards = [UNLOCK_REWARDS[state.mission.kind]].filter(Boolean);
   } else if (result === 'caught') {
-    score -= 80;
+    lines.push({ label: '被警察当场抓捕', value: -80 });
   } else if (result === 'timeout') {
-    score -= 50;
+    lines.push({ label: '任务超时', value: -50 });
   } else {
-    score -= 40;
+    lines.push({ label: '放弃任务', value: -40 });
   }
-  state.score = Math.max(0, Math.round(score));
+
+  state.scoreBreakdown = lines;
+  state.score = Math.max(0, Math.round(lines.reduce((sum, line) => sum + line.value, 0)));
+}
+
+/** 游戏进行中的实时预估分，和 finish() 的公式保持一致（不含结束时的加减项）。 */
+export function currentScore(state: GameState): number {
+  if (state.result) return state.score;
+  return Math.max(0, Math.round(state.mission.reward + state.kills * 10 - state.wanted * 3));
 }
 
 export function endTurn(state: GameState): void {
@@ -954,7 +1008,9 @@ export function endTurn(state: GameState): void {
           !state.pinnedPeople.includes(p.id),
       );
       if (!follower) return;
-      const options = ROOM_MAP[follower.room].neighbors.filter((r) => r !== state.playerRoom);
+      const options = ROOM_MAP[follower.room].neighbors.filter(
+        (r) => r !== state.playerRoom && (!isObstacle(r) || state.clearedObstacles.includes(r)),
+      );
       if (options.length) {
         follower.room = randomOf(options);
         log(state, `${leader.name} 带着 ${follower.name} 撤离到${roomName(follower.room)}。`);
@@ -982,6 +1038,10 @@ export function endTurn(state: GameState): void {
     return;
   }
 
+  // 手牌每回合弃掉重抽，避免玩家把整副牌囤在手里。
+  state.discardPile.push(...state.hand);
+  state.hand = [];
+
   state.turn += 1;
   state.energy = state.maxEnergy + state.bonusEnergyNextTurn;
   state.bonusEnergyNextTurn = 0;
@@ -994,18 +1054,6 @@ export function endTurn(state: GameState): void {
 
 export function giveUp(state: GameState): void {
   finish(state, 'failed');
-}
-
-export function startTurn(state: GameState): void {
-  state.energy = state.maxEnergy;
-  state.steps = state.maxSteps;
-  resetKillerRuntime(state);
-  state.freeMove = false;
-  state.discount = 0;
-  state.bonusDamage = 0;
-  state.noAlarmTurn = false;
-  state.killsThisTurn = 0;
-  drawCards(state, Math.max(0, 5 - state.hand.length));
 }
 
 export function getStars(score: number): number {

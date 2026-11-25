@@ -15,7 +15,7 @@
   --green: #57966a;
   --purple: #a06bc9;
   --radius: 12px;
-  font-family: 'Noto Sans SC', 'Microsoft YaHei', system-ui, sans-serif;
+  font-family: 'Microsoft YaHei', 'PingFang SC', 'Hiragino Sans GB', system-ui, -apple-system, sans-serif;
 }
 
 * { box-sizing: border-box; }
@@ -173,8 +173,16 @@ button { font-family: inherit; cursor: pointer; }
 .room-features { display: flex; gap: 6px; opacity: 1; }
 .room-feature { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 6px; background: #0009; border: 1px solid #ffffff1a; }
 .room-people { display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto; }
+/* 移动热区：用真实按钮铺满房间，键盘可直接聚焦，人物按钮叠在它上面 */
+.room-hit {
+  position: absolute; inset: 0; z-index: 1; padding: 0; margin: 0;
+  border: 0; background: transparent; border-radius: inherit;
+}
+.room-head, .room-desc, .room-features, .room-people { position: relative; z-index: 2; pointer-events: none; }
+.room-people .person-chip { pointer-events: auto; }
+.room-hit:focus-visible { outline: 2px solid var(--gold); outline-offset: -4px; }
 .door {
-  position: absolute; z-index: 4; border-radius: 2px;
+  position: absolute; z-index: 4; border-radius: 2px; pointer-events: none;
   background: linear-gradient(90deg, #d6ad3c, #8a6a1e);
   border: 1px solid #ffe6a0;
   box-shadow: 0 0 12px #d6ad3c99, inset 0 0 4px #0007;
@@ -334,6 +342,8 @@ button { font-family: inherit; cursor: pointer; }
 .killer-choice img { width: 44px; height: 44px; object-fit: contain; object-position: bottom center; filter: drop-shadow(0 4px 6px #000a); }
 .killer-choice.selected { border-color: var(--accent-2); box-shadow: 0 0 16px #b8322655, inset 0 0 0 1px #b8322655; }
 .killer-choice.locked { opacity: .55; }
+.killer-choice:disabled { cursor: not-allowed; }
+.killer-choice:disabled:hover { border-color: var(--line); }
 .killer-choice em { position: absolute; top: 4px; right: 6px; font-style: normal; font-size: 10px; color: var(--gold); }
 .killer-choice:hover { border-color: var(--gold); }
 .menu-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 14px; }
@@ -386,7 +396,11 @@ button { font-family: inherit; cursor: pointer; }
 .result-grid div { padding: 10px; background: #171a20; border-radius: 8px; border: 1px solid var(--line); }
 .result-grid small { color: var(--muted); display: block; }
 .result-grid b { font-size: 18px; }
-.bonus-row { display: flex; justify-content: center; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; font-size: 11px; color: #c9c4bb; }
+.score-breakdown { display: grid; gap: 6px; margin-bottom: 12px; font-size: 12px; }
+.score-line { display: flex; justify-content: space-between; gap: 12px; padding: 6px 10px; border-radius: 6px; background: #171a20; border: 1px solid var(--line); }
+.score-line span { color: #c9c4bb; }
+.score-line b { color: var(--gold); font-variant-numeric: tabular-nums; }
+.score-line.minus b { color: var(--accent-2); }
 
 .guide-modal { width: min(760px, 100%); }
 .guide-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 14px 0; }
@@ -445,4 +459,19 @@ button { font-family: inherit; cursor: pointer; }
   .floorplan { min-height: 400px; }
   .room-desc { display: none; }
   .menu-stats { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ---------- 无障碍兜底 ---------- */
+:where(button, [tabindex], a):focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+    scroll-behavior: auto !important;
+  }
 }

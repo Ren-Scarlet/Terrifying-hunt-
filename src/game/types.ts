@@ -37,9 +37,8 @@ export interface CardDef {
   type: CardType;
   desc: string;
   flavor: string;
-  /** 图鉴站图标对应的原技能名称；卡牌效果与机制为本项目原创。 */
-  sourceSkill?: string;
-  image?: string;
+  /** 图标对应的图鉴技能原名；卡牌效果与机制为本项目原创。 */
+  sourceSkill: string;
   unlocked: boolean;
 }
 
@@ -57,7 +56,6 @@ export interface Person {
   room: RoomId;
   hp: number;
   marked: boolean;
-  image?: string;
   /** 警觉度 0–100：越高越可能逃离玩家所在房间 */
   alert: number;
   /** 当前行为，用于档案与人物名单 */
@@ -93,6 +91,12 @@ export interface KillerRuntime {
   abilityUsed: boolean;
 }
 
+/** 结算面板上的一行明细 */
+export interface ScoreLine {
+  label: string;
+  value: number;
+}
+
 export type GamePhase = 'menu' | 'setup' | 'playing' | 'gameover';
 
 export type ResultKind = 'win' | 'caught' | 'timeout' | 'failed';
@@ -120,7 +124,6 @@ export interface GameState {
   evidence: number;
   ritualStreak: number;
   markedKilled: number;
-  targetEscaped: boolean;
   decoyRoom: RoomId | null;
   lockedRooms: RoomId[];
   freeMove: boolean;
@@ -130,13 +133,13 @@ export interface GameState {
   lastCrimeRoom: RoomId | null;
   result: ResultKind | null;
   score: number;
+  /** 结算面板的加分/扣分明细，由 finish() 生成 */
+  scoreBreakdown: ScoreLine[];
   rewardCards: string[];
 
   phoneCut: boolean;
   wiretap: boolean;
   poltergeist: boolean;
-  firstTurnSilent: boolean;
-  luredRoom: RoomId | null;
   policeBlocked: boolean;
   /** 被处刑者锁住、无法逃离的目标 */
   pinnedPeople: string[];

@@ -11,6 +11,7 @@ export interface AssetPaths {
 }
 
 export const ASSET_PATHS: AssetPaths = {
+  /** 一卡一图标：文件的 basename 与卡牌 id 相同 */
   cards: Object.keys(CARD_MAP).reduce(
     (acc, id) => {
       acc[id] = `assets/dbd/perks/${id}.png`;
@@ -24,11 +25,6 @@ export const ASSET_PATHS: AssetPaths = {
     player: 'assets/characters/michael-myers.webp',
   },
   ui: {
-    energy: 'assets/ui/energy.png',
-    wanted: 'assets/ui/wanted.png',
-    police: 'assets/ui/police.png',
-    evidence: 'assets/ui/evidence.png',
-    cardBack: 'assets/ui/card-back.png',
     mission: 'assets/ui/mission.png',
     missionTarget: 'assets/ui/mission-target.png',
     escape: 'assets/ui/escape.png',
@@ -45,8 +41,6 @@ export const ASSET_PATHS: AssetPaths = {
 };
 
 export function cardImage(defId: string): string | undefined {
-  const custom = CARD_MAP[defId]?.image;
-  if (custom) return `assets/dbd/perks/${custom}`;
   return ASSET_PATHS.cards[defId];
 }
 

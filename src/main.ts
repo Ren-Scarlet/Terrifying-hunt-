@@ -35,6 +35,10 @@ let shopOpen = false;
 let guideOpen = false;
 let editorDeck: string[] = [...save.deck];
 let resultApplied = false;
+/** 本局新解锁的卡牌，用于结算面板只提示真正新增的那张 */
+let lastNewCard: string | null = null;
+/** 信息面板当前展示的卡牌，避免同一张牌重复重绘 */
+let detailCardUid: string | null = null;
 
 const app = document.getElementById('app')!;
 
@@ -48,10 +52,11 @@ function render(): void {
     html = renderMenu(save);
   } else {
     html = renderGame(game, getKiller(save.killer));
-    if (screen === 'result') html += renderResult(game);
+    if (screen === 'result') html += renderResult(game, lastNewCard);
   }
   if (guideOpen) html += renderGuide();
   app.innerHTML = html;
+  detailCardUid = null;
 }
 
 function afterAction(): void {
@@ -69,7 +74,10 @@ function afterAction(): void {
         credits += Math.max(10, Math.round(game.score / 5));
         if (game.score >= 150) darkCells += 1;
         game.rewardCards.forEach((id) => {
-          if (CARD_MAP[id] && !unlocked.includes(id)) unlocked.push(id);
+          if (CARD_MAP[id] && !unlocked.includes(id)) {
+            unlocked.push(id);
+            lastNewCard = lastNewCard ?? id;
+          }
         });
       }
       save = { ...save, bestScore: newBest, wins, credits, darkCells, unlockedCards: unlocked };
@@ -83,7 +91,21 @@ function startGame(): void {
   game = createGame(save.deck, undefined, save.killer ?? '迈克尔·迈尔斯');
   screen = 'game';
   resultApplied = false;
+  lastNewCard = null;
   render();
+}
+
+function showCardDetail(uid: string | null): void {
+  const panel = document.getElementById('cardDetail');
+  if (!panel) return;
+  if (!uid) {
+    panel.innerHTML = defaultDetailHtml();
+    detailCardUid = null;
+    return;
+  }
+  if (detailCardUid === uid) return;
+  detailCardUid = uid;
+  if (game) panel.innerHTML = cardDetailHtml(game, uid);
 }
 
 app.addEventListener('click', (event) => {
@@ -101,6 +123,7 @@ app.addEventListener('click', (event) => {
     game = null;
     editorOpen = false;
     shopOpen = false;
+    lastNewCard = null;
     render();
     return;
   }
@@ -210,7 +233,10 @@ app.addEventListener('click', (event) => {
     const personId = target.dataset.personId;
     if (personId && game && screen === 'game') {
       const panel = document.getElementById('cardDetail');
-      if (panel) panel.innerHTML = personDetailHtml(game, personId);
+      if (panel) {
+        panel.innerHTML = personDetailHtml(game, personId);
+        detailCardUid = null;
+      }
     }
     return;
   }
@@ -228,7 +254,7 @@ app.addEventListener('click', (event) => {
   if (action === 'move') {
     const room = target.dataset.room as RoomId | undefined;
     if (room) movePlayer(game, room);
-    render();
+    afterAction();
     return;
   }
 
@@ -251,11 +277,11 @@ app.addEventListener('click', (event) => {
   }
 });
 
+/* 卡牌详情：鼠标悬停、键盘聚焦、触屏点按都能看见 */
 app.addEventListener('pointerover', (event) => {
   if (!game || screen !== 'game') return;
   const card = (event.target as HTMLElement).closest<HTMLElement>('[data-card-uid]');
-  const panel = document.getElementById('cardDetail');
-  if (card && panel) panel.innerHTML = cardDetailHtml(game, card.dataset.cardUid!);
+  if (card) showCardDetail(card.dataset.cardUid ?? null);
 });
 
 app.addEventListener('pointerout', (event) => {
@@ -263,16 +289,21 @@ app.addEventListener('pointerout', (event) => {
   if (!card) return;
   const to = event.relatedTarget as HTMLElement | null;
   if (to && to.closest('[data-card-uid]')) return;
-  const panel = document.getElementById('cardDetail');
-  if (panel) panel.innerHTML = defaultDetailHtml();
+  showCardDetail(null);
 });
 
-app.addEventListener('keydown', (event) => {
-  if (event.key !== 'Enter' && event.key !== ' ') return;
-  const target = (event.target as HTMLElement).closest<HTMLElement>('[data-action][role="button"]');
-  if (!target) return;
-  event.preventDefault();
-  target.click();
+app.addEventListener('focusin', (event) => {
+  if (!game || screen !== 'game') return;
+  const card = (event.target as HTMLElement).closest<HTMLElement>('[data-card-uid]');
+  if (card) showCardDetail(card.dataset.cardUid ?? null);
+});
+
+app.addEventListener('focusout', (event) => {
+  const card = (event.target as HTMLElement).closest<HTMLElement>('[data-card-uid]');
+  if (!card) return;
+  const to = event.relatedTarget as HTMLElement | null;
+  if (to && to.closest('[data-card-uid]')) return;
+  showCardDetail(null);
 });
 
 render();
