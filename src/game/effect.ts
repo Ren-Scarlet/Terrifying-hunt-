@@ -116,7 +116,8 @@ export type FlagKey =
   | 'exitBlocked'
   | 'clearBarricade'
   | 'freeMove'
-  | 'possessReady';
+  | 'possessReady'
+  | 'myersStalk';
 
 export type SabotageKey = 'phone' | 'exit' | 'radio' | 'lights';
 
