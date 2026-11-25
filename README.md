@@ -17,7 +17,7 @@ npm run preview    # 预览构建产物
 
 ```bash
 npm run check      # 约 3 秒：类型检查 + 11 条规则回归 + 39 局胜率抽样
-npm run check:full # 12 杀手 × 8 局，只用于最终平衡
+npm run check:full # 13 杀手 × 8 局，只用于最终平衡
 ```
 
 纯逻辑改动（卡牌数值、AI 反应、房间连通）跑 `check` 就够了。只有改了 CSS / 布局才需要开浏览器看图，
@@ -25,7 +25,7 @@ npm run check:full # 12 杀手 × 8 局，只用于最终平衡
 
 ## 玩法
 
-**一局 20–22 回合**。每回合 **7 点行动点（AP）**：走路、挥刀、出牌、搜索柜子全都从这一个池子里扣；回合结束弃掉手牌并重抽 5 张。原来「能量」和「行动点」是两套资源，现在合并——想多追几间屋就少出牌，想连砍就别乱跑。
+**一局 20–22 回合**。每回合 **4 点行动点（AP）**：走路、挥刀、出牌、搜索柜子全都从这一个池子里扣；回合结束弃掉手牌并重抽 5 张。原来「能量」和「行动点」是两套资源，现在合并——想多追几间屋就少出牌，想连砍就别乱跑。
 
 ### 击杀是流程，不是一张牌
 
@@ -258,7 +258,7 @@ scripts/
   ],
 ```
 
-**可选对象（who）**：`victim`（当前房间最优先的一人）、`lowestHpHere`、`highestAlert`（全场）、`targetsHere`、`civilsHere`、`allHere`、`markedAny`、`allAny`、`fleeing`、`randomAny`、`downedAny`（已经倒地的人）、`injuredAny`（受伤的人）。
+**可选对象（who）**：`victim`（当前房间最优先的一人）、`lowestHpHere`、`highestAlert`（全场）、`targetsHere`、`civilsHere`、`allHere`、`markedAny`、`allAny`、`fleeing`、`randomAny`、`downedHere`（当前房间倒地的人）、`downedAny`（全场倒地的人）、`injuredAny`（受伤的人）。
 
 **可用指令（op）**：
 
