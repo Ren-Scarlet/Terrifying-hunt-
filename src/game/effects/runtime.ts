@@ -299,7 +299,6 @@ export function executeOps(state: GameState, ops: Op[], runtime: EffectRuntime):
         target.alert = clamp(target.alert + 12, 0, 100);
         // 被追的人已经在你手边上了，不该再白拿一次「转身就跑」的反应，
         // 否则追击牌等于把人推得更远。
-        chasedId = target.id;
         onPlayerEnter(state, target.id);
         break;
       }

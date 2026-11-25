@@ -14,3 +14,6 @@ export const GENERATOR_JAM_TURNS = 2;
 export const ITEM_BOX_COUNT = 2;
 export const GENERATOR_MIN = 1;
 export const GENERATOR_MAX = 2;
+
+/** 恶魔附身的持续回合数。 */
+export const POSSESS_TURNS = 3;

@@ -1,12 +1,12 @@
 import { random, randomOf, shuffle } from './random';
 import { nearestOf, roomDistance } from './navigation';
-import { ESCAPE_ROOMS, BASE_AP, SABOTAGE_COST, ITEM_BOX_CHARGES, GENERATOR_JAM_TURNS } from './constants';
+import { ESCAPE_ROOMS, BASE_AP, SABOTAGE_COST, ITEM_BOX_CHARGES, GENERATOR_JAM_TURNS, POSSESS_TURNS } from './constants';
 import { drawCards } from './deck';
 import { executeOps } from './effects/runtime';
 import { createGame } from './setup';
 export { drawCards } from './deck';
 export { createGame } from './setup';
-export { BASE_AP, SABOTAGE_COST, ITEM_BOX_CHARGES, GENERATOR_JAM_TURNS } from './constants';
+export { BASE_AP, SABOTAGE_COST, ITEM_BOX_CHARGES, GENERATOR_JAM_TURNS, POSSESS_TURNS } from './constants';
 import { ACTIVITIES, createPeople, itemUsesFor } from './npc/factory';
 import { ARCH_DESC, ARCH_LABEL, GOAL_LABEL, HEALTH_LABEL, INTENT_LABEL, SITE_ITEM_LABEL, SURVIVOR_ITEM_LABEL } from './npc/catalog';
 export { ARCH_DESC, ARCH_LABEL, GOAL_LABEL, HEALTH_LABEL, INTENT_LABEL, SITE_ITEM_LABEL, SURVIVOR_ITEM_LABEL } from './npc/catalog';
@@ -66,8 +66,6 @@ const ESCAPE_ALERT_MIN = 35;
 /** 挥刀 / 搜索各自消耗 1 点行动点：唯一的伤害来源，不能免费 */
 export const ATTACK_COST = 1;
 export const SEARCH_COST = 1;
-/** 恶魔附身持续回合：期间挥刀伤害翻倍，健康的人一刀倒地 */
-export const POSSESS_TURNS = 3;
 /**
  * 一个人一回合最多能跑几间屋（含被砍后夺路而逃的那两步）。
  * 玩家一回合 4 点行动点，这个数字必须比它能走的格数小，否则永远追不上；
