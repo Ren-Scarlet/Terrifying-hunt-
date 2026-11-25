@@ -88,7 +88,7 @@ function caseDrawAndDiscardRules(): void {
   check('抽牌规则：主动抽 1 张消耗 1 AP', ok && draw.hand.length === before + 1 && draw.energy === 1, `hand=${draw.hand.length} AP=${draw.energy}`);
 
   const discard = newGame();
-  discard.hand = discard.hand.slice(0, HAND_LIMIT + 1);
+  discard.hand = [...discard.hand, ...discard.hand.slice(0, 2).map((card, index) => ({ ...card, uid: `${card.uid}-extra-${index}` }))];
   const denied = !drawCardAction(discard);
   const selected = discard.hand[0].uid;
   const dropped = discardCard(discard, selected);
@@ -118,7 +118,6 @@ function caseDrawAndDiscardRules(): void {
     check('回合结束：同屋幸存者即使移动次数用尽也会尝试逃跑', true, '没有可用出口，跳过');
   }
 }
-caseDrawAndDiscardRules();
 
 function caseNavigationUtilities(): void {
   const state = newGame();
@@ -900,6 +899,7 @@ function caseMergeAndMissions(): void {
 
 caseNavigationUtilities();
 caseMergeAndMissions();
+caseDrawAndDiscardRules();
 
 /** 本轮：人人可救援 / 主动赶去救 / 连杀之后团队进度被催快 */
 function caseAidAndPressure(): void {
