@@ -9,10 +9,18 @@ import {
 import {
   ALARM_MAX,
   ARCH_LABEL,
+  ATTACK_COST,
   ESCAPE_ROOMS,
+  FRENZY_AP_BONUS,
+  FRENZY_MAX,
+  FRENZY_THRESHOLD,
   GOAL_LABEL,
   HEALTH_LABEL,
   INTENT_LABEL,
+  SEARCH_COST,
+  TEAM_GOAL_MAX,
+  attackBlockReason,
+  canAttack,
   canMoveTo,
   canUsePower,
   conditionOf,
@@ -23,10 +31,17 @@ import {
   isPersonVisible,
   isRoomExplored,
   isRoomVisible,
+  isSensing,
   knownPeople,
   moveCost,
   powerBlockReason,
   powerCooldown,
+  visibleDisturbances,
+  visibleTrails,
+  SABOTAGE_COST,
+  SITE_ITEM_LABEL,
+  SURVIVOR_ITEM_LABEL,
+  sabotageBlockReason,
 } from '../game/engine';
 import { KILLERS, type KillerProfile } from '../game/killers';
 import { roomName } from '../game/missions';
@@ -113,9 +128,12 @@ export function getKiller(owner?: string): KillerProfile {
 
 export function defaultDetailHtml(): string {
   return detailCardHtml('信息面板', '悬停卡牌看完整效果 · 点人物看他的打算', '档案', [
-    '伤害只推进一档：健康 → 受伤 → 倒地。倒地的人不会自己死，要再补一次或用处决牌，否则会被同伴救起来。',
-    '看见你的幸存者会当场跑。想先手就用「静止隐身」伏击，人跑远了用「疾速残暴」贴上去——不打卡牌就只能硬追。',
-    '没进过的房间只有轮廓。完整规则在平面图右上的「玩法指引」里。',
+    '每回合 7 点行动点：走路、挥刀、出牌、搜索柜子全从这一个池子里扣。想多追几间屋就少出牌，想连砍就别乱跑。',
+    '伤害只有一个来源：左下角的「挥刀」（1 点行动点）。健康 → 受伤 → 倒地 → 补刀致死；砍完得先做别的事才能砍第二刀。卡牌只负责功能，不造成伤害。',
+    '相邻房间只看得见轮廓，看不见人。推门就是照面，人当场跑；追不上就低头看鞋印（只留最近两次行动），或者听哪间屋传来乌鸦叫——那是有人刚经过。',
+    '屋里的道具箱会给他们发道具（医疗包 / 工具箱 / 信号弹 / 钥匙 / 武器 / 烟雾弹），发电机会被他们修好、直接推一大截团队进度。你用不了这些，但可以花 1 点行动点砸掉：道具箱砸烂就再也发不出东西，发电机被砸会掉进度并停机两回合。',
+    '严格踩着脚印连续追才攒【杀戮】；随便走不涨。满 50 后每回合多 2 点行动点，路怎么走你自己点，不会替你瞬移。',
+    '他们也在忙自己的事：修电闸、凑钥匙、找后门。团队进度一旦做满，幸存者集体逃走，你就输了。有人藏进柜子时，点「搜索」翻出来（1 点行动点）。',
   ]);
 }
 
@@ -142,7 +160,7 @@ function intentDot(person: Person): string {
   return `<i class="intent-dot i-${person.intent}" title="${escape(INTENT_LABEL[person.intent])}"></i>`;
 }
 
-function personChip(person: Person): string {
+function personChip(person: Person, attackable = false): string {
   const cls =
     person.role === 'police'
       ? 'police'
@@ -153,9 +171,12 @@ function personChip(person: Person): string {
         : 'civilian';
   const img = characterImage(person.id);
   const health = conditionOf(person);
+  // 头顶上的警戒值：不用再翻日志判断这个人现在有多怕
+  const alertLevel = person.alert >= 70 ? 'high' : person.alert >= 35 ? 'mid' : 'low';
   const alertMark =
-    person.alert >= 70 ? '<span class="chip-alert high">!</span>'
-      : person.alert >= 35 ? '<span class="chip-alert">?</span>' : '';
+    person.role === 'police'
+      ? ''
+      : `<span class="chip-alert ${alertLevel}" title="警觉 ${person.alert}/100：越高越可能立刻逃跑">${person.alert}</span>`;
   const stateMark =
     health === 'downed'
       ? '<span class="chip-state downed" title="倒地：可以处决，也可能被救起">倒</span>'
@@ -163,11 +184,22 @@ function personChip(person: Person): string {
         ? '<span class="chip-state injured" title="受伤：再挨一下就会倒地">伤</span>'
         : '';
   const label = person.intent === 'idle' ? person.activity : INTENT_LABEL[person.intent];
-  return `<button type="button" class="person-chip ${cls} ${health === 'downed' ? 'is-downed' : ''}" data-action="person" data-person-id="${person.id}"
-    title="${escape(person.name)} · ${HEALTH_LABEL[health]} · 警觉 ${person.alert}/100 · ${escape(ARCH_LABEL[person.archetype])} · ${escape(GOAL_LABEL[person.goal])} · 正在${escape(label)}">
+  const note =
+    person.role === 'police'
+      ? ' · 警察：不能攻击，他会循着现场追你'
+      : attackable
+        ? ' · 点击对他挥刀'
+        : '';
+  return `<button type="button" class="person-chip ${cls} ${health === 'downed' ? 'is-downed' : ''} ${attackable ? 'can-hit' : ''}" data-action="person" data-person-id="${person.id}"${attackable ? ' data-attack="1"' : ''}
+    title="${escape(person.name)} · ${HEALTH_LABEL[health]} · 警觉 ${person.alert}/100 · ${escape(ARCH_LABEL[person.archetype])} · ${escape(GOAL_LABEL[person.goal])} · 正在${escape(label)}${note}">
     ${img ? `<img src="${img}" alt="" onerror="this.style.display='none'">` : ''}
-    <span>${escape(person.name)}</span>${intentDot(person)}${stateMark}${alertMark}
+    <span>${escape(person.name)}</span>${intentDot(person)}${stateMark}${alertMark}${person.item ? `<i class="chip-item" title="手里拿着${escape(SURVIVOR_ITEM_LABEL[person.item])}">${escape(SURVIVOR_ITEM_LABEL[person.item])}</i>` : ''}
   </button>`;
+}
+
+/** 感知到的红色人影：看得出「有人」，看不出是谁 */
+function shadowFigures(count: number): string {
+  return Array.from({ length: Math.min(3, count) }, () => '<span class="shadow-figure"></span>').join('');
 }
 
 function personPortraitHtml(profile: PersonProfile): string {
@@ -207,10 +239,17 @@ export function personDetailHtml(state: GameState, personId: string): string {
     } else {
       paras.push(`位置：${roomName(person.lastSeenRoom)}（最后确认于第 ${person.lastSeenTurn} 回合，现在不知道在哪）。`);
     }
-    if (person.hidden) paras.push('他躲起来了：不搜索这间屋子，你打不到他。');
+    if (person.hidden) paras.push('他躲起来了：点左下角的「搜索」翻柜子（1 点行动点），不然打不到他。');
+    if (person.sneaky) paras.push('老练：有时会踮着脚走路，不留鞋印、也不惊动乌鸦——但不会一直这样。');
+    if (person.goal === 'objective' || person.goal === 'key') paras.push('他正为团队目标忙：进度做满，幸存者会集体从后门逃走，你直接失败。');
     if (person.armed) paras.push('他手里有武器：进门时可能反击，让你下回合少走一步。');
     if (health === 'downed') paras.push('倒地：本回合内可以被处决，也可能被同伴救起。');
     if (threat) paras.push(`威胁：这名角色会主动对抗你，别把他当普通平民。`);
+    if (profile.role === 'police') {
+      paras.push(
+        '警察不能攻击：他循着「新鲜现场」追你。同屋连续两回合、且通缉值达到逮捕阈值，就会直接逮捕。压低通缉、制造假现场、或者离开这条街，才能甩掉他。',
+      );
+    }
   } else {
     paras.push('档案状态：已从现场消失。');
   }
@@ -312,11 +351,12 @@ export function renderGuide(): string {
         <div class="guide-grid">
           <div class="guide-card">${icon('mission')}<b>1 · 接取契约</b><p>每局随机获得任务。主目标旁会显示${icon('missionTarget', 'ui-icon tiny')}标记，告诉你要击杀谁、需要多少证据或仪式进度。</p></div>
           <div class="guide-card">${icon('darkCell')}<b>2 · 现场布局</b><p>布局牌（绿色）在行动阶段打出：剪断电话线、封死逃生点、装窃听。布局打早了才有用。</p></div>
-          <div class="guide-card">${icon('escape')}<b>3 · 他们看见你就跑</b><p>只有背对着门、还没起疑的人（警觉 < 30）才会让你摸到背后。已经绷着弦的，门一开就冲出去——想拿先手就先打<b>静止隐身</b>伏击进门；人已经跑了，用<b>疾速残暴</b>贴上去再补刀。点人物头像能看到他的<b>目的</b>和<b>行为原型</b>，右侧<b>威胁</b>面板会告诉你现在最该处理哪一头。</p></div>
-          <div class="guide-card">${icon('bloodPoint')}<b>4 · 伤害与评分</b><p>每回合恢复 3 能量与 4 步数，结束回合弃掉手牌重抽 5 张。<b>伤害只能推进一档</b>：健康 → 受伤 → 倒地，倒地的人要再补一次才会死。跑掉的人会扣分，标记目标跑掉直接判负。</p></div>
+          <div class="guide-card">${icon('escape')}<b>3 · 相邻只看轮廓，推门才是照面</b><p>隔壁房间<b>看得见名字、看不见人</b>——找人得自己走过去，或者靠侦查 / 感知牌。只要没打伏击，屋里的人<b>门一开就转身跑</b>；想拿先手先打<b>静止隐身</b>。跑掉的人留下<b>鞋印</b>；更远的地方会传来<b>乌鸦叫、地板响</b>，房间上亮起「动静」角标，那是有人刚经过。</p></div>
+          <div class="guide-card">${icon('bloodPoint')}<b>4 · 行动点、脚印与杀戮</b><p>每回合 <b>7 点行动点</b>：走路、挥刀、出牌、<b>搜索柜子</b>全从这一个池子里扣。伤害只从「挥刀」来（1 点），同屋多人<b>点谁砍谁</b>；有人钻进柜子就点<b>搜索</b>翻出来。<b>鞋印</b>只留最近两次行动，严格踩着它连续追才攒<b>杀戮</b>，随便走不涨；满 50 后每回合多 2 点行动点，<b>路你自己走，不会瞬移</b>。砍中人或被击晕清零。</p></div>
+          <div class="guide-card">${icon('missionTarget')}<b>5 · 他们也在赶进度</b><p>幸存者各有目的：修电闸、凑钥匙、报警、躲柜子。<b>蓝框房间</b>是他们的目标点，谁在那儿做事都会弄出动静。资源栏的<b>团队目标</b>一旦做满，他们集体从后门逃走，<b>你直接失败</b>——你追得越凶，他们越没空干活。老练的家伙偶尔会踮着脚走，不留脚印也不惊动乌鸦。</p></div>
         </div>
         <div class="guide-note">
-          ${icon('totem', 'ui-icon tiny')} 图腾：在此结束回合，下回合 +1 能量。
+          ${icon('totem', 'ui-icon tiny')} 图腾：在此结束回合，下回合 +1 行动点。
           ${icon('cabinet', 'ui-icon tiny')} 柜子：躲进去的人不会被引诱类卡牌锁定。
           ${icon('obstacle', 'ui-icon tiny')} 障碍：需要「所向无敌」或杀手能力破开。
           堵门的房间进入要多花 1 步。
@@ -401,13 +441,33 @@ export function renderDeckEditor(deck: string[], unlocked: string[]): string {
   `;
 }
 
-function roomFeatures(roomId: RoomId): string {
+function roomFeatures(state: GameState, roomId: RoomId): string {
   const parts: string[] = [];
+  const cleared = state.clearedObstacles.includes(roomId);
+  state.siteItems
+    .filter((i) => i.room === roomId)
+    .forEach((i) => {
+      const label = SITE_ITEM_LABEL[i.kind];
+      const status =
+        i.kind === 'itemBox'
+          ? i.broken
+            ? '已被砸烂'
+            : `还能翻 ${i.charges} 件`
+          : i.jammedTurns > 0
+            ? `停机 ${i.jammedTurns} 回合`
+            : i.charged
+              ? '已通电'
+              : `修复 ${i.progress}%`;
+      const down = i.broken || i.jammedTurns > 0;
+      parts.push(
+        `<span class="room-feature site ${i.kind} ${down ? 'broken' : ''}" title="${label}：${status}。你用不了它，但可以花 ${SABOTAGE_COST} 点行动点砸掉">${icon(i.kind === 'itemBox' ? 'itemBox' : 'generator', 'ui-icon tiny')}</span>`,
+      );
+    });
   if (roomId === EXIT_ROOM) parts.push(`<span class="room-feature escape" title="撤离点：任务完成的撤离位置">${icon('escape', 'ui-icon tiny')}</span>`);
   if (ESCAPE_ROOMS.includes(roomId)) parts.push(`<span class="room-feature escape-npc" title="逃生点：NPC 在这里待满一回合就会逃出去">${icon('escape', 'ui-icon tiny')}</span>`);
-  if (TOTEM_ROOMS.includes(roomId)) parts.push(`<span class="room-feature totem" title="图腾：在此结束回合，下回合 +1 能量">${icon('totem', 'ui-icon tiny')}</span>`);
+  if (TOTEM_ROOMS.includes(roomId)) parts.push(`<span class="room-feature totem" title="图腾：在此结束回合，下回合 +1 行动点">${icon('totem', 'ui-icon tiny')}</span>`);
   if (CABINET_ROOMS.includes(roomId)) parts.push(`<span class="room-feature cabinet" title="柜子：藏身者不会被引诱类卡牌锁定">${icon('cabinet', 'ui-icon tiny')}</span>`);
-  if (OBSTACLE_ROOMS.includes(roomId)) parts.push(`<span class="room-feature obstacle" title="障碍物：需所向无敌或杀手能力破开">${icon('obstacle', 'ui-icon tiny')}</span>`);
+  if (OBSTACLE_ROOMS.includes(roomId) && !cleared) parts.push(`<span class="room-feature obstacle" title="障碍：进入多花 1 点行动点；破门能力可以直接清掉">${icon('obstacle', 'ui-icon tiny')}</span>`);
   return parts.join('');
 }
 
@@ -509,12 +569,77 @@ function threatRowsHtml(state: GameState): string {
     .join('')}</div>`;
 }
 
+/**
+ * 地板上的脚印：把血丝划痕素材当 mask，染成锈红，旋转到「朝下一间屋」的方向。
+ *
+ * 坐标直接用百分比，所以不需要跟画布/房间的像素换算，户型怎么变都对得上。
+ * 只显示 visibleTrails 里的几段——跟丢了、走得久了，旧的脚印就没了。
+ */
+function trailOverlay(state: GameState): string {
+  const segs = visibleTrails(state);
+  if (!segs.length) return '';
+  const centerOf = (id: RoomId) => {
+    const r = ROOM_MAP[id].rect;
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  };
+  const prints = segs
+    .map((t) => {
+      const a = centerOf(t.room);
+      const b = centerOf(t.to);
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const len = Math.hypot(dx, dy) || 1;
+      const ux = dx / len;
+      const uy = dy / len;
+      // 脚印踩在房间中心朝门口的方向，像刚从这间屋子冲出去
+      const x = a.x + ux * Math.min(len * 0.34, 7);
+      const y = a.y + uy * Math.min(len * 0.34, 7);
+      // 鞋印默认脚趾朝上：旋转到「朝下一间屋」的方向
+      const rot = (Math.atan2(dy, dx) * 180) / Math.PI + 90;
+      const age = state.trailClock - t.clock;
+      const cls = `footprint${t.blood ? ' blood' : ''}${age <= 0 ? ' fresh' : ''}`;
+      return `<i class="${cls}" style="left:${x.toFixed(2)}%;top:${y.toFixed(2)}%;--rot:${rot.toFixed(1)}deg"></i>`;
+    })
+    .join('');
+  return `<div class="trail-layer" aria-hidden="true">${prints}</div>`;
+}
+
 export function renderGame(state: GameState, killer: KillerProfile): string {
   const m = state.mission;
   const here = state.people.filter((p) => p.room === state.playerRoom && p.role !== 'police');
   const policeHere = state.people.some((p) => p.room === state.playerRoom && p.role === 'police');
   const isMyers = killer.owner === '迈克尔·迈尔斯';
   const maxEscaped = m.maxEscaped ?? 2;
+
+  // 任务条：目标 / 达成条件 / 失败条件 / 实时进度 / 倒计时，一眼看清这一局要做什么
+  const need = m.targetCount ?? 2;
+  const atExit = state.playerRoom === EXIT_ROOM;
+  const left = Math.max(0, m.turns - state.turn + 1);
+  const urgent = left <= 5;
+  let progress = '';
+  let objectiveDone = false;
+  switch (m.kind) {
+    case 'assassinate':
+      progress = `名单 ${state.markedKilled}/${need} · 撤离 ${atExit ? '✓' : '✗'}`;
+      objectiveDone = state.markedKilled >= need && atExit;
+      break;
+    case 'bodyCount':
+      progress = `击杀 ${state.kills}/${need} · 通缉 ${state.wanted}/${m.maxWanted ?? 3}`;
+      objectiveDone = state.kills >= need && state.wanted <= (m.maxWanted ?? 3);
+      break;
+    case 'evidence':
+      progress = `证据 ${state.evidence}/${need} · 撤离 ${atExit ? '✓' : '✗'}`;
+      objectiveDone = state.evidence >= need && atExit;
+      break;
+    case 'ritual':
+      progress = `仪式 ${state.ritualStreak}/${need}`;
+      objectiveDone = state.ritualStreak >= need;
+      break;
+    case 'escape':
+      progress = `标记 ${state.markedKilled}/1 · 撤离 ${atExit ? '✓' : '✗'}`;
+      objectiveDone = state.markedKilled >= 1 && atExit;
+      break;
+  }
 
   const rooms = ROOMS.map((room) => {
     const visible = isRoomVisible(state, room.id);
@@ -541,26 +666,52 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
     const locked = isLocked(state, room.id);
     const barricaded = state.barricades.includes(room.id);
     const cost = moveCost(state, room.id);
+    const adjacent = ROOM_MAP[state.playerRoom].neighbors.includes(room.id);
+    const obstacleOpen = OBSTACLE_ROOMS.includes(room.id) && !state.clearedObstacles.includes(room.id);
+    const isObjective = state.objectiveRooms.includes(room.id);
+    const noise = visibleDisturbances(state).find((d) => d.room === room.id);
+    // 感知：看不见的房间也会浮出红色人影——只有影子，没有名字
+    const sensed =
+      !visible && isSensing(state)
+        ? state.people.filter((p) => p.room === room.id && p.role !== 'police' && p.hp > 0 && !p.hidden)
+            .length
+        : 0;
     const r = room.rect;
     const style = `left:${r.left}%;top:${r.top}%;width:${r.width}%;height:${r.height}%`;
     return `
-      <div class="room ${isPlayer ? 'current' : ''} ${reachable ? 'reachable' : 'disabled'} ${room.id === 'garden' ? 'outdoor' : ''} ${locked ? 'locked' : ''} ${barricaded ? 'barricaded' : ''} ${explored ? 'explored' : 'unexplored'} ${visible ? 'in-sight' : 'fogged'}"
-        style="${style}" data-room="${room.id}" title="${escape(room.name)}${explored ? `：${escape(room.desc)}` : '：还没进去过'}">
+      <div class="room ${isPlayer ? 'current' : ''} ${reachable ? 'reachable' : 'disabled'} ${adjacent ? 'adjacent' : ''} ${obstacleOpen ? 'obstacle' : ''} ${isObjective ? 'objective' : ''} ${room.id === 'garden' ? 'outdoor' : ''} ${locked ? 'locked' : ''} ${barricaded ? 'barricaded' : ''} ${explored ? 'explored' : 'unexplored'} ${visible ? 'in-sight' : 'fogged'}"
+        style="${style}" data-room="${room.id}" title="${escape(room.name)}${explored ? `：${escape(room.desc)}` : '：还没进去过'}${isObjective ? ' · 他们的目标点' : ''}">
         ${reachable ? `<button type="button" class="room-hit" data-action="move" data-room="${room.id}"
-          aria-label="移动到${escape(room.name)}${cost > 1 ? `（堵门，需 ${cost} 步）` : ''}"></button>` : ''}
+          aria-label="移动到${escape(room.name)}（需 ${cost} 点行动点）"></button>` : ''}
         <div class="room-head">
           <span class="room-name">${explored ? escape(room.name) : '？？？'}</span>
-          ${isPlayer ? '<span class="room-tag">你在</span>' : locked ? '<span class="room-tag lock">封锁</span>' : barricaded ? `<span class="room-tag bar">堵门 ${cost}步</span>` : ''}
+          ${noise ? `<span class="room-tag noise" title="${escape(noise.label)}">${icon('crow', 'crow-icon tiny')}动静</span>` : ''}
+          ${isObjective ? '<span class="room-tag objective" title="幸存者要在这儿做事：进度做满你就输">目标点</span>' : ''}
+          ${isPlayer
+            ? '<span class="room-tag">你在</span>'
+            : locked
+              ? '<span class="room-tag lock">封锁 · 进不去</span>'
+              : barricaded
+                ? `<span class="room-tag bar">堵门 · ${cost}点</span>`
+                : obstacleOpen
+                  ? `<span class="room-tag obstacle">障碍 · ${cost}点</span>`
+                  : reachable
+                    ? `<span class="room-tag go">可进 · ${cost}点</span>`
+                    : adjacent
+                      ? '<span class="room-tag short">行动点不足</span>'
+                      : ''}
         </div>
         ${explored
           ? `<div class="room-desc">${escape(room.desc)}</div>
-             <div class="room-features">${roomFeatures(room.id)}</div>`
-          : `<div class="room-unknown">未探索</div>`}
+             <div class="room-features">${roomFeatures(state, room.id)}</div>`
+          : `<div class="room-unknown">未探索</div>
+             <div class="room-features">${roomFeatures(state, room.id)}</div>`}
         <div class="room-people">
-          ${people.map(personChip).join('')}
+          ${people.map((p) => personChip(p, isPlayer && canAttack(state, p.id))).join('')}
           ${police ? personChip(police) : ''}
           ${ghosts.map(() => '<span class="ghost-chip" title="最后确认位置：人可能已经走了">?</span>').join('')}
         </div>
+        ${sensed ? `<div class="room-shadows" title="你感觉到这里有人，但看不清是谁">${shadowFigures(sensed)}</div>` : ''}
       </div>
     `;
   }).join('');
@@ -603,9 +754,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
       const img = characterImage(p.id);
       const vis = isPersonVisible(state, p);
       const health = conditionOf(p);
-      const alertLabel = p.alert >= 70
-        ? '<em class="alert-tag high">警觉</em>'
-        : p.alert >= 35 ? '<em class="alert-tag">留意</em>' : '';
+      const alertLabel = `<em class="alert-tag ${p.alert >= 70 ? 'high' : p.alert >= 35 ? 'mid' : ''}">警觉 ${p.alert}</em>`;
       const intentLabel = p.intent === 'idle' ? GOAL_LABEL[p.goal] : INTENT_LABEL[p.intent];
       const where = vis ? roomName(p.room) : `最后在${roomName(p.lastSeenRoom)}`;
       return `<button class="roster-person ${p.room === state.playerRoom ? 'here' : ''} ${p.marked ? 'marked' : ''} ${p.intent === 'escape' ? 'escaping' : ''} ${vis ? '' : 'unknown'} ${health === 'downed' ? 'downed' : ''}"
@@ -626,6 +775,34 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
       </div>`
     : '';
 
+  const atkOk = canAttack(state);
+  const atkReason = attackBlockReason(state);
+  const possessed = state.possessed;
+  const sabotageReason = sabotageBlockReason(state);
+  const sabotageTitle = sabotageReason ?? `破坏：砸掉这间屋子的道具箱 / 发电机，消耗 ${SABOTAGE_COST} 点行动点。会惊动乌鸦，把人引过来。`;
+  const sabotageMeta = sabotageReason ? escape(sabotageReason) : `${SABOTAGE_COST} 点 · 砸设施`;
+  const sabotageBtn = `<button class="btn sabotage ${sabotageReason ? 'spent' : ''}" data-action="sabotage" ${sabotageReason ? 'disabled' : ''}
+      title="${escape(sabotageTitle)}">
+      <span class="atk-name">破坏</span>
+      <span class="atk-meta">${sabotageMeta}</span>
+    </button>`;
+  const atkTitle = possessed
+    ? `恶魔附身（剩 ${state.possessTurns} 回合）：每一刀都直接把还站着的人放倒，倒地的人直接补刀致死。消耗 ${ATTACK_COST} 点行动点。`
+    : `挥刀：消耗 ${ATTACK_COST} 点行动点，健康→受伤→倒地，倒地的人再补一刀即死。砍完要再做一件事才能砍第二刀。`;
+  const attackBtn = `<button class="btn attack ${atkOk ? '' : 'spent'} ${possessed ? 'possessed' : ''}" data-action="attack" ${atkOk ? '' : 'disabled'}
+      title="${escape(atkOk ? atkTitle : atkReason)}">
+      <span class="atk-name">${possessed ? '附身 · 挥刀' : '挥刀'}</span>
+      <span class="atk-meta">${atkOk ? (possessed ? `${ATTACK_COST} 点 · 一刀倒地` : `${ATTACK_COST} 点 · 砍下去`) : escape(atkReason)}</span>
+    </button>`;
+  const searchOk = state.phase === 'playing' && state.energy >= SEARCH_COST;
+  const cabinetHere = CABINET_ROOMS.includes(state.playerRoom);
+  const hiddenHere = state.people.some((p) => p.room === state.playerRoom && p.hidden);
+  const searchBtn = `<button class="btn search" data-action="search" ${searchOk ? '' : 'disabled'}
+      title="${escape(searchOk ? (cabinetHere ? `搜索这间屋子的柜子：消耗 ${SEARCH_COST} 点行动点，把藏起来的人翻出来。` : `搜索这间屋子：消耗 ${SEARCH_COST} 点行动点。`) : '行动点不足')}">
+      <span class="atk-name">搜索</span>
+      <span class="atk-meta">${searchOk ? (hiddenHere ? '有动静 · 翻柜子' : `${SEARCH_COST} 点 · 翻柜子`) : '行动点不足'}</span>
+    </button>`;
+
   return `
     <div class="topbar">
       <div class="topbar-identity">
@@ -636,16 +813,20 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
         </div>
         ${meter}
       </div>
-      <div class="mission-strip">
+      <div class="mission-strip ${urgent ? 'urgent' : ''}">
         <div class="mission-icon">${icon('missionTarget', 'ui-icon')}</div>
         <div class="mission-content">
           <div class="mission-title">${escape(m.title)}<em>奖励 ${m.reward}</em></div>
-          <div class="mission-desc">${escape(m.desc)}</div>
+          <div class="mission-objective"><b>目标</b>${escape(m.objective ?? m.desc)}</div>
+          <div class="mission-rules">
+            <span class="mission-ok">✓ 成功：${escape(m.successText ?? '达成主目标')}</span>
+            <span class="mission-fail">✕ 失败：${escape(m.failText ?? '超时或被捕')}</span>
+          </div>
         </div>
         <div class="mission-meta">
-          <span>标记 ${state.markedKilled}/${m.kind === 'assassinate' ? (m.targetCount ?? 2) : 1}</span>
-          <span>证据 ${state.evidence}</span>
-          ${m.kind === 'ritual' ? `<span>仪式 ${state.ritualStreak}/${m.targetCount ?? 2}</span>` : ''}
+          <span class="mission-progress ${objectiveDone ? 'done' : ''}">${progress}</span>
+          <span class="mission-clock ${urgent ? 'hot' : ''}">剩余 <b>${left}</b> 回合</span>
+          <span class="mission-team ${state.teamProgress >= TEAM_GOAL_MAX * 0.7 ? 'hot' : ''}" title="他们在${escape(state.teamGoalLabel)}；进度做满他们就集体逃走，你直接失败">他们在赶工 <b>${state.teamProgress}%</b></span>
         </div>
       </div>
     </div>
@@ -653,11 +834,12 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
     <div class="layout">
       <div class="main-column">
         <div class="panel map-panel">
-          <div class="panel-heading"><h2>房屋平面</h2><span>点亮房间=可以走 · ？？？=没进去过 · 每局的户型都不一样</span>
+          <div class="panel-heading"><h2>房屋平面</h2><span>绿边=能走（标行动点） · 黄=障碍多1点 · 蓝框=他们的目标点 · ！动静=有人刚经过 · ？？？=没进去过</span>
             <button class="btn ghost mini" data-action="guide">玩法指引</button>
           </div>
           <div class="floorplan" style="aspect-ratio:${layoutAspect()}">
             ${rooms}
+            ${trailOverlay(state)}
             ${playerMarker}
           </div>
           <div class="map-legend">
@@ -667,6 +849,10 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
             <span>${icon('obstacle', 'ui-icon tiny')} 障碍物</span>
             <span class="legend-intent"><i class="intent-dot i-flee"></i> 逃跑中 <i class="intent-dot i-call"></i> 打电话 <i class="intent-dot i-escape"></i> 翻篱笆 <i class="intent-dot i-rescue"></i> 救援</span>
             <span class="legend-fog">？ 最后确认位置</span>
+            <span class="legend-trail"><i class="legend-claw"></i> 鞋印：只留最近两次行动，跟丢了就断</span>
+            <span class="legend-noise">${icon('crow', 'crow-icon tiny')} 动静：乌鸦叫 / 地板响，有人刚经过（短线索）</span>
+            <span class="legend-objective">蓝框：他们的团队目标点</span>
+            <span class="legend-sites">${icon('itemBox', 'ui-icon tiny')} 道具箱 ${icon('generator', 'ui-icon tiny')} 发电机：他们能用，你只能砸</span>
           </div>
         </div>
 
@@ -674,11 +860,20 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
         <div class="panel resource-bar">
           <div class="stats">
             <div class="stat"><b>${state.turn}<i>/${m.turns}</i></b><small>回合</small></div>
-            <div class="stat energy"><b>${state.energy}<i>/${state.maxEnergy}</i></b><small>能量</small></div>
-            <div class="stat"><b>${state.steps}</b><small>步数</small></div>
+            <div class="stat energy" title="走路、挥刀、出牌、搜索柜子，全都从这一个池子里扣"><b>${state.energy}<i>/${state.maxEnergy}</i></b><small>行动点</small></div>
             <div class="stat wanted"><b>${state.wanted}<i>/${state.arrestThreshold}</i></b><small>通缉/逮捕</small></div>
             <div class="stat"><b>${state.kills}</b><small>击杀</small></div>
             <div class="stat ${state.escaped > 0 ? 'escaped' : ''}"><b>${state.escaped}<i>/${maxEscaped}</i></b><small>逃走</small></div>
+            <div class="stat frenzy ${state.frenzy >= FRENZY_THRESHOLD ? 'active' : ''}" title="杀戮：严格踩着脚印连续追才涨；满 ${FRENZY_THRESHOLD} 后每回合多 ${FRENZY_AP_BONUS} 点行动点，路自己走。砍中人或被击晕清零。">
+              <b>${state.frenzy}<i>/${FRENZY_MAX}</i></b>
+              <div class="alarm-track"><span style="width:${state.frenzy}%"></span></div>
+              <small>杀戮</small>
+            </div>
+            <div class="stat team ${state.teamProgress >= TEAM_GOAL_MAX * 0.7 ? 'hot' : ''}" title="幸存者的团队目标：${escape(state.teamGoalLabel)}。进度做满他们集体逃走，你直接失败。">
+              <b>${state.teamProgress}<i>/${TEAM_GOAL_MAX}</i></b>
+              <div class="alarm-track"><span style="width:${state.teamProgress}%"></span></div>
+              <small>他们的进度</small>
+            </div>
             <div class="stat alarm-stat ${state.alarm >= 70 ? 'hot' : state.alarm >= 40 ? 'warm' : ''}" title="团队警戒：满 ${ALARM_MAX} 任务失败。剪电话、断电、制造噪声、锁门都能压低它。">
               <b>${state.alarm}<i>/${ALARM_MAX}</i></b>
               <div class="alarm-track"><span style="width:${state.alarm}%"></span></div>
@@ -690,6 +885,9 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
 
         <div class="panel hand">
           <div class="hand-actions">
+            ${attackBtn}
+            ${searchBtn}
+            ${sabotageBtn}
             <div class="power-row">${powerButtonHtml(state, killer)}</div>
             <button class="btn primary end-turn" data-action="end-turn">结束回合</button>
             <button class="btn ghost" data-action="give-up">放弃任务</button>
@@ -708,6 +906,23 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
           <div class="panel-heading"><h2>在场人物</h2><span>${here.length} 人在你的房间${policeHere ? ' · 警察也在' : ''}</span></div>
           <div class="roster">${roster || '<div class="roster-empty">还没有确认任何人的位置。走进房间，或者用侦查卡。</div>'}</div>
           ${unknownCount > 0 ? `<div class="roster-unknown">还有 ${unknownCount} 个人没有被确认</div>` : ''}
+        </div>
+        <div class="panel facility-panel">
+          <div class="panel-heading"><h2>现场设施</h2><span>他们能用 · 你只能砸</span></div>
+          <div class="facility-list">
+            ${state.siteItems.map((i) => {
+              const status = i.kind === 'itemBox'
+                ? i.broken ? '已被砸烂 · 不再发道具' : `还能翻 ${i.charges} 件道具`
+                : i.jammedTurns > 0 ? `停机 ${i.jammedTurns} 回合` : i.charged ? '已通电 · 进度已计入' : `修复 ${i.progress}%`;
+              const cls = i.broken ? 'broken' : i.jammedTurns > 0 ? 'jammed' : '';
+              const canSmash = i.room === state.playerRoom && !i.broken && (i.kind === 'itemBox' ? i.charges > 0 : true) && !sabotageReason;
+              return `<div class="facility-row ${i.kind} ${cls}">
+                <img class="facility-icon" src="${uiIcon(i.kind === 'itemBox' ? 'itemBox' : 'generator')}" alt="" onerror="this.style.display='none'">
+                <div class="facility-info"><b>${SITE_ITEM_LABEL[i.kind]}</b><small>${escape(roomName(i.room))} · ${status}</small></div>
+                ${canSmash ? `<button class="btn mini" data-action="sabotage" title="花 ${SABOTAGE_COST} 点行动点砸掉">砸掉</button>` : ''}
+              </div>`;
+            }).join('')}
+          </div>
         </div>
         <div class="panel threat-panel">
           <div class="panel-heading"><h2>威胁</h2><span>他们正在做什么 · 怎么反制</span></div>
@@ -728,8 +943,10 @@ export function renderResult(state: GameState, newCard: string | null): string {
     win: '任务完成', caught: '被警察抓捕', timeout: '任务超时', failed: '任务失败',
   };
   const stars = getStars(state.score);
-  const earned = state.result === 'win' ? Math.max(10, Math.round(state.score / 5)) : 0;
-  const darkCells = state.result === 'win' && state.score >= 150 ? 1 : 0;
+  const win = state.result === 'win';
+  const rank = win ? (state.score >= 260 ? 'S' : state.score >= 190 ? 'A' : 'B') : '—';
+  const earned = win ? Math.max(10, Math.round(state.score / 5)) : 0;
+  const darkCells = win && state.score >= 150 ? 1 : 0;
   const breakdown = state.scoreBreakdown
     .map((line) => `<div class="score-line ${line.value < 0 ? 'minus' : ''}">
         <span>${escape(line.label)}</span><b>${line.value >= 0 ? '+' : ''}${line.value}</b>
@@ -737,11 +954,17 @@ export function renderResult(state: GameState, newCard: string | null): string {
     .join('');
   return `
     <div class="overlay">
-      <div class="modal result-modal">
+      <div class="modal result-modal ${win ? 'is-win' : 'is-lose'}">
+        <div class="result-banner ${win ? '' : 'lose'}">${win ? '契约达成 · CONTRACT COMPLETE' : '契约未完成 · CONTRACT FAILED'}</div>
         <div class="subtitle">CONTRACT REPORT</div>
         <h1>${labels[state.result ?? 'failed']}</h1>
         ${state.resultReason ? `<p class="result-reason">${escape(state.resultReason)}</p>` : ''}
+        <div class="result-rank"><small>本局评级</small><b>${rank}</b></div>
         <div class="result-stars">${'★'.repeat(stars)}${'☆'.repeat(3 - stars)}</div>
+        <div class="result-objective ${win ? 'done' : ''}">
+          <span class="result-check">${win ? '✓' : '✕'}</span>
+          <div><small>${win ? '目标已达成' : '目标未完成'}</small><b>${escape(state.mission.objective ?? state.mission.title)}</b></div>
+        </div>
         <div class="result-grid">
           <div><small>最终评分</small><b>${state.score}</b></div>
           <div><small>击杀人数</small><b>${state.kills}</b></div>

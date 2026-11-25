@@ -3,6 +3,8 @@ import { KILLER_MAP, STARTER_KILLERS } from './killers';
 import type { SaveData } from './types';
 
 const KEY = 'night-hunt-dossier-save-v1';
+/** 存档结构版本：v3 起伤害全部来自「挥刀」按钮，旧牌组里的伤害牌已经不存在了 */
+const SAVE_VERSION = 3;
 
 const STARTER_CARDS: string[] = CARDS.filter((c) => c.unlocked).map((c) => c.id);
 
@@ -15,7 +17,7 @@ const DEFAULT_SAVE: SaveData = {
   credits: 60,
   darkCells: 3,
   unlockedKillers: [...STARTER_KILLERS],
-  version: 2,
+  version: SAVE_VERSION,
 };
 
 /**
@@ -59,8 +61,13 @@ export function loadSave(): SaveData {
       ? parsed.killer
       : DEFAULT_SAVE.killer;
 
+    // 旧版本的牌组里塞满了「攻击牌」。伤害改由挥刀按钮承担之后，
+    // 这些牌已经换成了功能性效果，牌组也整体换了套路，所以老档直接换新起始牌组。
+    const version = toInt(parsed.version, 1);
+    const deck = version < SAVE_VERSION ? [...STARTING_DECK] : sanitizeDeck(parsed.deck);
+
     return {
-      deck: sanitizeDeck(parsed.deck),
+      deck,
       unlockedCards,
       bestScore: toInt(parsed.bestScore, 0),
       wins: toInt(parsed.wins, 0),
@@ -68,6 +75,7 @@ export function loadSave(): SaveData {
       credits: toInt(parsed.credits, DEFAULT_SAVE.credits),
       darkCells: toInt(parsed.darkCells, DEFAULT_SAVE.darkCells),
       unlockedKillers,
+      version: SAVE_VERSION,
     };
   } catch {
     return { ...DEFAULT_SAVE, deck: [...DEFAULT_SAVE.deck] };

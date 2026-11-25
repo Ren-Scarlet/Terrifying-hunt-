@@ -1,11 +1,14 @@
 import './style.css';
 import { CARD_MAP } from './game/cards';
 import {
+  attack,
   createGame,
   endTurn,
   giveUp,
   movePlayer,
   playCard,
+  searchRoom,
+  sabotageSiteItem,
   usePower,
 } from './game/engine';
 import { loadSave, writeSave } from './game/save';
@@ -343,6 +346,12 @@ app.addEventListener('click', (event) => {
   if (action === 'person') {
     const personId = target.dataset.personId;
     if (personId && game && screen === 'game') {
+      // 地图房间里点人头 = 直接对他挥刀；右侧名单 / 不可攻击时 = 看档案
+      if (target.dataset.attack === '1') {
+        attack(game, personId);
+        afterAction();
+        return;
+      }
       const panel = document.getElementById('cardDetail');
       if (panel) {
         panel.innerHTML = personDetailHtml(game, personId);
@@ -365,6 +374,24 @@ app.addEventListener('click', (event) => {
   if (action === 'move') {
     const room = target.dataset.room as RoomId | undefined;
     if (room) movePlayer(game, room);
+    afterAction();
+    return;
+  }
+
+  if (action === 'attack') {
+    attack(game);
+    afterAction();
+    return;
+  }
+
+  if (action === 'sabotage') {
+    sabotageSiteItem(game);
+    afterAction();
+    return;
+  }
+
+  if (action === 'search') {
+    searchRoom(game);
     afterAction();
     return;
   }

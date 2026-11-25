@@ -77,7 +77,7 @@ export const KILLERS: KillerProfile[] = [
       {
         id: 'wraith_bell',
         name: '丧钟',
-        desc: '本回合隐身：移动无视相邻限制、不计步数，进门不会惊动任何人（伏击），也不会惊动目击者。',
+        desc: '本回合隐身：移动无视相邻限制、不计行动点，进门不会惊动任何人（伏击），也不会惊动目击者。',
         cooldown: 1,
         ops: [
           { op: 'ambush' },
@@ -90,7 +90,7 @@ export const KILLERS: KillerProfile[] = [
       {
         id: 'wraith_rush',
         name: '穿墙突袭',
-        desc: '本回合步数 +3、无视相邻限制、目击无效，且下次攻击 +2 伤害。',
+        desc: '本回合行动点 +3、无视相邻限制、目击无效，且下次攻击 +2 伤害。',
         cooldown: 3,
         ultimate: true,
         ops: [
@@ -113,7 +113,7 @@ export const KILLERS: KillerProfile[] = [
       {
         id: 'nurse_blink',
         name: '瞬步',
-        desc: '本回合步数 +2，移动时不会惊动目击者。',
+        desc: '本回合行动点 +2，移动时不会惊动目击者。',
         cooldown: 1,
         ops: [
           { op: 'steps', amount: 2 },
@@ -189,7 +189,7 @@ export const KILLERS: KillerProfile[] = [
       {
         id: 'ghost_nightfall',
         name: '夜袭',
-        desc: '本回合步数 +3、目击无效，且下次攻击 +2 伤害。',
+        desc: '本回合行动点 +3、目击无效，且下次攻击 +2 伤害。',
         cooldown: 3,
         ultimate: true,
         ops: [
@@ -229,15 +229,14 @@ export const KILLERS: KillerProfile[] = [
       {
         id: 'myers_possess',
         name: '恶魔附身',
-        desc: '尾随值满 100 且房间里有倒地的人才能发动：直接处决，之后尾随值清零。',
+        desc: '尾随值满 100 才能发动：接下来 3 回合进入附身，每一刀都直接把还站着的人放倒（正常要砍两刀），尾随值清零。',
         cooldown: 3,
         ultimate: true,
-        requires: [{ c: 'stalk', gte: 100 }, { c: 'downedHere' }],
+        requires: [{ c: 'stalk', gte: 100 }],
         ops: [
-          { op: 'execute', who: 'downedAny' },
-          { op: 'wanted', amount: 1 },
+          { op: 'flag', key: 'possessReady' },
           { op: 'stalk', amount: -100 },
-          { op: 'log', text: '面具合上了。那一刻不需要刀，也不需要理由。' },
+          { op: 'log', text: '面具合上了。接下来几刀不需要理由，也不需要第二下。' },
         ],
       },
     ],
@@ -319,7 +318,7 @@ export const KILLERS: KillerProfile[] = [
       {
         id: 'cannibal_sprint',
         name: '电锯冲刺',
-        desc: '本回合步数 +2、下次攻击 +1 伤害，但引擎声让通缉值 +1。',
+        desc: '本回合行动点 +2、下次攻击 +1 伤害，但引擎声让通缉值 +1。',
         cooldown: 1,
         ops: [
           { op: 'steps', amount: 2 },
@@ -385,7 +384,7 @@ export const KILLERS: KillerProfile[] = [
       {
         id: 'demogorgon_portal',
         name: '裂隙穿行',
-        desc: '移动到任意相邻房间且不计步数，不会惊动目击者。',
+        desc: '移动到任意相邻房间且不计行动点，不会惊动目击者。',
         cooldown: 1,
         ops: [
           { op: 'teleportPlayer', to: 'adjacent' },
@@ -451,7 +450,7 @@ export const KILLERS: KillerProfile[] = [
       {
         id: 'pig_ambush',
         name: '伏击',
-        desc: '本回合目击无效、步数 +1，且下次攻击 +1 伤害。',
+        desc: '本回合目击无效、行动点 +1，且下次攻击 +1 伤害。',
         cooldown: 1,
         ops: [
           { op: 'flag', key: 'noAlarm' },

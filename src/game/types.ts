@@ -15,7 +15,15 @@ export type RoomId =
   | 'laundry'
   | 'dining'
   | 'bathroom'
-  | 'conservatory';
+  | 'conservatory'
+  | 'foyer'
+  | 'library'
+  | 'wine'
+  | 'guestroom'
+  | 'workshop'
+  | 'stairwell'
+  | 'chapel'
+  | 'balcony';
 
 export type CardType = 'attack' | 'skill' | 'tactic' | 'setup';
 
@@ -52,7 +60,7 @@ export interface CardDef {
   unlocked: boolean;
   /** 效果程序：由 effect.ts 的解释器执行，改这里就能改卡牌效果 */
   ops: Op[];
-  /** 出牌前的条件检查：不满足时不消耗能量、不弃牌 */
+  /** 出牌前的条件检查：不满足时不消耗行动点、不弃牌 */
   precheck?: Precheck;
 }
 
@@ -66,7 +74,7 @@ export type PersonRole = 'target' | 'civilian' | 'police';
 /**
  * 六种行为类型。决定这名 NPC 被惊动后做什么，而不是所有 NPC 都用同一套反应。
  *   alert    警觉型：发现杀手就逃，逃跑路上通知同伴
- *   defiant  反抗型：堵门、拿武器反击，会让你掉步数
+ *   defiant  反抗型：堵门、拿武器反击，会让你掉行动点
  *   caller   求救型：摸向电话/无线电报警
  *   rescuer  救援型：治疗受伤、拉起倒地的人
  *   hider    躲藏型：钻进柜子/床底，不搜出来就找不到
@@ -85,10 +93,49 @@ export type NpcIntent =
   | 'escape'
   | 'stunned'
   | 'heal'
-  | 'rescue';
+  | 'rescue'
+  /** 在没有被惊动时推进团队目标（修电闸 / 凑钥匙） */
+  | 'work';
 
 /** 个人目的：决定他慌乱时往哪跑，是这一局 NPC 的行为主轴 */
-export type NpcGoal = 'phone' | 'exit' | 'hide' | 'gather' | 'weapon' | 'panic' | 'help';
+export type NpcGoal =
+  | 'phone'
+  | 'exit'
+  | 'hide'
+  | 'gather'
+  | 'weapon'
+  | 'panic'
+  | 'help'
+  /** 去团队目标房间做事：所有人合力完成，玩家就输 */
+  | 'objective'
+  /** 找钥匙开后门：同样计入团队进度 */
+  | 'key'
+  /** 去道具箱翻一件能用的东西 */
+  | 'supply'
+  /** 去把发电机修好 */
+  | 'generator';
+
+/** 幸存者从道具箱里翻出来的东西：用完即弃，是他们多出来的一条选择 */
+export type SurvivorItem = 'medkit' | 'toolbox' | 'flare' | 'key' | 'weapon' | 'smoke';
+
+/** 场地物品：杀手用不了，但可以砸掉 */
+export type SiteItemKind = 'itemBox' | 'generator';
+
+export interface SiteItem {
+  id: string;
+  kind: SiteItemKind;
+  room: RoomId;
+  /** 道具箱被砸烂后永久失效 */
+  broken: boolean;
+  /** 还能发几件道具 */
+  charges: number;
+  /** 发电机修复进度 0–100 */
+  progress: number;
+  /** 已经修好并给过团队进度 */
+  charged: boolean;
+  /** 被砸后停机的剩余回合 */
+  jammedTurns: number;
+}
 
 /** 健康 / 受伤 / 倒地。死亡等于从 people 里移除，所以没有第四态。 */
 export type Health = 'healthy' | 'injured' | 'downed';
@@ -123,13 +170,50 @@ export interface Person {
   callTurns: number;
   /** 躲在柜子/床底：不搜出来就看不见，也吃不到大部分卡牌 */
   hidden: boolean;
-  /** 找到武器：反抗时能让玩家掉步数 */
+  /** 找到武器：反抗时能让玩家掉行动点 */
   armed: boolean;
+  /** 老练的幸存者：有时能悄无声息地移动，不留脚印也不惊动乌鸦 */
+  sneaky: boolean;
+  /** 从道具箱翻到的东西：用完即弃，是他这一回合多出来的一条路 */
+  item: SurvivorItem | null;
   /** 被追踪的剩余回合：位置始终可见 */
   trackedTurns: number;
   /** 玩家最后一次看到他的房间与回合，用于地图上的"最后已知位置" */
   lastSeenRoom: RoomId;
   lastSeenTurn: number;
+  /**
+   * 本回合已经"跑"过几间屋（含被砍后夺路而逃的那几步）。
+   * 玩家每做一个动作，逃跑中的人会跟着动一格，但一回合最多 REACT_MOVE_CAP 格——
+   * 不然四条腿永远追不上。
+   */
+  movesThisTurn: number;
+}
+
+/**
+ * 地板上的痕迹：逃跑 / 受伤的人刮出来的鞋印，从一间屋指到下一间。
+ * 这是「他跑远了」之后唯一能把人找回来的线索。
+ */
+export interface Trail {
+  /** 痕迹留在哪个房间 */
+  room: RoomId;
+  /** 朝哪个方向延伸出去 */
+  to: RoomId;
+  /** 留下的回合，用来淡出 */
+  turn: number;
+  /** 留下痕迹时的玩家行动计数：痕迹只保留最近几次行动，跟丢了就断 */
+  clock: number;
+  /** 带血：受伤的人留下的痕迹更红 */
+  blood: boolean;
+}
+
+/** 有人经过某间屋子留下的动静（乌鸦叫、地板响）——不靠技能也能找人的线索 */
+export interface Disturbance {
+  room: RoomId;
+  /** 留下的回合 */
+  turn: number;
+  /** 留下的玩家行动计数，用来短线淡出 */
+  clock: number;
+  label: string;
 }
 
 export type MissionKind =
@@ -151,6 +235,12 @@ export interface Mission {
   maxWanted?: number;
   /** 允许逃走的 NPC 上限，超过即任务失败 */
   maxEscaped?: number;
+  /** 一句话主目标：任务条上永远看得见 */
+  objective?: string;
+  /** 达成条件：写清楚「做到什么就算成功」 */
+  successText?: string;
+  /** 失败条件：写清楚「没做到什么就失败」 */
+  failText?: string;
 }
 
 /** 每回合重置，用于结算杀手被动的一次性效果 */
@@ -177,10 +267,12 @@ export interface GameState {
   killerRuntime: KillerRuntime;
   arrestThreshold: number;
   turn: number;
+  /**
+   * 行动点（AP）：走路、砍人、打牌、搜索全都从这一个池子里扣。
+   * 原来「能量」和「步数」是两套资源，现在合并——想多走就少出牌，想连砍就别乱跑。
+   */
   energy: number;
   maxEnergy: number;
-  steps: number;
-  maxSteps: number;
   wanted: number;
   /** 最后一次被追查/目击的回合号：通缉值只在这个回合里保持，之后开始降温 */
   heatTurn: number;
@@ -188,6 +280,20 @@ export interface GameState {
   policeLock: number;
   /** 伏击生效的回合号：等于当前回合时，进门不会惊动任何人 */
   ambushTurn: number;
+  /** 感知生效的回合号：等于当前回合时，地图上会浮出红色人影（只有影子，没有身份） */
+  senseTurn: number;
+  /** 这一次挥刀是否已经收回来：砍完必须再做一件事才能砍第二刀 */
+  attackReady: boolean;
+  /** 玩家已经做了几次行动：痕迹按这个计数衰减，而不是按回合 */
+  trailClock: number;
+  /** 杀戮值 0–100：连续踩着脚印追会涨，满 50 后每回合多 2 行动点；见血或被击晕清零 */
+  frenzy: number;
+  /** 连续踩中脚印的次数：断了就不算「持续追踪」 */
+  frenzyStreak: number;
+  /** 地板上的痕迹，按留下顺序排列，越新越红 */
+  trails: Trail[];
+  /** 最近有人经过的房间：乌鸦叫 / 地板响，给玩家一个不靠技能的找人方向 */
+  disturbances: Disturbance[];
   playerRoom: RoomId;
   people: Person[];
   hand: CardInstance[];
@@ -229,7 +335,9 @@ export interface GameState {
   stalkMeter: number;
   stalkTargetId: string | null;
   possessed: boolean;
-  /** 图腾提供的下回合额外能量 */
+  /** 恶魔附身剩余回合：>0 时挥刀直接把健康的人放倒 */
+  possessTurns: number;
+  /** 图腾提供的下回合额外行动点 */
   bonusEnergyNextTurn: number;
   /** 已被破坏的障碍物房间 */
   clearedObstacles: RoomId[];
@@ -237,11 +345,11 @@ export interface GameState {
   /* ---------- NPC 逃跑系统 ---------- */
   /** 已经逃出这栋房子的人数 */
   escaped: number;
-  /** 堵门的房间：玩家进入要多花 1 步，需「所向无敌」清除 */
+  /** 堵门的房间：玩家进入要多花 1 行动点，需「所向无敌」清除 */
   barricades: RoomId[];
   /** 逃生点被封锁的剩余回合 */
   exitBlockedTurns: number;
-  /** 玩家被 NPC 反击造成的眩晕：下回合步数减少 */
+  /** 玩家被 NPC 反击造成的眩晕：下回合行动点减少 */
   stunTurns: number;
   /** 杀手能力冷却：powerId -> 剩余回合 */
   cooldowns: Record<string, number>;
@@ -259,6 +367,16 @@ export interface GameState {
   noiseRoom: RoomId | null;
   /** 消防斧/电闸这类设施被破坏后的标记 */
   sabotage: string[];
+
+  /* ---------- 幸存者团队目标 ---------- */
+  /** 本局随机挑出的团队目标房间：电闸 / 钥匙柜 */
+  objectiveRooms: RoomId[];
+  /** 团队目标进度 0–100，满了幸存者集体逃脱，玩家直接失败 */
+  teamProgress: number;
+  /** 这局他们要做的事，用于日志与任务条 */
+  teamGoalLabel: string;
+  /** 本局随机摆下的道具箱 / 发电机：杀手用不了，但能砸 */
+  siteItems: SiteItem[];
 }
 
 export interface SaveData {

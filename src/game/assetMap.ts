@@ -37,6 +37,9 @@ export const ASSET_PATHS: AssetPaths = {
     bonusBrutal: 'assets/ui/bonus-brutal.png',
     bonusHunt: 'assets/ui/bonus-hunt.png',
     bonusCunning: 'assets/ui/bonus-cunning.png',
+    crow: 'assets/ui/crow.webp',
+    itemBox: 'assets/ui/item-box.webp',
+    generator: 'assets/ui/generator.webp',
   },
 };
 

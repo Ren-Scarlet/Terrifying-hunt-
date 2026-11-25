@@ -228,6 +228,11 @@ button { font-family: inherit; cursor: pointer; }
 }
 .stat.wanted b { color: #cf6a52; }
 .stat.score b { color: #c9a86c; }
+.stat.frenzy { min-width: 84px; }
+.stat.frenzy b { color: #c46a4f; }
+.stat.frenzy.active b { color: #ff7a54; text-shadow: 0 0 10px #b73324; }
+.stat.frenzy .alarm-track { height: 3px; margin: 4px 0 3px; }
+.stat.frenzy.active .alarm-track span { background: linear-gradient(90deg, #8d3a2c, #ff7a54); box-shadow: 0 0 8px #b3452f88; }
 
 .stalk-meter { min-width: 200px; padding: 0 4px; }
 .stalk-label { display: flex; justify-content: space-between; font-size: 10px; letter-spacing: 2px; color: var(--faint); margin-bottom: 4px; text-transform: uppercase; }
@@ -348,7 +353,10 @@ button { font-family: inherit; cursor: pointer; }
  * 这里千万不能有实线边框——画在 Canvas 上的墙已经是实体，DOM 再描一圈亮边，
  * 十个房间立刻又变回十张漂浮的卡牌。
  */
-.room.reachable { cursor: pointer; border-color: rgba(96, 122, 142, .14); }
+.room.reachable { cursor: pointer; border-color: rgba(120, 160, 148, .3); }
+.room.reachable.adjacent { box-shadow: inset 0 0 0 1px rgba(120, 170, 150, .2); }
+.room.obstacle { border-color: rgba(150, 118, 70, .34); }
+.room.obstacle .room-name { color: #c7ad82; }
 .room.reachable:hover {
   border-color: rgba(150, 178, 196, .5);
   background: radial-gradient(ellipse at 50% 50%, rgba(125, 148, 166, .07), transparent 72%);
@@ -440,17 +448,80 @@ button { font-family: inherit; cursor: pointer; }
 .person-chip.police { border-color: #33485a; }
 .person-chip.civilian { border-color: #26292d; }
 .person-chip:hover { border-color: #b3945f; transform: translateY(-1px); }
+.person-chip.can-hit { cursor: crosshair; border-color: #7d2f22; box-shadow: 0 0 10px #4d0f08aa; }
+.person-chip.can-hit:hover { border-color: #c0472f; box-shadow: 0 0 14px #7d1a0ecc; transform: translateY(-1px); }
 
 .chip-alert {
   display: inline-grid; place-items: center;
-  width: 13px; height: 13px; border-radius: 50%;
-  background: #4b3f27; color: #e8cf9a;
-  font-size: 9px; font-weight: 800;
-  border: 1px solid #6b5c38;
+  min-width: 14px; height: 13px; padding: 0 3px;
+  border-radius: 7px;
+  background: #3a3324; color: #b8ab8c;
+  font-size: 8.5px; font-weight: 800; letter-spacing: -.2px;
+  font-family: var(--font-num);
+  border: 1px solid #55503e;
+  flex: 0 0 auto;
 }
+.chip-alert.mid { background: #4b3f27; color: #e8cf9a; border-color: #6b5c38; }
 .chip-alert.high { background: #6f2418; color: #ffd9cd; border-color: #9c3f2b; box-shadow: 0 0 8px #8d3a2caa; }
-.alert-tag { font-style: normal; font-size: 9px; padding: 0 4px; border-radius: 1px; background: #3d3423; color: #dbc58f; }
+.alert-tag { font-style: normal; font-size: 9px; padding: 0 4px; border-radius: 1px; background: #2c2a24; color: #8f8a7e; font-family: var(--font-num); }
+.alert-tag.mid { background: #3d3423; color: #dbc58f; }
 .alert-tag.high { background: #5f2118; color: #f0b5a3; }
+
+/* ---------- 感知到的人影：看得出「有人」，看不出是谁 ---------- */
+.room-shadows {
+  position: absolute; left: 0; right: 0; bottom: 6px;
+  z-index: 1; pointer-events: none;
+  display: flex; gap: 5px; justify-content: center;
+  filter: drop-shadow(0 0 5px #b8261d);
+}
+.shadow-figure {
+  width: 11px; height: 19px;
+  background: linear-gradient(180deg, #ff7b62 0%, #d02a1c 46%, #6d0f09 100%);
+  /* 头 + 肩 + 躯干的人形剪影，比一根红条更像"人影" */
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 38'%3E%3Ccircle cx='11' cy='6' r='5.2'/%3E%3Cpath d='M4 13.5 C4 12 6 11 11 11 C16 11 18 12 18 13.5 L20.5 26 L16.5 27 L16 38 L12.6 38 L11.6 27 L10.4 27 L9.4 38 L6 38 L5.5 27 L1.5 26 Z'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 38'%3E%3Ccircle cx='11' cy='6' r='5.2'/%3E%3Cpath d='M4 13.5 C4 12 6 11 11 11 C16 11 18 12 18 13.5 L20.5 26 L16.5 27 L16 38 L12.6 38 L11.6 27 L10.4 27 L9.4 38 L6 38 L5.5 27 L1.5 26 Z'/%3E%3C/svg%3E");
+  -webkit-mask-size: 100% 100%; mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+  opacity: .85;
+  animation: shadowBreathe 2.6s ease-in-out infinite;
+}
+@keyframes shadowBreathe {
+  0%, 100% { opacity: .55; transform: translateY(0) scaleY(.98); }
+  50% { opacity: .95; transform: translateY(-1px) scaleY(1); }
+}
+
+/* ---------- 地板上的脚印（血丝划痕素材） ---------- */
+.trail-layer {
+  position: absolute; inset: 0; z-index: 1;
+  pointer-events: none;
+  overflow: hidden;
+}
+.footprint {
+  position: absolute;
+  width: 24px; height: 24px;
+  transform: translate(-50%, -50%) rotate(var(--rot, 0deg));
+  background: #8a2a1c;
+  -webkit-mask: url('/assets/ui/trail.webp') center / contain no-repeat;
+  mask: url('/assets/ui/trail.webp') center / contain no-repeat;
+  opacity: .42;
+  filter: drop-shadow(0 0 3px #b03420) drop-shadow(0 0 8px #8d1c0e88);
+  transition: opacity .2s ease;
+}
+.footprint.fresh { opacity: .95; background: #d0402c; animation: trailGlow 2.4s ease-in-out infinite; }
+.footprint.blood { background: #e13a20; }
+.footprint.blood.fresh { filter: drop-shadow(0 0 5px #ff5230) drop-shadow(0 0 12px #b3200caa); }
+@keyframes trailGlow {
+  0%, 100% { filter: drop-shadow(0 0 2px #c03420) drop-shadow(0 0 5px #8d1c0e66); }
+  50% { filter: drop-shadow(0 0 6px #ff6140) drop-shadow(0 0 13px #c02a14bb); }
+}
+.legend-claw {
+  display: inline-block; width: 12px; height: 14px; margin-right: 4px;
+  background: #b73324;
+  -webkit-mask: url('/assets/ui/trail.webp') center / contain no-repeat;
+  mask: url('/assets/ui/trail.webp') center / contain no-repeat;
+  vertical-align: -3px;
+}
+.legend-trail { color: #a4594c; }
 
 /* 玩家标记：缩小、去掉金环，改为锈红细环 + 落影 */
 .player-marker {
@@ -681,6 +752,70 @@ button { font-family: inherit; cursor: pointer; }
 .btn.ghost { background: transparent; box-shadow: none; border-color: #2b2f33; color: #96918a; }
 .btn.ghost:hover { background: #ffffff06; color: #d4cec3; }
 .btn.mini { padding: 4px 10px; font-size: 10.5px; letter-spacing: 1.2px; }
+
+/* 挥刀：全游戏唯一的伤害来源，做得比普通按钮重一档 */
+.btn.attack {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 0;
+  min-width: 150px;
+  padding: 5px 14px 6px;
+  border-color: #7d3324;
+  background: linear-gradient(180deg, #33170f, #140b09);
+  box-shadow: inset 0 1px #ffffff10, 0 2px 10px #0008, inset 0 0 18px #8d2b1a33;
+}
+.btn.attack .atk-name { font-size: 13px; font-weight: 700; letter-spacing: 2.5px; color: #f0c0ae; }
+.btn.attack .atk-meta { font-size: 9px; letter-spacing: .2px; color: #9c7d70; max-width: 100%; }
+.btn.attack:hover:not(:disabled) {
+  border-color: #b0503a;
+  background: linear-gradient(180deg, #4a1e14, #1a0d0a);
+}
+.btn.attack:hover:not(:disabled) .atk-name { color: #ffded1; }
+/* 不能砍的时候也要看得清原因，所以不跟着 .btn:disabled 一起变灰 */
+.btn.attack:disabled { opacity: 1; cursor: not-allowed; transform: none; }
+.btn.attack.spent {
+  border-color: #33302c;
+  background: linear-gradient(180deg, #1a1b1d, #101112);
+  box-shadow: none;
+}
+.btn.attack.spent .atk-name { color: #79746d; }
+.btn.attack.spent .atk-meta { color: #6c6660; }
+
+/* 搜索房间：消耗 1 行动点，把柜子里的人翻出来 */
+.btn.search {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 0;
+  min-width: 132px; padding: 5px 12px 6px;
+  border-color: #4a5a3c;
+  background: linear-gradient(180deg, #1d2718, #0d110b);
+  box-shadow: inset 0 1px #ffffff10, 0 2px 10px #0008;
+}
+.btn.search .atk-name { font-size: 12px; font-weight: 700; letter-spacing: 2px; color: #cfe0b4; }
+.btn.search .atk-meta { font-size: 9px; color: #93a37e; }
+.btn.search:hover:not(:disabled) { border-color: #7d9a5e; background: linear-gradient(180deg, #2a3820, #141b10); }
+.btn.search:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+
+/* 房间上的动静 / 团队目标角标 */
+.room-tag.noise { background: #2b1b12cc; color: #e6a978; border-color: #6d4227; animation: noisePulse 1.6s ease-in-out infinite; }
+@keyframes noisePulse { 0%, 100% { opacity: .72; } 50% { opacity: 1; box-shadow: 0 0 7px #c2703a55; } }
+.room-tag.objective { background: #1a2430cc; color: #9fc4dd; border-color: #35526a; }
+.room.objective::after {
+  content: ''; position: absolute; inset: 3px;
+  border: 1px dashed #6d9fc455; pointer-events: none;
+}
+
+/* 团队目标进度：跟警戒一样是失败计时器 */
+.stat.team { min-width: 108px; }
+.stat.team b { color: #9fc4dd; }
+.stat.team.hot b { color: #ff9b6a; text-shadow: 0 0 9px #b3452f; }
+.stat.team .alarm-track { height: 3px; margin: 4px 0 3px; }
+.stat.team .alarm-track span { background: linear-gradient(90deg, #3b6a8c, #9fc4dd); }
+.stat.team.hot .alarm-track span { background: linear-gradient(90deg, #8d3a2c, #ff9b6a); }
+
+/* 任务条上的团队进度提醒与图例 */
+.mission-team { color: #9fc4dd; font-size: 10px; letter-spacing: .5px; white-space: nowrap; }
+.mission-team b { font-family: var(--font-num); color: #cfe4f5; }
+.mission-team.hot { color: #ff9b6a; }
+.mission-team.hot b { color: #ffbe8d; }
+.legend-noise { color: #e6a978; }
+.legend-objective { color: #9fc4dd; }
 .btn.ability {
   border-color: #6d2f22;
   background: linear-gradient(180deg, #341a15, #150e0d);
@@ -699,8 +834,9 @@ button { font-family: inherit; cursor: pointer; }
    弹层
    ========================================================================== */
 
+/* 结算弹窗必须盖住底部吸附的手牌栏（bottom-dock 是 30） */
 .overlay {
-  position: fixed; inset: 0; z-index: 20;
+  position: fixed; inset: 0; z-index: 100;
   padding: 20px;
   display: grid; place-items: center;
   background:
@@ -1311,6 +1447,9 @@ button { font-family: inherit; cursor: pointer; }
 .room.barricaded { box-shadow: inset 0 0 0 1px rgba(150, 122, 78, .3); }
 .room-tag.lock { background: #121d24cc; color: #9db8cc; border-color: #33485a; }
 .room-tag.bar { background: #221a0fcc; color: #d0b184; border-color: #5a4a2a; }
+.room-tag.go { background: #101d15cc; color: #9cc9a8; border-color: #2f4a37; }
+.room-tag.obstacle { background: #221a0fcc; color: #d0b184; border-color: #5a4a2a; }
+.room-tag.short { background: #1a1614cc; color: #9a8f82; border-color: #3a332c; }
 
 /* 顶栏「逃走」计数 */
 .stat.escaped b { color: #d99a86; }
@@ -1535,17 +1674,68 @@ button { font-family: inherit; cursor: pointer; }
 .mission-strip .mission-title em {
   font-style: normal; font-size: 10px; letter-spacing: 1px; color: var(--gold); opacity: .8;
 }
-.mission-strip .mission-desc {
-  margin-top: 2px;
-  font-size: 11px; color: var(--muted); line-height: 1.4;
-  overflow: hidden; display: -webkit-box;
-  -webkit-line-clamp: 1; -webkit-box-orient: vertical;
+.mission-strip .mission-objective {
+  margin-top: 3px; font-size: 11.5px; color: #ded6c6;
+  display: flex; align-items: baseline; gap: 6px;
 }
+.mission-strip .mission-objective b {
+  flex: 0 0 auto; font-size: 9px; letter-spacing: 1px;
+  padding: 1px 5px; border: 1px solid #6b4a2a; color: #d9b37f; background: #2a1d10;
+}
+.mission-strip .mission-rules {
+  margin-top: 3px; display: flex; flex-wrap: wrap; gap: 4px 12px;
+  font-size: 10px; line-height: 1.4;
+}
+.mission-strip .mission-ok { color: #7ea878; }
+.mission-strip .mission-fail { color: #b46a5c; }
 .mission-strip .mission-meta {
-  flex: 0 0 auto; display: flex; gap: 10px;
+  flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-end; gap: 4px;
   font-family: var(--font-num); font-size: 10px; letter-spacing: 1px; color: var(--faint);
   white-space: nowrap;
 }
+.mission-strip .mission-progress { color: #c9bb9c; font-size: 11px; }
+.mission-strip .mission-progress.done { color: #8fd08a; text-shadow: 0 0 10px #4c9a4688; }
+.mission-strip .mission-clock b { font-size: 14px; color: #ded8cc; }
+.mission-strip .mission-clock.hot b { color: #ff7b62; }
+.mission-strip.urgent { border-color: #7d3324; box-shadow: inset 0 0 20px #8d2b1a22; animation: missionUrgent 1.6s ease-in-out infinite; }
+@keyframes missionUrgent { 0%, 100% { border-color: #7d3324; } 50% { border-color: #c1523a; } }
+
+/* 恶魔附身期间的挥刀按钮 */
+.btn.attack.possessed {
+  border-color: #b7432e;
+  background: linear-gradient(180deg, #4a160f, #1a0806);
+  box-shadow: inset 0 0 22px #d3381f44, 0 0 14px #a3261744;
+}
+.btn.attack.possessed .atk-name { color: #ffb9a2; }
+.btn.attack.possessed .atk-meta { color: #d08b78; }
+
+/* 结算：胜负横幅、评级与契约达成清单 */
+.result-banner {
+  margin: -4px -4px 12px; padding: 7px 10px;
+  font-size: 11px; letter-spacing: 3px; text-align: center;
+  color: #f0d6a8; border: 1px solid #7a5a2c; border-radius: 2px;
+  background: linear-gradient(90deg, #2a1c0d, #4a2f12, #2a1c0d);
+  text-shadow: 0 0 12px #c9924a66;
+}
+.result-banner.lose {
+  color: #d7a79b; border-color: #6d3025;
+  background: linear-gradient(90deg, #23100d, #3a1712, #23100d);
+}
+.result-rank { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 4px 0 2px; }
+.result-rank small { font-size: 9px; letter-spacing: 2px; color: var(--faint); }
+.result-rank b { font-family: var(--font-num); font-size: 26px; color: var(--gold); text-shadow: 0 0 18px #b9915066; }
+.result-objective {
+  display: flex; align-items: center; gap: 10px; text-align: left;
+  margin: 12px 0 0; padding: 9px 12px;
+  border: 1px solid #3a3630; border-radius: 2px; background: #0a0c0e;
+}
+.result-objective.done { border-color: #3f6b3a; background: #0b120c; }
+.result-objective .result-check { font-size: 18px; color: #b4543f; }
+.result-objective.done .result-check { color: #8fd08a; }
+.result-objective small { display: block; font-size: 9px; letter-spacing: 2px; color: var(--faint); }
+.result-objective b { font-size: 12px; color: #ded8cc; }
+.result-modal.is-win { border-color: #6b542f; }
+.result-modal.is-lose { border-color: #5a2b22; }
 
 /* 底部吸附区：资源条 + 手牌一起贴在视口底部 */
 .bottom-dock {
@@ -1596,3 +1786,134 @@ button { font-family: inherit; cursor: pointer; }
 .threat-row.hot .t-name { color: #d69c8a; }
 .threat-row.hot .t-count { color: #d4694a; }
 .threat-row.hot .t-hint { color: #c2a99c; }
+
+/* ==========================================================================
+   可读性 / 场地物品 / 手机适配（统一放在最后，覆盖前面的旧值）
+   ========================================================================== */
+
+/* 桌面大屏：整体放大一档，不必眯着眼找 8px 的小字 */
+@media (min-width: 1280px) {
+  #app { zoom: 1.1; max-width: 1500px; }
+  .floorplan { max-height: max(260px, calc(100dvh - 610px)); }
+}
+
+/* 最暗的两级文字提亮，长文也不刺眼 */
+:root { --faint: #948d82; --muted: #a39c90; }
+body { min-height: 100vh; min-height: 100dvh; }
+button, .room-hit, .hand-row { touch-action: manipulation; }
+
+.room-name { font-size: 13px; }
+.room-desc { font-size: 11px; }
+.room-tag, .alert-tag { font-size: 10.5px; }
+.person-chip { font-size: 11.5px; }
+.chip-alert { font-size: 10px; min-width: 16px; height: 15px; }
+.panel h2 { font-size: 12.5px; }
+.panel-heading span { font-size: 11px; }
+.stat small { font-size: 10.5px; }
+.mission-title { font-size: 20px; }
+.mission-desc { font-size: 12.5px; }
+.mission-meta, .mission-team { font-size: 11.5px; }
+.card-desc { font-size: 12px; }
+.roster-person b { font-size: 13px; }
+.roster-person small { font-size: 11px; }
+.detail-body { font-size: 12.5px; }
+.detail-header p { font-size: 11.5px; }
+.guide-card p { font-size: 12px; }
+.guide-card b { font-size: 13px; }
+.menu-mission p { font-size: 12px; }
+.deck-row-info small, .shop-info small { font-size: 11px; }
+.log { font-size: 12px; line-height: 1.8; }
+.threat-row .t-name { font-size: 12px; }
+.threat-row .t-hint { font-size: 11.5px; }
+.btn.attack .atk-name, .btn.search .atk-name { font-size: 14px; }
+.btn.attack .atk-meta, .btn.search .atk-meta { font-size: 10.5px; }
+
+/* ---------- 乌鸦素材：动静角标与图例 ---------- */
+.crow-icon {
+  width: 16px; height: 16px; object-fit: contain; vertical-align: -4px;
+  filter: drop-shadow(0 0 5px #c07a2c);
+  animation: crowFlutter 2.1s ease-in-out infinite;
+}
+.crow-icon.tiny { width: 14px; height: 14px; }
+@keyframes crowFlutter {
+  0%, 100% { transform: translateY(0) rotate(-4deg); }
+  50% { transform: translateY(-2px) rotate(4deg); }
+}
+.room-tag.noise { display: inline-flex; align-items: center; gap: 3px; }
+.legend-noise, .legend-sites { display: inline-flex; align-items: center; gap: 4px; }
+
+/* ---------- 场地物品 ---------- */
+.room-feature.site { border-color: #6b5a30; background: #17140bcc; }
+.room-feature.site.generator { border-color: #3f6070; background: #0c151acc; }
+.room-feature.site.broken { opacity: .38; filter: grayscale(1); }
+.room-feature.site .ui-icon { width: 16px; height: 16px; opacity: 1; filter: none; }
+
+.btn.sabotage {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  padding: 6px 12px; min-width: 104px;
+  border: 1px solid #6b4a2a; border-radius: var(--radius);
+  background: linear-gradient(180deg, #211710, #120d09);
+}
+.btn.sabotage .atk-name { font-size: 13px; font-weight: 700; letter-spacing: 2px; color: #e0b183; }
+.btn.sabotage .atk-meta { font-size: 10px; color: #a1845e; }
+.btn.sabotage:hover:not(:disabled) { border-color: #b07b3f; box-shadow: 0 0 12px #8d5a2055; }
+.btn.sabotage:disabled, .btn.sabotage.spent { opacity: .42; }
+
+.facility-list { display: flex; flex-direction: column; gap: 5px; }
+.facility-row {
+  display: flex; align-items: center; gap: 8px; padding: 6px 8px;
+  border: 1px solid var(--line-soft); border-left: 2px solid #6b5a30;
+  border-radius: 2px; background: linear-gradient(90deg, #141310, transparent 90%);
+}
+.facility-row.generator { border-left-color: #3f6070; }
+.facility-row.broken { opacity: .5; }
+.facility-row.jammed { border-left-color: #8d3a2c; }
+.facility-icon { width: 28px; height: 28px; object-fit: contain; flex: 0 0 auto; }
+.facility-info { flex: 1; min-width: 0; }
+.facility-info b { display: block; font-size: 12px; color: #d8d2c7; }
+.facility-info small { display: block; font-size: 10.5px; color: var(--faint); }
+.facility-row .btn.mini { flex: 0 0 auto; }
+
+/* 人物手里的道具徽章 */
+.chip-item {
+  font-style: normal; font-size: 9.5px; padding: 0 4px; border-radius: 2px;
+  background: #20303a; color: #a9cfe4; border: 1px solid #3a5c6e;
+}
+
+/* ---------- 手机：地图保持可读尺寸，横向滑动看完整栋房子 ---------- */
+@media (max-width: 720px) {
+  html, body { max-width: 100%; overflow-x: hidden; }
+  #app { padding: 8px 8px 18px; max-width: 100%; }
+  .topbar { padding: 10px; gap: 10px; }
+  .brand { font-size: 20px; }
+  .mission-strip { flex-wrap: wrap; }
+  .stats { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .stat { min-width: 76px; padding: 3px 12px; }
+  .panel { padding: 10px; }
+  .panel-heading span { display: block; }
+  /* 房子不再被压成指甲盖：给一个能滑动的宽画布 */
+  .map-panel { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .floorplan {
+    width: 680px; min-width: 680px; max-width: none;
+    height: 544px; max-height: none; min-height: 0;
+    aspect-ratio: auto; margin-inline: 0;
+  }
+  .room { padding: 6px 7px; }
+  .room-name { font-size: 12px; }
+  .room-desc { display: block; font-size: 10px; }
+  .room-tag { font-size: 10px; padding: 2px 6px; }
+  .person-chip { font-size: 11px; }
+  .person-chip img { width: 22px; height: 22px; }
+  .bottom-dock { position: static; }
+  .hand-actions { flex-wrap: wrap; gap: 6px; }
+  .hand-actions .btn, .btn.mini { min-height: 44px; padding: 8px 12px; }
+  .hand-row { overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 6px; }
+  .card { flex: 0 0 154px; min-height: 214px; }
+  .side-column { gap: 10px; }
+  .map-legend { font-size: 11px; line-height: 1.9; }
+  .guide-grid, .menu-hero, .result-grid, .menu-stats, .deck-list { grid-template-columns: 1fr; }
+  .modal { width: calc(100% - 16px); max-height: 92dvh; overflow-y: auto; }
+}
+@media (max-width: 400px) {
+  .floorplan { width: 620px; min-width: 620px; height: 496px; }
+}

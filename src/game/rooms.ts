@@ -3,11 +3,12 @@ import type { Room, RoomId } from './types';
 /**
  * 房间没有固定的位置。
  *
- * 每开一局，`buildLayout()` 会在 5×4 的网格上随机「长出」一块连通的房间区，
+ * 每开一局，`buildLayout()` 会在 8×4 的网格上随机「长出」一块连通的房间区，
  * 再把房间随机塞进去——所以每一局的户型、走廊长度、后院挂在哪个方向都不一样。
  * 各处的 `ROOM_MAP[x].neighbors` / `rect` 都是开局时才填的，不要在模块加载阶段缓存。
  *
- * 15 间房（含后院）散在 20 个格子里，最远的两间要走 7 步以上——比固定户型经得起绕。
+ * 23 间房（含后院）散在 32 个格子里，最远的两间要走 10 步以上；
+ * 生成树只开少量环路，门少、走廊长——想追上一个人得真的绕房子，不是点两下就贴脸。
  */
 const BLUEPRINTS: Array<Pick<Room, 'id' | 'name' | 'desc'>> = [
   { id: 'attic', name: '阁楼', desc: '倾斜屋顶下堆满旧箱子，脚步声会被木板放大。' },
@@ -25,6 +26,14 @@ const BLUEPRINTS: Array<Pick<Room, 'id' | 'name' | 'desc'>> = [
   { id: 'laundry', name: '洗衣房', desc: '洗衣机还在转，地上全是水；烘干机后面能藏人。' },
   { id: 'garage', name: '车库', desc: '卷帘门半掩，汽车里还有余温，是撤离点。' },
   { id: 'garden', name: '后院', desc: '杂草没过脚踝，篱笆外是警笛的声音。' },
+  { id: 'foyer', name: '门厅', desc: '外套还挂在衣架上，门口的鞋印一路往里。' },
+  { id: 'library', name: '图书室', desc: '高到天花板的书架，梯子靠在最里侧，翻书声听得很清楚。' },
+  { id: 'wine', name: '酒窖', desc: '一排排落灰的瓶子，角落里有一扇没上锁的小门。' },
+  { id: 'guestroom', name: '客房', desc: '床罩平整得没人睡过，行李箱却已经打开了。' },
+  { id: 'workshop', name: '工具间', desc: '钉子、铁丝与生锈的剪子摊了一桌，够人找件趁手的东西。' },
+  { id: 'stairwell', name: '楼梯间', desc: '拐角处的灯坏了，每一步都在楼上回响一次。' },
+  { id: 'chapel', name: '小礼拜堂', desc: '长凳整齐排着，蜡烛还烧着，像有人刚离开。' },
+  { id: 'balcony', name: '阳台', desc: '栏杆外能看见整条街，也更早看见警灯。' },
 ];
 
 export const ROOMS: Room[] = BLUEPRINTS.map((b) => ({
@@ -47,7 +56,7 @@ export const ENTRY_ROOM: RoomId = 'hall';
 export const EXIT_ROOM: RoomId = 'garage';
 export const POLICE_START: RoomId = 'garden';
 
-/** 图腾：在此结束回合，下回合额外获得 1 点能量 */
+/** 图腾：在此结束回合，下回合额外获得 1 点行动点 */
 export const TOTEM_ROOMS: RoomId[] = ['attic', 'basement'];
 /** 柜子 / 床底 / 浴帘后：藏在这里的人不会被大部分卡牌锁定，要搜索才能揪出来 */
 export const CABINET_ROOMS: RoomId[] = ['bedroom', 'nursery', 'study', 'laundry', 'bathroom'];
@@ -64,8 +73,8 @@ export const WEAPON_ROOMS: RoomId[] = ['kitchen', 'garage', 'conservatory'];
 /*  户型生成                                                            */
 /* ==================================================================== */
 
-const COLS = 6;
-const ROWS = 3;
+const COLS = 8;
+const ROWS = 4;
 /** 平面图画布的内边距与格子之间的缝（百分比），保证相邻房间之间留出墙体 */
 const PAD = 2;
 const GAP = 2;
@@ -183,7 +192,11 @@ export function buildLayout(): string {
 
   // ③ 再开几条环路：完全没有环的房子会变成死胡同迷宫，追人时只能硬堵
   const used = new Set(treeEdges.map(([a, b]) => `${a}-${b}`));
-  const extras = shuffle(candidates.filter(([a, b]) => !used.has(`${a}-${b}`))).slice(0, 3);
+  // 环路数量跟着房间数走：屋子越大，绕路的可能越多，但始终以生成树为主
+  const extras = shuffle(candidates.filter(([a, b]) => !used.has(`${a}-${b}`))).slice(
+    0,
+    Math.max(3, Math.round(ROOMS.length / 5)),
+  );
   const edges = [...treeEdges, ...extras];
 
   const adjacency = new Map<number, Cell[]>();

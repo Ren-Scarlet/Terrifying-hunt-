@@ -30,6 +30,10 @@ import type {
   ResultKind,
   RoomId,
   ScoreLine,
+  Trail,
+  SiteItem,
+  SiteItemKind,
+  SurvivorItem,
 } from './types';
 
 /* ==================================================================== */
@@ -45,6 +49,77 @@ export const ALARM_MAX = 100;
 /** 站在后院的人至少要有这么高的警觉，才会想到翻篱笆（否则只是路过） */
 const ESCAPE_ALERT_MIN = 35;
 
+/** 挥刀 / 搜索各自消耗 1 点行动点：唯一的伤害来源，不能免费 */
+export const ATTACK_COST = 1;
+export const SEARCH_COST = 1;
+/** 恶魔附身持续回合：期间挥刀伤害翻倍，健康的人一刀倒地 */
+export const POSSESS_TURNS = 3;
+/** 每回合基础行动点：走路、砍人、打牌、搜索全从这一个池子里扣 */
+export const BASE_AP = 7;
+/**
+ * 一个人一回合最多能跑几间屋（含被砍后夺路而逃的那两步）。
+ * 玩家一回合 7 点行动点，这个数字必须比它能走的格数小，否则永远追不上；
+ * 但它也不能太小，否则「警觉就跑得很远」只是一句台词。
+ */
+const REACT_MOVE_CAP = 3;
+/** 被砍伤后当场夺路而逃的步数：一刀下去，他会连着跑两间屋 */
+const PANIC_HOPS_ON_HIT = 2;
+/** 痕迹留几回合（含留下的那回合） */
+export const TRAIL_TURNS = 3;
+/**
+ * 痕迹只保留最近这么多次「玩家行动」留下的（不是按回合）。
+ * 跟着脚印走，旧的会一步步被擦掉；走错方向再回头，那条线索已经没了。
+ */
+const TRAIL_ACTION_WINDOW = 2;
+/** 动静（乌鸦叫）也只留最近这么多次行动：短线索，不是常驻雷达 */
+const DISTURBANCE_WINDOW = 3;
+/** 杀戮值上限 / 激活阈值：满值后每回合多 2 行动点，由玩家自己决定怎么走 */
+export const FRENZY_MAX = 100;
+export const FRENZY_THRESHOLD = 50;
+/** 满值给的额外行动点：不替玩家走第二步，只把「能多走」交到他手里 */
+export const FRENZY_AP_BONUS = 2;
+/** 每跟对一段脚印涨多少，跟丢一次掉多少 */
+const FRENZY_GAIN = 25;
+const FRENZY_LOSS = 20;
+/** 幸存者团队目标：满了他们就集体逃走，玩家直接失败 */
+export const TEAM_GOAL_MAX = 100;
+/** 一个人在目标房间待一回合推进的进度 */
+const OBJECTIVE_GAIN = 5;
+
+/* ---------- 场地物品：道具箱 / 发电机 ---------- */
+/** 砸掉一件设施要花 1 点行动点，算一次玩家行动 */
+export const SABOTAGE_COST = 1;
+/** 每局两个道具箱，每个能发三件东西 */
+const ITEM_BOX_COUNT = 2;
+export const ITEM_BOX_CHARGES = 3;
+/** 发电机每局随机 1~2 台 */
+const GENERATOR_MIN = 1;
+const GENERATOR_MAX = 2;
+/** 在发电机房间待一回合推进多少；带工具箱翻倍 */
+const GENERATOR_GAIN = 9;
+/** 修满一台，一次性给团队进度的奖励 */
+const GENERATOR_CHARGED_BONUS = 26;
+/** 砸发电机扣掉的修复进度 / 已通电时倒退的团队进度 */
+const SABOTAGE_GEN_LOSS = 45;
+const SABOTAGE_TEAM_LOSS = 22;
+/** 砸坏后停机几回合，这段时间修不了 */
+export const GENERATOR_JAM_TURNS = 2;
+
+/** 幸存者从道具箱翻出来的东西：这些都是「选择」，不是写死的全局规则 */
+export const SURVIVOR_ITEM_LABEL: Record<SurvivorItem, string> = {
+  medkit: '医疗包',
+  toolbox: '工具箱',
+  flare: '信号弹',
+  key: '后门钥匙',
+  weapon: '防身武器',
+  smoke: '烟雾弹',
+};
+
+export const SITE_ITEM_LABEL: Record<SiteItemKind, string> = {
+  itemBox: '道具箱',
+  generator: '发电机',
+};
+
 export const INTENT_LABEL: Record<NpcIntent, string> = {
   idle: '做自己的事',
   wary: '起疑',
@@ -56,6 +131,7 @@ export const INTENT_LABEL: Record<NpcIntent, string> = {
   stunned: '动不了',
   heal: '正在治疗',
   rescue: '正在救援',
+  work: '在忙团队的事',
 };
 
 export const GOAL_LABEL: Record<NpcGoal, string> = {
@@ -66,6 +142,10 @@ export const GOAL_LABEL: Record<NpcGoal, string> = {
   weapon: '想找东西反抗',
   panic: '只想活下去',
   help: '想救同伴',
+  objective: '在修电闸 / 凑钥匙',
+  key: '在找后门钥匙',
+  supply: '想去道具箱找点能用的',
+  generator: '想去把发电机修好',
 };
 
 export const ARCH_LABEL: Record<Archetype, string> = {
@@ -152,8 +232,17 @@ function findVictim(
   room: RoomId,
   maxHp = Infinity,
   allowDowned = false,
+  targetId?: string,
 ): Person | undefined {
   const inRoom = peopleInRoom(state, room).filter((p) => p.role !== 'police');
+  // 玩家点了某个人：只打他，不再按「目标 > 平民」自动挑
+  if (targetId) {
+    const picked = inRoom.find((p) => p.id === targetId);
+    if (!picked) return undefined;
+    if (picked.hp <= 0 && !allowDowned) return undefined;
+    if (picked.hp > maxHp) return undefined;
+    return picked;
+  }
   const rank = (list: Person[]) =>
     list.find((p) => p.role === 'target' && p.marked) ??
     list.find((p) => p.role === 'target') ??
@@ -227,10 +316,15 @@ export { roomName };
 /*  视野：三层战争迷雾                                                   */
 /* ==================================================================== */
 
-/** 当前能不能看见这个房间：你所在的房间、相邻房间、被侦查过的房间 */
+/**
+ * 当前能不能看见这个房间里的「人」。
+ *
+ * 只有你站着的这一间、以及被侦查 / 感知临时点亮的房间才看得见人。
+ * 相邻房间只给你轮廓和名字（explored），不再白送「隔壁有谁」——
+ * 找人要靠走进去、脚印、乌鸦动静，或者侦查 / 感知卡牌。
+ */
 export function isRoomVisible(state: GameState, room: RoomId): boolean {
   if (room === state.playerRoom) return true;
-  if (ROOM_MAP[state.playerRoom].neighbors.includes(room)) return true;
   return (state.scouted[room] ?? 0) > 0;
 }
 
@@ -279,6 +373,164 @@ function refreshVision(state: GameState): void {
       .map(([k, v]) => [k, (v ?? 0) - 1])
       .filter(([, v]) => (v as number) > 0),
   ) as Partial<Record<RoomId, number>>;
+}
+
+/* ==================================================================== */
+/*  痕迹与感知                                                          */
+/* ==================================================================== */
+
+/**
+ * 这个人现在是在乱跑吗？
+ *
+ * 只有慌乱中的移动才会在地板上刮出痕迹——悠闲散步的人不会留下脚印，
+ * 否则满地图的红线会把「追」这件事变成看地图。
+ */
+function leavesTrail(person: Person): boolean {
+  return (
+    person.intent === 'flee' ||
+    person.intent === 'escape' ||
+    person.intent === 'call' ||
+    person.alert >= 45 ||
+    person.hp < 2
+  );
+}
+
+/**
+ * 老练的幸存者有时会踮着脚走：不留鞋印，也不惊动乌鸦。
+ * 用「行动计数 + 人物 id」做稳定判定，同一次行动里各处埋点结果一致；
+ * 下一次行动就会变——所以他不是永远安静，玩家总还有机会找到他。
+ */
+function isQuietMove(state: GameState, person: Person): boolean {
+  if (!person.sneaky) return false;
+  const seed =
+    (state.trailClock * 31 + person.id.length * 17 + state.turn * 7 + person.room.length * 13) % 100;
+  return seed < 45;
+}
+
+const NOISE_LABELS = [
+  '一群乌鸦扑棱着飞起',
+  '木地板吱呀响了一声',
+  '柜门被轻轻碰上',
+  '有人压着嗓子咳嗽',
+];
+
+/** 有人经过：不靠技能也能得到的方向提示 */
+function addDisturbance(state: GameState, room: RoomId): void {
+  // 同一间屋隔两次行动才再报一次，免得玩家每动一下都刷一条乌鸦叫
+  if (state.disturbances.some((d) => d.room === room && state.trailClock - d.clock <= 2)) return;
+  const label = randomOf(NOISE_LABELS);
+  state.disturbances.push({ room, turn: state.turn, clock: state.trailClock, label });
+  if (state.disturbances.length > 24) state.disturbances.splice(0, state.disturbances.length - 24);
+  log(state, `${roomName(room)}那边${label}——刚有人经过。`);
+}
+
+/** 还能听见的动静：短线索，走两步就断 */
+export function visibleDisturbances(state: GameState): GameState['disturbances'] {
+  return state.disturbances.filter((d) => state.trailClock - d.clock <= DISTURBANCE_WINDOW);
+}
+
+function pushTrail(state: GameState, room: RoomId, to: RoomId, blood: boolean): void {
+  if (room === to) return;
+  if (state.trails.some((t) => t.turn === state.turn && t.room === room && t.to === to)) return;
+  state.trails.push({ room, to, turn: state.turn, clock: state.trailClock, blood });
+  if (state.trails.length > 80) state.trails.splice(0, state.trails.length - 80);
+}
+
+/** 一段动作结束后，比对前后房间，把真正跑掉的路线与动静记下来 */
+function recordTrails(state: GameState, before: Map<string, RoomId>): void {
+  npcs(state).forEach((p) => {
+    const from = before.get(p.id);
+    if (!from || from === p.room) return;
+    // 悄悄走：不留鞋印，也不惊动乌鸦
+    if (isQuietMove(state, p)) return;
+    if (leavesTrail(p)) pushTrail(state, from, p.room, p.hp < 2);
+    addDisturbance(state, p.room);
+  });
+}
+
+function snapshotRooms(state: GameState): Map<string, RoomId> {
+  return new Map(npcs(state).map((p) => [p.id, p.room]));
+}
+
+function pruneTrails(state: GameState): void {
+  state.trails = state.trails.filter((t) => state.trailClock - t.clock <= TRAIL_ACTION_WINDOW);
+}
+
+function pruneDisturbances(state: GameState): void {
+  state.disturbances = state.disturbances.filter(
+    (d) => state.trailClock - d.clock <= DISTURBANCE_WINDOW,
+  );
+}
+
+/**
+ * 地面上还能看见的痕迹。
+ *
+ * 不按"是否探索过"过滤：血迹是跨出门槛的证据，正是靠它才敢往没进去过的房间走。
+ * 房间里叫什么仍然不知道，但地板上那道划痕指向哪里，你看得见。
+ */
+export function visibleTrails(state: GameState): Trail[] {
+  return state.trails.filter((t) => state.trailClock - t.clock <= TRAIL_ACTION_WINDOW);
+}
+
+/** 感知：这一回合地图上浮着全场红色人影（只有影子，不告诉你那是谁） */
+export function isSensing(state: GameState): boolean {
+  return state.senseTurn === state.turn;
+}
+
+/**
+ * 玩家做完一个动作之后：房子不会站着等你。
+ * 跑掉的人继续跑、求救的人继续摸电话、救援的人继续包扎——只不过一回合有上限。
+ */
+function npcReact(state: GameState): void {
+  if (state.result) return;
+  const before = snapshotRooms(state);
+  for (const person of npcs(state)) {
+    if (state.result) return;
+    if (!state.people.some((p) => p.id === person.id)) continue;
+    // 倒地、藏着、被按住的人在原地等；屋里的人留给进门反应与回合结算
+    if (person.hp <= 0 || person.hidden) continue;
+    if (person.room === state.playerRoom) continue;
+    if (person.blockedTurns > 0 || state.pinnedPeople.includes(person.id)) continue;
+    if (person.movesThisTurn >= REACT_MOVE_CAP) continue;
+    // 后院翻篱笆是回合结束的结算，不在这中间偷偷逃出去
+    if (wantsToLeave(person)) continue;
+
+    const fleeing = person.intent === 'flee' || person.intent === 'escape';
+    const busy =
+      person.intent === 'call' ||
+      person.intent === 'heal' ||
+      person.intent === 'rescue' ||
+      ((person.archetype === 'rescuer' || person.archetype === 'hider' || person.archetype === 'caller') &&
+        person.alert >= 25);
+    if (!fleeing && !busy) continue;
+
+    person.movesThisTurn += 1;
+    if (fleeing) fleeAway(state, person, true);
+    else actByArchetype(state, person);
+  }
+  recordTrails(state, before);
+  rememberVisible(state);
+}
+
+/** 不做计时结算，只把「现在看得见谁」记成最后确认位置 */
+function rememberVisible(state: GameState): void {
+  npcs(state).forEach((p) => {
+    if (!p.hidden && isRoomVisible(state, p.room)) {
+      p.lastSeenRoom = p.room;
+      p.lastSeenTurn = state.turn;
+    }
+  });
+}
+
+/** 玩家每一个动作结束后的统一收尾：世界动一下，视野记一下，胜负判一下 */
+function afterPlayerAction(state: GameState): void {
+  if (state.result) return;
+  npcReact(state);
+  // 玩家的一次行动结束：痕迹的寿命按行动数走，不是按回合。
+  // 这让「跟着脚印走」变成一段短线索，走错再回头就真的断了。
+  state.trailClock += 1;
+  pruneTrails(state);
+  pruneDisturbances(state);
 }
 
 /* ==================================================================== */
@@ -418,6 +670,8 @@ function damagePerson(state: GameState, person: Person, amount: number): void {
   const dmg = Math.max(0, amount + state.bonusDamage);
   state.bonusDamage = 0;
   if (dmg <= 0) return;
+  // 见血就清醒：杀戮值一脚踩空
+  state.frenzy = 0;
 
   const before = person.hp;
   person.hidden = false;
@@ -460,8 +714,12 @@ function damagePerson(state: GameState, person: Person, amount: number): void {
       p.alert = clamp(p.alert + 18, 0, 100);
     });
   addAlarm(state, 3);
-  // 受伤后立刻拉开距离，这是玩家必须提前封路的原因
-  fleeAway(state, person);
+  // 一刀下去他会连着跑两间屋，地板上留下一道血痕：
+  // 「砍一刀、他挪一格、我跟上去」那种没有张力的追逐到此为止。
+  for (let i = 0; i < PANIC_HOPS_ON_HIT; i++) {
+    if (!fleeAway(state, person)) break;
+    person.movesThisTurn += 1;
+  }
 }
 
 function executePerson(state: GameState, person: Person): void {
@@ -708,6 +966,19 @@ export function runOps(state: GameState, ops: Op[]): void {
         );
         break;
       }
+      case 'pulse': {
+        // 只给影子，不给身份：地图上每个人所在的位置浮出一个红色人影，
+        // 而且只亮这一回合——之后的去向要靠地面上的痕迹。
+        state.senseTurn = state.turn;
+        const alive = npcs(state).filter((p) => p.hp > 0 && !p.hidden);
+        log(
+          state,
+          alive.length
+            ? `你感觉到 ${alive.length} 个活人的位置——地图上浮起红色人影，但你看不清是谁。`
+            : '你什么也感觉不到。',
+        );
+        break;
+      }
       case 'search': {
         const here = peopleInRoom(state, state.playerRoom).filter((p) => p.role !== 'police');
         const found = here.filter((p) => p.hidden);
@@ -776,14 +1047,18 @@ export function runOps(state: GameState, ops: Op[]): void {
         break;
       case 'energy':
         state.energy = clamp(state.energy + op.amount, 0, 99);
+        if (op.amount > 0) log(state, `行动点 +${op.amount}。`);
         break;
       case 'steps':
-        state.steps = clamp(state.steps + op.amount, 0, 99);
-        if (op.amount > 0) log(state, `本回合步数 +${op.amount}。`);
+        // 兼容旧卡面：原本叫「步数」，统一行动点后同样加进 AP 池
+        state.energy = clamp(state.energy + op.amount, 0, 99);
+        if (op.amount > 0) log(state, `行动点 +${op.amount}。`);
         break;
       case 'stun':
         state.stunTurns += op.amount;
-        log(state, `你被绊了一下，下回合少 ${state.stunTurns} 步。`);
+        state.frenzy = 0;
+        state.frenzyStreak = 0;
+        log(state, `你被绊了一下，下回合少 ${state.stunTurns} 点行动点。`);
         break;
       case 'evidence':
         state.evidence += op.amount;
@@ -893,6 +1168,9 @@ export function runOps(state: GameState, ops: Op[]): void {
             state.freeMove = true;
             break;
           case 'possessReady':
+            state.possessed = true;
+            state.possessTurns = POSSESS_TURNS;
+            log(state, `恶魔附身：接下来 ${POSSESS_TURNS} 回合，每一刀都直接把人放倒。`);
             break;
         }
         break;
@@ -935,8 +1213,13 @@ function wantsToLeave(person: Person): boolean {
   );
 }
 
-/** 往离玩家最远的方向跑一步 */
-function fleeAway(state: GameState, person: Person): boolean {
+/**
+ * 往离玩家最远的方向跑一步
+ *
+ * quiet：玩家每动一下都会触发一次这样的逃跑，日志不能跟着刷屏；
+ * 这时候只留地面上的痕迹，让玩家自己看地板。
+ */
+function fleeAway(state: GameState, person: Person, quiet = false): boolean {
   if (state.pinnedPeople.includes(person.id) || person.blockedTurns > 0 || person.hp <= 0) return false;
   // 后院是出口：只有本来就打算离开、或者已经吓破胆的人才会往外跑。
   // 否则「被追」等于「自动逃生」，玩家把人逼到院子里反而在帮对手。
@@ -952,6 +1235,7 @@ function fleeAway(state: GameState, person: Person): boolean {
   );
   if (!options.length) return false;
   const from = roomName(person.room);
+  const fromId = person.room;
   const best = options
     .map((r) => ({ r, d: roomDistance(r, state.playerRoom) }))
     .sort((a, b) => b.d - a.d);
@@ -960,6 +1244,12 @@ function fleeAway(state: GameState, person: Person): boolean {
   person.alert = Math.max(0, person.alert - 12);
   person.intent = 'flee';
   person.activity = '夺路而逃';
+  // 老练的人踮着脚走：这一步连脚印都不留，也不惊动乌鸦
+  if (!isQuietMove(state, person)) {
+    pushTrail(state, fromId, person.room, person.hp < 2);
+    addDisturbance(state, person.room);
+  }
+  if (quiet) return true;
   log(state, `${person.name} 从${from}逃向${roomName(person.room)}。`);
   shout(state, person, 14);
   return true;
@@ -994,6 +1284,7 @@ function shout(state: GameState, person: Person, base = 18): void {
 function npcOnPlayerEnter(state: GameState): void {
   const hidden = playerIsHidden(state);
   const ambush = ambushActive(state);
+  const before = snapshotRooms(state);
   const here = peopleInRoom(state, state.playerRoom).filter(
     (p) => p.role !== 'police' && p.hp > 0,
   );
@@ -1022,13 +1313,10 @@ function npcOnPlayerEnter(state: GameState): void {
       person.alert = 100;
     }
 
-    // 用「进门之前」的警觉判断他是不是早就绷着弦：
-    // 刚看见你和已经在追杀你是两回事，不该混成一个阈值。
+    // 用「进门之前」的警觉决定他有多慌，但推门这个动作本身就是一次照面：
+    // 只要没打伏击，屋里的人就会察觉并转身跑——不存在「他背对着门没看见你」的白送窗口。
+    // 「进门不惊动任何人」是静止隐身这张牌买来的，不该白送。
     const wasAlert = person.alert;
-
-    // 背对着门、忙着翻抽屉的人不会在门响的一瞬间回头。
-    // 这是唯一「不用卡也能摸到人」的窗口，也是安静打法的立足点。
-    const unaware = wasAlert < 30 && !person.hidden;
 
     let gain = 30;
     if (threat === 'spiritual') gain = 65;
@@ -1039,12 +1327,6 @@ function npcOnPlayerEnter(state: GameState): void {
     if (hidden && threat !== 'spiritual') gain = Math.round(gain * 0.4);
     person.alert = clamp(person.alert + gain, 0, 100);
 
-    if (unaware) {
-      person.intent = 'wary';
-      person.activity = '背对着门，没有察觉';
-      return;
-    }
-
     // 看见你就等于确认「杀手在这间屋里」——不会站着等你出牌。
     // 想在他们转身之前动手，就得靠伏击；想在他们跑掉之后补刀，就得靠追击。
     if (person.archetype === 'defiant' && person.armed && person.room === state.playerRoom) {
@@ -1052,13 +1334,19 @@ function npcOnPlayerEnter(state: GameState): void {
       return;
     }
 
-    if (fleeAway(state, person)) {
+    // 已经跑满这一回合的人，腿已经不听使唤了：门一开他也只能贴着墙喘气。
+    // 这是玩家唯一能稳稳砍中「警觉的人」的机会，也是痕迹系统的兑现点。
+    const exhausted = person.movesThisTurn >= REACT_MOVE_CAP;
+    if (!exhausted && fleeAway(state, person)) {
+      person.movesThisTurn += 1;
       person.alert = 100;
       log(
         state,
         wasAlert >= 85
           ? `${person.name} 根本没等你站稳，已经冲出了门口。`
-          : `${person.name} 看见你，转身就跑。`,
+          : wasAlert < 30
+            ? `门一响，${person.name} 猛地回头，撒腿就跑。`
+            : `${person.name} 看见你，转身就跑。`,
       );
       return;
     }
@@ -1066,19 +1354,32 @@ function npcOnPlayerEnter(state: GameState): void {
     // 退无可退：被堵在墙角的人只能贴着墙看着你
     person.intent = 'wary';
     person.alert = 100;
-    person.activity = '无路可退，贴着墙盯着你';
-    log(state, `${person.name} 想跑，但门口被你占着——他退到了墙角。`);
+    person.activity = exhausted ? '跑不动了，靠着墙喘气' : '无路可退，贴着墙盯着你';
+    log(
+      state,
+      exhausted
+        ? `${person.name} 跑了整整一路，这会儿只能扶着墙喘气——你终于追上他了。`
+        : `${person.name} 想跑，但门口被你占着——他退到了墙角。`,
+    );
   });
+  // 门口那一步也会在地板上留下痕迹：你至少知道他是从哪儿溜走的
+  recordTrails(state, before);
 }
 
 /** 反抗型 / 英勇型的正面反击：玩家下回合少走一步 */
 function counterAttack(state: GameState, person: Person): void {
-  state.stunTurns += 1;
+  // 手里有防身武器的人反手更狠：多拖一点行动点
+  const heavy = person.item === 'weapon';
+  state.stunTurns += heavy ? 2 : 1;
+  if (heavy) person.item = null;
+  // 被反手推开：追势断了，杀戮清零
+  state.frenzy = 0;
+  state.frenzyStreak = 0;
   person.alert = 100;
   person.intent = 'wary';
   person.activity = '握着刀挡在门口';
   addAlarm(state, 4);
-  log(state, `${person.name} 抄起武器朝你扑过来——你被逼退了一步（下回合少 1 步）。`);
+  log(state, `${person.name} 抄起武器朝你扑过来——你被逼退了一步（下回合少 ${heavy ? 2 : 1} 点行动点）。`);
 }
 
 function barricadeRoom(state: GameState, person: Person): void {
@@ -1303,6 +1604,7 @@ function actByArchetype(state: GameState, person: Person): void {
 
 /** 回合结束时 NPC 的一轮行动 */
 function npcTurn(state: GameState): void {
+  const before = snapshotRooms(state);
   for (const person of [...npcs(state)]) {
     if (state.result) return;
     if (!state.people.some((p) => p.id === person.id)) continue;
@@ -1348,7 +1650,9 @@ function npcTurn(state: GameState): void {
       // 藏起来的人只在玩家进房间且警觉拉满时才会冲出去
       if (person.room === state.playerRoom && person.alert >= 85) {
         person.hidden = false;
-        fleeAway(state, person);
+        if (person.movesThisTurn < REACT_MOVE_CAP && fleeAway(state, person)) {
+          person.movesThisTurn += 1;
+        }
       } else {
         person.intent = 'hide';
         person.activity = '缩在柜子里，不敢出声';
@@ -1363,11 +1667,15 @@ function npcTurn(state: GameState): void {
         counterAttack(state, person);
         continue;
       }
-      if (fleeAway(state, person)) continue;
-      if (person.archetype === 'defiant') barricadeRoom(state, person);
-      else {
+      if (person.movesThisTurn < REACT_MOVE_CAP && fleeAway(state, person)) {
+        person.movesThisTurn += 1;
+        continue;
+      }
+      if (person.archetype === 'defiant' && person.movesThisTurn < REACT_MOVE_CAP) {
+        barricadeRoom(state, person);
+      } else {
         person.intent = 'wary';
-        person.activity = '贴在墙边，盯着你';
+        person.activity = person.movesThisTurn >= REACT_MOVE_CAP ? '跑不动了，靠着墙喘气' : '贴在墙边，盯着你';
       }
       continue;
     }
@@ -1381,6 +1689,30 @@ function npcTurn(state: GameState): void {
 
     // 玩家离开后：救援优先于一切
     if (tryRescue(state, person)) continue;
+
+    // 手里有道具的人会挑时机用掉它（救人、报警、开后门、抹掉脚印…）
+    if (useSurvivorItem(state, person)) continue;
+
+    // 跑了一整回合的人会喘不上气：找个角落停下来，甚至钻进柜子。
+    // 这就是「痕迹」能兑现的地方——你不是追上他，是跟着地板上的划痕找到他。
+    const ranFar = person.movesThisTurn >= 2 && roomDistance(state.playerRoom, person.room) >= 2;
+    if (ranFar && person.intent !== 'call' && person.intent !== 'escape' && Math.random() < 0.7) {
+      person.alert = Math.max(0, person.alert - 30);
+      person.intent = 'wary';
+      person.activity = '跑不动了，蹲在原地喘气';
+      if (CABINET_ROOMS.includes(person.room) && Math.random() < 0.55) {
+        person.hidden = true;
+        person.activity = '钻进柜子，屏住呼吸';
+        log(state, `${person.name} 躲进了${roomName(person.room)}的柜子——地板上的痕迹到这里就断了。`);
+      }
+      continue;
+    }
+
+    // 这一回合已经跑满了：再急也只能靠着墙缓一口
+    if (person.movesThisTurn >= REACT_MOVE_CAP) {
+      person.activity = '靠在墙上喘气，跑不动了';
+      continue;
+    }
 
     // 已经决定要跑/要打电话的人不会因为稍微冷静就放弃
     const committed = person.intent === 'escape' || person.intent === 'call';
@@ -1402,21 +1734,71 @@ function npcTurn(state: GameState): void {
       continue;
     }
 
-    // 低警觉：做自己的事，偶尔换房间。闲逛永远走不到后院——
-    // 逃出房子必须是「决定要走」，不能是散步散出去的。
+    // 低警觉：不再漫无目的地乱晃，各自朝这一局的个人目标走一步。
+    // 到了目标房间就「做事」——推进团队进度，同时弄出动静给玩家一条线索。
     person.intent = 'idle';
-    if (Math.random() < 0.3) {
-      const options = ROOM_MAP[person.room].neighbors.filter(
-        (r) =>
-          r !== state.playerRoom &&
-          !isLocked(state, r) &&
-          canStand(state, r) &&
-          !ESCAPE_ROOMS.includes(r),
+    // 路过没被砸烂的道具箱就翻一件：他们多一条路，你就多一个要盯的地方
+    if (tryTakeSupply(state, person)) continue;
+
+    const goalTargets: RoomId[] =
+      person.goal === 'objective'
+        ? state.objectiveRooms
+        : person.goal === 'key'
+          ? [EXIT_ROOM]
+          : person.goal === 'supply'
+            ? usableItemBoxes(state).map((i) => i.room)
+            : person.goal === 'generator'
+              ? state.siteItems.filter((i) => i.kind === 'generator' && !i.broken && !i.charged).map((i) => i.room)
+              : person.goal === 'phone'
+                ? PHONE_ROOMS
+                : person.goal === 'weapon' || person.goal === 'gather'
+                  ? WEAPON_ROOMS
+                  : person.goal === 'hide'
+                    ? CABINET_ROOMS
+                    : person.goal === 'help'
+                      ? [nearestOf(person.room, CABINET_ROOMS)]
+                      : person.goal === 'exit' || person.goal === 'panic'
+                        ? ESCAPE_ROOMS
+                        : [person.room];
+    const target = nearestOf(person.room, goalTargets.length ? goalTargets : [person.room]);
+    if (target === person.room) {
+      // 发电机是「完成目的」的另一条路：站在这儿修，修满直接给团队进度一大块。
+      // 带工具箱的人修得翻倍——道具箱因此值得抢，也值得砸。
+      const gen = state.siteItems.find(
+        (i) => i.kind === 'generator' && i.room === person.room && !i.broken && i.jammedTurns === 0 && !i.charged,
       );
-      if (options.length) person.room = randomOf(options);
+      if (gen) {
+        const gain = GENERATOR_GAIN * (person.item === 'toolbox' ? 2 : 1);
+        gen.progress = Math.min(100, gen.progress + gain);
+        person.intent = 'work';
+        person.activity = `在修发电机（${gen.progress}%）`;
+        addDisturbance(state, person.room);
+        log(state, `${person.name} 在${roomName(person.room)}修发电机（${gen.progress}%）。`);
+        if (gen.progress >= 100) {
+          gen.charged = true;
+          state.teamProgress = Math.min(TEAM_GOAL_MAX, state.teamProgress + GENERATOR_CHARGED_BONUS);
+          log(state, `发电机重新亮了起来，他们离逃出去又近了一大步（团队进度 ${state.teamProgress}/${TEAM_GOAL_MAX}）。`);
+        }
+      } else if ((person.goal === 'objective' || person.goal === 'key') && state.teamProgress < TEAM_GOAL_MAX) {
+        state.teamProgress = Math.min(TEAM_GOAL_MAX, state.teamProgress + OBJECTIVE_GAIN);
+        person.intent = 'work';
+        person.activity = `在${roomName(person.room)}${state.teamGoalLabel}`;
+        addDisturbance(state, person.room);
+        log(state, `${person.name} 在${roomName(person.room)}${state.teamGoalLabel}（团队进度 ${state.teamProgress}/${TEAM_GOAL_MAX}）。`);
+      } else {
+        person.activity = randomOf(ACTIVITIES);
+      }
+    } else {
+      const step = nextStepToward(state, person.room, target, [state.playerRoom]);
+      if (step) {
+        person.room = step;
+        person.activity = `朝${roomName(target)}摸过去`;
+      } else {
+        person.activity = randomOf(ACTIVITIES);
+      }
     }
-    person.activity = randomOf(ACTIVITIES);
   }
+  recordTrails(state, before);
 }
 
 /** 打电话的人真的把消息送出去了吗 */
@@ -1650,10 +2032,122 @@ function makePerson(
     callTurns: 0,
     hidden: false,
     armed: false,
+    // 有名有姓、带威胁设定的角色更老练；再随机挑一些普通人，避免人人都好抓
+    sneaky: SURVIVOR_MAP[s.id]?.threat ? true : Math.random() < 0.28,
     trackedTurns: 0,
     lastSeenRoom: room,
     lastSeenTurn: 0,
+    item: null,
+    movesThisTurn: 0,
   };
+}
+
+/* ---------- 场地物品：幸存者的补给与抉择 ---------- */
+
+/** 还能领东西的道具箱 */
+function usableItemBoxes(state: GameState): SiteItem[] {
+  return state.siteItems.filter((i) => i.kind === 'itemBox' && !i.broken && i.charges > 0);
+}
+
+/**
+ * 幸存者不是随手乱抓：他会看场上缺什么再决定拿哪件。
+ * 有人倒地 → 医疗包；发电机还能修 → 工具箱；想报警 → 信号弹；
+ * 想跑 → 钥匙；要挡你 → 武器；被盯上 → 烟雾弹。留两成随机，人也会慌。
+ */
+function pickSupply(state: GameState, person: Person): SurvivorItem {
+  const downed = npcs(state).some((p) => p.hp <= 0);
+  const injured = npcs(state).some((p) => p.hp === 1);
+  const genActive = state.siteItems.some((i) => i.kind === 'generator' && !i.broken && !i.charged);
+  const score: Record<SurvivorItem, number> = {
+    medkit: (downed ? 5 : 0) + (injured ? 2 : 0) + (person.archetype === 'rescuer' ? 4 : 0),
+    toolbox: genActive ? 4 + (person.goal === 'generator' || person.goal === 'objective' ? 3 : 0) : 0,
+    flare: (state.alarm < 45 ? 3 : 1) + (person.archetype === 'caller' ? 4 : 0),
+    key: state.teamProgress < 60 ? 3 + (person.goal === 'key' ? 2 : 0) : 1,
+    weapon: (person.archetype === 'defiant' || person.archetype === 'brave' ? 5 : 0) + (state.alarm >= 45 ? 2 : 0),
+    smoke: (person.alert >= 25 ? 4 : 1) + (person.sneaky ? 2 : 0),
+  };
+  const all = Object.keys(score) as SurvivorItem[];
+  const best = all.slice().sort((a, b) => score[b] - score[a])[0];
+  return Math.random() < 0.78 ? best : randomOf(all);
+}
+
+/** 走到道具箱前翻一件东西：这是幸存者「多一个选择」的来源 */
+function tryTakeSupply(state: GameState, person: Person): boolean {
+  if (person.item) return false;
+  const box = state.siteItems.find(
+    (i) => i.kind === 'itemBox' && i.room === person.room && !i.broken && i.charges > 0,
+  );
+  if (!box) return false;
+  box.charges -= 1;
+  const item = pickSupply(state, person);
+  person.item = item;
+  if (item === 'weapon') person.armed = true;
+  person.intent = 'work';
+  person.activity = `翻出了${SURVIVOR_ITEM_LABEL[item]}`;
+  addDisturbance(state, person.room);
+  log(state, `${person.name} 在${roomName(person.room)}的道具箱里翻出了${SURVIVOR_ITEM_LABEL[item]}（这个箱子还剩 ${box.charges} 件）。`);
+  return true;
+}
+
+/**
+ * 道具只在「用得上的那一刻」生效，用完即弃。
+ * 医疗包 / 信号弹 / 钥匙 / 烟雾弹各开一条路；工具箱与武器是装备，留到对应场合。
+ * 它们是幸存者手里的选择，不是引擎里写死的全局判定。
+ */
+function useSurvivorItem(state: GameState, person: Person): boolean {
+  const item = person.item;
+  if (!item) return false;
+  switch (item) {
+    case 'medkit': {
+      const hurt =
+        npcs(state).find((p) => p.hp <= 0 && roomDistance(person.room, p.room) <= 2) ??
+        npcs(state).find((p) => p.hp === 1 && roomDistance(person.room, p.room) <= 2);
+      if (!hurt) return false;
+      if (hurt.hp <= 0) rescuePerson(state, hurt);
+      else healPerson(state, hurt, 1);
+      person.item = null;
+      person.intent = 'heal';
+      person.activity = `用医疗包把${hurt.name}拉了起来`;
+      log(state, `${person.name} 用医疗包救了${hurt.name}——你留下的伤被人补回来了。`);
+      addDisturbance(state, person.room);
+      return true;
+    }
+    case 'flare': {
+      if (state.alarm >= ALARM_MAX - 12) return false;
+      person.item = null;
+      person.intent = 'call';
+      person.activity = '打出了一发信号弹';
+      log(state, `${person.name} 打出信号弹，整栋房子的警戒往上窜了一截。`);
+      addDisturbance(state, person.room);
+      addAlarm(state, 14);
+      return true;
+    }
+    case 'key': {
+      if (state.teamProgress >= TEAM_GOAL_MAX) return false;
+      person.item = null;
+      state.teamProgress = Math.min(TEAM_GOAL_MAX, state.teamProgress + 12);
+      person.intent = 'work';
+      person.activity = '用钥匙捅开了后门的锁';
+      log(state, `${person.name} 用钥匙捅开了后门锁（团队进度 ${state.teamProgress}/${TEAM_GOAL_MAX}）。`);
+      addDisturbance(state, person.room);
+      return true;
+    }
+    case 'smoke': {
+      if (person.alert < 18) return false;
+      person.item = null;
+      person.alert = Math.max(0, person.alert - 35);
+      if (CABINET_ROOMS.includes(person.room) && Math.random() < 0.6) person.hidden = true;
+      state.trails = state.trails.filter((t) => t.room !== person.room);
+      person.activity = '丢出烟雾弹，从视线里消失了';
+      log(state, `${person.name} 丢了烟雾弹，脚印和视线一起断在这里。`);
+      return true;
+    }
+    case 'weapon':
+    case 'toolbox':
+      // 要等到「和玩家同屋」/「走到发电机前」才有意义，先留着
+      return false;
+  }
+  return false;
 }
 
 function createPeople(mission: Mission): Person[] {
@@ -1715,9 +2209,12 @@ function createPeople(mission: Mission): Person[] {
     callTurns: 0,
     hidden: false,
     armed: false,
+    sneaky: false,
     trackedTurns: 0,
     lastSeenRoom: POLICE_START,
     lastSeenTurn: 0,
+    item: null,
+    movesThisTurn: 0,
   });
 
   return people;
@@ -1756,15 +2253,18 @@ export function createGame(
     // 逮捕阈值跟着任务规模走：要杀 4 个人的活儿不可能只容忍 4 点通缉值
     arrestThreshold: 5 + (mission.targetCount ?? 1),
     turn: 1,
-    energy: 3,
-    maxEnergy: 3,
-    // 房子变成 15 间、最远要跨 7 步，回合内给的移动要多一点
-    steps: 4,
-    maxSteps: 4,
+    // 走路 / 砍人 / 打牌 / 搜索共用这一个池子，原来「能量 + 步数」两套资源合并
+    energy: BASE_AP,
+    maxEnergy: BASE_AP,
     wanted: 0,
     heatTurn: 0,
     policeLock: 0,
     ambushTurn: 0,
+    senseTurn: 0,
+    attackReady: true,
+    trailClock: 0,
+    frenzy: 0,
+    trails: [],
     playerRoom: ENTRY_ROOM,
     people: createPeople(mission),
     hand: [],
@@ -1796,6 +2296,7 @@ export function createGame(
     stalkMeter: 0,
     stalkTargetId: null,
     possessed: false,
+    possessTurns: 0,
     bonusEnergyNextTurn: 0,
     clearedObstacles: [],
     escaped: 0,
@@ -1811,11 +2312,54 @@ export function createGame(
     scouted: {},
     noiseRoom: null,
     sabotage: [],
+    frenzyStreak: 0,
+    disturbances: [],
+    objectiveRooms: [],
+    teamProgress: 0,
+    teamGoalLabel: '',
+    siteItems: [],
   };
+  // 团队目标：随机挑 3 间房作为「电闸 / 钥匙柜」，再给每个人派一个个人目的。
+  // 不定死：有人修装置、有人找钥匙，也有人只是想报警或躲起来。
+  const objPool = ROOMS.map((r) => r.id).filter(
+    (id) => id !== ENTRY_ROOM && id !== EXIT_ROOM && !ESCAPE_ROOMS.includes(id) && !isObstacle(id),
+  );
+  state.objectiveRooms = shuffle(objPool).slice(0, 3);
+  state.teamGoalLabel = randomOf(['修好电闸', '凑齐后门钥匙', '接通无线电']);
+
+  // 场地物品：道具箱固定 2 个，发电机随机 1~2 台，撒在能走的房间里。
+  // 杀手用不了它们，但能砸——去哪边、什么时候砸，多了一层取舍。
+  const sitePool = shuffle(objPool.filter((id) => !state.objectiveRooms.includes(id)));
+  const genCount = GENERATOR_MIN + Math.floor(Math.random() * (GENERATOR_MAX - GENERATOR_MIN + 1));
+  const items: SiteItem[] = [];
+  for (let i = 0; i < ITEM_BOX_COUNT; i++) {
+    const room = sitePool.pop();
+    if (room) {
+      items.push({ id: `box-${i}`, kind: 'itemBox', room, broken: false, charges: ITEM_BOX_CHARGES, progress: 0, charged: false, jammedTurns: 0 });
+    }
+  }
+  for (let i = 0; i < genCount; i++) {
+    const room = sitePool.pop();
+    if (room) {
+      items.push({ id: `gen-${i}`, kind: 'generator', room, broken: false, charges: 0, progress: 0, charged: false, jammedTurns: 0 });
+    }
+  }
+  state.siteItems = items;
+
+  state.people
+    .filter((p) => p.role !== 'police')
+    .forEach((p) => {
+      const roll = Math.random();
+      if (roll < 0.26) p.goal = 'supply';
+      else if (roll < 0.46) p.goal = 'generator';
+      else if (roll < 0.68) p.goal = 'objective';
+      else if (roll < 0.8) p.goal = 'key';
+    });
   drawCards(state, 5);
   log(state, `契约已接取：${mission.title}`);
-  log(state, `你以「${killerId}」的身份行动。房子里的人各有各的活法，别让他们跑出后院。`);
-  log(state, '提示：先弄清楚谁想报警、谁想跑；把人打倒只是开始，处决之前他们会被救走。');
+  log(state, `你以「${killerId}」的身份行动。每回合 ${BASE_AP} 点行动点：走路、挥刀、出牌、搜索柜子都从这里扣。`);
+  log(state, `他们也在忙自己的事：${state.teamGoalLabel}就会集体从后门逃走。留意乌鸦叫和地板响，那是有人刚经过。`);
+  log(state, `屋里有 ${items.filter((i) => i.kind === 'itemBox').length} 个道具箱、${genCount} 台发电机：他们会靠这些翻盘，你只能砸掉它们（${SABOTAGE_COST} 点行动点）。`);
   return state;
 }
 
@@ -1829,36 +2373,77 @@ export function effectiveCost(defId: string, state: GameState): number {
   return Math.max(0, card.cost - state.discount);
 }
 
-/** 移动到某房间要花几步：堵门的房间要多花 1 步 */
+/**
+ * 移动到某房间要花几点行动点。
+ * 堵门 +1；障碍房（储藏室/地下室）没撞开前也 +1——但**不再是进不去**，
+ * 否则一个随机长在死角的障碍房会把整条支路变成永远走不到的死路。
+ */
 export function moveCost(state: GameState, room: RoomId): number {
-  return state.barricades.includes(room) ? 2 : 1;
+  const obstacle = isObstacle(room) && !state.clearedObstacles.includes(room) ? 1 : 0;
+  return (state.barricades.includes(room) ? 2 : 1) + obstacle;
 }
 
 export function canMoveTo(state: GameState, room: RoomId): boolean {
   if (state.phase !== 'playing') return false;
   if (room === state.playerRoom) return false;
-  if (isObstacle(room) && !state.clearedObstacles.includes(room)) return false;
+  // freeMove 是卡牌 / 能力买来的特权：无视相邻限制，而且这一步不耗行动点
   const cost = state.freeMove ? 0 : moveCost(state, room);
-  if (state.steps < cost) return false;
+  if (state.energy < cost) return false;
   if (state.freeMove) return true;
   return ROOM_MAP[state.playerRoom].neighbors.includes(room);
+}
+
+/**
+ * 这一步有没有严格踩着「从上一间屋指向这一间屋」的脚印。
+ * 只有持续跟着脚印走才攒杀戮；随便走、或者只是走到某个碰巧有脚印的房间，都不算。
+ */
+function updateFrenzy(state: GameState, from: RoomId, to: RoomId): void {
+  const onTrail = visibleTrails(state).some((t) => t.room === from && t.to === to);
+  if (onTrail) {
+    const before = state.frenzy;
+    state.frenzyStreak += 1;
+    state.frenzy = clamp(state.frenzy + FRENZY_GAIN, 0, FRENZY_MAX);
+    // 刚跨过阈值：立刻补 2 点行动点，之后每回合也多 2 点。
+    // 绝不替玩家走第二步——走哪、走几格都由他自己点，不再像瞬移。
+    if (before < FRENZY_THRESHOLD && state.frenzy >= FRENZY_THRESHOLD) {
+      state.energy += FRENZY_AP_BONUS;
+      log(state, `杀戮沸腾：多出 ${FRENZY_AP_BONUS} 点行动点，之后每回合也 +${FRENZY_AP_BONUS}。路你自己选。`);
+    }
+  } else {
+    state.frenzyStreak = 0;
+    state.frenzy = Math.max(0, state.frenzy - FRENZY_LOSS);
+  }
 }
 
 export function movePlayer(state: GameState, room: RoomId): boolean {
   const cost = state.freeMove ? 0 : moveCost(state, room);
   if (!canMoveTo(state, room)) {
-    log(state, state.steps < cost ? '步数不够，走过去太慢了。' : '无法移动到那里：不是相邻房间，或路被堵住了。');
+    log(state, state.energy < cost ? '行动点不够，走不过去。' : '无法移动到那里：不是相邻房间，或路被堵住了。');
     return false;
   }
 
-  state.steps -= cost;
+  const from = state.playerRoom;
+  state.energy -= cost;
   state.playerRoom = room;
   markExplored(state, room);
-  log(state, `你移动到${roomName(room)}${cost > 1 ? '（撞开堵门，多花 1 步）' : ''}。`);
+  log(
+    state,
+    state.freeMove
+      ? `你借着潜行掠到${roomName(room)}（不耗行动点）。`
+      : `你移动到${roomName(room)}（消耗 ${cost} 点行动点${cost > 1 ? '，撞开了门' : ''}）。`,
+  );
   if (state.barricades.includes(room)) {
     state.barricades = state.barricades.filter((r) => r !== room);
   }
+  if (isObstacle(room) && !state.clearedObstacles.includes(room)) {
+    state.clearedObstacles.push(room);
+    log(state, `你踢开${roomName(room)}门口堆着的杂物，硬挤了进去。`);
+  }
   npcOnPlayerEnter(state);
+  // 走出了第一步，刀就收回来了：边走边砍是这个游戏的基本节奏
+  state.attackReady = true;
+  updateFrenzy(state, from, room);
+  afterPlayerAction(state);
 
   checkImmediateWin(state);
   return true;
@@ -1883,7 +2468,7 @@ export function playCard(state: GameState, cardUid: string): boolean {
   }
   const cost = effectiveCost(card.defId, state);
   if (cost > state.energy) {
-    log(state, `能量不足：${def.name} 需要 ${cost} 点。`);
+    log(state, `行动点不足：${def.name} 需要 ${cost} 点。`);
     return false;
   }
   const blocked = precheckFailed(state, card.defId);
@@ -1895,9 +2480,110 @@ export function playCard(state: GameState, cardUid: string): boolean {
   state.energy -= cost;
   state.hand.splice(index, 1);
   state.discardPile.push(card);
-  log(state, `你打出「${def.name}」（消耗 ${cost} 能量）。`);
+  log(state, `你打出「${def.name}」（消耗 ${cost} 点行动点）。`);
 
   runOps(state, def.ops);
+  // 出了牌，刀就收回来了：下一刀可以砍
+  state.attackReady = true;
+  afterPlayerAction(state);
+  checkImmediateWin(state);
+  return true;
+}
+
+/* ==================================================================== */
+/*  挥刀：唯一的伤害来源                                                 */
+/* ==================================================================== */
+
+/**
+ * 现在这一刀能不能砍出去
+ *
+ * 三条门槛，缺一条都不行：
+ *   1. 能量够（1 点）——挥刀不是免费的
+ *   2. 上一刀已经收回来——「无法连续挥刀」，砍完必须再做一件事
+ *   3. 屋里确实站着一个能下手的人——倒地的人只能处决，砍不动
+ */
+export function attackBlockReason(state: GameState, targetId?: string): string {
+  if (state.phase !== 'playing') return '现在不能动手';
+  // 点了具体的人：先检查这个人本身。同屋多人时，点谁打谁。
+  if (targetId) {
+    const picked = state.people.find((p) => p.id === targetId);
+    if (!picked) return '这个人已经不在现场了';
+    if (picked.role === 'police') return '警察不能攻击：他一倒，整条街都会封死';
+    if (picked.room !== state.playerRoom) return '他不在这间屋里';
+    if (picked.hidden) return '他躲起来了，先搜索这间屋子';
+  }
+  if (!state.attackReady) return '刀还没收回来：先挪一步或出一张牌';
+  if (state.energy < ATTACK_COST) return `需要 ${ATTACK_COST} 点行动点`;
+  if (findVictim(state, state.playerRoom, Infinity, true, targetId)) return '';
+  const onlyPolice = peopleInRoom(state, state.playerRoom).some((p) => p.role === 'police');
+  return onlyPolice ? '屋里只有警察——他不能攻击，别在他眼皮底下动手' : '这间屋子里没有人';
+}
+
+export function canAttack(state: GameState, targetId?: string): boolean {
+  return attackBlockReason(state, targetId) === '';
+}
+
+/**
+ * 挥刀：健康 → 受伤，受伤 → 倒地，倒地 → 补刀致死。
+ * 恶魔附身期间伤害翻倍，还站着的人一刀就倒。
+ * 砍完就把 attackReady 关掉，必须再做一件事（走路 / 出牌 / 用能力）才能砍第二刀，
+ * 所以「一刀接一刀」不是按得快就行，中间得有一次追逐或一次控制。
+ * 传入 targetId 时只砍那个人——点房间里的谁，就砍谁。
+ */
+export function attack(state: GameState, targetId?: string): boolean {
+  if (state.phase !== 'playing') return false;
+  const reason = attackBlockReason(state, targetId);
+  if (reason) {
+    log(state, reason);
+    return false;
+  }
+  const target = findVictim(state, state.playerRoom, Infinity, true, targetId)!;
+  const heavy = state.possessed;
+  state.energy -= ATTACK_COST;
+  state.attackReady = false;
+  log(
+    state,
+    target.hp <= 0
+      ? `你俯身补上一刀，${target.name} 没能再起来（消耗 ${ATTACK_COST} 点行动点）。`
+      : heavy
+        ? `恶魔附身 · 你挥刀砍向 ${target.name}，这一刀直接见骨（消耗 ${ATTACK_COST} 点行动点）。`
+        : `你挥刀砍向 ${target.name}（消耗 ${ATTACK_COST} 点行动点）。`,
+  );
+  damagePerson(state, target, heavy ? 2 : 1);
+  afterPlayerAction(state);
+  checkImmediateWin(state);
+  return true;
+}
+
+/**
+ * 搜索当前房间：把钻进柜子 / 床底的人翻出来。
+ * 和走路、挥刀、出牌一样消耗 1 点行动点，也算一次玩家行动（世界跟着动）。
+ */
+export function searchRoom(state: GameState): boolean {
+  if (state.phase !== 'playing') return false;
+  if (state.energy < SEARCH_COST) {
+    log(state, `行动点不足：搜索需要 ${SEARCH_COST} 点。`);
+    return false;
+  }
+  state.energy -= SEARCH_COST;
+  const here = peopleInRoom(state, state.playerRoom).filter((p) => p.role !== 'police');
+  const found = here.filter((p) => p.hidden);
+  const hasCabinet = CABINET_ROOMS.includes(state.playerRoom);
+  log(state, `你翻查${roomName(state.playerRoom)}（消耗 ${SEARCH_COST} 点行动点）。`);
+  // 先无条件把藏着的人揪出来：卡牌可能把人挪到没有柜子的房间，不能让他白藏
+  found.forEach((p) => {
+    p.hidden = false;
+    p.alert = clamp(p.alert + 35, 0, 100);
+    p.intent = 'flee';
+    log(state, `${p.name} 被你从藏身处拖了出来。`);
+  });
+  if (!found.length) {
+    log(state, hasCabinet ? '柜子里空空的，只有旧衣服和灰。' : '这间屋子没有能藏人的柜子。');
+  }
+  scoutRoom(state, state.playerRoom, 1);
+  // 搜索也算「做了一件事」，刀可以收回来了
+  state.attackReady = true;
+  afterPlayerAction(state);
   checkImmediateWin(state);
   return true;
 }
@@ -1905,6 +2591,66 @@ export function playCard(state: GameState, cardUid: string): boolean {
 /* ==================================================================== */
 /*  杀手能力                                                            */
 /* ==================================================================== */
+
+/* ------------------------------------------------------------------ */
+/*  破坏场地物品：杀手用不了它们，但能不让幸存者用                        */
+/* ------------------------------------------------------------------ */
+
+/** 为什么现在砸不了：用于按钮禁用与日志 */
+export function sabotageBlockReason(state: GameState): string | null {
+  if (state.phase !== 'playing') return '这一局已经结束了。';
+  if (state.energy < SABOTAGE_COST) return `行动点不足：破坏需要 ${SABOTAGE_COST} 点。`;
+  const here = state.siteItems.filter(
+    (i) => i.room === state.playerRoom && !i.broken && (i.kind === 'itemBox' ? i.charges > 0 : true),
+  );
+  if (!here.length) return '这间屋子没有还能破坏的设施。';
+  return null;
+}
+
+/**
+ * 砸掉当前房间的道具箱 / 发电机。
+ * 道具箱一毁，幸存者再也拿不到补给；发电机被砸会掉修复进度、停机两回合，
+ * 已经通电的还会把团队进度拖回去。破坏本身会弄出动静、引来乌鸦——
+ * 所以「什么时候砸」也是个抉择，不是白嫖。
+ */
+export function sabotageSiteItem(state: GameState): boolean {
+  const reason = sabotageBlockReason(state);
+  if (reason) {
+    log(state, reason);
+    return false;
+  }
+  const item = state.siteItems.find(
+    (i) => i.room === state.playerRoom && !i.broken && (i.kind === 'itemBox' ? i.charges > 0 : true),
+  );
+  if (!item) return false;
+  state.energy -= SABOTAGE_COST;
+
+  if (item.kind === 'itemBox') {
+    item.broken = true;
+    item.charges = 0;
+    log(state, `你砸烂了${roomName(item.room)}的道具箱——从今往后，没人能从这里翻到道具了。`);
+  } else {
+    const before = item.progress;
+    item.progress = Math.max(0, item.progress - SABOTAGE_GEN_LOSS);
+    if (item.charged) {
+      item.charged = false;
+      state.teamProgress = Math.max(0, state.teamProgress - SABOTAGE_TEAM_LOSS);
+      log(state, `已经通电的线路被你扯断，他们的团队进度倒退了 ${SABOTAGE_TEAM_LOSS}。`);
+    }
+    item.jammedTurns = GENERATOR_JAM_TURNS;
+    // 停机而不是永久报废：他们还能修回来，破坏是「拖时间」而非一劳永逸
+    item.broken = false;
+    log(state, `你砸了${roomName(item.room)}的发电机，修复进度 ${before}% → ${item.progress}%，停机 ${GENERATOR_JAM_TURNS} 回合。`);
+  }
+
+  addDisturbance(state, state.playerRoom);
+  addAlarm(state, 3);
+  // 砸东西也算「做了一件事」，刀可以收回来
+  state.attackReady = true;
+  afterPlayerAction(state);
+  checkImmediateWin(state);
+  return true;
+}
 
 export function powerCooldown(state: GameState, powerId: string): number {
   return state.cooldowns[powerId] ?? 0;
@@ -1947,6 +2693,8 @@ export function usePower(state: GameState, powerId: string): boolean {
   state.cooldowns[powerId] = power.cooldown;
   log(state, `${killer.owner}·${power.name}：${power.desc}`);
   runOps(state, power.ops);
+  state.attackReady = true;
+  afterPlayerAction(state);
   checkImmediateWin(state);
   return true;
 }
@@ -1958,7 +2706,7 @@ export function usePower(state: GameState, powerId: string): boolean {
 function checkImmediateWin(state: GameState): void {
   if (state.result) return;
   const m = state.mission;
-  if (m.kind === 'assassinate' && state.markedKilled >= (m.targetCount ?? 2)) {
+  if (m.kind === 'assassinate' && state.markedKilled >= (m.targetCount ?? 2) && state.playerRoom === EXIT_ROOM) {
     finish(state, 'win');
   } else if (m.kind === 'evidence' && state.evidence >= (m.targetCount ?? 2) && state.playerRoom === EXIT_ROOM) {
     finish(state, 'win');
@@ -2040,11 +2788,17 @@ export function endTurn(state: GameState): void {
 
   if (TOTEM_ROOMS.includes(state.playerRoom)) {
     state.bonusEnergyNextTurn = 1;
-    log(state, '图腾余响：下一回合额外获得 1 点能量。');
+    log(state, '图腾余响：下一回合额外获得 1 点行动点。');
   }
 
   npcTurn(state);
   if (state.result) return;
+  // 他们把团队目标做满了：不等天亮，这局已经输了
+  if (state.teamProgress >= TEAM_GOAL_MAX) {
+    state.resultReason = `他们${state.teamGoalLabel}，从后门集体离开——契约作废。`;
+    finish(state, 'failed');
+    return;
+  }
 
   callPhase(state);
   if (state.result) return;
@@ -2071,10 +2825,20 @@ export function endTurn(state: GameState): void {
 
   /* ---------- 回合收尾 ---------- */
   refreshVision(state);
+  pruneTrails(state);
+  pruneDisturbances(state);
   state.decoyRoom = null;
   state.freeMove = false;
   state.discount = 0;
   state.bonusDamage = 0;
+  // 恶魔附身按回合倒计时，归零就恢复正常刀锋
+  if (state.possessed) {
+    state.possessTurns = Math.max(0, state.possessTurns - 1);
+    if (state.possessTurns === 0) {
+      state.possessed = false;
+      log(state, '恶魔附身消退，刀锋恢复了原本的重量。');
+    }
+  }
   state.noAlarmTurn = false;
   state.killsThisTurn = 0;
   state.revealedThisTurn = false;
@@ -2084,6 +2848,10 @@ export function endTurn(state: GameState): void {
       .filter(([, v]) => (v as number) > 0),
   ) as Partial<Record<RoomId, number>>;
   state.exitBlockedTurns = Math.max(0, state.exitBlockedTurns - 1);
+  // 被砸停机的发电机慢慢缓过来，幸存者可以接着修
+  state.siteItems.forEach((i) => {
+    if (i.jammedTurns > 0) i.jammedTurns -= 1;
+  });
   state.cooldowns = Object.fromEntries(
     Object.entries(state.cooldowns)
       .map(([k, v]) => [k, v - 1])
@@ -2102,12 +2870,21 @@ export function endTurn(state: GameState): void {
   state.hand = [];
 
   state.turn += 1;
-  state.energy = state.maxEnergy + state.bonusEnergyNextTurn;
+  // 杀戮满值 = 移动力提升：每回合多 2 点行动点，但绝不替玩家走第二步
+  const frenzyBonus = state.frenzy >= FRENZY_THRESHOLD ? FRENZY_AP_BONUS : 0;
+  state.energy = Math.max(
+    1,
+    state.maxEnergy + state.bonusEnergyNextTurn + frenzyBonus - state.stunTurns,
+  );
   state.bonusEnergyNextTurn = 0;
-  state.steps = Math.max(0, state.maxSteps - state.stunTurns);
   state.stunTurns = 0;
+  // 新回合：刀已经收回来，所有人的腿也歇过来了
+  state.attackReady = true;
+  state.people.forEach((p) => {
+    p.movesThisTurn = 0;
+  });
   drawCards(state, 5);
-  log(state, '新回合开始，能量与步数已恢复。');
+  log(state, `新回合开始，行动点恢复${frenzyBonus ? `（杀戮 +${frenzyBonus}）` : ''}。`);
 }
 
 export function giveUp(state: GameState): void {

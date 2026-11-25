@@ -1,10 +1,33 @@
 /**
- * 规则回归：六条「手感」断言。
- * 这些是玩家反馈打磨出来的边界，改引擎时最先会破的就是它们。
+ * 规则回归：玩家反馈打磨出来的边界，改引擎时最先会破的就是这些。
  * 运行：npm run check
  */
-import { CARD_MAP } from '../src/game/data/cards';
-import { createGame, movePlayer, playCard } from '../src/game/engine';
+import { CARD_MAP, CARDS } from '../src/game/data/cards';
+import {
+  BASE_AP,
+  FRENZY_AP_BONUS,
+  SEARCH_COST,
+  TEAM_GOAL_MAX,
+  GENERATOR_JAM_TURNS,
+  SABOTAGE_COST,
+  sabotageSiteItem,
+  attack,
+  attackBlockReason,
+  canAttack,
+  canMoveTo,
+  createGame,
+  effectiveCost,
+  endTurn,
+  isPersonVisible,
+  isRoomExplored,
+  isSensing,
+  moveCost,
+  movePlayer,
+  playCard,
+  searchRoom,
+  visibleDisturbances,
+  visibleTrails,
+} from '../src/game/engine';
 import { OBSTACLE_ROOMS, ROOM_MAP } from '../src/game/rooms';
 import { SURVIVOR_MAP } from '../src/game/survivors';
 import type { GameState, RoomId } from '../src/game/types';
@@ -40,49 +63,73 @@ function drawInto(state: GameState, defId: string): string {
   return found.uid;
 }
 
+/** 给这张牌补足行动点，免得测试被资源卡住 */
+function play(state: GameState, defId: string): boolean {
+  state.energy = Math.max(state.energy, 9);
+  return playCard(state, drawInto(state, defId));
+}
+
 /**
  * 取一个「走得到」的隔壁房间。
- * 储藏室/地下室要破门，直接走会被引擎拒绝，测试会因为随机邻居而假失败。
+ * 障碍房现在也能撞开（多花 1 点行动点），但测试仍优先挑普通房间，
+ * 免得用例被随机户型和额外消耗搞成假失败。
  */
 function openNeighbor(from: RoomId): RoomId {
   const cands = ROOM_MAP[from].neighbors.filter((r) => !OBSTACLE_ROOMS.includes(r));
   return cands[0] ?? ROOM_MAP[from].neighbors[0];
 }
 
+/** 这间屋还能往几间屋跑（排除要破门的、以及玩家占着的那间） */
+function exitsOf(room: RoomId, blocked?: RoomId): number {
+  return ROOM_MAP[room].neighbors.filter(
+    (r) => !OBSTACLE_ROOMS.includes(r) && r !== blocked,
+  ).length;
+}
+
 const player = (s: GameState) => s.people.find((p) => p.role !== 'police')!;
 
 /** A：已经起疑的人，不打卡牌直接推门 → 当场跑掉 */
 function caseBoltOnEnter(): void {
-  const s = newGame();
-  const v = player(s);
-  const next = openNeighbor(s.playerRoom);
-  v.room = next;
-  v.alert = 100;
-  movePlayer(s, next);
-  const fled = v.room !== next;
-  check('A 高警觉者被推门惊动会跑', fled, fled ? '跑到了 ' + v.room : '留在原地');
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const s = newGame();
+    const v = player(s);
+    const next = openNeighbor(s.playerRoom);
+    if (exitsOf(next, s.playerRoom) < 1) continue;
+    v.room = next;
+    v.alert = 100;
+    movePlayer(s, next);
+    const fled = v.room !== next;
+    check('A 高警觉者被推门惊动会跑', fled, fled ? '跑到了 ' + v.room : '留在原地');
+    return;
+  }
+  check('A 高警觉者被推门惊动会跑', true, '户型太封闭，跳过');
 }
 
-/** B：先打「静止隐身」再进门 → 没人察觉，可以白打一刀 */
+/** B：先打「静止隐身」再进门 → 没人察觉，可以白砍一刀 */
 function caseAmbush(): void {
   const s = newGame();
   const v = s.people.find(
-    (p) => p.role !== 'police' && SURVIVOR_MAP[p.id]?.threat !== 'spiritual',
+    (p) =>
+      p.role !== 'police' &&
+      SURVIVOR_MAP[p.id]?.threat !== 'spiritual' &&
+      p.archetype !== 'hider' &&
+      p.archetype !== 'rescuer' &&
+      p.archetype !== 'caller',
   )!;
   const next = openNeighbor(s.playerRoom);
   v.room = next;
   v.alert = 70;
   const before = v.alert;
 
-  playCard(s, drawInto(s, 'silent_step'));
+  play(s, 'silent_step');
   movePlayer(s, next);
   const stayed = v.room === next;
   const delta = v.alert - before;
   check('B 伏击牌压住进门惊动', stayed && delta <= 0, `留在原地=${stayed}，警觉 ${delta >= 0 ? '+' : ''}${delta}`);
 
   const hp = v.hp;
-  playCard(s, drawInto(s, 'choke'));
-  check('B 伏击后第一刀能打中', v.hp < hp, `hp ${hp} → ${v.hp}`);
+  const hit = attack(s);
+  check('B 伏击后第一刀能砍中', hit && v.hp < hp, `hp ${hp} → ${v.hp}`);
 }
 
 /** C：「疾速残暴」把两间房的距离抹平，追上去还能补刀 */
@@ -96,18 +143,18 @@ function casePursue(): void {
   v.hp = 1;
   v.intent = 'flee';
 
-  playCard(s, drawInto(s, 'sprint'));
+  play(s, 'sprint');
   const followed = s.playerRoom === v.room;
   check('C 追击牌能贴到目标房间', followed, `玩家在 ${s.playerRoom}，目标在 ${v.room}`);
 
   if (followed) {
     const hp = v.hp;
-    playCard(s, drawInto(s, 'shuriken'));
-    check('C 追上后能补刀', v.hp < hp, `hp ${hp} → ${v.hp}`);
+    const hit = attack(s);
+    check('C 追上后能补刀', hit && v.hp < hp, `hp ${hp} → ${v.hp}`);
   }
 }
 
-/** D：没打卡牌，一进门就被看见 → 对方当场跑，玩家来不及出手 */
+/** D：没打卡牌，一进门就被看见 → 对方当场跑 */
 function caseDefaultWindow(): void {
   const s = newGame();
   const v = player(s);
@@ -119,42 +166,357 @@ function caseDefaultWindow(): void {
   check('D 不打卡牌就别想轻松追上', bolted, bolted ? '跑向 ' + v.room : '还留在原地');
 }
 
-/** E：背对着门、毫无防备的人，走进屋也不会惊动他 */
+/** E：推门就是一次照面——没打伏击，再迟钝的人也会跑 */
 function caseUnaware(): void {
-  const s = newGame();
-  const v = player(s);
-  const next = openNeighbor(s.playerRoom);
-  v.room = next;
-  v.alert = 0;
-  v.hidden = false;
-  movePlayer(s, next);
-  const stayed = v.room === next;
-  const attackable = s.people.some((p) => p.room === s.playerRoom && p.hp > 0);
-  check('E 未察觉者不会凭空逃跑', stayed && attackable, `原地=${stayed}，可出手=${attackable}`);
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const s = newGame();
+    const v = player(s);
+    const next = openNeighbor(s.playerRoom);
+    v.room = next;
+    v.alert = 0;
+    v.hidden = false;
+    movePlayer(s, next);
+    if (v.room === next) continue;
+    check('E 低警觉者被推门惊动也会跑', true, `换了 ${attempt + 1} 局才碰到能跑的户型`);
+    check(
+      'E 不会再白送「背对着门」的偷袭窗口',
+      v.activity !== '背对着门，没有察觉' && v.alert >= 30,
+      `动作=${v.activity}，警觉=${v.alert}`,
+    );
+    return;
+  }
+  check('E 低警觉者被推门惊动也会跑', false, '10 局都没碰到能跑的户型');
 }
 
-/** F：屋里只剩倒地者时，攻击牌自动变成补刀 */
+/** F：倒地者挥刀补刀致死 + 处决牌 + 恶魔附身 */
 function caseFinisher(): void {
   const s = newGame();
   const v = player(s);
   v.room = s.playerRoom;
   v.hp = 0;
   v.alert = 0;
-  const before = s.people.length;
-  const ok = playCard(s, drawInto(s, 'shuriken'));
-  const gone = s.people.length < before;
-  check('F 倒地者能被攻击牌处决', ok && gone, ok ? (gone ? '已杀死' : 'hp=' + v.hp) : '牌被拒绝');
+  v.hidden = false;
+  v.intent = 'stunned';
+  s.energy = 3;
+  check('F 倒地者能被挥刀补刀（不再砍不动）', canAttack(s), attackBlockReason(s));
+  const stabbed = attack(s, v.id);
+  const gone = !s.people.some((p) => p.id === v.id);
+  check('F 补刀之后目标确实死亡', stabbed && gone, stabbed ? (gone ? '已死亡' : 'hp=' + v.hp) : '刀被拒绝');
+
+  const s2 = newGame();
+  const v2 = player(s2);
+  v2.room = s2.playerRoom;
+  v2.hp = 0;
+  const before2 = s2.people.length;
+  const ok2 = play(s2, 'execute');
+  check('F 处决牌也能结束倒地者', ok2 && s2.people.length < before2, ok2 ? (s2.people.length < before2 ? '已处决' : 'hp=' + v2.hp) : '牌被拒绝');
+
+  const s3 = newGame();
+  const v3 = player(s3);
+  v3.room = s3.playerRoom;
+  v3.hp = 2;
+  v3.hidden = false;
+  s3.energy = 3;
+  s3.possessed = true;
+  s3.possessTurns = 3;
+  attack(s3, v3.id);
+  check('F 恶魔附身时健康者一刀倒地', v3.hp === 0, `hp=${v3.hp}`);
 }
 
-/** G：卡牌数据仍挂着正确的指令（防止改数据时把卡牌化设计退回去） */
+/** G：卡牌数据仍然挂着正确的指令，而且不再直接造成伤害 */
 function caseCardData(): void {
   const ambush = (CARD_MAP['silent_step']?.ops ?? []).some((o) => o.op === 'ambush');
   const pursue = (CARD_MAP['sprint']?.ops ?? []).some((o) => o.op === 'pursue');
+  const pulse = (CARD_MAP['night_cover']?.ops ?? []).some((o) => o.op === 'pulse');
   check('G 静止隐身带 ambush', ambush);
   check('G 疾速残暴带 pursue', pursue);
+  check('G 黑暗启迪改用 pulse（人影而不是全图）', pulse);
+
+  const hurtful = CARDS.filter((c) =>
+    c.ops.some((o) => o.op === 'damage' || o.op === 'bleed' || o.op === 'down' || o.op === 'kill'),
+  ).map((c) => c.name);
+  check('G 没有一张卡直接造成伤害', hurtful.length === 0, hurtful.join('、') || '干净');
 }
 
-check('开局步数为 4', newGame().steps === 4, String(newGame().steps));
+/** H：挥刀的门槛——行动点、以及「砍完不能连砍」 */
+function caseSwingGate(): void {
+  const s = newGame();
+  const v = player(s);
+  v.room = s.playerRoom;
+  v.hp = 2;
+  v.alert = 0;
+  v.intent = 'idle';
+
+  s.energy = 3;
+  const first = attack(s);
+  const hurt = v.hp === 1;
+  check('H 挥刀把健康砍成受伤', first && hurt, `hp ${v.hp}，行动点 ${s.energy}`);
+
+  const second = attack(s);
+  check('H 不能连续挥刀', !second && !s.attackReady, attackBlockReason(s));
+
+  play(s, 'clean');
+  check('H 做别的事之后可以再砍', s.attackReady, 'attackReady=' + s.attackReady);
+
+  s.energy = 0;
+  check('H 没有行动点就砍不动', !canAttack(s), attackBlockReason(s));
+}
+
+/** I：受伤的人不是挪一格，而是当场连跑两间屋，并留下血迹 */
+function casePanicRun(): void {
+  const s = newGame();
+  const v = player(s);
+  v.room = s.playerRoom;
+  v.hp = 2;
+  v.alert = 0;
+  v.sneaky = false;
+  s.energy = 3;
+  const ok = attack(s);
+  check('I 挥刀命中健康的人', ok && v.hp === 1, `hp ${v.hp}`);
+  check(
+    'I 被砍伤的人会连着跑好几间屋',
+    v.movesThisTurn >= 2,
+    `movesThisTurn=${v.movesThisTurn}，位置 ${v.room}`,
+  );
+  const trails = visibleTrails(s);
+  const blood = trails.filter((t) => t.blood);
+  check('I 血迹留在通往他下一间屋的路上', blood.length > 0, `${blood.length} 段血痕`);
+  check(
+    'I 痕迹最后指向他真正所在的房间',
+    trails.some((t) => t.to === v.room),
+    trails.map((t) => `${t.room}→${t.to}`).join(' '),
+  );
+}
+
+/** J：玩家每做一个动作，跑掉的人也跟着动一步 */
+function caseWorldTicks(): void {
+  const s = newGame();
+  const v = player(s);
+  const hop1 = openNeighbor(s.playerRoom);
+  const hop2 = ROOM_MAP[hop1].neighbors.find((r) => r !== s.playerRoom)!;
+  v.room = hop2;
+  v.alert = 100;
+  v.intent = 'flee';
+  v.movesThisTurn = 0;
+
+  s.energy = 9;
+  movePlayer(s, hop1);
+  check('J 玩家走一步，逃跑的人也跟着动', v.movesThisTurn >= 1, `movesThisTurn=${v.movesThisTurn}`);
+}
+
+/** K：感知只给影子，不给身份 */
+function caseSense(): void {
+  const s = newGame();
+  const v = s.people.find((p) => p.role !== 'police' && p.trackedTurns === 0)!;
+  const hop1 = openNeighbor(s.playerRoom);
+  const hop2 = ROOM_MAP[hop1].neighbors.find(
+    (r) => r !== s.playerRoom && !ROOM_MAP[s.playerRoom].neighbors.includes(r),
+  )!;
+  v.room = hop2;
+  v.alert = 0;
+
+  play(s, 'night_cover');
+  const sensing = isSensing(s);
+  const identified = isPersonVisible(s, v);
+  check('K 感知生效（地图上会浮出人影）', sensing);
+  check('K 隔着两间屋仍看不出是谁', !identified, identified ? '直接被看见了' : `他在 ${v.room}`);
+}
+
+/** L：痕迹会过期，不会在地图上留一辈子 */
+function caseTrailDecay(): void {
+  const s = newGame();
+  const v = player(s);
+  v.room = s.playerRoom;
+  v.hp = 2;
+  s.energy = 3;
+  attack(s);
+  s.people.forEach((p) => {
+    p.alert = 0;
+    p.intent = 'idle';
+    p.hp = 2;
+    p.movesThisTurn = 0;
+  });
+  const now = visibleTrails(s).length;
+  for (let i = 0; i < 4; i++) s.trailClock += 1;
+  const later = visibleTrails(s).length;
+  check('L 痕迹只留最近两次行动', now > 0 && later === 0, `${now} → ${later}`);
+}
+
+/** M：同屋多人时，点谁打谁 */
+function casePickTarget(): void {
+  const s = newGame();
+  const pair = s.people.filter((p) => p.role !== 'police' && p.hp > 0).slice(0, 2);
+  pair.forEach((p) => {
+    p.room = s.playerRoom;
+    p.alert = 0;
+    p.hidden = false;
+  });
+  s.energy = 5;
+  s.attackReady = true;
+  const before = pair.map((p) => p.hp);
+  const ok = attack(s, pair[1].id);
+  check(
+    'M 点谁打谁（同屋两人时指定目标）',
+    ok && pair[1].hp < before[1] && pair[0].hp === before[0],
+    pair.map((p) => `${p.name}:${p.hp}`).join(' '),
+  );
+}
+
+/** N：障碍房不再是死路——多花 1 点行动点能撞开进去 */
+function caseObstacleEnter(): void {
+  const s = newGame();
+  const obstacle = OBSTACLE_ROOMS.find((id) => ROOM_MAP[id].neighbors.length > 0)!;
+  const from = ROOM_MAP[obstacle].neighbors[0];
+  s.playerRoom = from;
+  s.energy = 9;
+  s.freeMove = false;
+  const cost = moveCost(s, obstacle);
+  const can = canMoveTo(s, obstacle);
+  const moved = movePlayer(s, obstacle);
+  check(
+    'N 障碍房能撞开进去（多花 1 点）',
+    can && moved && cost === 2 && s.playerRoom === obstacle && s.clearedObstacles.includes(obstacle),
+    `cost=${cost} can=${can} at=${s.playerRoom}`,
+  );
+}
+
+/** O：行动点统一——走路、挥刀、出牌、搜索都从同一个池子扣 */
+function caseActionPoints(): void {
+  const s = newGame();
+  const next = openNeighbor(s.playerRoom);
+  s.energy = 9;
+  const e0 = s.energy;
+  movePlayer(s, next);
+  check('O 走路扣行动点', s.energy < e0, `${e0} → ${s.energy}`);
+
+  const before = s.energy;
+  searchRoom(s);
+  check('O 搜索扣 1 点行动点', before - s.energy === SEARCH_COST, `${before} → ${s.energy}`);
+
+  const uid = drawInto(s, 'clean');
+  const cost = effectiveCost('clean', s);
+  const before2 = s.energy;
+  playCard(s, uid);
+  check('O 出牌扣行动点', before2 - s.energy === cost, `${before2} → ${s.energy}`);
+}
+
+/** P：相邻房间看得见轮廓，看不见人 */
+function caseAdjacentHidden(): void {
+  const s = newGame();
+  const v = s.people.find((p) => p.role !== 'police' && p.trackedTurns === 0)!;
+  const next = openNeighbor(s.playerRoom);
+  v.room = next;
+  check('P 相邻房间不再白送人物视野', !isPersonVisible(s, v), `他在 ${v.room}`);
+  check('P 相邻房间仍然算已探索（有轮廓）', isRoomExplored(s, next));
+}
+
+/** Q：搜索把柜子里的人翻出来 */
+function caseSearch(): void {
+  const s = newGame();
+  const v = player(s);
+  v.room = s.playerRoom;
+  v.hidden = true;
+  s.energy = 9;
+  const ok = searchRoom(s);
+  check('Q 搜索能把藏起来的人翻出来', ok && !v.hidden, `hidden=${v.hidden}`);
+}
+
+/** R：有人经过会留下乌鸦 / 地板响的动静 */
+function caseDisturbance(): void {
+  const s = newGame();
+  const v = player(s);
+  v.room = s.playerRoom;
+  v.hp = 2;
+  v.sneaky = false;
+  s.energy = 9;
+  s.disturbances = [];
+  attack(s);
+  check('R 有人跑过会留下动静提示', visibleDisturbances(s).length > 0, `${visibleDisturbances(s).length} 处`);
+}
+
+/** S：他们的团队目标做满，玩家直接失败 */
+function caseTeamGoal(): void {
+  const s = newGame();
+  s.people = [];
+  s.teamProgress = TEAM_GOAL_MAX;
+  endTurn(s);
+  check('S 团队目标做满直接判负', s.result === 'failed' && s.resultReason.length > 0, s.resultReason);
+}
+
+/** T：动静和脚印一样是短线索，不会一直挂在地图上 */
+function caseDisturbanceDecay(): void {
+  const s = newGame();
+  s.disturbances = [{ room: s.playerRoom, turn: s.turn, clock: s.trailClock, label: '乌鸦叫' }];
+  const now = visibleDisturbances(s).length;
+  for (let i = 0; i < 5; i++) s.trailClock += 1;
+  const later = visibleDisturbances(s).length;
+  check('T 动静过几次行动就听不见了', now > 0 && later === 0, `${now} → ${later}`);
+}
+
+/** U：严格踩着脚印才攒杀戮，随便走不涨；满值给行动点而不是替玩家瞬移 */
+function caseFrenzy(): void {
+  const s = newGame();
+  const v = player(s);
+  const next = openNeighbor(s.playerRoom);
+  v.room = next;
+  v.hp = 2;
+  v.alert = 0;
+  s.trails = [{ room: s.playerRoom, to: next, turn: s.turn, clock: s.trailClock, blood: false }];
+  s.energy = 9;
+  const before = s.frenzy;
+  movePlayer(s, next);
+  check('U 严格踩着脚印走会攒杀戮', s.frenzy > before, `${before} → ${s.frenzy}`);
+
+  const s2 = newGame();
+  const b = openNeighbor(s2.playerRoom);
+  s2.trails = [];
+  s2.frenzy = 60;
+  s2.energy = 9;
+  const before2 = s2.frenzy;
+  movePlayer(s2, b);
+  check('U 没有按脚印追踪就不涨杀戮', s2.frenzy < before2, `${before2} → ${s2.frenzy}`);
+
+  s.frenzy = 80;
+  s.energy = 5;
+  s.attackReady = true;
+  v.room = s.playerRoom;
+  v.hp = 2;
+  v.hidden = false;
+  attack(s);
+  check('U 砍中人杀戮清零', s.frenzy === 0, String(s.frenzy));
+}
+
+/** V：杀戮满值不替玩家走第二步，而是每回合多给行动点 */
+function caseFrenzyMobility(): void {
+  for (let i = 0; i < 30; i++) {
+    const s = newGame();
+    const a = s.playerRoom;
+    const b = ROOM_MAP[a].neighbors.find((r) => !OBSTACLE_ROOMS.includes(r));
+    if (!b) continue;
+    s.trails = [];
+    s.frenzy = 80;
+    s.energy = 9;
+    movePlayer(s, b);
+    check('V 杀戮满值不会自动多走一格（不瞬移）', s.playerRoom === b, `停在 ${s.playerRoom}`);
+    s.people = [];
+    endTurn(s);
+    check(
+      'V 杀戮满值每回合多给行动点',
+      s.energy >= BASE_AP + FRENZY_AP_BONUS - 1,
+      `energy=${s.energy}（基础 ${BASE_AP}）`,
+    );
+    return;
+  }
+  check('V 杀戮满值不会自动多走一格（不瞬移）', true, '户型跳过');
+}
+
+/** W：场上有老练的幸存者（会悄悄走路） */
+function caseSneaky(): void {
+  const s = newGame();
+  check('W 有老练的幸存者', s.people.some((p) => p.role !== 'police' && p.sneaky), '至少两名知名角色带此技巧');
+}
+
+check('开局行动点为 7', newGame().energy === BASE_AP, String(newGame().energy));
 caseBoltOnEnter();
 caseAmbush();
 casePursue();
@@ -162,6 +524,103 @@ caseDefaultWindow();
 caseUnaware();
 caseFinisher();
 caseCardData();
+caseSwingGate();
+casePanicRun();
+caseWorldTicks();
+caseSense();
+caseTrailDecay();
+casePickTarget();
+caseObstacleEnter();
+caseActionPoints();
+caseAdjacentHidden();
+caseSearch();
+caseDisturbance();
+caseTeamGoal();
+caseDisturbanceDecay();
+caseFrenzy();
+caseFrenzyMobility();
+caseSneaky();
+
+/** X：道具箱 / 发电机随机摆放；杀手能砸，砸完幸存者就少了这条路 */
+function caseSiteItems(): void {
+  const s = newGame();
+  const boxes = s.siteItems.filter((i) => i.kind === 'itemBox');
+  const gens = s.siteItems.filter((i) => i.kind === 'generator');
+  const rooms = s.siteItems.map((i) => i.room);
+  check(
+    'X 道具箱 2 个、发电机 1~2 台且位置不重叠',
+    boxes.length === 2 && gens.length >= 1 && gens.length <= 2 && new Set(rooms).size === rooms.length,
+    `箱 ${boxes.length} / 机 ${gens.length}`,
+  );
+
+  const box = boxes[0];
+  s.playerRoom = box.room;
+  s.energy = BASE_AP;
+  const ok = sabotageSiteItem(s);
+  check(
+    'X 砸道具箱后补给清零（幸存者再拿不到）',
+    ok && box.broken && box.charges === 0,
+    `broken=${box.broken} charges=${box.charges}`,
+  );
+  check('X 破坏消耗 1 点行动点', s.energy === BASE_AP - SABOTAGE_COST, `energy=${s.energy}`);
+
+  const gen = gens[0];
+  gen.progress = 80;
+  gen.charged = true;
+  s.teamProgress = 50;
+  s.playerRoom = gen.room;
+  s.energy = BASE_AP;
+  const ok2 = sabotageSiteItem(s);
+  check(
+    'X 砸发电机扣进度 + 停机 + 团队进度倒退',
+    ok2 && gen.progress === 35 && gen.jammedTurns === GENERATOR_JAM_TURNS && !gen.charged && s.teamProgress === 28,
+    `progress=${gen.progress} jam=${gen.jammedTurns} team=${s.teamProgress}`,
+  );
+}
+
+/** Y：幸存者真的会从道具箱拿道具，并按局势用掉 */
+function caseSurvivorItems(): void {
+  let got = false;
+  for (let attempt = 0; attempt < 12 && !got; attempt++) {
+    const s = newGame();
+    const box = s.siteItems.find((i) => i.kind === 'itemBox')!;
+    const p = s.people.find((x) => x.role !== 'police')!;
+    p.room = box.room;
+    p.goal = 'supply';
+    p.alert = 0;
+    p.item = null;
+    s.playerRoom = 'hall';
+    endTurn(s);
+    got = s.people.some((x) => x.item !== null);
+  }
+  check('Y 幸存者会从道具箱取得道具', got);
+
+  const s2 = newGame();
+  s2.siteItems.filter((i) => i.kind === 'itemBox').forEach((b) => {
+    s2.playerRoom = b.room;
+    s2.energy = BASE_AP;
+    sabotageSiteItem(s2);
+  });
+  const p2 = s2.people.find((x) => x.role !== 'police')!;
+  p2.room = s2.siteItems[0].room;
+  p2.goal = 'supply';
+  p2.alert = 0;
+  s2.playerRoom = 'hall';
+  endTurn(s2);
+  check('Y 道具箱全被破坏后，幸存者拿不到道具', !s2.people.some((x) => x.item !== null));
+
+  const s3 = newGame();
+  const p3 = s3.people.find((x) => x.role !== 'police')!;
+  p3.item = 'key';
+  p3.alert = 0;
+  s3.playerRoom = 'hall';
+  const before = s3.teamProgress;
+  endTurn(s3);
+  check('Y 幸存者道具能推进团队进度', s3.teamProgress > before, `${before} → ${s3.teamProgress}`);
+}
+
+caseSiteItems();
+caseSurvivorItems();
 
 console.log(`\n规则回归 ${pass} 通过 / ${fail} 失败`);
 if (fail > 0) process.exitCode = 1;

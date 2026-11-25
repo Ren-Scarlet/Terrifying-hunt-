@@ -306,6 +306,14 @@ const ROOM_MATERIAL: Record<RoomId, MatKind> = {
   basement: 'concrete',
   garage: 'concrete',
   garden: 'grass',
+  foyer: 'wood',
+  library: 'wood',
+  wine: 'concrete',
+  guestroom: 'carpet',
+  workshop: 'concrete',
+  stairwell: 'woodV',
+  chapel: 'wood',
+  balcony: 'tile',
 };
 
 /** 每个房间的环境色（正片叠底），决定这个空间是暖木、冷瓷砖还是湿水泥 */
@@ -325,6 +333,14 @@ const ROOM_TINT: Record<RoomId, string> = {
   basement: 'rgba(38,52,46,.62)',
   garage: 'rgba(48,54,62,.6)',
   garden: 'rgba(38,54,36,.58)',
+  foyer: 'rgba(84,64,40,.58)',
+  library: 'rgba(70,52,36,.6)',
+  wine: 'rgba(48,44,52,.6)',
+  guestroom: 'rgba(76,56,52,.58)',
+  workshop: 'rgba(58,58,62,.6)',
+  stairwell: 'rgba(62,58,52,.58)',
+  chapel: 'rgba(72,56,40,.6)',
+  balcony: 'rgba(52,66,74,.56)',
 };
 
 interface Bulb {
@@ -404,6 +420,14 @@ const ROOM_AMBIENT: Record<RoomId, number> = {
   basement: 0.26,
   garage: 0.28,
   garden: 0.36,
+  foyer: 0.32,
+  library: 0.26,
+  wine: 0.2,
+  guestroom: 0.3,
+  workshop: 0.28,
+  stairwell: 0.22,
+  chapel: 0.26,
+  balcony: 0.38,
 };
 
 /* ------------------------------------------------------------------ */
@@ -572,6 +596,14 @@ const PROPS: Record<RoomId, Prop[]> = {
     { k: 'puddle', x: 0.5, y: 0.84, w: 0.4, h: 0.16 },
     { k: 'clutter', x: 0.16, y: 0.4, w: 0.2, h: 0.2 },
   ],
+  foyer: [],
+  library: [],
+  wine: [],
+  guestroom: [],
+  workshop: [],
+  stairwell: [],
+  chapel: [],
+  balcony: [],
   garden: [
     { k: 'tree', x: 0.12, y: 0.4, w: 0.24, h: 0.46 },
     { k: 'tree', x: 0.86, y: 0.62, w: 0.2, h: 0.4 },

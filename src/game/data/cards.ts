@@ -18,11 +18,14 @@ import type { CardDef } from '../types';
  *    封锁   死锁 / 花言巧语：锁房间、钉死后院
  *    潜行   静止隐身 / 折磨路径 / 恐惧释放：压通缉、压警戒、伏击进门
  *    追击   疾速残暴：贴到逃跑的人身后；配合伏击就是「偷袭 → 补刀」的两张牌组合
- *    追猎   辣手屠夫 / 牢牢紧握 / 优胜劣汰 / 恩赐解脱：受伤 → 倒地 → 处决
+ *    追猎   辣手屠夫 / 牢牢紧握 / 优胜劣汰 / 恩赐解脱：咬住伤口、按住人、磨刀、处决
  *
- *  —— 生死规则 ——
- *    伤害只能推进一档：健康 → 受伤 → 倒地。倒地的人不会自己死，
- *    必须再补一次伤害或用「处决」类卡牌才会死亡；期间可能被同伴救起。
+ *  —— 伤害只有一处来源 ——
+ *    界面上的「挥刀」按钮才是唯一能造成伤害的东西：消耗 1 点能量，
+ *    健康 → 受伤，受伤 → 倒地，而且砍完必须再做一件事（挪一步 / 出一张牌）才能砍第二刀。
+ *    卡牌不再直接造成伤害，它们只负责：让这一刀更狠（优胜劣汰）、让人跑不掉（牢牢紧握）、
+ *    或者告诉你人跑哪去了（辣手屠夫 / 鲜血回响 靠血迹，也就是地板上的红色划痕）。
+ *    倒地的人不会自己死，必须用「恩赐解脱」处决，期间可能被同伴救起。
  */
 
 export const CARDS: CardDef[] = [
@@ -33,30 +36,32 @@ export const CARDS: CardDef[] = [
     id: 'shuriken',
     name: '辣手屠夫',
     cost: 1,
-    type: 'attack',
-    desc: '对当前房间的一名目标造成 1 点伤害并使其流血：每回合结束再掉 1 点。伤口会自己把人拖垮。',
+    type: 'skill',
+    desc: '血迹会说话：所有已经受伤的人，接下来 3 回合位置始终可见。先挥一刀，再用这张牌咬住他。',
     flavor: '伤口不深，但一直不肯合上。',
     sourceSkill: 'Sloppy Butcher',
     sourceText: '普通攻击命中后使逃生者出血、重伤。',
     unlocked: true,
     ops: [
-      { op: 'damage', who: 'victim', amount: 1 },
-      { op: 'bleed', who: 'victim', amount: 1 },
+      { op: 'track', who: 'injuredAny', turns: 3 },
+      { op: 'log', text: '你低头看着地上的血迹——它比他跑得更快。' },
     ],
   },
   {
     id: 'choke',
     name: '牢牢紧握',
     cost: 2,
-    type: 'attack',
-    desc: '对当前房间的一名目标造成 2 点伤害（健康直接倒地），并把他按在原地，本回合无法被救走。',
+    type: 'tactic',
+    desc: '把当前房间的一名目标死死按住：本回合他跑不掉，也没人能把他拖走。按住了再挥刀。',
     flavor: '抓稳了，就别指望他还能自己走。',
     sourceSkill: 'Iron Grasp',
     sourceText: '搬运逃生者时，其扭动速度大幅减慢。',
     unlocked: true,
+    precheck: { cond: { c: 'victimHere' }, hint: '这间屋子里没有能抓住的人。' },
     ops: [
-      { op: 'damage', who: 'victim', amount: 2 },
       { op: 'pin', who: 'victim' },
+      { op: 'block', who: 'victim', turns: 2 },
+      { op: 'log', text: '你攥住他的领口，把他按在墙上，膝盖顶住他的后腰。' },
     ],
   },
   {
@@ -64,7 +69,7 @@ export const CARDS: CardDef[] = [
     name: '恩赐解脱',
     cost: 3,
     type: 'attack',
-    desc: '处决当前房间一名已经倒地的人。必须先把他打倒——这一刀不会凭空生效。通缉值 +3。',
+    desc: '处决当前房间一名已经倒地的人。挥刀只能把人打倒，最后这一下得靠这张牌。通缉值 +3。',
     flavor: '名单上的人不该开口。',
     sourceSkill: 'Coup de Grâce',
     sourceText: '消耗印记使突进攻击距离增加。',
@@ -80,31 +85,33 @@ export const CARDS: CardDef[] = [
     id: 'harvest',
     name: '鲜血回响',
     cost: 2,
-    type: 'attack',
-    desc: '若本回合已经杀过人：全场所有受伤或倒地的人再受 1 点伤害并流血。恐慌会沿着血迹传开。',
+    type: 'skill',
+    desc: '伤口连成一条线：所有受伤的人位置暴露 2 回合，团队警戒 -6。他们想躲，血先出卖他们。',
     flavor: '第一个之后，剩下的只是惯性。',
     sourceSkill: 'Blood Echo',
     sourceText: '钩住逃生者后，所有受伤逃生者陷入疲劳与出血。',
     unlocked: false,
-    precheck: { cond: { c: 'killsThisTurn', gte: 1 }, hint: '本回合还没有击杀，鲜血暂时不会回响。' },
     ops: [
-      { op: 'damage', who: 'injuredAny', amount: 1 },
-      { op: 'bleed', who: 'injuredAny', amount: 1 },
-      { op: 'alarm', amount: 8 },
+      { op: 'track', who: 'injuredAny', turns: 2 },
+      { op: 'alarm', amount: -6 },
+      { op: 'log', text: '血顺着地板缝渗下去，整栋房子的味道都变了。' },
     ],
   },
   {
     id: 'final_blow',
     name: '优胜劣汰',
     cost: 1,
-    type: 'attack',
-    desc: '对当前房间受伤最重的人造成 2 点伤害：受伤的直接倒地，倒地的直接死亡。',
+    type: 'skill',
+    desc: '磨刀：本回合下一刀的伤害 +1——对健康的人就是一刀倒地。',
     flavor: '结束要干脆。',
     sourceSkill: 'Cull the Weak',
     sourceText: '钩住非血祭品时积累印记，拖慢其他人。',
     unlocked: false,
-    precheck: { cond: { c: 'injuredHere' }, hint: '当前房间没有受伤或倒地的人。' },
-    ops: [{ op: 'damage', who: 'lowestHpHere', amount: 2 }],
+    precheck: { cond: { c: 'victimHere' }, hint: '这间屋子里没有能下手的人。' },
+    ops: [
+      { op: 'bonusDamage', amount: 1 },
+      { op: 'log', text: '你换了只手握刀，这一下不会再留力。' },
+    ],
   },
   {
     id: 'break_in',
@@ -132,7 +139,7 @@ export const CARDS: CardDef[] = [
     name: '静止隐身',
     cost: 1,
     type: 'skill',
-    desc: '伏击：本回合进门不惊动任何人，接着打攻击牌就是偷袭。通缉 -2，团队警戒 -8，目击无效。',
+    desc: '伏击：本回合进门不惊动任何人，接着挥刀就是偷袭。通缉 -2，团队警戒 -8，目击无效。',
     flavor: '影子不会留下脚印。',
     sourceSkill: 'Insidious',
     sourceText: '闲置后获得无法侦测状态。',
@@ -149,7 +156,7 @@ export const CARDS: CardDef[] = [
     name: '疾速残暴',
     cost: 1,
     type: 'skill',
-    desc: '追击：立刻贴到逃跑的人身后（不计步数，最远两间屋），接攻击牌补刀。步数 +2。',
+    desc: '追击：立刻贴到逃跑的人身后（不计行动点，最远两间屋），贴上去就能再挥一刀。行动点 +2。',
     flavor: '脚步声追不上你。',
     sourceSkill: 'Rapid Brutality',
     sourceText: '普通攻击命中后获得急速。',
@@ -157,7 +164,7 @@ export const CARDS: CardDef[] = [
     ops: [
       { op: 'pursue', who: 'fleeing', distance: 2 },
       { op: 'steps', amount: 2 },
-      { op: 'log', text: '本回合步数 +2。' },
+      { op: 'log', text: '本回合行动点 +2。' },
     ],
   },
   {
@@ -180,14 +187,14 @@ export const CARDS: CardDef[] = [
     name: '黑暗启迪',
     cost: 0,
     type: 'skill',
-    desc: '抽 1 张牌，同时侦查全场：地图点亮，所有人的位置显形 2 回合。',
+    desc: '抽 1 张牌，同时感知全场：地图上每个人的位置浮出红色人影——只有影子，没有名字，而且只亮这一回合。',
     flavor: '黑暗是你最好的同伙。',
     sourceSkill: 'Darkness Revealed',
     sourceText: '搜索储物柜时显示附近逃生者气场。',
     unlocked: true,
     ops: [
       { op: 'draw', amount: 1 },
-      { op: 'scout', all: true, turns: 2 },
+      { op: 'pulse' },
       { op: 'log', text: '你闭上眼睛，听见了每一扇门后面的呼吸。' },
     ],
   },
@@ -260,13 +267,13 @@ export const CARDS: CardDef[] = [
     name: '猎鹿者',
     cost: 1,
     type: 'skill',
-    desc: '侦查全场 3 回合，并追踪警觉最高的那个人：接下来 3 回合他的位置始终可见。下次攻击 +1 伤害。',
+    desc: '感知全场红色人影，并咬住警觉最高的那个人：接下来 3 回合他的位置始终可见。下一刀 +1 伤害。',
     flavor: '找准那一个瞬间。',
     sourceSkill: 'Deerstalker',
     sourceText: '显示濒死逃生者的气场。',
     unlocked: false,
     ops: [
-      { op: 'scout', all: true, turns: 3 },
+      { op: 'pulse' },
       { op: 'track', who: 'highestAlert', turns: 3 },
       { op: 'bonusDamage', amount: 1 },
     ],
@@ -474,14 +481,14 @@ export const CARDS: CardDef[] = [
     name: '致命追踪者',
     cost: 1,
     type: 'setup',
-    desc: '本回合步数 +2，侦查全场 2 回合。',
+    desc: '本回合行动点 +2，并感知全场红色人影。',
     flavor: '跟着光走的人，不会回头看。',
     sourceSkill: 'Lethal Pursuer',
     sourceText: '开局显示所有逃生者气场。',
     unlocked: false,
     ops: [
       { op: 'steps', amount: 2 },
-      { op: 'scout', all: true, turns: 2 },
+      { op: 'pulse' },
     ],
   },
   {
@@ -510,21 +517,23 @@ export const CARD_MAP: Record<string, CardDef> = CARDS.reduce(
 );
 
 export const STARTING_DECK: string[] = [
-  'shuriken',
-  'shuriken',
-  'shuriken',
-  'choke',
-  'choke',
-  'final_blow',
+  // 伤害全部来自「挥刀」按钮，所以起始牌组是一套「怎么把这一刀砍到人身上」的工具箱：
+  // 两张伏击（进门不惊动）、两张追击（追上去）、两张按住（砍第二刀）、一张磨刀。
   'silent_step',
   'silent_step',
   'sprint',
+  'sprint',
+  'choke',
+  'choke',
+  'final_blow',
+  'shuriken',
+  'night_cover',
   'bait',
   'clean',
-  'night_cover',
   'lock_door',
   'cut_line',
   'lure',
+  'search',
 ];
 
 export const UNLOCK_REWARDS: Record<string, string> = {
