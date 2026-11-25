@@ -155,6 +155,10 @@ export interface Person {
   archetype: Archetype;
   /** 警觉度 0–100：越高越可能逃离玩家所在房间 */
   alert: number;
+  /** 对危险的认知阶段：0 日常、1 疑惑、2 恐慌、3 求生 */
+  awareness: number;
+  /** 当前头顶显示的短暂对白 */
+  dialogue: string;
   /** 当前行为，用于档案与人物名单 */
   activity: string;
   /** 这一回合的意图 */
