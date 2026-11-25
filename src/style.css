@@ -1050,7 +1050,7 @@ button { font-family: inherit; cursor: pointer; }
   box-shadow: 0 6px 16px #000b;
 }
 .deck-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(262px, 1fr)); gap: 8px; margin-top: 14px; }
- .deck-row {
+.deck-row {
   display: flex; align-items: flex-start; gap: 9px;
   padding: 9px;
   border: 1px solid #22262a; border-radius: 2px;
@@ -1072,7 +1072,7 @@ button { font-family: inherit; cursor: pointer; }
   line-height: 1.5;
   margin-bottom: 4px;
 }
- .source-skill {
+.source-skill {
   display: block;
   color: #8b7d92; font-size: 8.5px; letter-spacing: .2px;
   white-space: normal; overflow: visible; overflow-wrap: anywhere;
