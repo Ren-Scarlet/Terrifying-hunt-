@@ -146,7 +146,8 @@ function caseAmbush(): void {
   check('B 伏击牌压住进门惊动', stayed && delta <= 0, `留在原地=${stayed}，警觉 ${delta >= 0 ? '+' : ''}${delta}`);
 
   const hp = v.hp;
-  const hit = attack(s);
+  // 固定随机源，避免随机手电筒干扰把伏击命中回归变成偶发测试。
+  const hit = withRandomSource(() => 0.99, () => attack(s));
   check('B 伏击后第一刀能砍中', hit && v.hp < hp, `hp ${hp} → ${v.hp}`);
 }
 
