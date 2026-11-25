@@ -993,6 +993,8 @@ function caseContractsPowerAndCarry(): void {
   grid.energy = BASE_AP;
   const broken = sabotageSiteItem(grid);
   check('AB 破坏独立电闸后对应区域断电', broken && circuit.broken && !isRoomLit(grid, affected));
+  check('AB 其他供电回路仍保持照明', isRoomLit(grid, 'bedroom'));
+
   const carry = newGame();
   carry.people = carry.people.filter((p) => p.role !== 'police').slice(0, 1);
   const victim = carry.people[0];
