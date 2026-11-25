@@ -2594,7 +2594,7 @@ export function attack(state: GameState, targetId?: string): boolean {
         log(state, '难逃一死生效：图腾仍然存留，你获得 2 点额外行动点。');
       }
     }
-    if (state.killer === '迈克尔·迈尔斯' && state.myersLastBestActive && target.role !== 'police' && !target.bloodSacrifice) {
+    if (state.killer === '迈克尔·迈尔斯' && state.myersLastBestActive && !target.bloodSacrifice) {
       state.myersLastBestMarks = Math.min(8, state.myersLastBestMarks + 1);
       log(state, `把最好的留在最后印记 +1（${state.myersLastBestMarks}/8）。`);
     }
