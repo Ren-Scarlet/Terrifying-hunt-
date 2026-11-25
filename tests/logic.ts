@@ -140,8 +140,7 @@ function caseMyersStalkingAndFearRadius(): void {
   const next = openNeighbor(s.playerRoom);
   s.energy = 9;
   const beforeCost = moveCost(s, next);
-  s.hand.push({ uid: 'test-myers-gaze', defId: 'myers_gaze' });
-  play(s, 'myers_gaze');
+  runOps(s, [{ op: 'flag', key: 'myersStalk' }]);
   check('迈尔斯：尾随者技能切换开启潜行模式', s.myersStalking);
   check('迈尔斯：尾随模式移动额外消耗 1 点行动点', moveCost(s, next) === beforeCost + 1);
   victim.room = s.playerRoom;
