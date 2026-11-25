@@ -1,3 +1,4 @@
+import { random } from './random';
 import { CARD_MAP, UNLOCK_REWARDS } from './cards';
 import type { Cond, Dest, Op, Who } from './effect';
 import { KILLER_MAP } from './killers';
@@ -239,14 +240,14 @@ const uid = (prefix: string) => `${prefix}-${Date.now()}-${uidCounter++}`;
 function shuffle<T>(arr: T[]): T[] {
   const copy = [...arr];
   for (let i = copy.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(random() * (i + 1));
     [copy[i], copy[j]] = [copy[j], copy[i]];
   }
   return copy;
 }
 
 function randomOf<T>(arr: T[]): T {
-  return arr[Math.floor(Math.random() * arr.length)];
+  return arr[Math.floor(random() * arr.length)];
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -882,6 +883,8 @@ function selectPeople(state: GameState, who: Who): Person[] {
       return standing(state);
     case 'fleeing':
       return standing(state).filter((p) => p.intent === 'flee' || p.intent === 'escape');
+    case 'downedHere':
+      return peopleInRoom(state, state.playerRoom).filter((p) => p.role !== 'police' && p.hp <= 0);
     case 'downedAny':
       return npcs(state).filter((p) => p.hp <= 0);
     case 'injuredAny':
@@ -1486,7 +1489,7 @@ function npcOnPlayerEnter(state: GameState): void {
     if (flasher) {
       consumeItem(state, flasher);
       interruptPlayer(state, `${flasher.name} 早在门后等着，手电筒一下子照白了你的视野。`, flasher.id);
-    } else if (obstacleHere && trapper && Math.random() < 0.55) {
+    } else if (obstacleHere && trapper && random() < 0.55) {
       interruptPlayer(
         state,
         `${trapper.name} 猛地推倒${roomName(state.playerRoom)}门口的杂物，正好砸在你身上。`,
@@ -1576,7 +1579,7 @@ function witnessInRoom(state: GameState, person: Person): boolean {
       p.alert = clamp(p.alert + 20, 0, 100);
     });
   addDisturbance(state, person.room);
-  if (Math.random() < 0.55 && person.movesThisTurn < REACT_MOVE_CAP) {
+  if (random() < 0.55 && person.movesThisTurn < REACT_MOVE_CAP) {
     fleeAway(state, person);
     person.movesThisTurn += 1;
     log(state, `${person.name} 看见同伴被砍，喊了一声夺路而逃。`);
@@ -1605,7 +1608,7 @@ function barricadeRoom(state: GameState, person: Person): void {
 function tryRescue(state: GameState, person: Person): boolean {
   if (person.room === state.playerRoom) return false;
   if (person.blockedTurns > 0) return false;
-  if (Math.random() > RESCUE_EAGERNESS[person.archetype]) return false;
+  if (random() > RESCUE_EAGERNESS[person.archetype]) return false;
   const allies = peopleInRoom(state, person.room).filter(
     (p) => p.id !== person.id && p.role !== 'police',
   );
@@ -1629,7 +1632,7 @@ function tryRescue(state: GameState, person: Person): boolean {
 /** 有人倒地时，幸存者会主动赶过去：救援优先于日常目标，但没人敢闯玩家守着的房间 */
 function tryAidRun(state: GameState, person: Person): boolean {
   if (person.hidden || person.blockedTurns > 0) return false;
-  if (Math.random() > RESCUE_EAGERNESS[person.archetype] * AID_RUN_RATE) return false;
+  if (random() > RESCUE_EAGERNESS[person.archetype] * AID_RUN_RATE) return false;
   const downed = npcs(state)
     .filter((p) => p.hp <= 0 && p.room !== state.playerRoom)
     .sort((a, b) => roomDistance(person.room, a.room) - roomDistance(person.room, b.room))[0];
@@ -1820,7 +1823,7 @@ function actByArchetype(state: GameState, person: Person): void {
         });
       person.intent = 'wary';
       person.activity = '在组织其他人';
-      if (Math.random() < 0.5) fleeAway(state, person);
+      if (random() < 0.5) fleeAway(state, person);
       return;
     }
     case 'alert': {
@@ -1912,7 +1915,7 @@ function npcTurn(state: GameState): void {
 
     // 玩家就在这一间：先跑，跑不掉再对抗
     if (person.room === state.playerRoom) {
-      if (person.archetype === 'defiant' && person.armed && Math.random() < 0.6) {
+      if (person.archetype === 'defiant' && person.armed && random() < 0.6) {
         counterAttack(state, person);
         continue;
       }
@@ -1948,11 +1951,11 @@ function npcTurn(state: GameState): void {
     // 跑了一整回合的人会喘不上气：找个角落停下来，甚至钻进柜子。
     // 这就是「痕迹」能兑现的地方——你不是追上他，是跟着地板上的划痕找到他。
     const ranFar = person.movesThisTurn >= 2 && roomDistance(state.playerRoom, person.room) >= 2;
-    if (ranFar && person.intent !== 'call' && person.intent !== 'escape' && Math.random() < 0.7) {
+    if (ranFar && person.intent !== 'call' && person.intent !== 'escape' && random() < 0.7) {
       person.alert = Math.max(0, person.alert - 30);
       person.intent = 'wary';
       person.activity = '跑不动了，蹲在原地喘气';
-      if (CABINET_ROOMS.includes(person.room) && Math.random() < 0.55) {
+      if (CABINET_ROOMS.includes(person.room) && random() < 0.55) {
         person.hidden = true;
         person.activity = '钻进柜子，屏住呼吸';
         log(state, `${person.name} 躲进了${roomName(person.room)}的柜子——地板上的痕迹到这里就断了。`);
@@ -1981,7 +1984,7 @@ function npcTurn(state: GameState): void {
     }
     if (person.alert >= 22) {
       person.intent = 'wary';
-      if (Math.random() < 0.5) actByArchetype(state, person);
+      if (random() < 0.5) actByArchetype(state, person);
       else person.activity = '紧张地四处张望';
       continue;
     }
@@ -2236,7 +2239,7 @@ function pickArchetype(survivor: (typeof SURVIVORS)[number]): Archetype {
     case 'team':
       return 'brave';
     case 'spiritual':
-      return Math.random() < 0.5 ? 'hider' : 'defiant';
+      return random() < 0.5 ? 'hider' : 'defiant';
     default:
       return randomOf(ARCHETYPES);
   }
@@ -2255,9 +2258,9 @@ function goalForArchetype(archetype: Archetype): NpcGoal {
     case 'hider':
       return 'hide';
     case 'defiant':
-      return Math.random() < 0.5 ? 'weapon' : 'panic';
+      return random() < 0.5 ? 'weapon' : 'panic';
     case 'kiter':
-      return Math.random() < 0.5 ? 'supply' : 'panic';
+      return random() < 0.5 ? 'supply' : 'panic';
   }
 }
 
@@ -2270,7 +2273,7 @@ function makePerson(
 ): Person {
   const archetype = pickArchetype(s);
   // 三成的人开局就带着一件小东西：只有发现他之后才看得到，值得你优先盯
-  const starter: SurvivorItem | null = Math.random() < STARTER_ITEM_RATE ? randomOf(STARTER_ITEMS) : null;
+  const starter: SurvivorItem | null = random() < STARTER_ITEM_RATE ? randomOf(STARTER_ITEMS) : null;
   return {
     id: s.id,
     name: s.name,
@@ -2291,7 +2294,7 @@ function makePerson(
     hidden: false,
     armed: false,
     // 有名有姓、带威胁设定的角色更老练；再随机挑一些普通人，避免人人都好抓
-    sneaky: SURVIVOR_MAP[s.id]?.threat ? true : Math.random() < 0.28,
+    sneaky: SURVIVOR_MAP[s.id]?.threat ? true : random() < 0.28,
     trackedTurns: 0,
     lastSeenRoom: room,
     lastSeenTurn: 0,
@@ -2331,7 +2334,7 @@ function pickSupply(state: GameState, person: Person): SurvivorItem {
   };
   const all = Object.keys(score) as SurvivorItem[];
   const best = all.slice().sort((a, b) => score[b] - score[a])[0];
-  return Math.random() < 0.78 ? best : randomOf(all);
+  return random() < 0.78 ? best : randomOf(all);
 }
 
 /** 走到道具箱前翻一件东西：这是幸存者「多一个选择」的来源 */
@@ -2416,7 +2419,7 @@ function useSurvivorItem(state: GameState, person: Person): boolean {
       if (person.alert < 18) return false;
       consumeItem(state, person);
       person.alert = Math.max(0, person.alert - 35);
-      if (CABINET_ROOMS.includes(person.room) && Math.random() < 0.6) person.hidden = true;
+      if (CABINET_ROOMS.includes(person.room) && random() < 0.6) person.hidden = true;
       state.trails = state.trails.filter((t) => t.room !== person.room);
       person.activity = '丢出烟雾弹，从视线里消失了';
       log(state, `${person.name} 丢了烟雾弹，脚印和视线一起断在这里。`);
@@ -2621,7 +2624,7 @@ export function createGame(
   // 场地物品：道具箱固定 2 个，发电机随机 1~2 台，撒在能走的房间里。
   // 杀手用不了它们，但能砸——去哪边、什么时候砸，多了一层取舍。
   const sitePool = shuffle(objPool.filter((id) => !state.objectiveRooms.includes(id)));
-  const genCount = GENERATOR_MIN + Math.floor(Math.random() * (GENERATOR_MAX - GENERATOR_MIN + 1));
+  const genCount = GENERATOR_MIN + Math.floor(random() * (GENERATOR_MAX - GENERATOR_MIN + 1));
   const items: SiteItem[] = [];
   for (let i = 0; i < ITEM_BOX_COUNT; i++) {
     const room = sitePool.pop();
@@ -2640,7 +2643,7 @@ export function createGame(
   state.people
     .filter((p) => p.role !== 'police')
     .forEach((p) => {
-      const roll = Math.random();
+      const roll = random();
       if (roll < 0.26) p.goal = 'supply';
       else if (roll < 0.46) p.goal = 'generator';
       else if (roll < 0.68) p.goal = 'objective';
@@ -2850,7 +2853,7 @@ export function attack(state: GameState, targetId?: string): boolean {
       p.alert >= 40 &&
       (p.room === state.playerRoom || ROOM_MAP[state.playerRoom].neighbors.includes(p.room)),
   );
-  if (flasher && Math.random() < 0.55) {
+  if (flasher && random() < 0.55) {
     consumeItem(state, flasher);
     if (flasher.room !== state.playerRoom) flasher.room = state.playerRoom;
     interruptPlayer(

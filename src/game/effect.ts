@@ -22,13 +22,14 @@ import type { RoomId } from './types';
  *   markedAny     全场被标记的目标
  *   allAny        全场所有非警察
  *   fleeing       全场正在逃跑的人
- *   downedAny     全场倒地的人（处决 / 救援的对象）
+ *   downedHere    当前房间倒地的人（处决目标）
+ *   downedAny     全场倒地的人（仅用于明确的全场效果）
  *   injuredAny    全场受伤的人（治疗的对象）
  *   randomAny     全场随机一人
  *
  * —— 伤害与生死 ——
  *   伤害只有一个来源：界面上的「挥刀」按钮（消耗 1 点行动点、不能连砍）。
- *   走路 / 挥刀 / 出牌 / 搜索柜子共用一个「行动点」池（BASE_AP=7/回合），
+ *   走路 / 挥刀 / 出牌 / 搜索柜子共用一个「行动点」池（BASE_AP=4/回合），
  *   所以「能量」和「步数」不再是两套资源，steps 指令现在也加进同一个池子。
  *   卡牌不再直接造成伤害——它们负责让这一刀更狠、让人跑不掉、或者告诉你人跑哪去了。
  *   damage     造成伤害，只能推进一档：健康→受伤→倒地（倒地的人要处决牌才死）
@@ -95,6 +96,7 @@ export type Who =
   | 'markedAny'
   | 'allAny'
   | 'fleeing'
+  | 'downedHere'
   | 'downedAny'
   | 'injuredAny'
   | 'randomAny'

@@ -366,7 +366,7 @@ export const KILLERS: KillerProfile[] = [
         ultimate: true,
         requires: [{ c: 'downedHere' }],
         ops: [
-          { op: 'execute', who: 'downedAny' },
+          { op: 'execute', who: 'downedHere' },
           { op: 'wanted', amount: 2 },
           { op: 'log', text: '他跪了下来，因为知道自己该跪。' },
         ],

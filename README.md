@@ -16,8 +16,8 @@ npm run preview    # 预览构建产物
 ### 改完东西怎么验（不要开浏览器）
 
 ```bash
-npm run check      # 约 3 秒：类型检查 + 11 条规则回归 + 39 局胜率抽样
-npm run check:full # 12 杀手 × 8 局，只用于最终平衡
+npm run check      # 类型检查 + 规则回归 + 39 局胜率抽样
+npm run check:full # 13 杀手 × 8 局，只用于最终平衡
 ```
 
 纯逻辑改动（卡牌数值、AI 反应、房间连通）跑 `check` 就够了。只有改了 CSS / 布局才需要开浏览器看图，
@@ -25,7 +25,7 @@ npm run check:full # 12 杀手 × 8 局，只用于最终平衡
 
 ## 玩法
 
-**一局 20–22 回合**。每回合 **7 点行动点（AP）**：走路、挥刀、出牌、搜索柜子全都从这一个池子里扣；回合结束弃掉手牌并重抽 5 张。原来「能量」和「行动点」是两套资源，现在合并——想多追几间屋就少出牌，想连砍就别乱跑。
+**一局 20–22 回合**。每回合 **4 点行动点（AP）**：走路、挥刀、出牌、搜索柜子全都从这一个池子里扣；回合结束弃掉手牌并重抽 5 张。原来「能量」和「行动点」是两套资源，现在合并——想多追几间屋就少出牌，想连砍就别乱跑。
 
 ### 击杀是流程，不是一张牌
 
@@ -190,13 +190,15 @@ src/
   game/
     types.ts             所有数据结构
     effect.ts            效果指令（DSL）的类型定义与说明书
+    effectCatalog.ts     DSL 编辑器元数据（指令名称、字段和目标选项）
+    random.ts            可注入随机源与种子随机数生成器
     data/
       cards.ts           ★ 29 张卡牌 + 每张的效果程序（改卡牌改这里）
       killers.ts         ★ 13 个杀手 + 两个能力的效果程序（改能力改这里）
     cards.ts             转发 data/cards.ts
     killers.ts           转发 data/killers.ts
     engine.ts            规则结算 + 效果解释器 + NPC 行为（纯逻辑，可单测）
-    tuning.ts            ★ 平衡数值的本地存档：改写卡牌/能力，导出与重置
+    tuning.ts            ★ 平衡数值的本地存档：改写卡牌/能力，校验导入、导出与重置
     rooms.ts             房间、邻接关系、平面图矩形、特殊房间
     missions.ts          任务生成
     survivors.ts         52 名逃生者与威胁类型
@@ -217,7 +219,7 @@ scripts/
 - **卡牌**：直接改费用，改每一条指令的数值（伤害、流血、警戒、锁定回合……），改目标对象、改条件分支里的数值。
 - **能力**：改冷却，改每一条指令的数值。
 - **保存即生效**。改动写进 `localStorage` 的 `night-hunt-tuning-v2`，刷新后仍然有效；卡牌角上会出现一个「调」字标记。
-- **重置**回基线，或者**导出 JSON** 备份、粘回去导入。
+- **重置**回基线，或者**导出 JSON** 备份；导入时会校验 ID、指令结构、字段和数值范围，非法数据不会覆盖当前配置。
 
 数值改在存档里，原始数据（`data/cards.ts`、`data/killers.ts`）不动，所以「重置」永远能回到出厂值。
 
@@ -258,7 +260,7 @@ scripts/
   ],
 ```
 
-**可选对象（who）**：`victim`（当前房间最优先的一人）、`lowestHpHere`、`highestAlert`（全场）、`targetsHere`、`civilsHere`、`allHere`、`markedAny`、`allAny`、`fleeing`、`randomAny`、`downedAny`（已经倒地的人）、`injuredAny`（受伤的人）。
+**可选对象（who）**：`victim`（当前房间最优先的一人）、`lowestHpHere`、`highestAlert`（全场）、`targetsHere`、`civilsHere`、`allHere`、`markedAny`、`allAny`、`fleeing`、`randomAny`、`downedHere`（当前房间倒地的人）、`downedAny`（全场倒地的人）、`injuredAny`（受伤的人）。
 
 **可用指令（op）**：
 

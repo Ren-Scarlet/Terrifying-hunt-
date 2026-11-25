@@ -1,7 +1,8 @@
+import { random } from './random';
 import { ROOM_MAP } from './rooms';
 import type { Mission, MissionKind, RoomId } from './types';
 
-const pick = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
+const pick = <T,>(arr: T[]): T => arr[Math.floor(random() * arr.length)];
 
 /**
  * 任务生成。玩家一律靠「杀够人 / 杀掉关键人物再撤离 / 收齐证据撤离」取胜；
@@ -18,7 +19,7 @@ export function generateMission(unlockedKinds: MissionKind[] = [
 
   switch (kind) {
     case 'assassinate': {
-      const count = Math.random() < 0.5 ? 2 : 3;
+      const count = random() < 0.5 ? 2 : 3;
       return {
         id: `mission-${Date.now()}`,
         kind,
@@ -33,7 +34,7 @@ export function generateMission(unlockedKinds: MissionKind[] = [
       };
     }
     case 'bodyCount': {
-      const count = 3 + Math.floor(Math.random() * 2);
+      const count = 3 + Math.floor(random() * 2);
       return {
         id: `mission-${Date.now()}`,
         kind,
@@ -48,7 +49,7 @@ export function generateMission(unlockedKinds: MissionKind[] = [
       };
     }
     case 'evidence': {
-      const count = 2 + Math.floor(Math.random() * 2);
+      const count = 2 + Math.floor(random() * 2);
       return {
         id: `mission-${Date.now()}`,
         kind,

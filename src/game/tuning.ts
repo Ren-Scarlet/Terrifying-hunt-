@@ -50,14 +50,14 @@ function load(): TuningData {
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return { cards: {}, powers: {} };
-    const parsed = JSON.parse(raw) as Partial<TuningData>;
-    return { cards: parsed.cards ?? {}, powers: parsed.powers ?? {} };
+    const parsed: unknown = JSON.parse(raw);
+    return validateTuning(parsed) ? clone(parsed) : { cards: {}, powers: {} };
   } catch {
     return { cards: {}, powers: {} };
   }
 }
 
-let data: TuningData = load();
+let data: TuningData;
 
 function persist(): void {
   try {
@@ -195,27 +195,153 @@ export function exportTuning(): string {
   return JSON.stringify(data, null, 2);
 }
 
-export function importTuning(raw: string): boolean {
-  try {
-    const parsed = JSON.parse(raw) as Partial<TuningData>;
-    data = { cards: parsed.cards ?? {}, powers: parsed.powers ?? {} };
-    // 先恢复默认，再套用导入的数据，避免旧覆盖残留
-    BASELINE_CARDS.forEach((base) => {
-      const card = CARD_MAP[base.id];
-      if (!card) return;
-      card.cost = base.cost;
-      card.ops = clone(base.ops);
-    });
-    BASELINE_POWERS.forEach((base) => {
-      const power = KILLER_MAP[base.owner]?.powers.find((p) => p.id === base.id);
-      if (!power) return;
-      power.cooldown = base.cooldown;
-      power.ops = clone(base.ops);
-    });
-    applyTuning();
-    persist();
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+const WHO_VALUES = new Set([
+  'victim', 'lowestHpHere', 'highestAlert', 'targetsHere', 'civilsHere', 'allHere',
+  'markedAny', 'allAny', 'fleeing', 'downedHere', 'downedAny', 'injuredAny',
+  'randomAny', 'unawareNearby',
+]);
+const FLAG_VALUES = new Set([
+  'phoneCut', 'wiretap', 'poltergeist', 'policeBlocked', 'noAlarm', 'exitBlocked',
+  'clearBarricade', 'freeMove', 'possessReady',
+]);
+const SABOTAGE_VALUES = new Set(['phone', 'exit', 'radio', 'lights']);
+const DEST_VALUES = new Set([
+  'here', 'adjacent', 'far', 'exit', 'garden', 'attic', 'nursery', 'bedroom',
+  'study', 'storage', 'hall', 'corridor', 'kitchen', 'basement', 'laundry',
+  'garage', 'dining', 'bathroom', 'conservatory',
+]);
+
+function validateCondition(value: unknown, baseline: unknown): boolean {
+  if (!isRecord(value) || !isRecord(baseline) || value.c !== baseline.c) return false;
+  const allowed = Object.keys(baseline);
+  const optional: Record<string, string[]> = { wanted: ['gte', 'lte'], alarm: ['gte', 'lte'], victimHere: ['maxHp'] };
+  const optionalKeys = optional[String(baseline.c)] ?? [];
+  if (Object.keys(value).some((key) => !allowed.includes(key))) return false;
+  if (allowed.some((key) => !optionalKeys.includes(key) && !(key in value))) return false;
+  for (const key of allowed) {
+    if (!(key in value)) continue;
+    const v = value[key];
+    if (typeof baseline[key] === 'number') {
+      if (typeof v !== 'number' || !Number.isFinite(v) || Math.abs(v) > 1000) return false;
+    } else if (typeof baseline[key] === 'string') {
+      if (typeof v !== 'string' || v.length > 100) return false;
+      if (key === 'key' && baseline.c === 'flag' && !FLAG_VALUES.has(v)) return false;
+      if (key === 'v' && baseline.c === 'hasThreat' && !['alarm', 'lead', 'team', 'spiritual'].includes(v)) return false;
+      if (key === 'a' && baseline.c === 'hasArchetype' && !['alert', 'defiant', 'caller', 'rescuer', 'hider', 'brave'].includes(v)) return false;
+    }
+  }
+  return true;
+}
+
+const OPTIONAL_OP_FIELDS: Record<string, string[]> = {
+  damage: ['maxHp'], move: ['clearAlert'], scout: ['to', 'all', 'adj', 'turns'],
+  pursue: ['distance'], flag: ['value'], if: ['else'],
+};
+
+function validateOptionalField(op: string, field: string, value: unknown): boolean {
+  if (op === 'damage' && field === 'maxHp') return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 2;
+  if (op === 'move' && field === 'clearAlert') return typeof value === 'boolean';
+  if (op === 'scout' && field === 'to') return typeof value === 'string' && DEST_VALUES.has(value);
+  if (op === 'scout' && (field === 'all' || field === 'adj')) return typeof value === 'boolean';
+  if (op === 'scout' && field === 'turns') return typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 10;
+  if (op === 'pursue' && field === 'distance') return typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 20;
+  if (op === 'flag' && field === 'value') return typeof value === 'boolean' || (typeof value === 'number' && Number.isFinite(value) && Math.abs(value) <= 1000);
+  return false;
+}
+
+/** 只允许调整基准 DSL 已有的指令和字段，不允许导入时注入新指令。 */
+function validateOps(value: unknown, baseline: Op[]): value is Op[] {
+  if (!Array.isArray(value) || value.length !== baseline.length) return false;
+  return value.every((candidate, index) => {
+    const base = baseline[index] as unknown as Record<string, unknown>;
+    if (!isRecord(candidate) || candidate.op !== base.op) return false;
+    const keys = Object.keys(base);
+    const optional = OPTIONAL_OP_FIELDS[candidate.op as string] ?? [];
+    const candidateKeys = Object.keys(candidate);
+    if (candidateKeys.some((key) => !keys.includes(key) && !optional.includes(key))) return false;
+    for (const key of candidateKeys) {
+      if (!keys.includes(key) && !validateOptionalField(candidate.op as string, key, candidate[key])) return false;
+    }
+    if (keys.some((key) => !optional.includes(key) && !(key in candidate))) return false;
+    for (const key of keys) {
+      const current = candidate[key];
+      const original = base[key];
+      if (original === undefined && current !== undefined) {
+        if (!validateOptionalField(candidate.op as string, key, current)) return false;
+        continue;
+      }
+      if (key === 'then' || key === 'else') {
+        if (current === undefined && original === undefined) continue;
+        if (!Array.isArray(original) || !Array.isArray(current) || !validateOps(current, original as Op[])) return false;
+      } else if (key === 'cond') {
+        if (!validateCondition(current, original)) return false;
+      } else if (typeof original === 'number') {
+        if (typeof current !== 'number' || !Number.isFinite(current) || Math.abs(current) > 1000) return false;
+      } else if (typeof original === 'string') {
+        if (typeof current !== 'string' || current.length > 1000) return false;
+        if (key === 'who' && !WHO_VALUES.has(current)) return false;
+        if ((key === 'to' || key === 'room') && !DEST_VALUES.has(current)) return false;
+        if (key === 'key' && candidate.op === 'flag' && !FLAG_VALUES.has(current)) return false;
+        if (key === 'key' && candidate.op === 'sabotage' && !SABOTAGE_VALUES.has(current)) return false;
+      } else if (typeof original === 'boolean' && typeof current !== 'boolean') {
+        return false;
+      }
+    }
     return true;
+  });
+}
+
+function validateTuning(value: unknown): value is TuningData {
+  if (!isRecord(value) || !isRecord(value.cards) || !isRecord(value.powers)) return false;
+  if (Object.keys(value).some((key) => key !== 'cards' && key !== 'powers')) return false;
+
+  for (const [id, tune] of Object.entries(value.cards)) {
+    const base = BASELINE_CARDS.find((item) => item.id === id);
+    if (!base || !isRecord(tune) || Object.keys(tune).some((key) => key !== 'cost' && key !== 'ops')) return false;
+    if ('cost' in tune && (typeof tune.cost !== 'number' || !Number.isInteger(tune.cost) || tune.cost < 0 || tune.cost > 6)) return false;
+    if ('ops' in tune && !validateOps(tune.ops, base.ops)) return false;
+  }
+
+  for (const [key, tune] of Object.entries(value.powers)) {
+    const [owner, powerId, ...extra] = key.split('::');
+    const base = BASELINE_POWERS.find((item) => item.owner === owner && item.id === powerId);
+    if (!base || extra.length || !isRecord(tune) || Object.keys(tune).some((field) => field !== 'cooldown' && field !== 'ops')) return false;
+    if ('cooldown' in tune && (typeof tune.cooldown !== 'number' || !Number.isInteger(tune.cooldown) || tune.cooldown < 1 || tune.cooldown > 8)) return false;
+    if ('ops' in tune && !validateOps(tune.ops, base.ops)) return false;
+  }
+  return true;
+}
+
+data = load();
+
+export function importTuning(raw: string): boolean {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
   } catch {
     return false;
   }
+  if (!validateTuning(parsed)) return false;
+
+  // 校验完整通过后才改运行时数据，错误文件不会污染当前平衡配置。
+  data = clone(parsed);
+  BASELINE_CARDS.forEach((base) => {
+    const card = CARD_MAP[base.id];
+    if (!card) return;
+    card.cost = base.cost;
+    card.ops = clone(base.ops);
+  });
+  BASELINE_POWERS.forEach((base) => {
+    const power = KILLER_MAP[base.owner]?.powers.find((p) => p.id === base.id);
+    if (!power) return;
+    power.cooldown = base.cooldown;
+    power.ops = clone(base.ops);
+  });
+  applyTuning();
+  persist();
+  return true;
 }

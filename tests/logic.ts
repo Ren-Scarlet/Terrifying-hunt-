@@ -3,6 +3,7 @@
  * 运行：npm run check
  */
 import { CARD_MAP, CARDS } from '../src/game/data/cards';
+import { KILLERS } from '../src/game/data/killers';
 import {
   ARCH_LABEL,
   BASE_AP,
@@ -29,6 +30,7 @@ import {
   moveCost,
   movePlayer,
   playCard,
+  runOps,
   searchRoom,
   visibleDisturbances,
   visibleTrails,
@@ -38,6 +40,7 @@ import { OBSTACLE_ROOMS, ROOM_MAP } from '../src/game/rooms';
 import { SURVIVOR_MAP } from '../src/game/survivors';
 import { generateMission } from '../src/game/missions';
 import type { GameState, RoomId } from '../src/game/types';
+import { createSeededRandom, random, withRandomSource } from '../src/game/random';
 
 let pass = 0;
 let fail = 0;
@@ -47,6 +50,14 @@ function check(name: string, ok: boolean, detail = ''): void {
   else fail += 1;
   console.log(`${ok ? '  ok  ' : ' FAIL '} ${name}${detail ? ' — ' + detail : ''}`);
 }
+
+const seededA = createSeededRandom(20261125);
+const seededB = createSeededRandom(20261125);
+const sequenceA = Array.from({ length: 8 }, () => seededA());
+const sequenceB = Array.from({ length: 8 }, () => seededB());
+check('随机源：相同种子产生相同序列', sequenceA.every((value, index) => value === sequenceB[index]));
+const injected = withRandomSource(() => 0.25, () => random());
+check('随机源：可在作用域内注入确定值', injected === 0.25);
 
 function newGame(): GameState {
   const deck = ['silent_step', 'sprint', 'choke', 'shuriken', 'execute', 'clean', 'night_cover', 'aim'];
@@ -230,6 +241,30 @@ function caseFinisher(): void {
   const before2 = s2.people.length;
   const ok2 = play(s2, 'execute');
   check('F 处决牌也能结束倒地者', ok2 && s2.people.length < before2, ok2 ? (s2.people.length < before2 ? '已处决' : 'hp=' + v2.hp) : '牌被拒绝');
+
+  // 处决范围必须限制在玩家当前房间，不能波及其他房间的倒地者
+  const scoped = newGame();
+  const localDowned = scoped.people.find((p) => p.role !== 'police')!;
+  const remoteDowned = scoped.people.find((p) => p.role !== 'police' && p.id !== localDowned.id)!;
+  localDowned.room = scoped.playerRoom;
+  localDowned.hp = 0;
+  localDowned.downedTurns = DOWNED_LOCK_TURNS;
+  remoteDowned.room = openNeighbor(scoped.playerRoom);
+  remoteDowned.hp = 0;
+  remoteDowned.downedTurns = DOWNED_LOCK_TURNS;
+  runOps(scoped, CARD_MAP.execute!.ops);
+  check(
+    'F 处决牌只处决当前房间目标',
+    !scoped.people.some((p) => p.id === localDowned.id) && scoped.people.some((p) => p.id === remoteDowned.id),
+    `local=${scoped.people.some((p) => p.id === localDowned.id)} remote=${scoped.people.some((p) => p.id === remoteDowned.id)}`,
+  );
+
+  const executioner = KILLERS.find((killer) => killer.owner === '处刑者');
+  const ultimate = executioner?.powers.find((power) => power.id === 'executioner_judge');
+  check(
+    'F 处刑者大招也使用当前房间目标',
+    ultimate?.ops.some((op) => op.op === 'execute' && op.who === 'downedHere') ?? false,
+  );
 
   const s3 = newGame();
   const v3 = player(s3);
@@ -536,7 +571,7 @@ function caseSneaky(): void {
   check('W 有老练的幸存者', s.people.some((p) => p.role !== 'police' && p.sneaky), '至少两名知名角色带此技巧');
 }
 
-check('开局行动点为 7', newGame().energy === BASE_AP, String(newGame().energy));
+check('开局行动点为 4', newGame().energy === BASE_AP, String(newGame().energy));
 caseBoltOnEnter();
 caseAmbush();
 casePursue();
