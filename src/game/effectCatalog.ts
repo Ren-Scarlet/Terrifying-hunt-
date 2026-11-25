@@ -11,7 +11,7 @@ export const WHO_OPTIONS = [
   ['targetsHere', '房间内所有目标'], ['civilsHere', '房间内所有平民'], ['allHere', '房间内所有人'],
   ['markedAny', '全场标记目标'], ['allAny', '全场所有人'], ['fleeing', '正在逃跑的人'],
   ['downedHere', '当前房间倒地的人'], ['downedAny', '全场倒地的人'], ['injuredAny', '全场受伤的人'],
-  ['randomAny', '全场随机一人'], ['unawareNearby', '相邻房间未察觉者'],
+  ['bloodSacrifice', '本局血祭品'], ['randomAny', '全场随机一人'], ['unawareNearby', '相邻房间未察觉者'],
 ] as const;
 
 export const DEST_OPTIONS = [

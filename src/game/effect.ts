@@ -24,7 +24,8 @@ import type { RoomId } from './types';
  *   fleeing       全场正在逃跑的人
  *   downedHere    当前房间倒地的人（处决目标）
  *   downedAny     全场倒地的人（仅用于明确的全场效果）
- *   injuredAny    全场受伤的人（治疗的对象）
+ *   injuredAny    全场受伤的人（生命值 1–2）
+ *   bloodSacrifice 本局随机标记的血祭品
  *   randomAny     全场随机一人
  *
  * —— 伤害与生死 ——
@@ -32,8 +33,8 @@ import type { RoomId } from './types';
  *   走路 / 挥刀 / 出牌 / 搜索柜子共用一个「行动点」池（BASE_AP=4/回合），
  *   所以「能量」和「步数」不再是两套资源，steps 指令现在也加进同一个池子。
  *   卡牌不再直接造成伤害——它们负责让这一刀更狠、让人跑不掉、或者告诉你人跑哪去了。
- *   damage     造成伤害，只能推进一档：健康→受伤→倒地（倒地的人要处决牌才死）
- *   down       直接把受伤的人击倒（对健康的人无效）
+ *   damage     造成指定点数伤害：4→2 受伤，2→0 倒地（倒地的人要处决牌才死）
+ *   down       对受伤者再造成 2 点伤害并击倒（对健康的人无效）
  *   execute    处决：只能对倒地的人使用，直接死亡
  *   kill       立即死亡（保留给真正的即死效果，正常流程请用 execute）
  *   heal       治疗：受伤→健康；倒地的人救不起来，要用 rescue
@@ -99,6 +100,7 @@ export type Who =
   | 'downedHere'
   | 'downedAny'
   | 'injuredAny'
+  | 'bloodSacrifice'
   | 'randomAny'
   /** 相邻房间里还没察觉到你的人（藏起来的除外） */
   | 'unawareNearby';

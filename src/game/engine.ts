@@ -1,12 +1,12 @@
 import { random, randomOf, shuffle } from './random';
 import { nearestOf, roomDistance } from './navigation';
-import { ESCAPE_ROOMS, BASE_AP, SABOTAGE_COST, ITEM_BOX_CHARGES, GENERATOR_JAM_TURNS, POSSESS_TURNS } from './constants';
+import { ESCAPE_ROOMS, BASE_AP, SABOTAGE_COST, ITEM_BOX_CHARGES, GENERATOR_JAM_TURNS, POSSESS_TURNS, SURVIVOR_MAX_HP, SURVIVOR_INJURED_HP } from './constants';
 import { drawCards } from './deck';
 import { executeOps } from './effects/runtime';
 import { createGame } from './setup';
 export { drawCards } from './deck';
 export { createGame } from './setup';
-export { BASE_AP, SABOTAGE_COST, ITEM_BOX_CHARGES, GENERATOR_JAM_TURNS, POSSESS_TURNS } from './constants';
+export { BASE_AP, SABOTAGE_COST, ITEM_BOX_CHARGES, GENERATOR_JAM_TURNS, POSSESS_TURNS, SURVIVOR_MAX_HP, SURVIVOR_INJURED_HP } from './constants';
 import { ACTIVITIES, createPeople, itemUsesFor } from './npc/factory';
 import { ARCH_DESC, ARCH_LABEL, GOAL_LABEL, HEALTH_LABEL, INTENT_LABEL, SITE_ITEM_LABEL, SURVIVOR_ITEM_LABEL } from './npc/catalog';
 export { ARCH_DESC, ARCH_LABEL, GOAL_LABEL, HEALTH_LABEL, INTENT_LABEL, SITE_ITEM_LABEL, SURVIVOR_ITEM_LABEL } from './npc/catalog';
@@ -93,6 +93,8 @@ const FRENZY_GAIN = 25;
 const FRENZY_LOSS = 20;
 /** 幸存者团队目标：满了他们就集体逃走，玩家直接失败 */
 export const TEAM_GOAL_MAX = 100;
+export const TEAM_STAGE_COUNT = 4;
+export const TEAM_STAGE_SIZE = TEAM_GOAL_MAX / TEAM_STAGE_COUNT;
 /** 一个人在目标房间待一回合推进的进度 */
 const OBJECTIVE_GAIN = 5;
 
@@ -172,10 +174,53 @@ function log(state: GameState, text: string): void {
   if (state.log.length > 60) state.log.length = 60;
 }
 
+/** 按实际步行路径计算地图上距离最远的一对房间。 */
+function farthestRoomPair(): RoomId[] {
+  const candidates = ROOMS.map((room) => room.id).filter((id) => id !== ENTRY_ROOM && id !== EXIT_ROOM);
+  let farthest = -1;
+  let pairs: Array<[RoomId, RoomId]> = [];
+  for (let i = 0; i < candidates.length; i += 1) {
+    for (let j = i + 1; j < candidates.length; j += 1) {
+      const distance = roomDistance(candidates[i], candidates[j]);
+      if (distance > farthest) { farthest = distance; pairs = [[candidates[i], candidates[j]]]; }
+      else if (distance === farthest) pairs.push([candidates[i], candidates[j]]);
+    }
+  }
+  return pairs.length ? randomOf(pairs) : [ENTRY_ROOM, EXIT_ROOM];
+}
+
+function completeTeamStage(state: GameState): void {
+  state.teamStage = Math.min(TEAM_STAGE_COUNT, state.teamStage + 1);
+  log(state, `幸存者团队完成第 ${state.teamStage}/${TEAM_STAGE_COUNT} 阶段：${state.teamGoalLabel}。`);
+  if (state.teamStage !== TEAM_STAGE_COUNT) return;
+  state.teamProgress = TEAM_GOAL_MAX;
+  state.escapeRooms = farthestRoomPair();
+  const names = state.escapeRooms.map(roomName).join('、');
+  for (const person of state.people) {
+    if (person.role === 'police' || person.hp <= 0) continue;
+    person.goal = 'exit'; person.intent = 'escape'; person.alert = 100;
+    person.escapeProgress = 0; person.activity = '正在赶往逃生点';
+  }
+  log(state, `第四阶段完成！地图出现两个逃生点：${names}。所有幸存者开始撤离！`);
+}
+
+/** 团队进度跨过 25% 里程碑时完成阶段；已完成阶段不会倒退。 */
+function addTeamProgress(state: GameState, amount: number): void {
+  if (amount <= 0 || state.teamStage >= TEAM_STAGE_COUNT) return;
+  state.teamProgress = Math.min(TEAM_GOAL_MAX, state.teamProgress + amount);
+  while (state.teamStage < TEAM_STAGE_COUNT && state.teamProgress >= (state.teamStage + 1) * TEAM_STAGE_SIZE) completeTeamStage(state);
+}
+
+/** 破坏设施只能拖慢当前阶段，不能抹掉已经完成的阶段。 */
+function reduceTeamProgress(state: GameState, amount: number): void {
+  if (amount <= 0 || state.teamStage >= TEAM_STAGE_COUNT) return;
+  state.teamProgress = Math.max(state.teamStage * TEAM_STAGE_SIZE, state.teamProgress - amount);
+}
+
 /** 健康 / 受伤 / 倒地，由血量推导，不单独存一份避免不同步 */
 export function conditionOf(person: Person): Health {
-  if (person.hp >= 2) return 'healthy';
-  if (person.hp === 1) return 'injured';
+  if (person.hp > SURVIVOR_INJURED_HP) return 'healthy';
+  if (person.hp > 0) return 'injured';
   return 'downed';
 }
 
@@ -378,7 +423,7 @@ function leavesTrail(person: Person): boolean {
     person.intent === 'escape' ||
     person.intent === 'call' ||
     person.alert >= 45 ||
-    person.hp < 2
+    person.hp <= SURVIVOR_INJURED_HP
   );
 }
 
@@ -430,7 +475,7 @@ function recordTrails(state: GameState, before: Map<string, RoomId>): void {
     if (!from || from === p.room) return;
     // 悄悄走：不留鞋印，也不惊动乌鸦
     if (isQuietMove(state, p)) return;
-    if (leavesTrail(p)) pushTrail(state, from, p.room, p.hp < 2);
+    if (leavesTrail(p)) pushTrail(state, from, p.room, p.hp <= SURVIVOR_INJURED_HP);
     addDisturbance(state, p.room);
   });
 }
@@ -489,7 +534,7 @@ function npcReact(state: GameState): void {
     }
     if (person.movesThisTurn >= REACT_MOVE_CAP) continue;
     // 后院翻篱笆是回合结束的结算，不在这中间偷偷逃出去
-    if (wantsToLeave(person)) continue;
+    if (wantsToLeave(state, person)) continue;
 
     const fleeing = person.intent === 'flee' || person.intent === 'escape';
     const busy =
@@ -674,12 +719,13 @@ function damagePerson(state: GameState, person: Person, amount: number): void {
     return;
   }
 
-  // 受伤：立刻中断手上的一切，优先逃命
+  // 受到伤害后会惊慌逃跑；累计达到 2 点时，状态才正式变为受伤。
   person.alert = 100;
   person.intent = 'flee';
-  person.activity = '捂着伤口逃窜';
+  person.activity = person.hp <= SURVIVOR_INJURED_HP ? '捂着伤口逃窜' : '受到攻击，惊慌逃窜';
   person.goal = 'exit';
-  log(state, `${person.name} 受伤了（${person.hp}/2），丢下手里的东西就跑。`);
+  if (before > SURVIVOR_INJURED_HP && person.hp <= SURVIVOR_INJURED_HP) log(state, `${person.name} 受伤了（${person.hp}/${SURVIVOR_MAX_HP}），丢下手里的东西就跑。`);
+  else log(state, `${person.name} 受到 ${dmg} 点伤害（剩余 ${person.hp}/${SURVIVOR_MAX_HP}）。`);
   peopleInRoom(state, state.playerRoom)
     .filter((p) => p.id !== person.id && p.role !== 'police')
     .forEach((p) => {
@@ -715,7 +761,7 @@ function executePerson(state: GameState, person: Person): void {
 
 function rescuePerson(state: GameState, person: Person): void {
   if (person.hp > 0) return;
-  person.hp = 1;
+  person.hp = SURVIVOR_INJURED_HP;
   person.downedTurns = 0;
   person.intent = 'flee';
   person.activity = '被人从地上拖了起来';
@@ -726,8 +772,8 @@ function rescuePerson(state: GameState, person: Person): void {
 function healPerson(state: GameState, person: Person, amount = 1): void {
   if (person.hp <= 0) return;
   const before = person.hp;
-  person.hp = Math.min(2, person.hp + amount);
-  if (person.hp > before) log(state, `${person.name} 的伤口被处理过（${person.hp}/2）。`);
+  person.hp = Math.min(SURVIVOR_MAX_HP, person.hp + amount);
+  if (person.hp > before) log(state, `${person.name} 的伤口被处理过（${person.hp}/${SURVIVOR_MAX_HP}）。`);
 }
 
 /* ==================================================================== */
@@ -773,11 +819,13 @@ function selectPeople(state: GameState, who: Who): Person[] {
     case 'downedAny':
       return npcs(state).filter((p) => p.hp <= 0);
     case 'injuredAny':
-      return npcs(state).filter((p) => p.hp === 1);
+      return npcs(state).filter((p) => p.hp > 0 && p.hp <= SURVIVOR_INJURED_HP);
     case 'unawareNearby': {
       const near = ROOM_MAP[state.playerRoom].neighbors;
       return standing(state).filter((p) => !p.hidden && p.alert < 35 && near.includes(p.room));
     }
+    case 'bloodSacrifice':
+      return npcs(state).filter((p) => p.bloodSacrifice);
     case 'randomAny': {
       const all = standing(state);
       return all.length ? [randomOf(all)] : [];
@@ -832,7 +880,7 @@ function checkCond(state: GameState, cond: Cond): boolean {
       return peopleInRoom(state, state.playerRoom).some((p) => p.role !== 'police' && p.hp <= 0);
     case 'injuredHere':
       return peopleInRoom(state, state.playerRoom).some(
-        (p) => p.role !== 'police' && p.hp > 0 && p.hp < 2,
+        (p) => p.role !== 'police' && p.hp > 0 && p.hp <= SURVIVOR_INJURED_HP,
       );
     case 'targetAway':
       return npcs(state).some((p) => p.role === 'target' && p.room !== state.playerRoom && p.hp > 0);
@@ -875,8 +923,8 @@ function movePersonTo(state: GameState, person: Person, room: RoomId, clearAlert
  * 结果是「被追到后院」的人反而绝对安全。只要人站在后院并且确实慌了
  * （逃跑中 / 目的就是出口 / 警觉够高），就算他要走。
  */
-function wantsToLeave(person: Person): boolean {
-  if (!ESCAPE_ROOMS.includes(person.room)) return false;
+function wantsToLeave(state: GameState, person: Person): boolean {
+  if (state.teamStage < TEAM_STAGE_COUNT || !state.escapeRooms.includes(person.room)) return false;
   return (
     person.intent === 'escape' ||
     person.intent === 'flee' ||
@@ -895,14 +943,14 @@ function fleeAway(state: GameState, person: Person, quiet = false): boolean {
   // 后院是出口：只有本来就打算离开、或者已经吓破胆的人才会往外跑。
   // 否则「被追」等于「自动逃生」，玩家把人逼到院子里反而在帮对手。
   const mayExit =
-    person.goal === 'exit' || person.goal === 'panic' || person.alert >= 70 || person.hp < 2;
+    person.goal === 'exit' || person.goal === 'panic' || person.alert >= 70 || person.hp <= SURVIVOR_INJURED_HP;
   const options = ROOM_MAP[person.room].neighbors.filter(
     (r) =>
       r !== state.playerRoom &&
       !isLocked(state, r) &&
       canStand(state, r) &&
       !state.barricades.includes(r) &&
-      (mayExit || !ESCAPE_ROOMS.includes(r)),
+      (mayExit || !state.escapeRooms.includes(r)),
   );
   if (!options.length) return false;
   const from = roomName(person.room);
@@ -917,7 +965,7 @@ function fleeAway(state: GameState, person: Person, quiet = false): boolean {
   person.activity = '夺路而逃';
   // 老练的人踮着脚走：这一步连脚印都不留，也不惊动乌鸦
   if (!isQuietMove(state, person)) {
-    pushTrail(state, fromId, person.room, person.hp < 2);
+    pushTrail(state, fromId, person.room, person.hp <= SURVIVOR_INJURED_HP);
     addDisturbance(state, person.room);
   }
   if (quiet) return true;
@@ -1130,7 +1178,7 @@ function survivorsActOnce(state: GameState, actorId: string): void {
       fleeAway(state, p);
       p.movesThisTurn += 1;
     } else if (state.teamProgress < TEAM_GOAL_MAX) {
-      state.teamProgress = Math.min(TEAM_GOAL_MAX, state.teamProgress + 2);
+      addTeamProgress(state, 2);
     }
   }
   void actorId;
@@ -1156,7 +1204,7 @@ function witnessInRoom(state: GameState, person: Person): boolean {
     person.movesThisTurn += 1;
     log(state, `${person.name} 看见同伴被砍，喊了一声夺路而逃。`);
   } else {
-    state.teamProgress = Math.min(TEAM_GOAL_MAX, state.teamProgress + 3);
+    addTeamProgress(state, 3);
     person.intent = 'work';
     person.activity = '趁乱把手里的事往前推了一步';
     log(state, `${person.name} 没跟着跑，反而趁乱多干了一点活（团队进度 +3）。`);
@@ -1191,7 +1239,7 @@ function tryRescue(state: GameState, person: Person): boolean {
     person.activity = `正在把 ${downed.name} 从地上拖起来`;
     return true;
   }
-  const injured = allies.find((p) => p.hp === 1);
+  const injured = allies.find((p) => p.hp > 0 && p.hp <= SURVIVOR_INJURED_HP);
   if (injured) {
     healPerson(state, injured, 1);
     person.intent = 'heal';
@@ -1326,7 +1374,7 @@ function actByArchetype(state: GameState, person: Person): void {
         .filter((p) => p.hp <= 0 && p.room !== state.playerRoom)
         .sort((a, b) => roomDistance(person.room, a.room) - roomDistance(person.room, b.room))[0];
       const wounded = standing(state)
-        .filter((p) => p.hp === 1 && p.room !== person.room)
+        .filter((p) => p.hp > 0 && p.hp <= SURVIVOR_INJURED_HP && p.room !== person.room)
         .sort((a, b) => roomDistance(person.room, a.room) - roomDistance(person.room, b.room))[0];
       const target = downed ?? wounded;
       if (target) {
@@ -1470,7 +1518,7 @@ function npcTurn(state: GameState): void {
       person.intent = 'stunned';
       continue;
     }
-    if (person.hidden) {
+    if (person.hidden && state.teamStage < TEAM_STAGE_COUNT) {
       // 藏起来的人只在玩家进房间且警觉拉满时才会冲出去
       if (person.room === state.playerRoom && person.alert >= 85) {
         person.hidden = false;
@@ -1482,6 +1530,24 @@ function npcTurn(state: GameState): void {
         person.activity = '缩在柜子里，不敢出声';
         person.alert = Math.max(0, person.alert - 4);
       }
+      continue;
+    }
+    if (person.hidden && state.teamStage >= TEAM_STAGE_COUNT) person.hidden = false;
+
+    // 第四阶段开启后，所有幸存者都以两个动态逃生点为目标，不再执行原本的个人工作。
+    if (state.teamStage >= TEAM_STAGE_COUNT && state.escapeRooms.length === 2) {
+      person.goal = 'exit'; person.intent = 'escape'; person.alert = 100;
+      if (state.escapeRooms.includes(person.room)) {
+        person.activity = person.escapeProgress > 0 ? '正在翻越逃生点' : '已抵达逃生点';
+        continue;
+      }
+      const exitTarget = nearestOf(person.room, state.escapeRooms);
+      const exitStep = person.room === state.playerRoom ? null : nextStepToward(state, person.room, exitTarget, [state.playerRoom]);
+      if (exitStep) {
+        const from = person.room; person.room = exitStep;
+        person.activity = `正赶往${roomName(exitTarget)}`;
+        pushTrail(state, from, exitStep, person.hp <= SURVIVOR_INJURED_HP);
+      } else if (person.room === state.playerRoom) fleeAway(state, person);
       continue;
     }
 
@@ -1505,7 +1571,7 @@ function npcTurn(state: GameState): void {
     }
 
     // 决定要走的人站在后院里：不再听性格指挥，专心翻篱笆
-    if (wantsToLeave(person)) {
+    if (wantsToLeave(state, person)) {
       person.intent = 'escape';
       person.activity = person.escapeProgress >= 1 ? '正翻上篱笆' : '正在翻后院篱笆';
       continue;
@@ -1606,7 +1672,7 @@ function npcTurn(state: GameState): void {
         log(state, `${person.name} 在${roomName(person.room)}修发电机（${gen.progress}%）。`);
         if (gen.progress >= 100) {
           gen.charged = true;
-          state.teamProgress = Math.min(TEAM_GOAL_MAX, state.teamProgress + GENERATOR_CHARGED_BONUS);
+          addTeamProgress(state, GENERATOR_CHARGED_BONUS);
           log(state, `发电机重新亮了起来，他们离逃出去又近了一大步（团队进度 ${state.teamProgress}/${TEAM_GOAL_MAX}）。`);
         }
       } else if ((person.goal === 'objective' || person.goal === 'key') && state.teamProgress < TEAM_GOAL_MAX) {
@@ -1614,7 +1680,7 @@ function npcTurn(state: GameState): void {
         const hasToolbox = person.item === 'toolbox' && person.itemUses > 0;
         const gain = teamWorkGain(state) * (hasToolbox ? 2 : 1);
         if (hasToolbox) consumeItem(state, person);
-        state.teamProgress = Math.min(TEAM_GOAL_MAX, state.teamProgress + gain);
+        addTeamProgress(state, gain);
         person.intent = 'work';
         person.activity = `在${roomName(person.room)}${state.teamGoalLabel}`;
         addDisturbance(state, person.room);
@@ -1653,29 +1719,30 @@ function callPhase(state: GameState): void {
  * 或者警觉够高），就当他开始翻篱笆。
  */
 function escapePhase(state: GameState): void {
+  if (state.teamStage < TEAM_STAGE_COUNT || state.escapeRooms.length !== 2) return;
   for (const person of [...npcs(state)]) {
     if (person.hp <= 0) continue;
-    if (!wantsToLeave(person)) {
+    if (!state.escapeRooms.includes(person.room)) {
       person.escapeProgress = 0;
       continue;
     }
     // 站到后院就等于决定要走了，后面 actByArchetype 别再把他劝回去
     person.intent = 'escape';
     if (state.exitBlockedTurns > 0) {
-      person.activity = '篱笆被钉死了，翻不出去';
-      log(state, `${person.name} 想翻篱笆，但后门被封死了。`);
+      person.activity = '逃生点被封锁，暂时无法离开';
+      log(state, `${person.name} 抵达逃生点，但出口被封锁了。`);
       continue;
     }
     if (person.escapeProgress < 1) {
       person.escapeProgress = 1;
-      person.activity = '正在翻后院篱笆';
-      log(state, `！${person.name} 已经在后院里翻篱笆了，下回合就会逃出去。`);
+      person.activity = '正在翻越逃生点';
+      log(state, `！${person.name} 已抵达逃生点，下回合就会逃出去。`);
       continue;
     }
     state.people = state.people.filter((p) => p.id !== person.id);
     state.escaped += 1;
     addAlarm(state, 10);
-    log(state, `${person.name} 翻过篱笆消失了。`);
+    log(state, `${person.name} 成功逃离。`);
     if (person.marked) log(state, `名单上少了一个人：${person.name} 已经不在房子里了。`);
 
     // 有人跑掉，剩下的人胆子会变大
@@ -1683,18 +1750,10 @@ function escapePhase(state: GameState): void {
       p.alert = clamp(p.alert + 12, 0, 100);
     });
 
-    const remainingMarked = npcs(state).filter((p) => p.marked).length;
-    const need = state.mission.kind === 'assassinate' ? state.mission.targetCount ?? 2 : 1;
-    if (remainingMarked === 0 && state.markedKilled < need) {
-      state.resultReason = '名单上的目标全部脱逃，契约作废。';
-      finish(state, 'failed');
-      return;
-    }
     // 每逃一个人都在结算里扣 15 分；直到最后一个幸存者也翻出篱笆，契约才作废。
     // 不再用「逃够 N 个就立刻输」的硬阈值——那会让幸存者的个人目标失去博弈空间。
-    const survivorsLeft = state.people.filter((p) => p.role !== 'police').length;
-    if (survivorsLeft === 0 && state.escaped > 0) {
-      state.resultReason = `最后一名幸存者也翻过了篱笆，房子里再没有活人——契约作废（逃走 ${state.escaped} 人）。`;
+    if (state.escaped >= state.survivorTotal && state.survivorTotal > 0) {
+      state.resultReason = `最后一名幸存者也成功逃离，房子里再没有活人——契约作废（逃走 ${state.escaped} 人）。`;
       finish(state, 'failed');
     }
   }
@@ -1803,7 +1862,7 @@ function usableItemBoxes(state: GameState): SiteItem[] {
  */
 function pickSupply(state: GameState, person: Person): SurvivorItem {
   const downed = npcs(state).some((p) => p.hp <= 0);
-  const injured = npcs(state).some((p) => p.hp === 1);
+  const injured = npcs(state).some((p) => p.hp > 0 && p.hp <= SURVIVOR_INJURED_HP);
   const genActive = state.siteItems.some((i) => i.kind === 'generator' && !i.broken && !i.charged);
   const score: Record<SurvivorItem, number> = {
     medkit: (downed ? 5 : 0) + (injured ? 2 : 0) + (person.archetype === 'rescuer' ? 4 : 0),
@@ -1850,7 +1909,7 @@ function useSurvivorItem(state: GameState, person: Person): boolean {
     case 'medkit': {
       const hurt =
         npcs(state).find((p) => p.hp <= 0 && roomDistance(person.room, p.room) <= 2) ??
-        npcs(state).find((p) => p.hp === 1 && roomDistance(person.room, p.room) <= 2);
+        npcs(state).find((p) => p.hp > 0 && p.hp <= SURVIVOR_INJURED_HP && roomDistance(person.room, p.room) <= 2);
       if (!hurt) return false;
       // 慢速治疗：要连着两回合，玩家有一整个窗口去打断或先把人处决掉
       person.healTurns += 1;
@@ -1890,7 +1949,7 @@ function useSurvivorItem(state: GameState, person: Person): boolean {
     case 'key': {
       if (state.teamProgress >= TEAM_GOAL_MAX) return false;
       consumeItem(state, person);
-      state.teamProgress = Math.min(TEAM_GOAL_MAX, state.teamProgress + 12);
+      addTeamProgress(state, 12);
       person.intent = 'work';
       person.activity = '用钥匙捅开了后门的锁';
       log(state, `${person.name} 用钥匙捅开了后门锁（团队进度 ${state.teamProgress}/${TEAM_GOAL_MAX}）。`);
@@ -2266,7 +2325,7 @@ export function sabotageSiteItem(state: GameState): boolean {
     item.progress = Math.max(0, item.progress - SABOTAGE_GEN_LOSS);
     if (item.charged) {
       item.charged = false;
-      state.teamProgress = Math.max(0, state.teamProgress - SABOTAGE_TEAM_LOSS);
+      reduceTeamProgress(state, SABOTAGE_TEAM_LOSS);
       log(state, `已经通电的线路被你扯断，他们的团队进度倒退了 ${SABOTAGE_TEAM_LOSS}。`);
     }
     item.jammedTurns = GENERATOR_JAM_TURNS;
@@ -2405,7 +2464,7 @@ export function endTurn(state: GameState): void {
   if (downedHere) {
     state.guardingTurns += 1;
     const gain = GUARD_TEAM_GAIN + Math.min(6, state.guardingTurns * 2);
-    state.teamProgress = Math.min(TEAM_GOAL_MAX, state.teamProgress + gain);
+    addTeamProgress(state, gain);
     log(state, `你守在倒地的人旁边没动……其他人趁这段时间把${state.teamGoalLabel}往前赶了一大截（团队进度 +${gain}）。`);
   } else {
     state.guardingTurns = 0;
@@ -2455,13 +2514,6 @@ export function endTurn(state: GameState): void {
 
   npcTurn(state);
   if (state.result) return;
-  // 他们把团队目标做满了：不等天亮，这局已经输了
-  if (state.teamProgress >= TEAM_GOAL_MAX) {
-    state.resultReason = `他们${state.teamGoalLabel}，从后门集体离开——契约作废。`;
-    finish(state, 'failed');
-    return;
-  }
-
   callPhase(state);
   if (state.result) return;
 

@@ -135,6 +135,7 @@ export function personChip(person: Person, attackable = false): string {
         : 'civilian';
   const img = characterImage(person.id);
   const health = conditionOf(person);
+  const sacrificeMark = person.bloodSacrifice ? '<span class="chip-sacrifice" title="本局血祭品">🩸</span>' : '';
   // 头顶上的警戒值：不用再翻日志判断这个人现在有多怕
   const alertLevel = person.alert >= 70 ? 'high' : person.alert >= 35 ? 'mid' : 'low';
   const alertMark =
@@ -161,10 +162,10 @@ export function personChip(person: Person, attackable = false): string {
       : attackable
         ? ' · 点击对他挥刀'
         : '';
-  return `<button type="button" class="person-chip ${cls} ${health === 'downed' ? 'is-downed' : ''} ${attackable ? 'can-hit' : ''}" data-action="person" data-person-id="${person.id}"${attackable ? ' data-attack="1"' : ''}
+  return `<button type="button" class="person-chip ${cls} ${person.bloodSacrifice ? 'blood-sacrifice' : ''} ${health === 'downed' ? 'is-downed' : ''} ${attackable ? 'can-hit' : ''}" data-action="person" data-person-id="${person.id}"${attackable ? ' data-attack="1"' : ''}
     title="${escape(person.name)} · ${HEALTH_LABEL[health]} · 警觉 ${person.alert}/100 · ${escape(ARCH_LABEL[person.archetype])} · ${escape(GOAL_LABEL[person.goal])} · 正在${escape(label)}${note}">
     ${img ? `<img src="${img}" alt="" onerror="this.style.display='none'">` : ''}
-    <span>${escape(person.name)}</span>${intentDot(person)}${stateMark}${alertMark}${watchMark}${person.item ? itemBadge(person.item, person.itemUses) : ''}
+    <span>${escape(person.name)}</span>${sacrificeMark}${intentDot(person)}${stateMark}${alertMark}${watchMark}${person.item ? itemBadge(person.item, person.itemUses) : ''}
   </button>`;
 }
 

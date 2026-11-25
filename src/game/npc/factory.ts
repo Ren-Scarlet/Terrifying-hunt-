@@ -78,6 +78,7 @@ function makePerson(
     room,
     hp,
     marked,
+    bloodSacrifice: false,
     archetype,
     alert: 0,
     activity: randomOf(ACTIVITIES),
@@ -131,17 +132,17 @@ export function createPeople(mission: Mission): Person[] {
 
   const people: Person[] = [];
   cast.slice(0, markedCount).forEach((s) => {
-    const person = makePerson(s, 'target', nextRoom(), 2, true);
+    const person = makePerson(s, 'target', nextRoom(), 4, true);
     // 名单上的人：你手上有他的照片和住址，开局三回合内知道他在哪。
     // 否则 15 间房的迷雾里找一个人，任务还没开始就已经输了。
     person.trackedTurns = 3;
     people.push(person);
   });
   cast.slice(markedCount, markedCount + 2).forEach((s) => {
-    people.push(makePerson(s, 'target', nextRoom(), 2, false));
+    people.push(makePerson(s, 'target', nextRoom(), 4, false));
   });
   cast.slice(markedCount + 2, markedCount + 6).forEach((s) => {
-    people.push(makePerson(s, 'civilian', nextRoom(), 2, false));
+    people.push(makePerson(s, 'civilian', nextRoom(), 4, false));
   });
 
   people.push({
@@ -149,8 +150,9 @@ export function createPeople(mission: Mission): Person[] {
     name: '巡逻警员',
     role: 'police',
     room: POLICE_START,
-    hp: 2,
+    hp: 4,
     marked: false,
+    bloodSacrifice: false,
     archetype: 'alert',
     alert: 0,
     activity: '在辖区巡逻',

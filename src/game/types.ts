@@ -146,9 +146,11 @@ export interface Person {
   name: string;
   role: PersonRole;
   room: RoomId;
-  /** 2 = 健康，1 = 受伤，0 = 倒地。伤害只能推进一档，击杀必须走处决 */
+  /** 4 = 健康；累计受到 2 点伤害进入受伤，累计 4 点伤害倒地 */
   hp: number;
   marked: boolean;
+  /** 本局随机选中的血祭品；仅作身份标记，供卡牌与能力引用 */
+  bloodSacrifice: boolean;
   /** 行为类型 */
   archetype: Archetype;
   /** 警觉度 0–100：越高越可能逃离玩家所在房间 */
@@ -388,8 +390,14 @@ export interface GameState {
   /* ---------- 幸存者团队目标 ---------- */
   /** 本局随机挑出的团队目标房间：电闸 / 钥匙柜 */
   objectiveRooms: RoomId[];
-  /** 团队目标进度 0–100，满了幸存者集体逃脱，玩家直接失败 */
+  /** 团队目标总进度 0–100，每 25% 完成一个阶段 */
   teamProgress: number;
+  /** 已完成的团队阶段数：0–4，完成阶段不可倒退 */
+  teamStage: number;
+  /** 第四阶段完成后激活的两个动态逃生点 */
+  escapeRooms: RoomId[];
+  /** 本局幸存者总人数（不包含警察），用于判定是否全部逃离 */
+  survivorTotal: number;
   /** 这局他们要做的事，用于日志与任务条 */
   teamGoalLabel: string;
   /** 本局随机摆下的道具箱 / 发电机：杀手用不了，但能砸 */

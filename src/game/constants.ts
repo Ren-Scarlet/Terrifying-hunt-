@@ -3,6 +3,10 @@ import type { RoomId } from './types';
 /** NPC 能逃出这栋房子的地方 */
 export const ESCAPE_ROOMS: RoomId[] = ['garden'];
 
+/** 幸存者生命：4 点健康，降至 2 点时受伤，降至 0 点时击倒。 */
+export const SURVIVOR_MAX_HP = 4;
+export const SURVIVOR_INJURED_HP = 2;
+
 /** 每回合基础行动点。 */
 export const BASE_AP = 4;
 /** 砸掉场地设施的行动点成本。 */
