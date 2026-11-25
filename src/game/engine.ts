@@ -419,8 +419,8 @@ export function isRoomExplored(state: GameState, room: RoomId): boolean {
 
 /** 这个人现在是否在玩家视野里 */
 export function isPersonVisible(state: GameState, person: Person): boolean {
-  if (person.hidden) return person.trackedTurns > 0 || (person.revealedActions ?? 0) > 0;
-  if (person.trackedTurns > 0 || (person.revealedActions ?? 0) > 0) return true;
+  if (person.hidden) return person.trackedTurns > 0;
+  if (person.trackedTurns > 0) return true;
   return isRoomVisible(state, person.room);
 }
 
@@ -2450,7 +2450,15 @@ export function playCard(state: GameState, cardUid: string): boolean {
       sacrifice.intent = 'flee';
       sacrifice.activity = '被迈尔斯戏耍，仓皇逃离视线';
       if (sacrifice.movesThisTurn < REACT_MOVE_CAP) {
-        if (fleeAway(state, sacrifice, true)) sacrifice.movesThisTurn += 1;
+        const outOfSight = ROOM_MAP[sacrifice.room].neighbors.filter((room) =>
+          room !== state.playerRoom && !isRoomVisible(state, room) && canStand(state, room) && !isLocked(state, room),
+        );
+        if (outOfSight.length) {
+          movePersonTo(state, sacrifice, randomOf(outOfSight));
+          sacrifice.movesThisTurn += 1;
+        } else if (fleeAway(state, sacrifice, true)) {
+          sacrifice.movesThisTurn += 1;
+        }
       }
       if (state.myersFoodMarks % 2 === 0 && state.myersFoodMarks <= 8) {
         state.energy += 1;
@@ -2586,8 +2594,10 @@ export function attack(state: GameState, targetId?: string): boolean {
   if (target.role !== 'police' && target.hp < hpBeforeHit) {
     if (state.hexHuntressActive && !state.hexHuntressUsed) {
       state.hexHuntressUsed = true;
-      if (!state.totems.includes(state.playerRoom)) state.totems.push(state.playerRoom);
-      log(state, `厄咒：猎杀戾气触发，${roomName(state.playerRoom)}生成了一个图腾。幸存者可能会将其破坏。`);
+      const totemCandidates = ROOMS.map((room) => room.id).filter((room) => room !== state.playerRoom && !OBSTACLE_ROOMS.includes(room));
+      const totemRoom = randomOf(totemCandidates);
+      if (totemRoom && !state.totems.includes(totemRoom)) state.totems.push(totemRoom);
+      log(state, `厄咒：猎杀戾气触发，${roomName(totemRoom ?? state.playerRoom)}生成了一个图腾。幸存者可能会将其破坏。`);
       if (state.hexNoedActive && state.teamStage >= 4 && !state.hexNoedBonusGranted) {
         state.energy += 2;
         state.hexNoedBonusGranted = true;
