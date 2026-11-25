@@ -14,6 +14,7 @@ import {
   ROOMS,
   TOTEM_ROOMS,
   WEAPON_ROOMS,
+  buildLayout,
 } from './rooms';
 import { SPECIAL_SURVIVORS, SURVIVOR_MAP, SURVIVORS } from './survivors';
 import type {
@@ -146,16 +147,23 @@ function standing(state: GameState): Person[] {
   return npcs(state).filter((p) => p.hp > 0);
 }
 
-function findVictim(state: GameState, room: RoomId, maxHp = Infinity): Person | undefined {
-  // 优先挑还站着的人：倒地的人需要玩家主动补刀，不能被自动选中
-  const here = peopleInRoom(state, room).filter(
-    (p) => p.role !== 'police' && p.hp > 0 && p.hp <= maxHp,
-  );
-  return (
-    here.find((p) => p.role === 'target' && p.marked) ??
-    here.find((p) => p.role === 'target') ??
-    here.find((p) => p.role === 'civilian')
-  );
+function findVictim(
+  state: GameState,
+  room: RoomId,
+  maxHp = Infinity,
+  allowDowned = false,
+): Person | undefined {
+  const inRoom = peopleInRoom(state, room).filter((p) => p.role !== 'police');
+  const rank = (list: Person[]) =>
+    list.find((p) => p.role === 'target' && p.marked) ??
+    list.find((p) => p.role === 'target') ??
+    list.find((p) => p.role === 'civilian');
+
+  // 优先挑还站着的人；屋里只剩倒地的人时，攻击卡就是补刀——不然「再打一次」永远打不出去
+  const standing = rank(inRoom.filter((p) => p.hp > 0 && p.hp <= maxHp));
+  if (standing) return standing;
+  if (!allowDowned) return undefined;
+  return rank(inRoom.filter((p) => p.hp <= 0));
 }
 
 export function isLocked(state: GameState, room: RoomId): boolean {
@@ -182,6 +190,9 @@ function alarmSuppressed(state: GameState): boolean {
 function playerIsHidden(state: GameState): boolean {
   return alarmSuppressed(state);
 }
+
+/** 正在被「追击」的人：这一瞬间他已经贴到你身上，不再触发转身就跑 */
+let chasedId: string | null = null;
 
 /** 本回合是否处于「伏击」状态：推门进去也不会惊动任何人 */
 function ambushActive(state: GameState): boolean {
@@ -490,7 +501,8 @@ function selectPeople(state: GameState, who: Who): Person[] {
   );
   switch (who) {
     case 'victim': {
-      const v = findVictim(state, state.playerRoom);
+      // allowDowned：屋里只剩倒地的人时，攻击牌自动变成补刀
+      const v = findVictim(state, state.playerRoom, Infinity, true);
       return v ? [v] : [];
     }
     case 'lowestHpHere': {
@@ -521,6 +533,10 @@ function selectPeople(state: GameState, who: Who): Person[] {
       return npcs(state).filter((p) => p.hp <= 0);
     case 'injuredAny':
       return npcs(state).filter((p) => p.hp === 1);
+    case 'unawareNearby': {
+      const near = ROOM_MAP[state.playerRoom].neighbors;
+      return standing(state).filter((p) => !p.hidden && p.alert < 35 && near.includes(p.room));
+    }
     case 'randomAny': {
       const all = standing(state);
       return all.length ? [randomOf(all)] : [];
@@ -676,9 +692,20 @@ export function runOps(state: GameState, ops: Op[]): void {
       }
       case 'scout': {
         const turns = op.turns ?? 2;
-        const rooms = op.all ? ROOMS.map((r) => r.id) : [op.to ? resolveDest(state, op.to) : state.playerRoom];
+        const rooms = op.all
+          ? ROOMS.map((r) => r.id)
+          : op.adj
+            ? [state.playerRoom, ...ROOM_MAP[state.playerRoom].neighbors]
+            : [op.to ? resolveDest(state, op.to) : state.playerRoom];
         rooms.forEach((r) => scoutRoom(state, r, turns));
-        log(state, op.all ? `你点亮了整栋房子的位置（${turns} 回合）。` : `${roomName(rooms[0])}的情况被你摸清了。`);
+        log(
+          state,
+          op.all
+            ? `你点亮了整栋房子的位置（${turns} 回合）。`
+            : op.adj
+              ? `你贴着门缝看过去：相邻的 ${rooms.length - 1} 间屋子都在视野里了（${turns} 回合）。`
+              : `${roomName(rooms[0])}的情况被你摸清了。`,
+        );
         break;
       }
       case 'search': {
@@ -819,7 +846,11 @@ export function runOps(state: GameState, ops: Op[]): void {
         markExplored(state, target.room);
         log(state, `你贴着他的脚步声从${from}追进了${roomName(target.room)}。`);
         target.alert = clamp(target.alert + 12, 0, 100);
+        // 被追的人已经在你手边上了，不该再白拿一次「转身就跑」的反应，
+        // 否则追击牌等于把人推得更远。
+        chasedId = target.id;
         npcOnPlayerEnter(state);
+        chasedId = null;
         break;
       }
       case 'silenceAlarm':
@@ -970,6 +1001,15 @@ function npcOnPlayerEnter(state: GameState): void {
   here.forEach((person) => {
     const threat = SURVIVOR_MAP[person.id]?.threat;
 
+    // 刚被追上来的人：他已经在你面前了，这一下跑不掉
+    if (person.id === chasedId) {
+      person.alert = 100;
+      person.intent = 'flee';
+      person.activity = '被你堵在屋里';
+      log(state, `${person.name} 猛一回头，你已经在门口了。`);
+      return;
+    }
+
     // 伏击：屋里的人根本没发现你进来——不加警觉、不喊人，
     // 回合结束时也不会夺门而逃。这是「偷袭」这张牌买来的一个回合。
     if (ambush && threat !== 'spiritual') {
@@ -982,9 +1022,14 @@ function npcOnPlayerEnter(state: GameState): void {
       person.alert = 100;
     }
 
-    // 用「进门之前」的警觉判断他是不是早就确认了你在房子里：
+    // 用「进门之前」的警觉判断他是不是早就绷着弦：
     // 刚看见你和已经在追杀你是两回事，不该混成一个阈值。
     const wasAlert = person.alert;
+
+    // 背对着门、忙着翻抽屉的人不会在门响的一瞬间回头。
+    // 这是唯一「不用卡也能摸到人」的窗口，也是安静打法的立足点。
+    const unaware = wasAlert < 30 && !person.hidden;
+
     let gain = 30;
     if (threat === 'spiritual') gain = 65;
     else if (threat === 'alarm') gain = 55;
@@ -994,52 +1039,35 @@ function npcOnPlayerEnter(state: GameState): void {
     if (hidden && threat !== 'spiritual') gain = Math.round(gain * 0.4);
     person.alert = clamp(person.alert + gain, 0, 100);
 
-    if (person.alert < 35) {
+    if (unaware) {
       person.intent = 'wary';
       person.activity = '背对着门，没有察觉';
       return;
     }
 
-    // 已经完全确认「杀手就在这栋房子里」的人，看到门开就直接冲出去。
-    // 想在他们身上拿先手，就得先用伏击类卡牌（静止隐身）。
-    if (wasAlert >= 85) {
-      if (person.archetype === 'defiant' && person.armed && person.room === state.playerRoom) {
-        counterAttack(state, person);
-        return;
-      }
-      if (fleeAway(state, person)) {
-        log(state, `${person.name} 根本没等你站稳，已经冲出了门口。`);
-        return;
-      }
-    }
-
-    // 高警觉：丢下手上的事，准备夺门而逃。
-    // 这里刻意不让 NPC 立刻瞬移走——玩家刚推开门，总该有一次出手的机会；
-    // 真正的移动发生在回合结束的 npcTurn 里，于是「进门 → 出手 → 追」才成立。
-    if (person.alert >= 62) {
-      if (person.archetype === 'defiant' && person.armed && person.room === state.playerRoom) {
-        counterAttack(state, person);
-        return;
-      }
-      person.intent = 'flee';
-      person.activity = '被你撞见，正往门口退';
-      log(state, `${person.name} 看见了你，丢下手里的东西就往门口退。`);
-      addAlarm(state, 2);
+    // 看见你就等于确认「杀手在这间屋里」——不会站着等你出牌。
+    // 想在他们转身之前动手，就得靠伏击；想在他们跑掉之后补刀，就得靠追击。
+    if (person.archetype === 'defiant' && person.armed && person.room === state.playerRoom) {
+      counterAttack(state, person);
       return;
     }
 
-    // 中警觉：按行为类型做准备
-    if (person.archetype === 'defiant' && person.armed) {
-      if (Math.random() < 0.45) {
-        counterAttack(state, person);
-        return;
-      }
+    if (fleeAway(state, person)) {
+      person.alert = 100;
+      log(
+        state,
+        wasAlert >= 85
+          ? `${person.name} 根本没等你站稳，已经冲出了门口。`
+          : `${person.name} 看见你，转身就跑。`,
+      );
+      return;
     }
-    if (person.archetype === 'alert') {
-      shout(state, person, 22);
-    }
+
+    // 退无可退：被堵在墙角的人只能贴着墙看着你
     person.intent = 'wary';
-    person.activity = `${ARCH_LABEL[person.archetype]}：警惕地盯着门`;
+    person.alert = 100;
+    person.activity = '无路可退，贴着墙盯着你';
+    log(state, `${person.name} 想跑，但门口被你占着——他退到了墙角。`);
   });
 }
 
@@ -1655,7 +1683,11 @@ function createPeople(mission: Mission): Person[] {
 
   const people: Person[] = [];
   cast.slice(0, markedCount).forEach((s) => {
-    people.push(makePerson(s, 'target', nextRoom(), 2, true));
+    const person = makePerson(s, 'target', nextRoom(), 2, true);
+    // 名单上的人：你手上有他的照片和住址，开局三回合内知道他在哪。
+    // 否则 15 间房的迷雾里找一个人，任务还没开始就已经输了。
+    person.trackedTurns = 3;
+    people.push(person);
   });
   cast.slice(markedCount, markedCount + 2).forEach((s) => {
     people.push(makePerson(s, 'target', nextRoom(), 2, false));
@@ -1709,6 +1741,9 @@ export function createGame(
   mission = generateMission(),
   killer = '迈克尔·迈尔斯',
 ): GameState {
+  // 先重新排一遍户型：每一局的房子都不一样，之后所有人都在新户型上出生
+  buildLayout();
+
   const pile = shuffle(deckIds.filter((id) => CARD_MAP[id])).map<CardInstance>((defId) => ({
     uid: uid('card'),
     defId,
@@ -1723,8 +1758,9 @@ export function createGame(
     turn: 1,
     energy: 3,
     maxEnergy: 3,
-    steps: 3,
-    maxSteps: 3,
+    // 房子变成 15 间、最远要跨 7 步，回合内给的移动要多一点
+    steps: 4,
+    maxSteps: 4,
     wanted: 0,
     heatTurn: 0,
     policeLock: 0,
@@ -1823,18 +1859,6 @@ export function movePlayer(state: GameState, room: RoomId): boolean {
     state.barricades = state.barricades.filter((r) => r !== room);
   }
   npcOnPlayerEnter(state);
-
-  // 迈尔斯的被动：进入有人的房间会积累尾随值
-  if (state.killer === '迈克尔·迈尔斯') {
-    const observed = peopleInRoom(state, room).filter((p) => p.role !== 'police' && p.hp > 0);
-    if (observed.length > 0) {
-      let gain = 12 + observed.length * 8;
-      if (state.stalkTargetId && observed.some((p) => p.id === state.stalkTargetId)) gain += 10;
-      state.stalkMeter = clamp(state.stalkMeter + gain, 0, 100);
-      state.stalkTargetId = randomOf(observed).id;
-      log(state, `尾随：+${gain}（当前 ${state.stalkMeter}/100）。`);
-    }
-  }
 
   checkImmediateWin(state);
   return true;

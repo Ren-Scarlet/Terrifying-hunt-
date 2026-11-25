@@ -12,7 +12,10 @@ export type RoomId =
   | 'attic'
   | 'storage'
   | 'nursery'
-  | 'laundry';
+  | 'laundry'
+  | 'dining'
+  | 'bathroom'
+  | 'conservatory';
 
 export type CardType = 'attack' | 'skill' | 'tactic' | 'setup';
 

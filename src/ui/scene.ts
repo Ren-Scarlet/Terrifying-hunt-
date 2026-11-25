@@ -293,6 +293,9 @@ function tileFill(c: Ctx, tex: HTMLCanvasElement, r: Rect, offset: number): void
 const ROOM_MATERIAL: Record<RoomId, MatKind> = {
   attic: 'woodV',
   nursery: 'carpet',
+  dining: 'wood',
+  bathroom: 'tile',
+  conservatory: 'tile',
   bedroom: 'carpet',
   study: 'wood',
   storage: 'concrete',
@@ -309,6 +312,9 @@ const ROOM_MATERIAL: Record<RoomId, MatKind> = {
 const ROOM_TINT: Record<RoomId, string> = {
   attic: 'rgba(78,58,34,.6)',
   nursery: 'rgba(66,52,60,.58)',
+  dining: 'rgba(88,58,34,.56)',
+  bathroom: 'rgba(52,66,74,.58)',
+  conservatory: 'rgba(46,64,52,.6)',
   bedroom: 'rgba(76,44,48,.58)',
   study: 'rgba(70,54,32,.55)',
   storage: 'rgba(54,56,48,.58)',
@@ -348,6 +354,9 @@ const WINDOWS: Partial<Record<RoomId, WindowLight[]>> = {
   attic: [{ side: 'left', p: 0.32, w: 0.3 }],
   nursery: [{ side: 'top', p: 0.5, w: 0.26 }],
   bedroom: [{ side: 'top', p: 0.42, w: 0.34 }],
+  dining: [{ side: 'right', p: 0.36, w: 0.4 }],
+  bathroom: [{ side: 'top', p: 0.7, w: 0.2 }],
+  conservatory: [{ side: 'left', p: 0.3, w: 0.36 }, { side: 'top', p: 0.3, w: 0.3 }],
   study: [
     { side: 'top', p: 0.6, w: 0.3 },
     { side: 'right', p: 0.62, w: 0.26 },
@@ -373,12 +382,18 @@ const BULBS: Partial<Record<RoomId, Bulb[]>> = {
   attic: [{ x: 0.52, y: 0.52, r: 0.34, color: [255, 196, 128], power: 0.32, flicker: 0.14, fixture: 'bulb' }],
   nursery: [{ x: 0.7, y: 0.3, r: 0.36, color: [255, 206, 176], power: 0.34, flicker: 0.2, fixture: 'bulb' }],
   garage: [{ x: 0.3, y: 0.36, r: 0.44, color: [200, 216, 232], power: 0.3, flicker: 0.62, fixture: 'tube' }],
+  dining: [{ x: 0.5, y: 0.4, r: 0.6, color: [255, 200, 140], power: 0.72, flicker: 0.12, fixture: 'bulb' }],
+  bathroom: [{ x: 0.5, y: 0.3, r: 0.38, color: [206, 226, 240], power: 0.44, flicker: 0.5, fixture: 'tube' }],
+  conservatory: [{ x: 0.5, y: 0.32, r: 0.56, color: [176, 226, 186], power: 0.5, flicker: 0.28, fixture: 'tube' }],
 };
 
 /** 房间整体环境光的强度：没有灯的房间也要能读出地面，只是更暗 */
 const ROOM_AMBIENT: Record<RoomId, number> = {
   attic: 0.22,
   nursery: 0.28,
+  dining: 0.32,
+  bathroom: 0.26,
+  conservatory: 0.32,
   bedroom: 0.32,
   study: 0.28,
   storage: 0.24,
@@ -452,6 +467,29 @@ const PROPS: Record<RoomId, Prop[]> = {
     { k: 'lamp', x: 0.2, y: 0.72, w: 0.08, h: 0.08 },
     { k: 'clutter', x: 0.72, y: 0.86, w: 0.24, h: 0.14 },
     { k: 'clutter', x: 0.42, y: 0.5, w: 0.16, h: 0.12 },
+  ],
+  dining: [
+    { k: 'rug', x: 0.5, y: 0.62, w: 0.74, h: 0.44 },
+    { k: 'table', x: 0.5, y: 0.5, w: 0.52, h: 0.34 },
+    { k: 'chair', x: 0.26, y: 0.34, w: 0.16, h: 0.16, rot: -4 },
+    { k: 'chair', x: 0.74, y: 0.34, w: 0.16, h: 0.16, rot: 6 },
+    { k: 'chair', x: 0.3, y: 0.72, w: 0.15, h: 0.15, rot: 12 },
+    { k: 'candles', x: 0.5, y: 0.44, w: 0.16, h: 0.12 },
+    { k: 'counter', x: 0.1, y: 0.6, w: 0.14, h: 0.5 },
+  ],
+  bathroom: [
+    { k: 'puddle', x: 0.42, y: 0.68, w: 0.5, h: 0.34 },
+    { k: 'counter', x: 0.5, y: 0.18, w: 0.56, h: 0.18 },
+    { k: 'sheet', x: 0.9, y: 0.58, w: 0.16, h: 0.5 },
+    { k: 'clutter', x: 0.2, y: 0.8, w: 0.2, h: 0.16 },
+  ],
+  conservatory: [
+    { k: 'plant', x: 0.2, y: 0.3, w: 0.28, h: 0.34 },
+    { k: 'plant', x: 0.76, y: 0.28, w: 0.24, h: 0.3 },
+    { k: 'tree', x: 0.52, y: 0.42, w: 0.34, h: 0.4 },
+    { k: 'bench', x: 0.5, y: 0.78, w: 0.42, h: 0.14 },
+    { k: 'puddle', x: 0.36, y: 0.66, w: 0.3, h: 0.2 },
+    { k: 'crate', x: 0.86, y: 0.74, w: 0.2, h: 0.18, rot: 8 },
   ],
   bedroom: [
     { k: 'rug', x: 0.5, y: 0.64, w: 0.7, h: 0.44 },

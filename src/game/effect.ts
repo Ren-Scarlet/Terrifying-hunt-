@@ -91,7 +91,9 @@ export type Who =
   | 'fleeing'
   | 'downedAny'
   | 'injuredAny'
-  | 'randomAny';
+  | 'randomAny'
+  /** 相邻房间里还没察觉到你的人（藏起来的除外） */
+  | 'unawareNearby';
 
 export type Dest = 'here' | 'adjacent' | 'far' | 'exit' | 'garden' | RoomId;
 
@@ -158,8 +160,8 @@ export type Op =
   | { op: 'teleportPlayer'; to: Dest }
   /** 锁住一个房间：NPC 与警察都无法穿过，玩家可以进 */
   | { op: 'lockRoom'; room: Dest; turns: number }
-  /** 侦查：点亮房间并看见里面的人 */
-  | { op: 'scout'; to?: Dest; all?: boolean; turns?: number }
+  /** 侦查：点亮房间并看见里面的人；adj 表示同时点亮相邻的所有房间 */
+  | { op: 'scout'; to?: Dest; all?: boolean; adj?: boolean; turns?: number }
   /** 搜索当前房间，把藏起来的人揪出来 */
   | { op: 'search' }
   /** 追踪一个人 N 回合 */

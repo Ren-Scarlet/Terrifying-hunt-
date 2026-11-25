@@ -73,6 +73,7 @@ const WHO_OPTIONS = [
   ['downedAny', '全场倒地的人'],
   ['injuredAny', '全场受伤的人'],
   ['randomAny', '全场随机一人'],
+  ['unawareNearby', '相邻房间未察觉者'],
 ];
 
 const DEST_OPTIONS = [
@@ -92,6 +93,9 @@ const DEST_OPTIONS = [
   ['basement', '地下室'],
   ['laundry', '洗衣房'],
   ['garage', '车库'],
+  ['dining', '餐厅'],
+  ['bathroom', '浴室'],
+  ['conservatory', '温室'],
 ];
 
 const FLAG_OPTIONS = [

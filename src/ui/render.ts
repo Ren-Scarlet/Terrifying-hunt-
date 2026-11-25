@@ -37,6 +37,7 @@ import {
   ROOM_MAP,
   ROOMS,
   TOTEM_ROOMS,
+  layoutAspect,
 } from '../game/rooms';
 import { getPersonProfile, type PersonProfile } from '../game/people';
 import { SURVIVOR_MAP } from '../game/survivors';
@@ -111,12 +112,10 @@ export function getKiller(owner?: string): KillerProfile {
 }
 
 export function defaultDetailHtml(): string {
-  return detailCardHtml('信息面板', '悬停或选中卡牌、点击人物查看资料', '档案', [
-    '地图分三层：没进过的房间只看得见轮廓；进过的房间看得见家具和出口；只有你现在所在的房间和相邻房间，才看得见里面的人。',
-    '每个人都会先躲、先跑、先报警。点人物头像能看到他的行为类型和目的——警觉型会喊人，求救型会摸向电话，救援型会去拉倒地的人。',
-    '伤害只能把人从健康打成受伤，再打成倒地。倒地的人不会自己死：再补一次伤害或用处决牌，否则他会被同伴救起来。',
-    '想先手就先伏击：「静止隐身」让你这一回合推门进去不惊动任何人；人已经跑了就用「疾速残暴」立刻贴到他身后补刀。',
-    '顶部「警戒」是整栋房子的紧张程度，满 100 直接失败。剪电话、拉电闸、制造噪声、锁门隔离，都是在压这个数字。',
+  return detailCardHtml('信息面板', '悬停卡牌看完整效果 · 点人物看他的打算', '档案', [
+    '伤害只推进一档：健康 → 受伤 → 倒地。倒地的人不会自己死，要再补一次或用处决牌，否则会被同伴救起来。',
+    '看见你的幸存者会当场跑。想先手就用「静止隐身」伏击，人跑远了用「疾速残暴」贴上去——不打卡牌就只能硬追。',
+    '没进过的房间只有轮廓。完整规则在平面图右上的「玩法指引」里。',
   ]);
 }
 
@@ -313,8 +312,8 @@ export function renderGuide(): string {
         <div class="guide-grid">
           <div class="guide-card">${icon('mission')}<b>1 · 接取契约</b><p>每局随机获得任务。主目标旁会显示${icon('missionTarget', 'ui-icon tiny')}标记，告诉你要击杀谁、需要多少证据或仪式进度。</p></div>
           <div class="guide-card">${icon('darkCell')}<b>2 · 现场布局</b><p>布局牌（绿色）在行动阶段打出：剪断电话线、封死逃生点、装窃听。布局打早了才有用。</p></div>
-          <div class="guide-card">${icon('escape')}<b>3 · 他们想跑</b><p>点人物头像能看到他的<b>目的</b>和<b>行为原型</b>：想打电话的会往书房摸，想逃的会往${icon('escape', 'ui-icon tiny')}后院跑。想在他们跑掉之前动手，就先打<b>静止隐身</b>伏击进门；人已经跑了，就用<b>疾速残暴</b>立刻贴到身后补刀。顶栏的<b>团队警戒</b>满了直接判负。</p></div>
-          <div class="guide-card">${icon('bloodPoint')}<b>4 · 伤害与评分</b><p>每回合恢复 3 能量与 3 步数，结束回合弃掉手牌重抽 5 张。<b>伤害只能推进一档</b>：健康 → 受伤 → 倒地，倒地的人要再补一次才会死。跑掉的人会扣分，标记目标跑掉直接判负。</p></div>
+          <div class="guide-card">${icon('escape')}<b>3 · 他们看见你就跑</b><p>只有背对着门、还没起疑的人（警觉 < 30）才会让你摸到背后。已经绷着弦的，门一开就冲出去——想拿先手就先打<b>静止隐身</b>伏击进门；人已经跑了，用<b>疾速残暴</b>贴上去再补刀。点人物头像能看到他的<b>目的</b>和<b>行为原型</b>，右侧<b>威胁</b>面板会告诉你现在最该处理哪一头。</p></div>
+          <div class="guide-card">${icon('bloodPoint')}<b>4 · 伤害与评分</b><p>每回合恢复 3 能量与 4 步数，结束回合弃掉手牌重抽 5 张。<b>伤害只能推进一档</b>：健康 → 受伤 → 倒地，倒地的人要再补一次才会死。跑掉的人会扣分，标记目标跑掉直接判负。</p></div>
         </div>
         <div class="guide-note">
           ${icon('totem', 'ui-icon tiny')} 图腾：在此结束回合，下回合 +1 能量。
@@ -437,6 +436,79 @@ function powerButtonHtml(state: GameState, killer: KillerProfile): string {
     .join('');
 }
 
+/**
+ * 威胁面板：把「他们正在做什么」直接摊开，每一行都给出一个具体的反制办法。
+ * 数值全部从真实状态算，不做占位。
+ */
+function threatRowsHtml(state: GameState): string {
+  const alive = state.people.filter((p) => p.role !== 'police' && p.hp > 0);
+  const downed = state.people.filter((p) => p.role !== 'police' && p.hp <= 0);
+  const atExit = alive.filter((p) => ESCAPE_ROOMS.includes(p.room));
+  const leaving = alive.filter((p) => p.intent === 'escape');
+  const calling = alive.filter((p) => p.intent === 'call');
+  const caring = alive.filter((p) => p.intent === 'rescue' || p.intent === 'heal');
+  const armed = alive.filter((p) => p.armed);
+  const barricaded = state.barricades.length;
+  const hiding = state.people.filter((p) => p.role !== 'police' && p.hidden);
+
+  const rows: Array<{ name: string; count: number; hint: string; level: 'calm' | 'warn' | 'hot' }> = [
+    {
+      name: '逃生',
+      count: atExit.length + leaving.length,
+      hint: atExit.length
+        ? `${atExit.length} 人已经在后院，撑过这回合就翻出去`
+        : leaving.length
+          ? '正往后院跑，先封门或追上去'
+          : '还没人动身，后院那扇门可以先钉死',
+      level: atExit.length ? 'hot' : leaving.length ? 'warn' : 'calm',
+    },
+    {
+      name: '报警',
+      count: calling.length,
+      hint: state.phoneCut
+        ? '电话线已经剪断，他们只能去地下室碰无线电'
+        : calling.length
+          ? '有人正在摸电话，报警会让通缉 +3'
+          : '书房和大厅有电话，先剪线最省事',
+      level: calling.length ? (state.phoneCut ? 'warn' : 'hot') : 'calm',
+    },
+    {
+      name: '救援',
+      count: caring.length + downed.length,
+      hint: downed.length
+        ? `${downed.length} 人倒地 · ${caring.length} 人正赶去救，守尸或钉住他`
+        : '现在没人倒地，救不起来也就没得救',
+      level: downed.length ? (caring.length ? 'hot' : 'warn') : 'calm',
+    },
+    {
+      name: '反抗',
+      count: armed.length + barricaded,
+      hint: armed.length
+        ? `${armed.length} 人手里有家伙，正面撞上会被逼退一步`
+        : barricaded
+          ? `${barricaded} 间房门被堵住，进去要多花一步`
+          : '厨房、车库、温室能翻到武器，提前清掉',
+      level: armed.length > 1 ? 'hot' : armed.length || barricaded ? 'warn' : 'calm',
+    },
+    {
+      name: '躲藏',
+      count: hiding.length,
+      hint: hiding.length ? `${hiding.length} 人藏在柜子或床底，搜一次才揪得出来` : '没人在藏，或者你还没看见',
+      level: hiding.length ? 'warn' : 'calm',
+    },
+  ];
+
+  return `<div class="threat-list">${rows
+    .map(
+      (r) => `<div class="threat-row ${r.level}">
+        <span class="t-name">${r.name}</span>
+        <b class="t-count">${r.count}</b>
+        <span class="t-hint">${escape(r.hint)}</span>
+      </div>`,
+    )
+    .join('')}</div>`;
+}
+
 export function renderGame(state: GameState, killer: KillerProfile): string {
   const m = state.mission;
   const here = state.people.filter((p) => p.room === state.playerRoom && p.role !== 'police');
@@ -557,64 +629,66 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
   return `
     <div class="topbar">
       <div class="topbar-identity">
-        <div class="brand">夜猎<span>档案</span> <small>${icon('mission', 'ui-icon tiny')} ${escape(m.title)}</small></div>
+        <div class="brand">夜猎<span>档案</span></div>
         <div class="killer-chip">
           ${killerFaceHtml(killer, 'chip')}
           <span>${escape(killer.owner)} · ${escape(killer.title)}</span>
         </div>
         ${meter}
       </div>
-      <div class="stats">
-        <div class="stat"><b>${state.turn}/${m.turns}</b><small>回合</small></div>
-        <div class="stat energy"><b>${state.energy}/${state.maxEnergy}</b><small>能量</small></div>
-        <div class="stat"><b>${state.steps}</b><small>步数</small></div>
-        <div class="stat wanted"><b>${state.wanted}/${state.arrestThreshold}</b><small>通缉/逮捕</small></div>
-        <div class="stat"><b>${state.kills}</b><small>击杀</small></div>
-        <div class="stat ${state.escaped > 0 ? 'escaped' : ''}"><b>${state.escaped}/${maxEscaped}</b><small>逃走</small></div>
-        <div class="stat alarm-stat ${state.alarm >= 70 ? 'hot' : state.alarm >= 40 ? 'warm' : ''}" title="团队警戒：满 ${ALARM_MAX} 任务失败。剪电话、断电、制造噪声、锁门都能压低它。">
-          <b>${state.alarm}<i>/${ALARM_MAX}</i></b>
-          <div class="alarm-track"><span style="width:${state.alarm}%"></span></div>
-          <small>团队警戒</small>
+      <div class="mission-strip">
+        <div class="mission-icon">${icon('missionTarget', 'ui-icon')}</div>
+        <div class="mission-content">
+          <div class="mission-title">${escape(m.title)}<em>奖励 ${m.reward}</em></div>
+          <div class="mission-desc">${escape(m.desc)}</div>
         </div>
-        <div class="stat score"><b>${currentScore(state)}</b><small>预计得分</small></div>
+        <div class="mission-meta">
+          <span>标记 ${state.markedKilled}/${m.kind === 'assassinate' ? (m.targetCount ?? 2) : 1}</span>
+          <span>证据 ${state.evidence}</span>
+          ${m.kind === 'ritual' ? `<span>仪式 ${state.ritualStreak}/${m.targetCount ?? 2}</span>` : ''}
+        </div>
       </div>
     </div>
 
     <div class="layout">
       <div class="main-column">
-        <div class="panel mission-panel">
-          <div class="mission-icon">${icon('missionTarget', 'ui-icon large')}</div>
-          <div class="mission-content">
-            <div class="mission-title">${escape(m.title)}</div>
-            <div class="mission-desc">${escape(m.desc)}</div>
-            <div class="mission-meta">
-              <span>奖励 ${m.reward}</span><span>标记击杀 ${state.markedKilled}/${m.kind === 'assassinate' ? (m.targetCount ?? 2) : 1}</span><span>证据 ${state.evidence}</span>
-              ${m.kind === 'ritual' ? `<span>仪式 ${state.ritualStreak}/${m.targetCount ?? 2}</span>` : ''}
-              <span class="escape-quota">允许逃走 ${state.escaped}/${maxEscaped}</span>
-            </div>
-          </div>
-        </div>
-
         <div class="panel map-panel">
-          <div class="panel-heading"><h2>房屋平面</h2><span>点击亮起的房间移动 · 注意每个人的意图 · 后院是他们的逃生点</span>
+          <div class="panel-heading"><h2>房屋平面</h2><span>点亮房间=可以走 · ？？？=没进去过 · 每局的户型都不一样</span>
             <button class="btn ghost mini" data-action="guide">玩法指引</button>
           </div>
-          <div class="floorplan">
+          <div class="floorplan" style="aspect-ratio:${layoutAspect()}">
             ${rooms}
             ${playerMarker}
           </div>
           <div class="map-legend">
-            <span>${icon('escape', 'ui-icon tiny')} 撤离点</span>
+            <span>${icon('escape', 'ui-icon tiny')} 撤离点/后院</span>
             <span>${icon('totem', 'ui-icon tiny')} 图腾</span>
             <span>${icon('cabinet', 'ui-icon tiny')} 柜子</span>
             <span>${icon('obstacle', 'ui-icon tiny')} 障碍物</span>
             <span class="legend-intent"><i class="intent-dot i-flee"></i> 逃跑中 <i class="intent-dot i-call"></i> 打电话 <i class="intent-dot i-escape"></i> 翻篱笆 <i class="intent-dot i-rescue"></i> 救援</span>
-            <span class="legend-fog">？？？ 未探索 · ? 最后确认位置</span>
+            <span class="legend-fog">？ 最后确认位置</span>
+          </div>
+        </div>
+
+        <div class="bottom-dock">
+        <div class="panel resource-bar">
+          <div class="stats">
+            <div class="stat"><b>${state.turn}<i>/${m.turns}</i></b><small>回合</small></div>
+            <div class="stat energy"><b>${state.energy}<i>/${state.maxEnergy}</i></b><small>能量</small></div>
+            <div class="stat"><b>${state.steps}</b><small>步数</small></div>
+            <div class="stat wanted"><b>${state.wanted}<i>/${state.arrestThreshold}</i></b><small>通缉/逮捕</small></div>
+            <div class="stat"><b>${state.kills}</b><small>击杀</small></div>
+            <div class="stat ${state.escaped > 0 ? 'escaped' : ''}"><b>${state.escaped}<i>/${maxEscaped}</i></b><small>逃走</small></div>
+            <div class="stat alarm-stat ${state.alarm >= 70 ? 'hot' : state.alarm >= 40 ? 'warm' : ''}" title="团队警戒：满 ${ALARM_MAX} 任务失败。剪电话、断电、制造噪声、锁门都能压低它。">
+              <b>${state.alarm}<i>/${ALARM_MAX}</i></b>
+              <div class="alarm-track"><span style="width:${state.alarm}%"></span></div>
+              <small>团队警戒</small>
+            </div>
+            <div class="stat score"><b>${currentScore(state)}</b><small>预计得分</small></div>
           </div>
         </div>
 
         <div class="panel hand">
-          <div class="panel-heading"><h2>手牌</h2><span>悬停或选中查看完整效果 · 点击打出 · 结束回合重抽</span></div>
           <div class="hand-actions">
             <div class="power-row">${powerButtonHtml(state, killer)}</div>
             <button class="btn primary end-turn" data-action="end-turn">结束回合</button>
@@ -622,21 +696,26 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
           </div>
           <div class="hand-row">${hand || '<div style="color:var(--muted);font-size:13px">手牌已空，结束回合重新抽牌。</div>'}</div>
         </div>
+        </div>
       </div>
 
       <div class="side-column">
+        <div class="panel">
+          <h2>信息面板</h2>
+          <div id="cardDetail" class="detail-wrap">${defaultDetailHtml()}</div>
+        </div>
         <div class="panel roster-panel">
           <div class="panel-heading"><h2>在场人物</h2><span>${here.length} 人在你的房间${policeHere ? ' · 警察也在' : ''}</span></div>
           <div class="roster">${roster || '<div class="roster-empty">还没有确认任何人的位置。走进房间，或者用侦查卡。</div>'}</div>
           ${unknownCount > 0 ? `<div class="roster-unknown">还有 ${unknownCount} 个人没有被确认</div>` : ''}
         </div>
-        <div class="panel">
-          <h2>信息面板</h2>
-          <div id="cardDetail" class="detail-wrap">${defaultDetailHtml()}</div>
+        <div class="panel threat-panel">
+          <div class="panel-heading"><h2>威胁</h2><span>他们正在做什么 · 怎么反制</span></div>
+          ${threatRowsHtml(state)}
         </div>
         <div class="panel">
           <h2>行动日志</h2>
-          <div class="log">${state.log.map((line) => `<div>${escape(line)}</div>`).join('')}</div>
+          <div class="log">${state.log.slice(0, 10).map((line) => `<div>${escape(line)}</div>`).join('')}</div>
         </div>
       </div>
     </div>

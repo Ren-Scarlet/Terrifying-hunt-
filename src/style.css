@@ -504,8 +504,8 @@ button { font-family: inherit; cursor: pointer; }
 /* 卡牌：像一张被反复翻过的现场卡片——哑光纸面、压边、烫金费用 */
 .card {
   position: relative;
-  flex: 0 0 152px;
-  min-height: 212px;
+  flex: 0 0 148px;
+  min-height: 186px;
   padding: 11px 11px 12px;
   border-radius: 2px;
   border: 1px solid #37332c;
@@ -1511,3 +1511,88 @@ button { font-family: inherit; cursor: pointer; }
   border-radius: 2px;
   background: #1a1409;
 }
+
+/* ==========================================================================
+   2026-11 界面重组：回合资源贴着手牌，右侧改成态势
+   ========================================================================== */
+
+/* 顶部：品牌 + 杀手 + 任务，压成一条，把高度让给地图 */
+.topbar { align-items: stretch; gap: 14px; }
+.mission-strip {
+  flex: 1 1 auto; min-width: 0;
+  display: flex; align-items: center; gap: 12px;
+  padding: 6px 12px 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: linear-gradient(90deg, #16191b, #101214);
+}
+.mission-strip .mission-icon { flex: 0 0 auto; opacity: .8; }
+.mission-strip .mission-content { flex: 1 1 auto; min-width: 0; }
+.mission-strip .mission-title {
+  display: flex; align-items: baseline; gap: 8px;
+  font-family: var(--font-title); font-size: 13px; letter-spacing: 2px; color: #ded8cc;
+}
+.mission-strip .mission-title em {
+  font-style: normal; font-size: 10px; letter-spacing: 1px; color: var(--gold); opacity: .8;
+}
+.mission-strip .mission-desc {
+  margin-top: 2px;
+  font-size: 11px; color: var(--muted); line-height: 1.4;
+  overflow: hidden; display: -webkit-box;
+  -webkit-line-clamp: 1; -webkit-box-orient: vertical;
+}
+.mission-strip .mission-meta {
+  flex: 0 0 auto; display: flex; gap: 10px;
+  font-family: var(--font-num); font-size: 10px; letter-spacing: 1px; color: var(--faint);
+  white-space: nowrap;
+}
+
+/* 底部吸附区：资源条 + 手牌一起贴在视口底部 */
+.bottom-dock {
+  position: sticky; bottom: 10px; z-index: 30;
+  display: flex; flex-direction: column; gap: 6px;
+}
+@media (max-width: 720px) {
+  .bottom-dock { position: static; }
+}
+.panel.hand { position: static; box-shadow: 0 14px 30px #000b, inset 0 1px #ffffff09; }
+.resource-bar { padding: 7px 10px; }
+.resource-bar .stats { justify-content: center; }
+.resource-bar .stat { padding: 1px 12px; }
+.resource-bar .stat b { font-size: 15px; }
+.resource-bar .stat b i {
+  font-style: normal; font-size: 9px; letter-spacing: 0; color: #5f5a53;
+}
+
+/* 地图撑满主栏：房子是 5×4 的网格，按 5:4 排版再用视口高度封顶，
+   房间能从 124×85 长到 200×110，名字和人物标签才看得清。 */
+.floorplan {
+  width: 100%;
+  aspect-ratio: 5 / 4;
+  /* 顶部任务条 + 底部吸附的资源条与手牌都要留在屏幕里，地图只吃剩下的高度。
+     60vh 是上限，再按「视口减去固定占位」封一次顶，房间就不会被手牌盖住。 */
+  max-height: max(230px, calc(100vh - 585px));
+  min-height: 230px;
+}
+
+/* 威胁面板 */
+.threat-list { display: flex; flex-direction: column; gap: 1px; margin-top: 6px; }
+.threat-row {
+  display: grid; grid-template-columns: 40px 22px 1fr;
+  align-items: center; gap: 6px;
+  padding: 5px 6px;
+  border-left: 2px solid #24211e;
+  background: linear-gradient(90deg, #14171a, transparent 85%);
+}
+.threat-row .t-name { font-size: 11px; letter-spacing: 2px; color: var(--muted); }
+.threat-row .t-count {
+  font-family: var(--font-num); font-size: 13px; text-align: center; color: #6d665c;
+}
+.threat-row .t-hint { font-size: 10.5px; line-height: 1.35; color: var(--faint); }
+.threat-row.warn { border-left-color: #7d6a42; }
+.threat-row.warn .t-count { color: #c0913f; }
+.threat-row.warn .t-hint { color: #a99a86; }
+.threat-row.hot { border-left-color: #8d3a2c; background: linear-gradient(90deg, #1d1413, transparent 85%); }
+.threat-row.hot .t-name { color: #d69c8a; }
+.threat-row.hot .t-count { color: #d4694a; }
+.threat-row.hot .t-hint { color: #c2a99c; }

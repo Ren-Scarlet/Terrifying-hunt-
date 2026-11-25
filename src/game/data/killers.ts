@@ -209,18 +209,19 @@ export const KILLERS: KillerProfile[] = [
     school: 'grounded',
     passive: {
       name: '尾随',
-      short: '每次进入有人的房间都会积累尾随值（会随时间衰减）。',
+      short: '只有主动凝视别人时才会积累尾随值——走过去不会自动涨，也不会随时间凭空出现。',
     },
     sourceNote: NOTE,
     powers: [
       {
         id: 'myers_gaze',
         name: '凝视',
-        desc: '尾随值 +30，侦查当前房间，并让房间里所有人的警觉 -15。',
+        desc: '主动发动：尾随值 +30。看清相邻所有房间，并记住其中还没察觉你的人（2 回合内位置不掉线）；同房间的人被你看得发毛，警觉 -15。',
         cooldown: 1,
         ops: [
           { op: 'stalk', amount: 30 },
-          { op: 'scout', to: 'here', turns: 1 },
+          { op: 'scout', adj: true, turns: 1 },
+          { op: 'track', who: 'unawareNearby', turns: 2 },
           { op: 'alert', who: 'allHere', amount: -15 },
           { op: 'log', text: '你站在门口，一动不动地看着他。' },
         ],
