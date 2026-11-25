@@ -1,0 +1,236 @@
+import { CARDS, CARD_MAP } from '../../game/cards';
+import { PERK_RARITY_BG, POWER_RARITY_BG, cardImage, characterImage, uiIcon } from '../../game/assetMap';
+import {
+  ARCH_LABEL, BASE_AP, BLEEDOUT_TURNS, DOWNED_LOCK_TURNS, GOAL_LABEL, HEALTH_LABEL,
+  INTENT_LABEL, conditionOf, effectiveCost, isPersonVisible,
+} from '../../game/engine';
+import { KILLERS, type KillerProfile } from '../../game/killers';
+import { roomName } from '../../game/missions';
+import { getPersonProfile, type PersonProfile } from '../../game/people';
+import { SURVIVOR_MAP } from '../../game/survivors';
+import type { GameState, Person, SaveData } from '../../game/types';
+
+const escape = (s: string) =>
+  s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+
+const TYPE_NAMES: Record<string, string> = { attack: '攻击', skill: '技能', tactic: '战术', setup: '布局' };
+const TYPE_RARITY: Record<string, string> = { attack: 'visceral', skill: 'very-rare', tactic: 'rare', setup: 'uncommon' };
+
+const icon = (name: Parameters<typeof uiIcon>[0], cls = 'ui-icon') =>
+  `<img class="${cls}" src="${uiIcon(name)}" alt="" aria-hidden="true">`;
+
+/** 三件道具按你的设计各配一张图；其余道具仍用文字角标 */
+const ITEM_ICONS: Partial<Record<NonNullable<Person['item']>, Parameters<typeof uiIcon>[0]>> = {
+  medkit: 'medkit',
+  toolbox: 'toolbox',
+  flashlight: 'flashlight',
+};
+const itemIconHtml = (item: NonNullable<Person['item']>): string => {
+  const key = ITEM_ICONS[item];
+  return key ? `<img class="item-icon" src="${uiIcon(key)}" alt="" aria-hidden="true">` : '';
+};
+const itemBadge = (item: NonNullable<Person['item']>, uses: number): string =>
+  `<i class="chip-item" title="手里拿着${escape(SURVIVOR_ITEM_LABEL[item])} · 还能用 ${uses} 次">${itemIconHtml(item)}${escape(SURVIVOR_ITEM_LABEL[item])}×${uses}</i>`;
+
+function detailCardHtml(
+  title: string,
+  subtitle: string,
+  rarityLabel: string,
+  paragraphs: string[],
+  rarityKey = 'common',
+  leadingHtml = '',
+): string {
+  return `
+    <article class="detail-card">
+      <header class="detail-header" data-rarity="${rarityKey}">
+        <div>
+          <h2>${escape(title)}</h2>
+          <p>${escape(subtitle)}</p>
+        </div>
+        <span class="rarity-label">${escape(rarityLabel)}</span>
+      </header>
+      <div class="detail-body">
+        ${leadingHtml}
+        ${paragraphs.map((p) => `<p>${escape(p)}</p>`).join('')}
+      </div>
+    </article>
+  `;
+}
+
+function perkIconHtml(defId: string, size = ''): string {
+  return `
+    <div class="dbd-perk ${size}">
+      <img class="dbd-perk-bg" src="${PERK_RARITY_BG}" alt="" onerror="this.style.display='none'">
+      ${cardImage(defId) ? `<img class="dbd-perk-glyph" src="${cardImage(defId)}" alt="" onerror="this.style.display='none'">` : ''}
+    </div>
+  `;
+}
+
+/** 杀手头像：有立绘用立绘，没有就退回力量图标，统一装进同一个框里 */
+export function killerFaceHtml(killer: KillerProfile, cls = ''): string {
+  if (killer.portrait) {
+    return `<span class="killer-face art ${cls}"><img src="${killer.portrait}" alt="" onerror="this.style.display='none'"></span>`;
+  }
+  return `<span class="killer-face glyph ${cls}">
+      <img class="face-bg" src="${POWER_RARITY_BG}" alt="" onerror="this.style.display='none'">
+      <img class="face-icon" src="${killer.icon}" alt="" onerror="this.style.display='none'">
+    </span>`;
+}
+
+function powerIconHtml(killer: KillerProfile): string {
+  return `
+    <div class="dbd-power">
+      <img class="dbd-power-bg" src="${POWER_RARITY_BG}" alt="" onerror="this.style.display='none'">
+      <img class="dbd-power-glyph" src="${killer.icon}" alt="" onerror="this.style.display='none'">
+    </div>
+  `;
+}
+
+export function getKiller(owner?: string): KillerProfile {
+  return KILLERS.find((k) => k.owner === owner) ?? KILLERS[0];
+}
+
+export function defaultDetailHtml(): string {
+  return detailCardHtml('信息面板', '悬停卡牌看完整效果 · 点人物看他的打算', '档案', [
+    `每回合 ${BASE_AP} 点行动点：走路、挥刀、出牌、搜索柜子全从这一个池子里扣。想多追几间屋就少出牌，想连砍就别乱跑。`,
+    '伤害只有一个来源：左下角的「挥刀」（1 点行动点）。健康 → 受伤 → 倒地；倒地后要隔 2 回合才能补刀处决，这期间同伴可能把人救走。砍完要么做别的事、要么花 1 点「擦刀」，才能砍第二刀。卡牌只负责功能，不造成伤害。',
+    '相邻房间只看得见轮廓，看不见人。推门就是照面，人当场跑；追不上就低头看鞋印（只看得见当前房间、只留最近两次行动），或者听哪间屋传来乌鸦叫——那是有人刚经过。',
+    '屋里的道具箱会给他们发道具（医疗包 / 工具箱 / 信号弹 / 钥匙 / 武器 / 烟雾弹），发电机会被他们修好、直接推一大截团队进度。你用不了这些，但可以花 1 点行动点砸掉：道具箱砸烂就再也发不出东西，发电机被砸会掉进度并停机两回合。',
+    '严格踩着脚印连续追才攒【杀戮】；随便走不涨。满 50 后每回合多 2 点行动点，路怎么走你自己点，不会替你瞬移。',
+    '他们也在忙自己的事：修电闸、凑钥匙、找后门。团队进度一旦做满，幸存者集体逃走，你就输了。有人藏进柜子时，点「搜索」翻出来（1 点行动点）。',
+  ]);
+}
+
+export function cardDetailHtml(state: GameState, cardUid: string): string {
+  const card = state.hand.find((c) => c.uid === cardUid);
+  if (!card) return defaultDetailHtml();
+  const def = CARD_MAP[card.defId];
+  if (!def) return defaultDetailHtml();
+  const cost = effectiveCost(card.defId, state);
+  const paras = [def.desc, def.flavor];
+  if (def.sourceText) paras.push(`图鉴原效果：${def.sourceText}`);
+  return detailCardHtml(
+    def.name,
+    `费用 ${cost} / ${TYPE_NAMES[def.type] ?? def.type} / 图标取自 ${def.sourceSkill}`,
+    TYPE_NAMES[def.type] ?? def.type,
+    paras,
+    TYPE_RARITY[def.type] ?? 'rare',
+    perkIconHtml(def.id),
+  );
+}
+
+function intentDot(person: Person): string {
+  if (person.intent === 'idle') return '';
+  return `<i class="intent-dot i-${person.intent}" title="${escape(INTENT_LABEL[person.intent])}"></i>`;
+}
+
+function personChip(person: Person, attackable = false): string {
+  const cls =
+    person.role === 'police'
+      ? 'police'
+      : person.role === 'target'
+        ? person.marked
+          ? 'marked'
+          : 'target'
+        : 'civilian';
+  const img = characterImage(person.id);
+  const health = conditionOf(person);
+  // 头顶上的警戒值：不用再翻日志判断这个人现在有多怕
+  const alertLevel = person.alert >= 70 ? 'high' : person.alert >= 35 ? 'mid' : 'low';
+  const alertMark =
+    person.role === 'police'
+      ? ''
+      : `<span class="chip-alert ${alertLevel}" title="警觉 ${person.alert}/100：越高越可能立刻逃跑">${person.alert}</span>`;
+  const bleedLeft = Math.max(0, BLEEDOUT_TURNS - person.downedTurns);
+  const lockLeft = Math.max(0, DOWNED_LOCK_TURNS - person.downedTurns);
+  const stateMark =
+    health === 'downed'
+      ? `<span class="chip-state downed" title="${lockLeft > 0 ? '刚倒下：还要等 ' + lockLeft + ' 回合才能补刀，同伴可能把他救走' : '可以补刀处决了；再过 ' + bleedLeft + ' 回合会自己流干'}">${lockLeft > 0 ? `锁 ${lockLeft}` : `倒 ${bleedLeft}`}</span>`
+      : health === 'injured'
+        ? '<span class="chip-state injured" title="受伤：再挨一下就会倒地">伤</span>'
+        : '';
+  const watchMark = person.watched
+    ? '<span class="chip-watch locked" title="夜幕锁定：持续显形，下一刀直接击倒">锁定</span>'
+    : person.watchValue > 0
+      ? `<span class="chip-watch" title="夜幕监视值 ${person.watchValue}/100">监视 ${person.watchValue}</span>`
+      : '';
+  const label = person.intent === 'idle' ? person.activity : INTENT_LABEL[person.intent];
+  const note =
+    person.role === 'police'
+      ? ' · 警察：不能攻击，他会循着现场追你'
+      : attackable
+        ? ' · 点击对他挥刀'
+        : '';
+  return `<button type="button" class="person-chip ${cls} ${health === 'downed' ? 'is-downed' : ''} ${attackable ? 'can-hit' : ''}" data-action="person" data-person-id="${person.id}"${attackable ? ' data-attack="1"' : ''}
+    title="${escape(person.name)} · ${HEALTH_LABEL[health]} · 警觉 ${person.alert}/100 · ${escape(ARCH_LABEL[person.archetype])} · ${escape(GOAL_LABEL[person.goal])} · 正在${escape(label)}${note}">
+    ${img ? `<img src="${img}" alt="" onerror="this.style.display='none'">` : ''}
+    <span>${escape(person.name)}</span>${intentDot(person)}${stateMark}${alertMark}${watchMark}${person.item ? itemBadge(person.item, person.itemUses) : ''}
+  </button>`;
+}
+
+/** 感知到的红色人影：看得出「有人」，看不出是谁 */
+function shadowFigures(count: number): string {
+  return Array.from({ length: Math.min(3, count) }, () => '<span class="shadow-figure"></span>').join('');
+}
+
+function personPortraitHtml(profile: PersonProfile): string {
+  const img = profile.portrait
+    ? `<img class="person-detail-img" src="${profile.portrait}" alt="${escape(profile.name)}立绘"
+        onerror="this.style.display='none'">`
+    : '';
+  return `
+    <div class="person-detail-portrait">
+      <div class="portrait-silhouette" aria-hidden="true">
+        <svg viewBox="0 0 100 120">
+          <circle cx="50" cy="37" r="20" fill="#3b3f48" />
+          <path d="M10 120 C10 83 27 66 50 66 C73 66 90 83 90 120 Z" fill="#3b3f48" />
+        </svg>
+      </div>
+      ${img}
+    </div>
+  `;
+}
+
+export function personDetailHtml(state: GameState, personId: string): string {
+  const person = state.people.find((p) => p.id === personId);
+  const profile = getPersonProfile(personId, person?.role);
+  const roleName = profile.role === 'police' ? '警察' : profile.role === 'target' ? '目标' : '平民';
+  const rarityKey = profile.role === 'police' ? 'rare' : profile.role === 'target' ? 'visceral' : 'common';
+  const rarityLabel = person?.marked ? '标记目标' : roleName;
+  const threat = SURVIVOR_MAP[personId]?.threat;
+  const paras = [...profile.bio, `习惯：${profile.habit}`, `秘密：${profile.secret}`];
+  if (person) {
+    const health = conditionOf(person);
+    paras.push(
+      `状态：${HEALTH_LABEL[health]}（${person.hp}/2）。行为类型：${ARCH_LABEL[person.archetype]}。`,
+      `目的：${GOAL_LABEL[person.goal]}。警觉 ${person.alert}/100，当前${INTENT_LABEL[person.intent]}。`,
+    );
+    if (isPersonVisible(state, person)) {
+      paras.push(`位置：${roomName(person.room)}。`);
+    } else {
+      paras.push(`位置：${roomName(person.lastSeenRoom)}（最后确认于第 ${person.lastSeenTurn} 回合，现在不知道在哪）。`);
+    }
+    if (person.hidden) paras.push('他躲起来了：点左下角的「搜索」翻柜子（1 点行动点），不然打不到他。');
+    if (person.sneaky) paras.push('老练：有时会踮着脚走路，不留鞋印、也不惊动乌鸦——但不会一直这样。');
+    if (person.goal === 'objective' || person.goal === 'key') paras.push('他正为团队目标忙：进度做满，幸存者会集体从后门逃走，你直接失败。');
+    if (person.armed) paras.push('他手里有武器：进门时可能反击，让你下回合少走一步。');
+    if (health === 'downed') paras.push(person.downedTurns >= DOWNED_LOCK_TURNS ? '倒地：已经可以补刀处决，但同伴仍可能把他救起。' : `倒地：还要等 ${DOWNED_LOCK_TURNS - person.downedTurns} 回合才能补刀，这是同伴的救援窗口。`);
+    if (threat) paras.push(`威胁：这名角色会主动对抗你，别把他当普通平民。`);
+    if (profile.role === 'police') {
+      paras.push(
+        '警察可以攻击，但代价极高。他循着「新鲜现场」追你，同屋越久你的暴露度涨得越快——满 100 就会被捕（灵异鬼怪则是被驱散）。剪电话、制造假现场、或者干脆离开这条街，才能甩掉他。',
+      );
+    }
+  } else {
+    paras.push('档案状态：已从现场消失。');
+  }
+  return detailCardHtml(
+    profile.name,
+    `${roleName} / ${profile.occupation} / ${profile.age} 岁 · ${profile.tags.join(' · ')}`,
+    rarityLabel,
+    paras,
+    rarityKey,
+    `<div class="person-detail-lead">${personPortraitHtml(profile)}</div>`,
+  );
+}
+
