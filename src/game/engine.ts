@@ -11,13 +11,13 @@ import {
   ROOMS,
   TOTEM_ROOMS,
 } from './rooms';
-import { SETUP_CARDS, SETUP_MAP } from './setupCards';
 import { SPECIAL_SURVIVORS, SURVIVOR_MAP, SURVIVORS, type NpcThreat } from './survivors';
 import type {
   CardInstance,
   GameState,
   Mission,
   Person,
+  PersonRole,
   ResultKind,
   RoomId,
 } from './types';
@@ -52,7 +52,7 @@ function mechanicId(state: GameState): string | undefined {
 }
 
 function resetKillerRuntime(state: GameState): void {
-  state.killerRuntime = { killUsed: false, moveUsed: false, attackUsed: false, witnessUsed: false };
+  state.killerRuntime = { killUsed: false, moveUsed: false, attackUsed: false, witnessUsed: false, abilityUsed: false };
 }
 
 function hasThreatInRoom(state: GameState, room: RoomId, threat: NpcThreat, excludeId?: string): boolean {
@@ -84,6 +84,70 @@ function findVictim(state: GameState, room: RoomId): Person | undefined {
 
 function addWanted(state: GameState, amount: number): void {
   state.wanted = clamp(state.wanted + amount, 0, 10);
+}
+
+/** 让一个人从当前房间逃向相邻房间（不进入玩家所在房间与封锁房间）。 */
+function fleePerson(state: GameState, person: Person): boolean {
+  if (state.pinnedPeople.includes(person.id)) return false;
+  const options = ROOM_MAP[person.room].neighbors.filter(
+    (r) => r !== state.playerRoom && !state.lockedRooms.includes(r),
+  );
+  if (!options.length) return false;
+  const from = roomName(person.room);
+  person.room = randomOf(options);
+  person.alert = Math.max(0, person.alert - 15);
+  person.activity = '惊魂未定';
+  log(state, `${person.name} 从${from}逃向${roomName(person.room)}。`);
+  return true;
+}
+
+/** 玩家当前是否处于不易被察觉的状态。 */
+function playerIsHidden(state: GameState): boolean {
+  const id = mechanicId(state);
+  if (state.noAlarmTurn || state.firstTurnSilent) return true;
+  if ((id === 'wraith' || id === 'rift') && state.killerRuntime.moveUsed) return true;
+  if ((id === 'nightfall' || id === 'shock') && !state.killerRuntime.witnessUsed) return true;
+  return false;
+}
+
+/** 玩家踏入房间后的即时反应：警觉、躲避、报警、逃跑。 */
+function npcOnPlayerEnter(state: GameState): void {
+  const hidden = playerIsHidden(state);
+  const id = mechanicId(state);
+  const here = peopleInRoom(state, state.playerRoom).filter((p) => p.role !== 'police' && p.hp > 0);
+
+  here.forEach((person) => {
+    const threat = SURVIVOR_MAP[person.id]?.threat;
+    let gain = 30;
+    if (threat === 'spiritual') gain = 65;
+    else if (threat === 'alarm') gain = 55;
+    else if (threat === 'lead') gain = 42;
+    else if (threat === 'team') gain = 38;
+    if (hidden && threat !== 'spiritual') gain = Math.round(gain * 0.4);
+    if (id === 'stalker' && !hidden) gain = Math.round(gain * 0.7);
+    person.alert = clamp(person.alert + gain, 0, 100);
+
+    if (person.alert >= 70) {
+      if (fleePerson(state, person)) return;
+      person.activity = '缩在角落里发抖';
+      log(state, `${person.name} 找不到出路，只能缩在角落里发抖。`);
+      return;
+    }
+
+    if (threat === 'team') {
+      here.forEach((other) => {
+        if (other.id !== person.id) other.alert = clamp(other.alert + 12, 0, 100);
+      });
+      person.activity = '低声招呼同伴';
+      log(state, `${person.name} 低声招呼同伴，房间里每个人都绷紧了。`);
+    } else if (gain < 20) {
+      person.activity = '背对着门，没有察觉';
+      log(state, `${person.name} 背对着门，还没发现你（警觉 ${person.alert}/100）。`);
+    } else {
+      person.activity = '警惕地盯着门';
+      log(state, `${person.name} 察觉到动静，警觉 ${person.alert}/100。`);
+    }
+  });
 }
 
 function killPerson(state: GameState, person: Person, fromCurse = false): void {
@@ -160,11 +224,41 @@ function damageVictim(
       state.pinnedPeople.push(victim.id);
       log(state, `锁链拷问：${victim.name} 被钉在原地，无法逃离。`);
     }
+    victim.alert = 100;
+    victim.activity = '带伤逃窜';
+    peopleInRoom(state, state.playerRoom)
+      .filter((p) => p.id !== victim.id && p.role !== 'police')
+      .forEach((p) => { p.alert = clamp(p.alert + 25, 0, 100); });
+    if (!state.pinnedPeople.includes(victim.id)) fleePerson(state, victim);
+    else log(state, `${victim.name} 被锁链钉住，无法逃跑。`);
   }
   return true;
 }
 
-function createPeople(mission: Mission, luredRoom?: RoomId): Person[] {
+const ACTIVITIES = [
+  '在翻找抽屉',
+  '靠在窗边抽烟',
+  '低声打电话',
+  '整理桌上的文件',
+  '盯着墙上的旧钟',
+  '在门后犹豫',
+  '把箱子搬到墙角',
+];
+
+function makePerson(s: (typeof SURVIVORS)[number], role: PersonRole, room: RoomId, hp: number, marked: boolean): Person {
+  return {
+    id: s.id,
+    name: s.name,
+    role,
+    room,
+    hp,
+    marked,
+    alert: 0,
+    activity: randomOf(ACTIVITIES),
+  };
+}
+
+function createPeople(mission: Mission): Person[] {
   const rooms = shuffle(ROOMS.map((r) => r.id));
   const markedCount = mission.kind === 'assassinate' ? mission.targetCount ?? 2 : 1;
 
@@ -175,34 +269,13 @@ function createPeople(mission: Mission, luredRoom?: RoomId): Person[] {
 
   const people: Person[] = [];
   cast.slice(0, markedCount).forEach((s, i) => {
-    people.push({
-      id: s.id,
-      name: s.name,
-      role: 'target',
-      room: luredRoom ?? rooms[i + 2] ?? rooms[i],
-      hp: 4,
-      marked: true,
-    });
+    people.push(makePerson(s, 'target', rooms[i + 2] ?? rooms[i], 4, true));
   });
   cast.slice(markedCount, markedCount + 2).forEach((s, i) => {
-    people.push({
-      id: s.id,
-      name: s.name,
-      role: 'target',
-      room: rooms[(i + 3) % rooms.length],
-      hp: 4,
-      marked: false,
-    });
+    people.push(makePerson(s, 'target', rooms[(i + 3) % rooms.length], 4, false));
   });
   cast.slice(markedCount + 2, markedCount + 6).forEach((s, i) => {
-    people.push({
-      id: s.id,
-      name: s.name,
-      role: 'civilian',
-      room: rooms[(i + 5) % rooms.length],
-      hp: 2,
-      marked: false,
-    });
+    people.push(makePerson(s, 'civilian', rooms[(i + 5) % rooms.length], 2, false));
   });
 
   people.push({
@@ -212,6 +285,8 @@ function createPeople(mission: Mission, luredRoom?: RoomId): Person[] {
     room: POLICE_START,
     hp: 99,
     marked: false,
+    alert: 0,
+    activity: '在辖区巡逻',
   });
 
   return people;
@@ -239,9 +314,9 @@ export function createGame(
   const killerId = KILLER_MAP[killer] ? killer : '迈克尔·迈尔斯';
   const mid = KILLER_MAP[killerId].mechanic.id;
   const state: GameState = {
-    phase: 'setup',
+    phase: 'playing',
     killer: killerId,
-    killerRuntime: { killUsed: false, moveUsed: false, attackUsed: false, witnessUsed: false },
+    killerRuntime: { killUsed: false, moveUsed: false, attackUsed: false, witnessUsed: false, abilityUsed: false },
     arrestThreshold: mid === 'nightfall' ? 6 : 4,
     turn: 1,
     energy: 3,
@@ -250,7 +325,7 @@ export function createGame(
     maxSteps: mid === 'nurse' ? 3 : 2,
     wanted: 0,
     playerRoom: ENTRY_ROOM,
-    people: [],
+    people: createPeople(mission),
     hand: [],
     drawPile: pile,
     discardPile: [],
@@ -272,8 +347,6 @@ export function createGame(
     result: null,
     score: 0,
     rewardCards: [],
-    setupPoints: 2,
-    setupHand: shuffle(SETUP_CARDS.map((c) => c.id)).slice(0, 4),
     phoneCut: false,
     wiretap: false,
     poltergeist: false,
@@ -290,58 +363,8 @@ export function createGame(
   drawCards(state, 5);
   log(state, `契约已接取：${mission.title}`);
   log(state, `你以「${killerId}」的身份行动，原创机制「${KILLER_MAP[killerId].mechanic.name}」已生效。`);
-  log(state, '布局阶段：先安排好现场，再开始行动。');
+  log(state, '行动开始：房屋里的人都有自己的警觉与行动，别贸然推门。');
   return state;
-}
-
-export function canPlaySetupCard(state: GameState, cardId: string): boolean {
-  const def = SETUP_MAP[cardId];
-  return !!def && state.phase === 'setup' && state.setupPoints >= def.cost && state.setupHand.includes(cardId);
-}
-
-export function playSetupCard(state: GameState, cardId: string): boolean {
-  if (!canPlaySetupCard(state, cardId)) return false;
-  const def = SETUP_MAP[cardId];
-  state.setupPoints -= def.cost;
-  state.setupHand = state.setupHand.filter((id) => id !== cardId);
-  log(state, `布局：打出「${def.name}」。`);
-
-  switch (cardId) {
-    case 'cut_line':
-      state.phoneCut = true;
-      break;
-    case 'wiretap':
-      state.wiretap = true;
-      break;
-    case 'lure':
-      state.luredRoom = randomOf(['attic', 'storage', 'kitchen', 'study'] as RoomId[]);
-      log(state, `你在${roomName(state.luredRoom)}制造了声响。`);
-      break;
-    case 'poltergeist':
-      state.poltergeist = true;
-      break;
-    case 'blackout':
-      state.firstTurnSilent = true;
-      break;
-    case 'block_gate':
-      state.policeBlocked = true;
-      break;
-    case 'ghost_light':
-      state.steps += 1;
-      break;
-    case 'false_report':
-      state.arrestThreshold += 1;
-      break;
-  }
-  return true;
-}
-
-export function beginOperation(state: GameState): void {
-  if (state.phase !== 'setup') return;
-  state.people = createPeople(state.mission, state.luredRoom ?? undefined);
-  state.phase = 'playing';
-  log(state, '布局完成，行动开始。');
-  if (state.luredRoom) log(state, `标记目标已被吸引到${roomName(state.luredRoom)}。`);
 }
 
 export function effectiveCost(defId: string, state: GameState): number {
@@ -392,6 +415,7 @@ export function movePlayer(state: GameState, room: RoomId): boolean {
   if (!state.freeMove) state.steps -= 1;
   state.playerRoom = room;
   log(state, `你移动到${roomName(room)}。`);
+  npcOnPlayerEnter(state);
 
   if (id === 'stalker' && !state.possessed) {
     const observed = peopleInRoom(state, room, 'target').concat(peopleInRoom(state, room, 'civilian'));
@@ -428,37 +452,103 @@ export function enterPossession(state: GameState): boolean {
   return true;
 }
 
-/** 基础攻击：消耗 1 点能量，攻击当前房间的指定人物（默认优先标记目标）。 */
-export function basicAttack(state: GameState, personId?: string): boolean {
-  if (state.phase !== 'playing') return false;
-  if (state.energy < 1) {
-    log(state, '能量不足：基础攻击需要 1 点能量。');
+export function canUseKillerAbility(state: GameState): boolean {
+  return state.phase === 'playing' && !state.killerRuntime.abilityUsed;
+}
+
+/** 主动杀手能力：每回合一次，与被动机制叠加。 */
+export function useKillerAbility(state: GameState): boolean {
+  if (!canUseKillerAbility(state)) {
+    log(state, '本回合的杀手能力已经使用过。');
     return false;
   }
+  const id = mechanicId(state);
+  const name = KILLER_MAP[state.killer].mechanic.name;
+  state.killerRuntime.abilityUsed = true;
 
-  const here = peopleInRoom(state, state.playerRoom).filter((p) => p.role !== 'police' && p.hp > 0);
-  const victim = (personId ? here.find((p) => p.id === personId) : findVictim(state, state.playerRoom));
-  if (!victim || victim.role === 'police') {
-    log(state, '当前房间没有可以攻击的人类。');
-    return false;
+  switch (id) {
+    case 'stalker': {
+      if (state.possessed) {
+        const victim = findVictim(state, state.playerRoom);
+        if (!victim) {
+          log(state, '恶魔附身：当前房间没有可以处决的人。');
+          state.killerRuntime.abilityUsed = false;
+          return false;
+        }
+        killPerson(state, victim);
+        addWanted(state, 1);
+        state.possessed = false;
+        state.stalkMeter = 0;
+        state.stalkTargetId = null;
+        log(state, `恶魔附身：你处决了 ${victim.name}，附身结束，尾随值清零。`);
+        checkImmediateWin(state);
+        return true;
+      }
+      const before = state.stalkMeter;
+      state.stalkMeter = clamp(state.stalkMeter + 25, 0, 100);
+      peopleInRoom(state, state.playerRoom).forEach((p) => {
+        p.alert = Math.max(0, p.alert - 20);
+      });
+      log(state, `恶魔附身：你贴着墙影跟踪，尾随值 ${before} → ${state.stalkMeter}，周围人的警觉降低。`);
+      if (state.stalkMeter >= 100) log(state, '尾随值已满：点击「进入恶魔附身」完成猎杀。');
+      return true;
+    }
+    case 'trapper': {
+      const left = state.playerRoom;
+      if (!state.lockedRooms.includes(left)) state.lockedRooms.push(left);
+      const neighbor = randomNeighbor(left);
+      if (!state.lockedRooms.includes(neighbor)) state.lockedRooms.push(neighbor);
+      log(state, `封门设陷：${roomName(left)}与${roomName(neighbor)}被封锁，警察本回合无法进入。`);
+      return true;
+    }
+    case 'wraith':
+    case 'rift':
+      state.freeMove = true;
+      state.noAlarmTurn = true;
+      log(state, `${name}：本回合无视相邻限制移动，且不会惊动目击者。`);
+      return true;
+    case 'nurse':
+    case 'dream':
+      state.steps += 2;
+      if (id === 'dream') drawCards(state, 1);
+      log(state, `${name}：本回合步数 +2${id === 'dream' ? '，并额外抽 1 张牌' : ''}。`);
+      return true;
+    case 'huntress':
+    case 'butcher': {
+      const bonus = id === 'huntress' ? 2 : 3;
+      state.bonusDamage += bonus;
+      if (id === 'butcher') addWanted(state, 1);
+      log(state, `${name}：下次攻击伤害 +${bonus}${id === 'butcher' ? '，引擎声让通缉值 +1' : ''}。`);
+      return true;
+    }
+    case 'nightfall':
+    case 'shock':
+      state.noAlarmTurn = true;
+      if (id === 'shock') addWanted(state, 1);
+      log(state, `${name}：本回合目击不会报警${id === 'shock' ? '，但电流痕迹让通缉值 +1' : ''}。`);
+      return true;
+    case 'curse': {
+      const victims = peopleInRoom(state, state.playerRoom).filter((p) => p.role !== 'police' && p.hp > 0);
+      victims.forEach((v) => {
+        v.hp -= 2;
+        if (v.hp <= 0) killPerson(state, v);
+        else log(state, `诅咒蔓延：${v.name} 失去 2 点生命。`);
+      });
+      log(state, `诅咒蔓延：影响了 ${victims.length} 人。`);
+      checkImmediateWin(state);
+      return true;
+    }
+    case 'torture': {
+      const victims = peopleInRoom(state, state.playerRoom).filter((p) => p.role !== 'police' && p.hp > 0);
+      victims.forEach((v) => {
+        if (!state.pinnedPeople.includes(v.id)) state.pinnedPeople.push(v.id);
+      });
+      log(state, `锁链拷问：${victims.length} 人被钉在原地，下回合无法逃离。`);
+      return true;
+    }
+    default:
+      return false;
   }
-
-  if (state.possessed && mechanicId(state) === 'stalker') {
-    killPerson(state, victim);
-    addWanted(state, 1);
-    state.possessed = false;
-    state.stalkMeter = 0;
-    state.stalkTargetId = null;
-    log(state, `恶魔附身：你处决了 ${victim.name}，附身结束，尾随值清零。`);
-    checkImmediateWin(state);
-    return true;
-  }
-
-  state.energy -= 1;
-  log(state, `基础攻击：你扑向 ${victim.name}（消耗 1 能量）。`);
-  damageVictim(state, 1, false, victim);
-  checkImmediateWin(state);
-  return true;
 }
 
 function randomNeighbor(room: RoomId): RoomId {
@@ -589,7 +679,9 @@ export function playCard(state: GameState, cardUid: string): boolean {
       );
       if (target) {
         target.room = state.playerRoom;
-        log(state, `${target.name} 被引到${roomName(state.playerRoom)}。`);
+        target.alert = 15;
+        target.activity = '被引到门边，还在犹豫';
+        log(state, `${target.name} 被引到${roomName(state.playerRoom)}，暂时没有察觉。`);
       } else {
         log(state, '没有可被操控的目标。');
       }
@@ -601,6 +693,53 @@ export function playCard(state: GameState, cardUid: string): boolean {
     case 'search':
       state.evidence += 1;
       log(state, `证据 +1（当前 ${state.evidence}）。`);
+      break;
+
+    /* 布局牌：在行动阶段布置现场 */
+    case 'cut_line':
+      state.phoneCut = true;
+      log(state, '电话线被剪断：本局目击造成的通缉增长 -1。');
+      break;
+    case 'lure': {
+      const target =
+        state.people.find((p) => p.role === 'target' && p.marked) ??
+        state.people.find((p) => p.role === 'target');
+      const options = (['attic', 'storage', 'kitchen', 'study'] as RoomId[]).filter(
+        (r) => r !== state.playerRoom,
+      );
+      if (target && options.length) {
+        target.room = randomOf(options);
+        target.alert = 0;
+        target.activity = '朝声响处张望';
+        log(state, `你在${roomName(target.room)}制造声响，${target.name}被吸引过去，警觉暂时降低。`);
+      } else {
+        log(state, '现场已经没有可以被引开的目标。');
+      }
+      break;
+    }
+    case 'wiretap':
+      state.wiretap = true;
+      log(state, '窃听器已安装：之后每回合都会提示警察的下一步目的地。');
+      break;
+    case 'poltergeist':
+      state.poltergeist = true;
+      log(state, '灵异事件让目击者自顾不暇：本局目击通缉再 -1。');
+      break;
+    case 'blackout':
+      state.noAlarmTurn = true;
+      log(state, '拉闸断电：本回合所有目击完全无效。');
+      break;
+    case 'block_gate':
+      state.policeBlocked = true;
+      log(state, '后院大门被封：警察下一回合无法移动。');
+      break;
+    case 'ghost_light':
+      state.steps += 2;
+      log(state, '鬼火引路：本回合步数 +2。');
+      break;
+    case 'false_report':
+      state.arrestThreshold += 1;
+      log(state, `虚假报案生效：警察逮捕阈值提高到 ${state.arrestThreshold}。`);
       break;
   }
 
@@ -643,14 +782,46 @@ function policeNextStep(state: GameState): RoomId {
   return police.room;
 }
 
+/** 回合结算时，NPC 的警觉衰减、巡逻与远离玩家。 */
+function npcPatrolPhase(state: GameState): void {
+  state.people
+    .filter((p) => p.role !== 'police' && p.hp > 0)
+    .forEach((person) => {
+      if (state.pinnedPeople.includes(person.id)) {
+        person.activity = '被锁链钉住，无法动弹';
+        return;
+      }
+      person.alert = Math.max(0, person.alert - 20);
+      const isLeader = SURVIVOR_MAP[person.id]?.threat === 'lead';
+      if (person.alert >= 55 && !isLeader) {
+        fleePerson(state, person);
+        return;
+      }
+      if (person.alert < 25 && Math.random() < 0.35) {
+        const options = ROOM_MAP[person.room].neighbors.filter(
+          (r) => r !== state.playerRoom && !state.lockedRooms.includes(r),
+        );
+        if (options.length) {
+          const from = roomName(person.room);
+          person.room = randomOf(options);
+          log(state, `${person.name} 从${from}走到${roomName(person.room)}。`);
+        }
+        person.activity = randomOf(ACTIVITIES);
+      } else {
+        person.activity = person.alert >= 25 ? '压低声音交谈' : randomOf(ACTIVITIES);
+      }
+    });
+}
+
 function policePhase(state: GameState): void {
   const police = state.people.find((p) => p.role === 'police');
   if (!police) return;
 
   const next = policeNextStep(state);
   if (state.wiretap) log(state, `窃听：警察正在前往${roomName(next)}。`);
-  if (state.policeBlocked && state.turn === 1) {
-    log(state, '后院大门被锁，警察第一回合无法移动。');
+  if (state.policeBlocked) {
+    state.policeBlocked = false;
+    log(state, '后院大门被锁，警察本回合无法移动。');
   } else if (next !== police.room) {
     police.room = next;
     log(state, `警察移动到${roomName(next)}。`);
@@ -790,6 +961,7 @@ export function endTurn(state: GameState): void {
       }
     });
 
+  npcPatrolPhase(state);
   policePhase(state);
   if (state.result) return;
 

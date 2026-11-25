@@ -6,7 +6,7 @@ import {
   characterImage,
   uiIcon,
 } from '../game/assetMap';
-import { canEnterPossession, canMoveTo, effectiveCost, getStars } from '../game/engine';
+import { canEnterPossession, canMoveTo, canUseKillerAbility, effectiveCost, getStars } from '../game/engine';
 import { KILLERS, type KillerProfile } from '../game/killers';
 import { roomName } from '../game/missions';
 import {
@@ -18,14 +18,13 @@ import {
   TOTEM_ROOMS,
 } from '../game/rooms';
 import { getPersonProfile, type PersonProfile } from '../game/people';
-import { SETUP_MAP } from '../game/setupCards';
 import type { GameState, Person, RoomId, SaveData } from '../game/types';
 
 const escape = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
-const TYPE_NAMES: Record<string, string> = { attack: '攻击', skill: '技能', tactic: '战术' };
-const TYPE_RARITY: Record<string, string> = { attack: 'visceral', skill: 'very-rare', tactic: 'rare' };
+const TYPE_NAMES: Record<string, string> = { attack: '攻击', skill: '技能', tactic: '战术', setup: '布局' };
+const TYPE_RARITY: Record<string, string> = { attack: 'visceral', skill: 'very-rare', tactic: 'rare', setup: 'uncommon' };
 
 const icon = (name: Parameters<typeof uiIcon>[0], cls = 'ui-icon') =>
   `<img class="${cls}" src="${uiIcon(name)}" alt="" aria-hidden="true">`;
@@ -85,8 +84,8 @@ export function getKiller(owner?: string): KillerProfile {
 export function defaultDetailHtml(): string {
   return detailCardHtml('信息面板', '悬停卡牌或点击人物查看资料', '档案', [
     '点击手牌查看卡牌的完整效果；点击房间中的头像查看人物档案与立绘。',
-    '基础攻击消耗 1 点能量，直接攻击当前房间的人类。',
-    '移动、出牌与攻击都受能量和步数限制，请谨慎安排每一回合。',
+    '攻击只能依靠卡牌。人物会警觉、躲避和逃跑，先布局再下手。',
+    '每回合可使用一次杀手能力；移动、出牌都受能量和步数限制。',
   ]);
 }
 
@@ -116,10 +115,11 @@ function personChip(person: Person): string {
           : 'target'
         : 'civilian';
   const img = characterImage(person.id);
+  const alertMark = person.alert >= 70 ? '<span class="chip-alert high">!</span>' : person.alert >= 35 ? '<span class="chip-alert">?</span>' : '';
   return `<button type="button" class="person-chip ${cls}" data-action="person" data-person-id="${person.id}"
-    title="${escape(person.name)} · 生命 ${person.hp} · 点击查看档案">
+    title="${escape(person.name)} · 生命 ${person.hp} · 警觉 ${person.alert}/100 · 正在${escape(person.activity)} · 点击查看档案">
     ${img ? `<img src="${img}" alt="" onerror="this.style.display='none'">` : ''}
-    <span>${escape(person.name)}</span>
+    <span>${escape(person.name)}</span>${alertMark}
   </button>`;
 }
 
@@ -148,21 +148,15 @@ export function personDetailHtml(state: GameState, personId: string): string {
   const rarityKey = profile.role === 'police' ? 'rare' : profile.role === 'target' ? 'visceral' : 'common';
   const rarityLabel = person?.marked ? '标记目标' : roleName;
   const status = person
-    ? `当前位置：${roomName(person.room)} · 生命 ${person.hp}${person.marked ? ' · 已被标记' : ''}`
+    ? `当前位置：${roomName(person.room)} · 生命 ${person.hp} · 警觉 ${person.alert}/100 · 正在${person.activity}${person.marked ? ' · 已被标记' : ''}`
     : '档案状态：已从现场消失。';
-  const canAttack =
-    person && person.role !== 'police' && person.hp > 0 && person.room === state.playerRoom && state.phase === 'playing';
-  const attackLabel = state.possessed ? '恶魔附身 · 处决' : '基础攻击 · 1 能量';
-  const attackButton = canAttack
-    ? `<button class="btn primary detail-attack" data-action="attack" data-person-id="${personId}">${attackLabel}</button>`
-    : '';
   return detailCardHtml(
     profile.name,
     `${roleName} / ${profile.occupation} / ${profile.age} 岁 · ${profile.tags.join(' · ')}`,
     rarityLabel,
     [...profile.bio, `习惯：${profile.habit}`, `秘密：${profile.secret}`, status],
     rarityKey,
-    `<div class="person-detail-lead">${personPortraitHtml(profile)}${attackButton}</div>`,
+    `<div class="person-detail-lead">${personPortraitHtml(profile)}</div>`,
   );
 }
 
@@ -194,8 +188,8 @@ export function renderMenu(save: SaveData): string {
           </div>
           <div class="menu-mission">
             ${icon('mission', 'ui-icon large')}
-            <div><small>本局流程</small><b>布局 → 狩猎 → 结算</b></div>
-            <p>完成任务获得血点与暗金细胞。暗金细胞可解锁新的杀手。</p>
+            <div><small>本局流程</small><b>接取契约 → 潜入布局 → 猎杀撤离</b></div>
+            <p>布局牌在行动阶段打出。完成任务获得血点与暗金细胞。</p>
           </div>
         </div>
 
@@ -235,49 +229,12 @@ export function renderGuide(): string {
         <h1>玩法<span>指引</span></h1>
         <div class="guide-grid">
           <div class="guide-card">${icon('mission')}<b>1 · 接取契约</b><p>每局随机获得任务。主目标旁会显示${icon('missionTarget', 'ui-icon tiny')}标记，告诉你要击杀谁、需要多少证据或仪式进度。</p></div>
-          <div class="guide-card">${icon('darkCell')}<b>2 · 布局现场</b><p>行动前先打出布局牌：剪断电话线、安装窃听、拉闸断电。布局点有限，别浪费。</p></div>
-          <div class="guide-card">${icon('escape')}<b>3 · 追踪与猎杀</b><p>点击相邻房间移动（墙上的缺口是门）。点击人物查看${icon('missionTarget', 'ui-icon tiny')}档案；在场人物可直接用「基础攻击」下手，消耗 1 能量。</p></div>
+          <div class="guide-card">${icon('darkCell')}<b>2 · 现场布局</b><p>布局牌（绿色）和别的卡牌一样在行动阶段打出：剪断电话线、引开注意、安装窃听、拉闸断电。布局也能成为牌组的一部分。</p></div>
+          <div class="guide-card">${icon('escape')}<b>3 · 追踪与猎杀</b><p>点击亮起的相邻房间移动（发光的门就是通道）。点击人物查看${icon('missionTarget', 'ui-icon tiny')}档案。NPC 会警觉、躲避、逃跑，先用潜行或布局降低警觉，再用攻击卡下手。</p></div>
           <div class="guide-card">${icon('bloodPoint')}<b>4 · 卡牌与评分</b><p>手牌每张都有费用，每回合恢复 3 能量与 2 步数。悬停卡牌查看完整效果。胜利按评分发放血点，可去商店买卡。</p></div>
         </div>
         <div class="guide-note">${icon('totem', 'ui-icon tiny')} 图腾房间：在此结束回合，下回合 +1 能量。 ${icon('cabinet', 'ui-icon tiny')} 柜子房间：藏身者不会被引诱类卡牌锁定。 ${icon('obstacle', 'ui-icon tiny')} 障碍房间：需要「破门而入」或恶魔附身才能进入。</div>
         <div class="actions"><button class="btn primary" data-action="guide-close">知道了</button></div>
-      </div>
-    </div>
-  `;
-}
-
-export function renderSetup(state: GameState, killer: KillerProfile): string {
-  const m = state.mission;
-  const cards = state.setupHand
-    .map((id) => {
-      const def = SETUP_MAP[id];
-      if (!def) return '';
-      const disabled = def.cost > state.setupPoints;
-      return `
-        <button class="setup-card ${def.school}" data-action="setup-play" data-setup-id="${id}" ${disabled ? 'disabled' : ''}>
-          <span class="setup-cost">${def.cost}</span>
-          <div class="setup-name">${escape(def.name)}</div>
-          <div class="setup-desc">${escape(def.desc)}</div>
-          <div class="setup-flavor">${escape(def.flavor)}</div>
-        </button>
-      `;
-    })
-    .join('');
-
-  return `
-    <div class="overlay">
-      <div class="modal setup-modal">
-        <div class="subtitle">PREPARATION PHASE</div>
-        <h1>布局<span>阶段</span></h1>
-        <div class="setup-mission">${icon('missionTarget', 'ui-icon large')}
-          <div><small>契约 / ${escape(killer.owner)}</small><b>${escape(m.title)}</b><p>${escape(m.desc)}</p></div>
-        </div>
-        <div class="setup-points">剩余布局点：<b>${state.setupPoints}</b> · 原创机制「${escape(killer.mechanic.name)}」：${escape(killer.mechanic.short)}</div>
-        <div class="setup-row">${cards || '<p style="color:var(--muted)">布局牌已用完。</p>'}</div>
-        <div class="actions">
-          <button class="btn primary" data-action="begin">开始行动</button>
-          <button class="btn ghost" data-action="guide">玩法指引</button>
-        </div>
       </div>
     </div>
   `;
@@ -343,6 +300,7 @@ export function renderDeckEditor(deck: string[], unlocked: string[]): string {
   return `
     <div class="overlay">
       <div class="modal deck-modal">
+        <button class="btn back-top" data-action="deck-cancel">← 返回主菜单</button>
         <h1>牌组<span>构筑</span></h1>
         <p>牌组需要 10–15 张牌，同一种卡牌最多 3 张。点击加减号调整，保存后才会生效。</p>
         <div class="deck-list">${rows}</div>
@@ -368,7 +326,8 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
   const m = state.mission;
   const here = state.people.filter((p) => p.room === state.playerRoom);
   const isStalker = killer.mechanic.id === 'stalker';
-  const attackDisabled = state.energy < 1 || here.every((p) => p.role === 'police' || p.hp <= 0);
+  const abilityDisabled = !canUseKillerAbility(state);
+  const abilityLabel = state.possessed ? '恶魔附身 · 处决' : `杀手能力 · ${killer.mechanic.name}`;
 
   const rooms = ROOMS.map((room) => {
     const people = state.people.filter((p) => p.room === room.id && p.role !== 'police');
@@ -383,8 +342,20 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
         const nr = ROOM_MAP[nid].rect;
         const dx = nr.left + nr.width / 2 - (r.left + r.width / 2);
         const dy = nr.top + nr.height / 2 - (r.top + r.height / 2);
-        const side = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : dy > 0 ? 'bottom' : 'top';
-        return `<span class="door door-${side}" aria-hidden="true"></span>`;
+        let side: 'top' | 'bottom' | 'left' | 'right';
+        let p = 50;
+        if (Math.abs(dx) > Math.abs(dy)) {
+          side = dx > 0 ? 'right' : 'left';
+          const top = Math.max(r.top, nr.top);
+          const bottom = Math.min(r.top + r.height, nr.top + nr.height);
+          if (bottom > top) p = (((top + bottom) / 2 - r.top) / r.height) * 100;
+        } else {
+          side = dy > 0 ? 'bottom' : 'top';
+          const left = Math.max(r.left, nr.left);
+          const right = Math.min(r.left + r.width, nr.left + nr.width);
+          if (right > left) p = (((left + right) / 2 - r.left) / r.width) * 100;
+        }
+        return `<span class="door door-${side}" style="--door-p:${Math.max(8, Math.min(92, p)).toFixed(1)}%" aria-hidden="true"></span>`;
       })
       .join('');
     return `
@@ -437,10 +408,13 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
     .map((p) => {
       const profile = getPersonProfile(p.id, p.role);
       const img = characterImage(p.id);
+      const alertLabel = p.alert >= 70
+        ? '<em class="alert-tag high">警觉</em>'
+        : p.alert >= 35 ? '<em class="alert-tag">留意</em>' : '';
       return `<button class="roster-person ${p.room === state.playerRoom ? 'here' : ''} ${p.marked ? 'marked' : ''}"
         data-action="person" data-person-id="${p.id}" title="点击查看档案">
         ${img ? `<img src="${img}" alt="" onerror="this.style.display='none'">` : ''}
-        <span><b>${escape(p.name)}</b><small>${roomName(p.room)} · ${p.hp} HP</small></span>
+        <span><b>${escape(p.name)} ${alertLabel}</b><small>${roomName(p.room)} · ${p.hp} HP · ${escape(p.activity)}</small></span>
       </button>`;
     })
     .join('');
@@ -452,7 +426,6 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
         ${canEnterPossession(state) ? '<button class="btn primary possess" data-action="possess">进入恶魔附身</button>' : ''}
       </div>`
     : '';
-  const attackLabel = state.possessed ? '恶魔附身 · 处决' : '基础攻击 · 1 能量';
 
   return `
     <div class="topbar">
@@ -489,7 +462,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
         </div>
 
         <div class="panel map-panel">
-          <div class="panel-heading"><h2>房屋平面</h2><span>点击相邻房间移动 · 点击人物查看档案 · 墙上的缺口是门</span>
+          <div class="panel-heading"><h2>房屋平面</h2><span>点击亮起的房间移动 · 发光的长条是门 · 人物会警觉和逃跑</span>
             <button class="btn ghost mini" data-action="guide">玩法指引</button>
           </div>
           <div class="floorplan">
@@ -508,7 +481,9 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
         <div class="panel hand">
           <div class="panel-heading"><h2>手牌</h2><span>悬停查看完整效果 · 点击打出</span></div>
           <div class="hand-actions">
-            <button class="btn attack" data-action="attack" ${attackDisabled ? 'disabled' : ''}>${attackLabel}</button>
+            <button class="btn ability" data-action="ability" ${abilityDisabled ? 'disabled' : ''}
+              title="${escape(killer.mechanic.short)}">${escape(abilityLabel)}</button>
+            <small class="ability-hint">${escape(killer.mechanic.short)}</small>
             <button class="btn primary" data-action="end-turn">结束回合</button>
             <button class="btn ghost" data-action="give-up">放弃任务</button>
           </div>

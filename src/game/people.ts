@@ -28,7 +28,7 @@ const POLICE_PROFILE: PersonProfile = {
   role: 'police',
   age: 37,
   occupation: '辖区巡警',
-  portrait: 'assets/characters/police-0.png',
+  portrait: 'assets/characters/portraits/S12_DavidTapp_Portrait.webp',
   tags: ['警觉', '守规矩', '追踪者'],
   bio: [
     '他在这片辖区巡逻了六年，记性很好。哪扇门该开着、哪扇门不该开着，他一眼就能看出来。',

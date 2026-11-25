@@ -12,11 +12,15 @@ export interface Survivor {
   franchise?: string;
   threat?: NpcThreat;
   bio: string;
+  /** 实际素材文件名，由 id + 英文名拼接而成 */
+  portrait: string;
 }
 
-const portrait = (id: string) => `assets/characters/portraits/${id}_Portrait.webp`;
+/** 素材命名规则：S01_DwightFairfield_Portrait.webp */
+const portraitOf = (s: Omit<Survivor, 'portrait'>): string =>
+  `assets/characters/portraits/${s.id}_${s.en.replace(/\s/g, '')}_Portrait.webp`;
 
-export const SURVIVORS: Survivor[] = [
+const SURVIVOR_SEEDS: Omit<Survivor, 'portrait'>[] = [
   { id: 'S01', name: '德怀特·费尔菲尔德', en: 'Dwight Fairfield', bio: '总在找人组队，却总是最后一个知道发生了什么。' },
   { id: 'S02', name: '梅格·托马斯', en: 'Meg Thomas', bio: '短跑选手，习惯用速度解决一切问题。' },
   { id: 'S03', name: '克洛黛特·莫雷尔', en: 'Claudette Morel', bio: '懂草药，也懂如何让别人闭嘴。' },
@@ -71,6 +75,8 @@ export const SURVIVORS: Survivor[] = [
   { id: 'S52', name: '权泰英', en: 'Kwon Tae-young', franchise: '鱿鱼游戏', threat: 'team', bio: '他习惯在混乱里数清还有多少人站着。' },
 ];
 
+export const SURVIVORS: Survivor[] = SURVIVOR_SEEDS.map((s) => ({ ...s, portrait: portraitOf(s) }));
+
 export const SURVIVOR_MAP: Record<string, Survivor> = SURVIVORS.reduce(
   (acc, s) => {
     acc[s.id] = s;
@@ -95,4 +101,4 @@ export const THREAT_DESC: Record<NpcThreat, string> = {
   spiritual: '能看穿潜行与夜幕，你的无声机制对她无效。',
 };
 
-export const survivorPortrait = (id: string) => portrait(id);
+export const survivorPortrait = (id: string) => SURVIVOR_MAP[id]?.portrait ?? '';

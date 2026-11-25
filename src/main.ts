@@ -1,15 +1,13 @@
 import './style.css';
 import { CARD_MAP } from './game/cards';
 import {
-  basicAttack,
-  beginOperation,
   createGame,
   endTurn,
   enterPossession,
   giveUp,
   movePlayer,
   playCard,
-  playSetupCard,
+  useKillerAbility,
 } from './game/engine';
 import { loadSave, writeSave } from './game/save';
 import type { GameState, RoomId, SaveData } from './game/types';
@@ -23,7 +21,6 @@ import {
   renderGuide,
   renderMenu,
   renderResult,
-  renderSetup,
   renderShop,
   shopPrice,
 } from './ui/render';
@@ -49,8 +46,6 @@ function render(): void {
     html = renderShop(save);
   } else if (screen === 'menu' || !game) {
     html = renderMenu(save);
-  } else if (game.phase === 'setup') {
-    html = renderSetup(game, getKiller(save.killer));
   } else {
     html = renderGame(game, getKiller(save.killer));
     if (screen === 'result') html += renderResult(game);
@@ -211,19 +206,6 @@ app.addEventListener('click', (event) => {
     return;
   }
 
-  if (action === 'setup-play') {
-    const id = target.dataset.setupId;
-    if (id && game && game.phase === 'setup') playSetupCard(game, id);
-    render();
-    return;
-  }
-
-  if (action === 'begin') {
-    if (game && game.phase === 'setup') beginOperation(game);
-    render();
-    return;
-  }
-
   if (action === 'person') {
     const personId = target.dataset.personId;
     if (personId && game && screen === 'game') {
@@ -233,10 +215,10 @@ app.addEventListener('click', (event) => {
     return;
   }
 
-  if (action === 'attack' || action === 'possess') {
+  if (action === 'ability' || action === 'possess') {
     if (!game || screen !== 'game') return;
     if (action === 'possess') enterPossession(game);
-    else basicAttack(game, target.dataset.personId);
+    else useKillerAbility(game);
     afterAction();
     return;
   }

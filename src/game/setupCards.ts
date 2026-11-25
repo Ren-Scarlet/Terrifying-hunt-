@@ -1,4 +1,7 @@
-/** 布局阶段专属卡牌。它们不进入牌组，只在行动开始前布置局面。 */
+/**
+ * 布局牌的原始设计记录。已迁移到 cards.ts 与 engine.ts，
+ * 现在它们与别的卡牌一样在行动阶段打出，不设独立开局阶段。
+ */
 
 export interface SetupCardDef {
   id: string;

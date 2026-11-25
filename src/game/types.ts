@@ -10,7 +10,7 @@ export type RoomId =
   | 'attic'
   | 'storage';
 
-export type CardType = 'attack' | 'skill' | 'tactic';
+export type CardType = 'attack' | 'skill' | 'tactic' | 'setup';
 
 export interface RoomRect {
   /** 相对平面图的百分比坐标，用于拼接成完整房屋 */
@@ -58,6 +58,10 @@ export interface Person {
   hp: number;
   marked: boolean;
   image?: string;
+  /** 警觉度 0–100：越高越可能逃离玩家所在房间 */
+  alert: number;
+  /** 当前行为，用于档案与人物名单 */
+  activity: string;
 }
 
 export type MissionKind =
@@ -85,6 +89,8 @@ export interface KillerRuntime {
   moveUsed: boolean;
   attackUsed: boolean;
   witnessUsed: boolean;
+  /** 主动杀手能力每回合只能使用一次 */
+  abilityUsed: boolean;
 }
 
 export type GamePhase = 'menu' | 'setup' | 'playing' | 'gameover';
@@ -126,9 +132,6 @@ export interface GameState {
   score: number;
   rewardCards: string[];
 
-  /** 布局阶段 */
-  setupPoints: number;
-  setupHand: string[];
   phoneCut: boolean;
   wiretap: boolean;
   poltergeist: boolean;

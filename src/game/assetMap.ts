@@ -19,16 +19,9 @@ export const ASSET_PATHS: AssetPaths = {
     {} as Record<string, string>,
   ),
   characters: {
-    'target-0': 'assets/characters/target-0.png',
-    'target-1': 'assets/characters/target-1.png',
-    'target-2': 'assets/characters/target-2.png',
-    'target-3': 'assets/characters/target-3.png',
-    'civilian-0': 'assets/characters/civilian-0.png',
-    'civilian-1': 'assets/characters/civilian-1.png',
-    'civilian-2': 'assets/characters/civilian-2.png',
-    'civilian-3': 'assets/characters/civilian-3.png',
-    'police-0': 'assets/characters/police-0.png',
-    player: 'assets/characters/player.png',
+    /** 警员借用「大卫·塔普」警探的肖像 */
+    'police-0': 'assets/characters/portraits/S12_DavidTapp_Portrait.webp',
+    player: 'assets/characters/michael-myers.webp',
   },
   ui: {
     energy: 'assets/ui/energy.png',
@@ -52,6 +45,8 @@ export const ASSET_PATHS: AssetPaths = {
 };
 
 export function cardImage(defId: string): string | undefined {
+  const custom = CARD_MAP[defId]?.image;
+  if (custom) return `assets/dbd/perks/${custom}`;
   return ASSET_PATHS.cards[defId];
 }
 
