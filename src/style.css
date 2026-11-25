@@ -902,7 +902,11 @@ button { font-family: inherit; cursor: pointer; }
 .menu-modal {
   width: min(980px, 100%);
   position: relative;
-  overflow: hidden;
+  /* 菜单内容比矮屏/手机高得多：必须能在面板内纵向滚动，
+     否则「开始任务」会被裁在视口外，根本点不到（桌面 1020 高时刚好塞得下，所以只在小屏暴露） */
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   border-color: #2e2b26;
 }
 /* 菜单背后的一束暖光 + 一点冷光：不让整块面板变成一块死黑的板 */
