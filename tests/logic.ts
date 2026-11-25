@@ -579,10 +579,16 @@ function caseSiteItems(): void {
   s.teamProgress = 50;
   s.playerRoom = gen.room;
   s.energy = BASE_AP;
+  const teamBefore = s.teamProgress;
   const ok2 = sabotageSiteItem(s);
   check(
     'X 砸发电机扣进度 + 停机 + 团队进度倒退',
-    ok2 && gen.progress === 35 && gen.jammedTurns === GENERATOR_JAM_TURNS && !gen.charged && s.teamProgress === 28,
+    ok2 &&
+      gen.progress === 35 &&
+      gen.jammedTurns === GENERATOR_JAM_TURNS &&
+      !gen.charged &&
+      // 破坏后同屋目击者可能趁乱再推 3 点，所以看「至少倒退 10」而不是卡死 28
+      s.teamProgress <= teamBefore - 10,
     `progress=${gen.progress} jam=${gen.jammedTurns} team=${s.teamProgress}`,
   );
 }
