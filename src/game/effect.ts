@@ -117,7 +117,17 @@ export type FlagKey =
   | 'clearBarricade'
   | 'freeMove'
   | 'possessReady'
-  | 'myersStalk';
+  | 'myersStalk'
+  | 'hexHuntress'
+  | 'hexNoed'
+  | 'scourgeShrine'
+  | 'distressing'
+  | 'hexRuin'
+  | 'stealthNext'
+  | 'revealAura'
+  | 'revealNearestTrail'
+  | 'revealWorkers'
+  | 'myersLastBest';
 
 export type SabotageKey = 'phone' | 'exit' | 'radio' | 'lights';
 
