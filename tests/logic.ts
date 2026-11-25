@@ -1242,6 +1242,7 @@ function caseNewPerkSystem(): void {
   noed.teamStage = 4;
   noed.teamProgress = 100;
   noed.totems = ['attic'];
+  noed.people.forEach((person) => { person.room = 'bedroom'; person.alert = 0; person.awareness = 0; });
   noed.hand = [{ uid: 'test-noed', defId: 'hex_noed' }];
   noed.energy = 6;
   const noedEnergy = noed.energy;
