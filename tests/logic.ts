@@ -25,6 +25,7 @@ import {
   carryPerson,
   executeCarriedPerson,
   isRoomLit,
+  missionTaskProgress,
   attackBlockReason,
   canAttack,
   canMoveTo,
@@ -983,6 +984,10 @@ caseAidAndPressure();
 function caseContractsPowerAndCarry(): void {
   const contract = newGame();
   check('AB 每局契约至少包含两个组合目标', (contract.mission.tasks?.length ?? 0) >= 2, String(contract.mission.tasks?.length));
+  const alarmTask = { id: 'test-alarm', kind: 'no_alarm' as const, label: '阻止报警', target: 1 };
+  check('AB 未发生报警时无报警目标保持完成', missionTaskProgress(contract, alarmTask) === 1);
+  contract.npcAlarmed = true;
+  check('AB 幸存者成功报警后无报警目标失败', missionTaskProgress(contract, alarmTask) === 0);
   check('AB 组合目标均为已支持类型', (contract.mission.tasks ?? []).every((task) => ['kill_count', 'marked_kill', 'execute', 'no_alarm', 'break_circuit'].includes(task.kind)));
   const grid = newGame();
   const circuit = grid.powerCircuits[0];
