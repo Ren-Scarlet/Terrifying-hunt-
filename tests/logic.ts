@@ -189,7 +189,7 @@ function caseMyersStalkingAndFearRadius(): void {
   const hiddenRoom = (Object.keys(ROOM_MAP) as RoomId[]).find((room) =>
     room !== noPrey.playerRoom && !ROOM_MAP[noPrey.playerRoom].neighbors.includes(room),
   ) ?? openNeighbor(noPrey.playerRoom);
-  noPrey.people.forEach((person) => { if (person.role !== 'police') person.room = hiddenRoom; });
+  noPrey.people.forEach((person) => { if (person.role !== 'police') { person.room = hiddenRoom; person.hidden = true; person.trackedTurns = 0; person.revealedActions = 0; } });
   noPrey.energy = 4;
   check('迈尔斯：视野内没有幸存者时尾随不能使用也不扣 AP',
     !usePower(noPrey, 'myers_gaze') && noPrey.energy === 4 && noPrey.stalkMeter === 0 && !noPrey.myersStalking);
