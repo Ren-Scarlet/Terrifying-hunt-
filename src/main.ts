@@ -16,6 +16,7 @@ import { loadSave, writeSave } from './game/save';
 import {
   applyTuning,
   exportTuning,
+  importTuning,
   resetTuning,
   setCardCost,
   setCardOpValue,
@@ -242,6 +243,19 @@ app.addEventListener('click', (event) => {
   if (action === 'admin-reset') {
     resetTuning();
     render();
+    return;
+  }
+
+  if (action === 'admin-import') {
+    const input = document.getElementById('adminImportText') as HTMLTextAreaElement | null;
+    const status = document.getElementById('adminImportStatus');
+    if (!input || !status) return;
+    const ok = importTuning(input.value);
+    status.textContent = ok
+      ? '导入成功，配置已保存。'
+      : '导入失败：JSON 格式或数据结构不合法，当前配置未改变。';
+    status.setAttribute('class', ok ? 'tune-import-success' : 'tune-import-error');
+    if (ok) render();
     return;
   }
 
