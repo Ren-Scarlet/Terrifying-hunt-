@@ -409,7 +409,8 @@ function casePickTarget(): void {
   s.energy = 5;
   s.attackReady = true;
   const before = pair.map((p) => p.hp);
-  const ok = attack(s, pair[1].id);
+  // 固定随机值，避免手电筒 NPC 的随机干扰让目标选择测试偶发失败。
+  const ok = withRandomSource(() => 0.99, () => attack(s, pair[1].id));
   check(
     'M 点谁打谁（同屋两人时指定目标）',
     ok && pair[1].hp < before[1] && pair[0].hp === before[0],
