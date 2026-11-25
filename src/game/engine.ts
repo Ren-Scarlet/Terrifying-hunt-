@@ -1568,8 +1568,8 @@ function npcTurn(state: GameState): void {
         random() < 0.6
       ) {
         counterAttack(state, person);
-        continue;
       }
+      // 反抗者可以先反击，但回合结束前仍会尝试撤离，不能站在原地等玩家下回合再砍。
       if (fleeAway(state, person)) {
         person.movesThisTurn = Math.min(REACT_MOVE_CAP, person.movesThisTurn + 1);
         continue;
