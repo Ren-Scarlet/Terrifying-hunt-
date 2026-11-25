@@ -294,10 +294,15 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
     const r = room.rect;
     const style = `left:${r.left}%;top:${r.top}%;width:${r.width}%;height:${r.height}%`;
     return `
-      <div class="room ${isPlayer ? 'current' : ''} ${reachable ? 'reachable' : 'disabled'} ${adjacent ? 'adjacent' : ''} ${obstacleOpen ? 'obstacle' : ''} ${isObjective ? 'objective' : ''} ${darkRoom ? 'dark-room' : 'lit-room'} ${room.id === 'garden' ? 'outdoor' : ''} ${locked ? 'locked' : ''} ${barricaded ? 'barricaded' : ''} ${explored ? 'explored' : 'unexplored'} ${visible ? 'in-sight' : 'fogged'}"
+      <div class="room ${isPlayer ? 'current' : ''} ${reachable ? 'reachable' : 'disabled'} ${adjacent ? 'adjacent' : ''} ${state.lookingAround && adjacent ? 'look-target' : ''} ${obstacleOpen ? 'obstacle' : ''} ${isObjective ? 'objective' : ''} ${darkRoom ? 'dark-room' : 'lit-room'} ${room.id === 'garden' ? 'outdoor' : ''} ${locked ? 'locked' : ''} ${barricaded ? 'barricaded' : ''} ${explored ? 'explored' : 'unexplored'} ${visible ? 'in-sight' : 'fogged'}"
         style="${style}" data-room="${room.id}" title="${escape(room.name)}${explored ? `：${escape(room.desc)}` : '：还没进去过'}${isObjective ? ' · 他们的目标点' : ''}">
-        ${reachable ? `<button type="button" class="room-hit" data-action="move" data-room="${room.id}"
-          aria-label="移动到${escape(room.name)}（需 ${cost} 点行动点）"></button>` : ''}
+        ${state.lookingAround && adjacent
+          ? `<button type="button" class="room-hit look-hit" data-action="look-select" data-room="${room.id}"
+              aria-label="查看${escape(room.name)}，消耗 ${LOOK_COST} 点行动点">查看这里</button>`
+          : !state.lookingAround && reachable
+            ? `<button type="button" class="room-hit" data-action="move" data-room="${room.id}"
+                aria-label="移动到${escape(room.name)}（需 ${cost} 点行动点）"></button>`
+            : ''}
         <div class="room-head">
           <span class="room-name">${explored ? escape(room.name) : '？？？'}</span>
           ${noise ? `<span class="room-tag noise" title="${escape(noise.label)}">${icon('crow', 'crow-icon tiny')}动静</span>` : ''}
@@ -460,11 +465,15 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
       <span class="atk-meta">${searchOk ? (hiddenHere ? '有动静 · 翻柜子' : `${SEARCH_COST} 点 · 翻柜子`) : '行动点不足'}</span>
     </button>`;
   const lookOk = state.phase === 'playing' && state.energy >= LOOK_COST;
-  const lookBtn = `<button class="btn search inspect" data-action="look" ${lookOk ? '' : 'disabled'}
-      title="${lookOk ? `查看当前房间周围一格的所有相邻房间，消耗 ${LOOK_COST} 点行动点；不会移动。` : '行动点不足'}">
-      <span class="atk-name">查看</span>
-      <span class="atk-meta">${lookOk ? `${LOOK_COST} 点 · 查看周围一格` : '行动点不足'}</span>
-    </button>`;
+  const lookBtn = state.lookingAround
+    ? `<button class="btn search inspect selecting" data-action="look-cancel">
+        <span class="atk-name">取消查看</span><span class="atk-meta">尚未消耗行动点</span>
+      </button>`
+    : `<button class="btn search inspect" data-action="look" ${lookOk ? '' : 'disabled'}
+        title="${lookOk ? `选择一个相邻房间查看，确认后消耗 ${LOOK_COST} 点行动点。` : '行动点不足'}">
+        <span class="atk-name">查看</span>
+        <span class="atk-meta">${lookOk ? `${LOOK_COST} 点 · 选择一个房间` : '行动点不足'}</span>
+      </button>`;
 
   return `
     <div class="topbar">
@@ -503,10 +512,13 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
             <button class="btn ghost mini audio-toggle" data-action="mute" title="开关音效与背景音乐">${isMuted() ? '音效 关' : '音效 开'}</button>
           </div>
           ${statusHtml}${carryStatus}
-          <div class="floorplan" style="--ar:${layoutAspectNum().toFixed(4)};aspect-ratio:${layoutAspect()}">
-            ${rooms}
-            ${trailOverlay(state)}
-            ${playerMarker}
+          ${state.lookingAround ? '<div class="look-prompt" role="status"><b>选择要查看的房间</b><span>地图上亮起边框的房间都与当前位置相邻。点击其中一个，消耗 1 点行动点查看。</span><button class="btn ghost mini" data-action="look-cancel">取消</button></div>' : ''}
+          <div class="map-viewport">
+            <div class="floorplan" style="--ar:${layoutAspectNum().toFixed(4)};aspect-ratio:${layoutAspect()}">
+              ${rooms}
+              ${trailOverlay(state)}
+              ${playerMarker}
+            </div>
           </div>
           <div class="map-legend">
             <span>${icon('escape', 'ui-icon tiny')} 逃生点（第4阶段开启）</span>
