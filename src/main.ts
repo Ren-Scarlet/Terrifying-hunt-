@@ -1,5 +1,5 @@
 import './style.css';
-import { CARD_MAP } from './game/cards';
+import { CARD_MAP, deckCardsForKiller, STARTING_DECK } from './game/cards';
 import {
   attack,
   carryPerson,
@@ -79,7 +79,7 @@ function render(): void {
   if (adminOpen) {
     html = renderAdmin();
   } else if (editorOpen) {
-    html = renderDeckEditor(editorDeck, save.unlockedCards);
+    html = renderDeckEditor(editorDeck, save.unlockedCards, save.killer ?? '迈克尔·迈尔斯');
   } else if (shopOpen) {
     html = renderShop(save);
   } else if (screen === 'menu' || !game) {
@@ -340,7 +340,9 @@ app.addEventListener('click', (event) => {
   if (action === 'killer') {
     const owner = target.dataset.owner;
     if (owner) {
-      save = { ...save, killer: owner };
+      const allowed = new Set(deckCardsForKiller(owner).map((card) => card.id));
+      const compatibleDeck = save.deck.filter((id) => allowed.has(id));
+      save = { ...save, killer: owner, deck: compatibleDeck.length >= 10 ? compatibleDeck : [...STARTING_DECK] };
       writeSave(save);
       render();
     }
@@ -374,7 +376,8 @@ app.addEventListener('click', (event) => {
     if (!id) return;
     if (action === 'deck-add') {
       const count = editorDeck.filter((c) => c === id).length;
-      if (save.unlockedCards.includes(id) && count < 3 && editorDeck.length < 15) editorDeck.push(id);
+      const allowed = deckCardsForKiller(save.killer ?? '迈克尔·迈尔斯').some((card) => card.id === id);
+      if (allowed && save.unlockedCards.includes(id) && count < 3 && editorDeck.length < 15) editorDeck.push(id);
     } else {
       const index = editorDeck.indexOf(id);
       if (index >= 0) editorDeck.splice(index, 1);
