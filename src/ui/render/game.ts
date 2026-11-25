@@ -14,7 +14,6 @@ import {
   HEALTH_LABEL,
   INTENT_LABEL,
   SEARCH_COST,
-  TEAM_GOAL_MAX,
   attackBlockReason,
   canAttack,
   canMoveTo,
@@ -423,12 +422,12 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
       <span class="atk-meta">${sabotageMeta}</span>
     </button>`;
   const atkTitle = possessed
-    ? `恶魔附身（剩 ${state.possessTurns} 回合）：每一刀都直接把还站着的人放倒。消耗 ${ATTACK_COST} 点行动点。`
-    : `挥刀：消耗 ${ATTACK_COST} 点行动点，健康→受伤→倒地；倒地后要隔 ${DOWNED_LOCK_TURNS} 回合才能补刀处决。砍完要再做一件事（或花 ${WIPE_COST} 点擦刀）才能砍第二刀。`;
+    ? `恶魔附身（剩 ${state.possessTurns} 回合）：每一刀造成 2 点伤害，健康者受伤、受伤者倒地。消耗 ${ATTACK_COST} 点行动点。`
+    : `挥刀：消耗 ${ATTACK_COST} 点行动点，默认造成 1 点伤害；累计 2 点进入受伤，再累计 2 点倒地。倒地后要隔 ${DOWNED_LOCK_TURNS} 回合才能补刀处决。砍完要再做一件事（或花 ${WIPE_COST} 点擦刀）才能砍第二刀。`;
   const attackBtn = `<button class="btn attack ${atkOk ? '' : 'spent'} ${possessed ? 'possessed' : ''}" data-action="attack" ${atkOk ? '' : 'disabled'}
       title="${escape(atkOk ? atkTitle : atkReason)}">
       <span class="atk-name">${possessed ? '附身 · 挥刀' : '挥刀'}</span>
-      <span class="atk-meta">${atkOk ? (possessed ? `${ATTACK_COST} 点 · 一刀倒地` : `${ATTACK_COST} 点 · 砍下去`) : escape(atkReason)}</span>
+      <span class="atk-meta">${atkOk ? (possessed ? `${ATTACK_COST} 点 · 每刀 2 点伤害` : `${ATTACK_COST} 点 · 砍下去`) : escape(atkReason)}</span>
     </button>`;
   const wipeReason = wipeBlockReason(state);
   const wipeBtn = `<button class="btn wipe ${wipeReason ? 'spent' : ''}" data-action="wipe" ${wipeReason ? 'disabled' : ''}

@@ -12,8 +12,8 @@ import type { KillerPower } from '../effect';
  *  能力效果由 effect.ts 的指令描述。数值可以在游戏主菜单的「平衡调整」里
  *  直接改（冷却、每条指令的数值），改完保存即生效。
  *
- *  注意伤害尺度：健康 / 受伤 / 倒地各两格血，1 点伤害只是受伤，
- *  2 点伤害才能把健康的人打倒。处决类能力必须先用 `execute` 并带
+ *  幸存者生命值为 4：累计 2 点伤害进入受伤，再累计 2 点倒地。默认挥刀 1 点，
+ *  2 点伤害可让健康者受伤、让已受伤者倒地。处决类能力必须先用 `execute` 并带
  *  `requires: [{ c: 'downedHere' }]`，不能凭空秒人。
  */
 
@@ -124,7 +124,7 @@ export const KILLERS: KillerProfile[] = [
       {
         id: 'nurse_breath',
         name: '窒息之息',
-        desc: '当前房间所有人受 1 点伤害（健康变受伤），并被压在原地 1 回合。',
+        desc: '当前房间所有人受 1 点伤害，并被压在原地 1 回合；累计伤害达到 2 点才会受伤。',
         cooldown: 3,
         ultimate: true,
         ops: [
@@ -145,7 +145,7 @@ export const KILLERS: KillerProfile[] = [
       {
         id: 'huntress_axe',
         name: '投斧',
-        desc: '对全场警觉最高的人造成 1 点伤害，不论他躲在哪个房间。',
+        desc: '对全场警觉最高的人造成 1 点伤害，不论他躲在哪个房间；可与其他伤害效果叠加。',
         cooldown: 1,
         ops: [
           { op: 'damage', who: 'highestAlert', amount: 1 },
@@ -155,7 +155,7 @@ export const KILLERS: KillerProfile[] = [
       {
         id: 'huntress_volley',
         name: '连投',
-        desc: '对全场警觉最高的人造成 2 点伤害，再对另一人造成 1 点。',
+        desc: '对全场警觉最高的人造成 2 点伤害（健康者受伤、受伤者倒地），再对另一人造成 1 点。',
         cooldown: 3,
         ultimate: true,
         ops: [
@@ -177,7 +177,7 @@ export const KILLERS: KillerProfile[] = [
       {
         id: 'ghost_stalk',
         name: '夜幕',
-        desc: '拉开夜幕：接下来每回合盯住相邻房间的一名幸存者，监视值累积到 100 他就持续显形（红色小人），下一刀可直接把他击倒。有人闯进你所在房间会打断夜幕，且对方能多跑一步。',
+        desc: '拉开夜幕：接下来每回合盯住相邻房间的一名幸存者，监视值累积到 100 他就持续显形（红色小人），下一刀额外造成 1 点伤害；已受伤者会被击倒。有人闯进你所在房间会打断夜幕，且对方能多跑一步。',
         cooldown: 1,
         ops: [
           { op: 'alarm', amount: -10 },
@@ -188,7 +188,7 @@ export const KILLERS: KillerProfile[] = [
       {
         id: 'ghost_nightfall',
         name: '夜袭 · 收网',
-        desc: '本回合行动点 +3、目击无效、下次攻击 +2 伤害。趁监视锁定的人还在显形时贴上去，一刀就能收网。',
+        desc: '本回合行动点 +3、目击无效、下次攻击 +2 伤害。趁监视锁定的已受伤目标还在显形时贴上去，一刀即可击倒。',
         cooldown: 3,
         ultimate: true,
         ops: [
@@ -228,7 +228,7 @@ export const KILLERS: KillerProfile[] = [
       {
         id: 'myers_possess',
         name: '恶魔附身',
-        desc: '尾随值满 100 才能发动：接下来 3 回合进入附身，每一刀都直接把还站着的人放倒（正常要砍两刀），尾随值清零。',
+        desc: '尾随值满 100 才能发动：接下来 3 回合进入附身，每一刀造成 2 点伤害（健康者受伤、受伤者倒地），尾随值清零。',
         cooldown: 3,
         ultimate: true,
         requires: [{ c: 'stalk', gte: 100 }],

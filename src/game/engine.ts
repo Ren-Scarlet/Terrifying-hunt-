@@ -1518,7 +1518,7 @@ function npcTurn(state: GameState): void {
       person.intent = 'stunned';
       continue;
     }
-    if (person.hidden) {
+    if (person.hidden && state.teamStage < TEAM_STAGE_COUNT) {
       // 藏起来的人只在玩家进房间且警觉拉满时才会冲出去
       if (person.room === state.playerRoom && person.alert >= 85) {
         person.hidden = false;
@@ -1532,6 +1532,7 @@ function npcTurn(state: GameState): void {
       }
       continue;
     }
+    if (person.hidden && state.teamStage >= TEAM_STAGE_COUNT) person.hidden = false;
 
     // 第四阶段开启后，所有幸存者都以两个动态逃生点为目标，不再执行原本的个人工作。
     if (state.teamStage >= TEAM_STAGE_COUNT && state.escapeRooms.length === 2) {
@@ -1751,7 +1752,6 @@ function escapePhase(state: GameState): void {
 
     // 每逃一个人都在结算里扣 15 分；直到最后一个幸存者也翻出篱笆，契约才作废。
     // 不再用「逃够 N 个就立刻输」的硬阈值——那会让幸存者的个人目标失去博弈空间。
-    const survivorsLeft = state.people.filter((p) => p.role !== 'police').length;
     if (state.escaped >= state.survivorTotal && state.survivorTotal > 0) {
       state.resultReason = `最后一名幸存者也成功逃离，房子里再没有活人——契约作废（逃走 ${state.escaped} 人）。`;
       finish(state, 'failed');
