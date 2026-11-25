@@ -8,6 +8,8 @@ import {
   BLEEDOUT_TURNS,
   DOWNED_LOCK_TURNS,
   FRENZY_AP_BONUS,
+  DRAW_CARD_COST,
+  HAND_LIMIT,
   FRENZY_MAX,
   FRENZY_THRESHOLD,
   GOAL_LABEL,
@@ -339,15 +341,17 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
     </div>
   `;
 
+  const selectingDiscards = state.hand.length > HAND_LIMIT;
   const hand = state.hand
     .map((card) => {
       const def = CARD_MAP[card.defId];
       if (!def) return '';
       const cost = effectiveCost(card.defId, state);
-      const disabled = cost > state.energy;
+      const disabled = selectingDiscards ? false : cost > state.energy;
+      const action = selectingDiscards ? 'discard' : 'play';
       return `
-        <button class="card ${def.type}" data-action="play" data-uid="${card.uid}" data-card-uid="${card.uid}"
-          ${disabled ? 'disabled' : ''} title="${escape(def.desc)}">
+        <button class="card ${def.type} ${selectingDiscards ? 'discard-choice' : ''}" data-action="${action}" data-uid="${card.uid}" data-card-uid="${card.uid}"
+          ${disabled ? 'disabled' : ''} title="${escape(selectingDiscards ? '点击弃掉这张牌' : def.desc)}">
           <span class="card-type">${escape(TYPE_NAMES[def.type] ?? def.type)}</span>
           <span class="card-cost">${cost}</span>
           ${isCardTuned(def.id) ? '<span class="card-tuned" title="这张卡使用了你在平衡调整里改过的数值">调</span>' : ''}
@@ -526,13 +530,15 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
         </div>
 
         <div class="panel hand">
+          ${selectingDiscards ? `<div class="hand-limit-warning">手牌 ${state.hand.length}/${HAND_LIMIT}：请点击要弃掉的牌，直到剩余 ${HAND_LIMIT} 张。</div>` : ''}
           <div class="hand-actions">
             ${attackBtn}
+            <button class="btn draw-card" data-action="draw" ${state.energy < DRAW_CARD_COST || (state.drawPile.length === 0 && state.discardPile.length === 0) || selectingDiscards ? 'disabled' : ''} title="消耗 ${DRAW_CARD_COST} 点行动点，从牌库抽 1 张">${DRAW_CARD_COST} 点 · 抽 1 张</button>
             ${wipeBtn}
             ${searchBtn}
             ${sabotageBtn}
             <div class="power-row">${powerButtonHtml(state, killer)}</div>
-            <button class="btn primary end-turn" data-action="end-turn">结束回合</button>
+            <button class="btn primary end-turn" data-action="end-turn" ${selectingDiscards ? 'disabled' : ''}>结束回合</button>
             <button class="btn ghost" data-action="give-up">放弃任务</button>
           </div>
           <div class="hand-row">${hand || '<div style="color:var(--muted);font-size:13px">手牌已空，结束回合重新抽牌。</div>'}</div>
