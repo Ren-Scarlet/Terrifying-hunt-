@@ -143,10 +143,20 @@ function workPressure(state: GameState): number {
 }
 
 /** 追一个人越久、杀的人越多，其他人干活越快；这是「守着一个人追 / 一路屠杀」的代价 */
-function teamWorkGain(state: GameState): number {
-  return Math.round(
+function scaleSurvivorProgress(state: GameState, person: Person, amount: number): number {
+  let multiplier = state.distressingActive ? 0.8 : 1;
+  if (state.killer === '迈克尔·迈尔斯' && state.myersEclipseMarks > 0) {
+    const marks = Math.min(5, state.myersEclipseMarks);
+    multiplier *= person.bloodSacrifice ? 1 + marks * 0.05 : Math.max(0.65, 1 - marks * 0.05);
+  }
+  return Math.max(1, Math.round(amount * multiplier));
+}
+
+function teamWorkGain(state: GameState, person: Person): number {
+  const base = Math.round(
     OBJECTIVE_GAIN * (1 + Math.min(1, state.chaseTurns * CHASE_WORK_BONUS) + workPressure(state)),
   );
+  return scaleSurvivorProgress(state, person, base);
 }
 
 /* ---------- 场地物品：道具箱 / 发电机 ---------- */
@@ -215,6 +225,11 @@ function addTeamProgress(state: GameState, amount: number): void {
   if (amount <= 0 || state.teamStage >= TEAM_STAGE_COUNT) return;
   state.teamProgress = Math.min(TEAM_GOAL_MAX, state.teamProgress + amount);
   while (state.teamStage < TEAM_STAGE_COUNT && state.teamProgress >= (state.teamStage + 1) * TEAM_STAGE_SIZE) completeTeamStage(state);
+  if (state.hexNoedActive && state.teamStage >= 4 && state.totems.length > 0 && !state.hexNoedBonusGranted) {
+    state.energy += 2;
+    state.hexNoedBonusGranted = true;
+    log(state, '难逃一死生效：图腾仍然存留，你获得 2 点额外行动点。');
+  }
 }
 
 /** 破坏设施只能拖慢当前阶段，不能抹掉已经完成的阶段。 */
@@ -307,6 +322,7 @@ function playerIsHidden(state: GameState): boolean {
 
 /** 尾随者模式会把迈尔斯的实际恐惧范围压到 0。 */
 function effectiveFearRadius(state: GameState): number {
+  if (state.stealthActions > 0) return 0;
   return state.killer === '迈克尔·迈尔斯' && state.myersStalking ? 0 : state.fearRadius;
 }
 
@@ -402,8 +418,8 @@ export function isRoomExplored(state: GameState, room: RoomId): boolean {
 
 /** 这个人现在是否在玩家视野里 */
 export function isPersonVisible(state: GameState, person: Person): boolean {
-  if (person.hidden) return person.trackedTurns > 0;
-  if (person.trackedTurns > 0) return true;
+  if (person.hidden) return person.trackedTurns > 0 || (person.revealedActions ?? 0) > 0;
+  if (person.trackedTurns > 0 || (person.revealedActions ?? 0) > 0) return true;
   return isRoomVisible(state, person.room);
 }
 
@@ -613,6 +629,11 @@ function rememberVisible(state: GameState): void {
 function afterPlayerAction(state: GameState): void {
   if (state.result) return;
   npcReact(state);
+  state.revealAuraActions = Math.max(0, state.revealAuraActions - 1);
+  state.trailRevealActions = Math.max(0, state.trailRevealActions - 1);
+  state.stealthActions = Math.max(0, state.stealthActions - 1);
+  if (state.trailRevealActions === 0) state.highlightedTrail = null;
+  state.people.forEach((person) => { person.revealedActions = Math.max(0, (person.revealedActions ?? 0) - 1); });
   // 恶魔附身以行动而非回合计时；每次行动消耗 20 点尾随值。
   if (state.killer === '迈克尔·迈尔斯' && state.possessed) {
     state.stalkMeter = Math.max(0, state.stalkMeter - 20);
@@ -1329,7 +1350,7 @@ function witnessInRoom(state: GameState, person: Person): boolean {
     person.movesThisTurn += 1;
     log(state, `${person.name} 看见同伴被砍，喊了一声夺路而逃。`);
   } else {
-    addTeamProgress(state, 3);
+    addTeamProgress(state, scaleSurvivorProgress(state, person, 3));
     person.intent = 'work';
     person.activity = '趁乱把手里的事往前推了一步';
     log(state, `${person.name} 没跟着跑，反而趁乱多干了一点活（团队进度 +3）。`);
@@ -1655,6 +1676,11 @@ function npcTurn(state: GameState): void {
   for (const person of [...npcs(state)]) {
     if (state.result) return;
     if (!state.people.some((p) => p.id === person.id)) continue;
+    const totemIndex = state.totems.indexOf(person.room);
+    if (totemIndex >= 0 && person.hp > 0 && person.awareness >= 1 && random() < 0.18) {
+      state.totems.splice(totemIndex, 1);
+      log(state, `${person.name} 在${roomName(person.room)}发现并破坏了图腾。`);
+    }
 
     // 警觉值只代表情绪强度；认知阶段决定 NPC 是否真的知道危险存在。
     person.awareness = Math.max(person.awareness, person.alert >= 75 ? 3 : person.alert >= 40 ? 2 : person.alert >= 12 ? 1 : 0);
@@ -1690,7 +1716,7 @@ function npcTurn(state: GameState): void {
     if (isRoomLit(state, person.room) && person.awareness > 0) {
       person.alert = clamp(person.alert + 4, 0, 100);
       if (person.awareness >= 2 && (person.goal === 'objective' || person.goal === 'generator' || person.goal === 'key' || person.intent === 'work')) {
-        addTeamProgress(state, 2);
+        addTeamProgress(state, scaleSurvivorProgress(state, person, 2));
         log(state, `${roomName(person.room)}仍有照明，${person.name}借着灯光加快了行动（团队进度 +2）。`);
       }
     }
@@ -1919,13 +1945,13 @@ function npcTurn(state: GameState): void {
         log(state, `${person.name} 在${roomName(person.room)}修发电机（${gen.progress}%）。`);
         if (gen.progress >= 100) {
           gen.charged = true;
-          addTeamProgress(state, GENERATOR_CHARGED_BONUS);
+          addTeamProgress(state, scaleSurvivorProgress(state, person, GENERATOR_CHARGED_BONUS));
           log(state, `发电机重新亮了起来，他们离逃出去又近了一大步（团队进度 ${state.teamProgress}/${TEAM_GOAL_MAX}）。`);
         }
       } else if ((person.goal === 'objective' || person.goal === 'key') && state.teamProgress < TEAM_GOAL_MAX) {
         // 工具箱：按你的设计，推进团队目标也更快（不只是修发电机）
         const hasToolbox = person.item === 'toolbox' && person.itemUses > 0;
-        const gain = teamWorkGain(state) * (hasToolbox ? 2 : 1);
+        const gain = teamWorkGain(state, person) * (hasToolbox ? 2 : 1);
         if (hasToolbox) consumeItem(state, person);
         addTeamProgress(state, gain);
         person.intent = 'work';
@@ -2229,7 +2255,7 @@ function useSurvivorItem(state: GameState, person: Person): boolean {
     case 'key': {
       if (state.teamProgress >= TEAM_GOAL_MAX) return false;
       consumeItem(state, person);
-      addTeamProgress(state, 12);
+      addTeamProgress(state, scaleSurvivorProgress(state, person, 12));
       person.intent = 'work';
       person.activity = '用钥匙捅开了后门的锁';
       log(state, `${person.name} 用钥匙捅开了后门锁（团队进度 ${state.teamProgress}/${TEAM_GOAL_MAX}）。`);
@@ -2387,11 +2413,53 @@ export function playCard(state: GameState, cardUid: string): boolean {
     log(state, blocked);
     return false;
   }
+  if (def.killerOnly && def.killerOnly !== state.killer) {
+    log(state, `「${def.name}」是 ${def.killerOnly} 的专属卡牌。`);
+    return false;
+  }
+  if (card.defId === 'myers_eclipse_light') {
+    const lastTarget = state.people.find((person) => person.id === state.lastAttackedId);
+    if (state.killer !== '迈克尔·迈尔斯' || !lastTarget || lastTarget.hp > 0 || lastTarget.bloodSacrifice) {
+      log(state, '湮灭之光：必须先击倒一名非血祭品幸存者才能打出。');
+      return false;
+    }
+  }
+  if (card.defId === 'myers_plaything') {
+    const sacrifice = state.people.find((person) => person.bloodSacrifice && person.role !== 'police' && person.hp > 0 && isPersonVisible(state, person));
+    if (state.killer !== '迈克尔·迈尔斯' || !sacrifice) {
+      log(state, '戏耍食物：视野内没有可见的血祭品，无法打出。');
+      return false;
+    }
+  }
 
   state.energy -= cost;
   state.hand.splice(index, 1);
   state.discardPile.push(card);
   log(state, `你打出「${def.name}」（消耗 ${cost} 点行动点）。`);
+
+  if (card.defId === 'myers_eclipse_light') {
+    state.myersEclipseMarks = Math.min(5, state.myersEclipseMarks + 1);
+    log(state, `湮灭之光印记 +1（${state.myersEclipseMarks}/5）：普通幸存者推进变慢，血祭品推进变快。`);
+  } else if (card.defId === 'myers_plaything') {
+    const sacrifice = state.people.find((person) => person.bloodSacrifice && person.role !== 'police' && person.hp > 0 && isPersonVisible(state, person));
+    if (sacrifice) {
+      state.myersFoodMarks = Math.min(8, state.myersFoodMarks + 1);
+      sacrifice.alert = Math.max(sacrifice.alert, 55);
+      sacrifice.awareness = Math.max(sacrifice.awareness, 2);
+      sacrifice.intent = 'flee';
+      sacrifice.activity = '被迈尔斯戏耍，仓皇逃离视线';
+      if (sacrifice.movesThisTurn < REACT_MOVE_CAP) {
+        if (fleeAway(state, sacrifice, true)) sacrifice.movesThisTurn += 1;
+      }
+      if (state.myersFoodMarks % 2 === 0 && state.myersFoodMarks <= 8) {
+        state.energy += 1;
+        log(state, `戏耍食物印记达到 ${state.myersFoodMarks}/8：额外行动点 +1。`);
+      } else {
+        log(state, `戏耍食物印记 +1（${state.myersFoodMarks}/8）。`);
+      }
+      log(state, `${sacrifice.name} 获得一次额外行动并逃离你的视线。`);
+    }
+  }
 
   runOps(state, def.ops);
   // 出了牌，刀就收回来了：下一刀可以砍
@@ -2459,6 +2527,7 @@ export function attack(state: GameState, targetId?: string): boolean {
   }
   const target = findVictim(state, state.playerRoom, Infinity, true, targetId)!;
   const heavy = state.possessed;
+  const noedActive = state.hexNoedActive && state.teamStage >= 4 && state.totems.length > 0;
   // 带手电筒的人可能从隔壁冲进来照你：这一刀落空，两个人都趁机跑掉
   const flasher = npcs(state).find(
     (p) =>
@@ -2511,7 +2580,33 @@ export function attack(state: GameState, targetId?: string): boolean {
     target.watchValue = 0;
     log(state, `夜幕锁定 ${target.name}：这一刀直接把他放倒。`);
   }
-  damagePerson(state, target, heavy && state.killer === '迈克尔·迈尔斯' ? SURVIVOR_MAX_HP : heavy || nightfallKill ? 2 : 1);
+  const hpBeforeHit = target.hp;
+  damagePerson(state, target, noedActive || (heavy && state.killer === '迈克尔·迈尔斯') ? SURVIVOR_MAX_HP : heavy || nightfallKill ? 2 : 1);
+  if (target.role !== 'police' && target.hp < hpBeforeHit) {
+    if (state.hexHuntressActive && !state.hexHuntressUsed) {
+      state.hexHuntressUsed = true;
+      if (!state.totems.includes(state.playerRoom)) state.totems.push(state.playerRoom);
+      log(state, `厄咒：猎杀戾气触发，${roomName(state.playerRoom)}生成了一个图腾。幸存者可能会将其破坏。`);
+      if (state.hexNoedActive && state.teamStage >= 4 && !state.hexNoedBonusGranted) {
+        state.energy += 2;
+        state.hexNoedBonusGranted = true;
+        log(state, '难逃一死生效：图腾仍然存留，你获得 2 点额外行动点。');
+      }
+    }
+    if (state.killer === '迈克尔·迈尔斯' && state.myersLastBestActive && !target.bloodSacrifice) {
+      state.myersLastBestMarks = Math.min(8, state.myersLastBestMarks + 1);
+      log(state, `把最好的留在最后印记 +1（${state.myersLastBestMarks}/8）。`);
+    }
+    if (state.killer === '迈克尔·迈尔斯' && state.myersFoodMarks > 0) {
+      state.myersFoodMarks -= 1;
+      log(state, `戏耍食物印记 -1（${state.myersFoodMarks}/8）。`);
+    }
+    if (state.scourgeShrineReady && target.room === 'kitchen') {
+      reduceTeamProgress(state, 12);
+      state.scourgeShrineReady = false;
+      log(state, '天灾：鬼魔神龛触发，厨房特殊处决地点的攻击使团队进度倒退 12。');
+    }
+  }
   afterPlayerAction(state);
   checkImmediateWin(state);
   return true;
@@ -2538,6 +2633,11 @@ export function wipeBlade(state: GameState): boolean {
   }
   state.energy -= WIPE_COST;
   state.attackReady = true;
+  if (state.killer === '迈克尔·迈尔斯' && state.myersLastBestActive && state.myersLastBestMarks > 0) {
+    const removed = Math.min(2, state.myersLastBestMarks);
+    state.myersLastBestMarks -= removed;
+    log(state, `把最好的留在最后：擦刀移除 ${removed} 枚专属印记（剩余 ${state.myersLastBestMarks}）。`);
+  }
   log(state, `你低头把刀上的血慢慢擦干净（消耗 ${WIPE_COST} 点行动点）。这一下动静，够他们做点什么了。`);
   afterPlayerAction(state);
   checkImmediateWin(state);
@@ -2619,6 +2719,11 @@ export function sabotageSiteItem(state: GameState): boolean {
   );
   if (!circuit && !item) return false;
   state.energy -= SABOTAGE_COST;
+  if (state.hexRuinActive && !state.hexRuinUsed) {
+    state.hexRuinUsed = true;
+    reduceTeamProgress(state, 10);
+    log(state, '粉碎希望触发：首次破坏使团队进度额外倒退 10。');
+  }
 
   if (circuit) {
     circuit.broken = true;
