@@ -51,7 +51,7 @@ import {
   wipeBlade,
   usePower,
 } from '../src/game/engine';
-import { OBSTACLE_ROOMS, ROOM_MAP } from '../src/game/rooms';
+import { OBSTACLE_ROOMS, ROOM_MAP, ROOMS, buildLayout } from '../src/game/rooms';
 import { cardImage } from '../src/game/assetMap';
 import { personChip } from '../src/ui/render/shared';
 import { SURVIVOR_MAP } from '../src/game/survivors';
@@ -1308,6 +1308,11 @@ function caseNewPerkSystem(): void {
   const food = createGame(['myers_plaything'], undefined, '迈克尔·迈尔斯');
   const sacrifice = food.people.find((person) => person.bloodSacrifice)!;
   sacrifice.room = food.playerRoom;
+  // 固定清除开局随机的追踪状态，避免把「已被追踪」误判为仍处于玩家直接视野。
+  sacrifice.trackedTurns = 0;
+  sacrifice.revealedActions = 0;
+  sacrifice.hidden = false;
+  sacrifice.lastSeenTurn = 0;
   // 阻止卡牌结算后的 NPC 自主行动干扰「立即离开视线」的断言；
   // 卡牌自身仍会直接把血祭品移动到迷雾房间。
   sacrifice.blockedTurns = 2;
@@ -1402,6 +1407,60 @@ const noApLook = newGame();
 noApLook.energy = 0;
 const noApLookResult = lookAround(noApLook);
 check('查看：行动点不足时不能进入选房模式', !noApLookResult && !noApLook.lookingAround && noApLook.energy === 0 && Object.keys(noApLook.scouted).length === 0);
+
+
+/* 不规则房间布局：多种种子验证矩形拼接、门网连通和后院出口。 */
+let layoutOverlapFailures = 0;
+let layoutAdjacencyFailures = 0;
+let layoutConnectivityFailures = 0;
+let layoutGardenFailures = 0;
+let layoutSizeVarietyFailures = 0;
+for (let seed = 1; seed <= 40; seed += 1) {
+  withRandomSource(createSeededRandom(seed), () => buildLayout());
+  const rects = ROOMS.map((room) => room.rect);
+  for (let i = 0; i < rects.length; i += 1) {
+    for (let j = i + 1; j < rects.length; j += 1) {
+      const a = rects[i];
+      const b = rects[j];
+      const overlapW = Math.min(a.left + a.width, b.left + b.width) - Math.max(a.left, b.left);
+      const overlapH = Math.min(a.top + a.height, b.top + b.height) - Math.max(a.top, b.top);
+      if (overlapW > 0.01 && overlapH > 0.01) layoutOverlapFailures += 1;
+    }
+  }
+  for (const room of ROOMS) {
+    for (const neighborId of room.neighbors) {
+      const a = room.rect;
+      const b = ROOM_MAP[neighborId].rect;
+      const vertical = (
+        Math.abs(a.left + a.width - b.left) < 1 ||
+        Math.abs(b.left + b.width - a.left) < 1
+      ) && Math.min(a.top + a.height, b.top + b.height) - Math.max(a.top, b.top) > 0.01;
+      const horizontal = (
+        Math.abs(a.top + a.height - b.top) < 1 ||
+        Math.abs(b.top + b.height - a.top) < 1
+      ) && Math.min(a.left + a.width, b.left + b.width) - Math.max(a.left, b.left) > 0.01;
+      if (!vertical && !horizontal) layoutAdjacencyFailures += 1;
+    }
+  }
+  const reached = new Set<RoomId>(['hall']);
+  const queue: RoomId[] = ['hall'];
+  for (let cursor = 0; cursor < queue.length; cursor += 1) {
+    for (const next of ROOM_MAP[queue[cursor]].neighbors) {
+      if (reached.has(next)) continue;
+      reached.add(next);
+      queue.push(next);
+    }
+  }
+  if (reached.size !== ROOMS.length) layoutConnectivityFailures += 1;
+  if (ROOM_MAP.garden.neighbors.length !== 1 || ROOM_MAP.garden.neighbors[0] !== 'garage') layoutGardenFailures += 1;
+  if (new Set(ROOMS.map((room) => room.size)).size < 2) layoutSizeVarietyFailures += 1;
+}
+buildLayout();
+check('不规则地图：40 组随机布局无房间重叠', layoutOverlapFailures === 0, `overlap=${layoutOverlapFailures}`);
+check('不规则地图：所有门都位于真实共边处', layoutAdjacencyFailures === 0, `invalid doors=${layoutAdjacencyFailures}`);
+check('不规则地图：每局 23 个房间保持全图连通', layoutConnectivityFailures === 0, `disconnected maps=${layoutConnectivityFailures}`);
+check('不规则地图：后院始终只有车库一个入口', layoutGardenFailures === 0, `invalid garden exits=${layoutGardenFailures}`);
+check('不规则地图：每局至少出现三种房间尺寸', layoutSizeVarietyFailures === 0, `low-variety maps=${layoutSizeVarietyFailures}`);
 
 caseNewPerkSystem();
 

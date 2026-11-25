@@ -2309,3 +2309,35 @@ button, .room-hit, .hand-row { touch-action: manipulation; }
   color: #f0cb88; font-size: 11px; font-style: normal;
   font-weight: 700; line-height: 1.5;
 }
+
+
+/* ---------- 不规则房间尺寸：小房间收紧信息，大厅与室外区域留出呼吸空间 ---------- */
+.room.room-size-small {
+  padding: 5px 6px;
+  gap: 2px;
+  overflow: hidden;
+}
+.room.room-size-small .room-name {
+  font-size: 11px;
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+}
+.room.room-size-small .room-desc { display: none; }
+.room.room-size-small .room-features { gap: 2px; }
+.room.room-size-small .room-feature { width: 19px; height: 19px; }
+.room.room-size-small .room-feature .ui-icon { width: 14px; height: 14px; }
+.room.room-size-small .room-people { gap: 2px; max-height: 54px; overflow: hidden; }
+.room.room-size-small .person-chip { gap: 2px; padding: 1px 3px 1px 1px; font-size: 10px; }
+.room.room-size-small .person-chip img { width: 21px; height: 21px; }
+.room.room-size-large { padding: 10px 12px; gap: 5px; }
+.room.room-size-large .room-desc { -webkit-line-clamp: 3; }
+.room.room-size-open {
+  padding: 11px 13px;
+  background: linear-gradient(145deg, rgba(37, 55, 39, .16), rgba(12, 19, 14, .04));
+}
+.room.room-size-open .room-name { color: #a9c79e; }
+@media (max-width: 700px) {
+  .room.room-size-small { padding: 5px 6px; }
+  .room.room-size-small .room-name { font-size: 11px; }
+  .room.room-size-large, .room.room-size-open { padding: 9px 10px; }
+}
