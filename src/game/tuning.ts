@@ -242,6 +242,17 @@ const OPTIONAL_OP_FIELDS: Record<string, string[]> = {
   pursue: ['distance'], flag: ['value'], if: ['else'],
 };
 
+function validateOptionalField(op: string, field: string, value: unknown): boolean {
+  if (op === 'damage' && field === 'maxHp') return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 2;
+  if (op === 'move' && field === 'clearAlert') return typeof value === 'boolean';
+  if (op === 'scout' && field === 'to') return typeof value === 'string' && DEST_VALUES.has(value);
+  if (op === 'scout' && (field === 'all' || field === 'adj')) return typeof value === 'boolean';
+  if (op === 'scout' && field === 'turns') return typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 10;
+  if (op === 'pursue' && field === 'distance') return typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 20;
+  if (op === 'flag' && field === 'value') return typeof value === 'boolean' || (typeof value === 'number' && Number.isFinite(value) && Math.abs(value) <= 1000);
+  return false;
+}
+
 /** 只允许调整基准 DSL 已有的指令和字段，不允许导入时注入新指令。 */
 function validateOps(value: unknown, baseline: Op[]): value is Op[] {
   if (!Array.isArray(value) || value.length !== baseline.length) return false;
@@ -255,6 +266,10 @@ function validateOps(value: unknown, baseline: Op[]): value is Op[] {
     for (const key of keys) {
       const current = candidate[key];
       const original = base[key];
+      if (original === undefined && current !== undefined) {
+        if (!validateOptionalField(candidate.op as string, key, current)) return false;
+        continue;
+      }
       if (key === 'then' || key === 'else') {
         if (current === undefined && original === undefined) continue;
         if (!Array.isArray(original) || !Array.isArray(current) || !validateOps(current, original as Op[])) return false;
