@@ -1540,7 +1540,7 @@ function npcTurn(state: GameState): void {
     if (!state.people.some((p) => p.id === person.id)) continue;
 
     // 警觉值只代表情绪强度；认知阶段决定 NPC 是否真的知道危险存在。
-    person.awareness = person.alert >= 75 ? 3 : person.alert >= 40 ? 2 : person.alert >= 12 ? 1 : 0;
+    person.awareness = Math.max(person.awareness, person.alert >= 75 ? 3 : person.alert >= 40 ? 2 : person.alert >= 12 ? 1 : 0);
 
     // 被抱起的人不会参与救援或移动，但仍然会继续流血倒计时。
     if (person.id === state.carryPersonId) {
