@@ -1089,5 +1089,29 @@ function caseNpcLocksAndPersistentTrails(): void {
   }
 }
 caseNpcLocksAndPersistentTrails();
-console.log(`\n规则回归 ${pass} 通过 / ${fail} 失败`);
+
+/** AC：开局日常、局部疑惑与对白状态 */
+function caseNpcAwarenessAndDialogue(): void {
+  const daily = newGame();
+  const civilians = daily.people.filter((p) => p.role !== 'police');
+  check('AC 幸存者开局处于日常认知阶段', civilians.every((p) => p.awareness === 0 && p.alert === 0));
+  const beforeProgress = daily.teamProgress;
+  endTurn(daily);
+  check('AC 没有异常时幸存者不会启动团队逃生工作', daily.teamProgress === beforeProgress && civilians.every((p) => p.awareness === 0));
+  check('AC 日常 NPC 会生成生活对白', civilians.every((p) => p.dialogue.length > 0));
+
+  const suspicious = newGame();
+  const target = player(suspicious);
+  target.alert = 20;
+  endTurn(suspicious);
+  check('AC 低强度异常只让 NPC 起疑，不直接进入求生', target.awareness === 1 && target.intent === 'wary' && target.dialogue.length > 0);
+
+  const panic = newGame();
+  const witness = player(panic);
+  witness.alert = 100;
+  endTurn(panic);
+  check('AC 高危信息让 NPC 进入求生并显示逃跑对白', witness.awareness === 3 && witness.dialogue.length > 0);
+}
+caseNpcAwarenessAndDialogue();
+console.log(`\n规则回归 ${pass} 通过 / ${fail} 失败`); ${pass} 通过 / ${fail} 失败`);
 if (fail > 0) process.exitCode = 1;
