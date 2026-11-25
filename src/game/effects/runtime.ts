@@ -343,8 +343,23 @@ export function executeOps(state: GameState, ops: Op[], runtime: EffectRuntime):
             break;
           case 'possessReady':
             state.possessed = true;
-            state.possessTurns = POSSESS_TURNS;
-            log(state, `恶魔附身：接下来 ${POSSESS_TURNS} 回合，每一刀都直接把人放倒。`);
+            state.possessTurns = 0;
+            state.myersStalking = false;
+            state.stalkPressure = 0;
+            state.stalkTargetId = null;
+            state.stalkMeter = 100;
+            log(state, '恶魔附身：每次行动消耗 20 点尾随值，归零时退出；每一刀都能直接击倒站立的幸存者。');
+            break;
+          case 'myersStalk':
+            state.myersStalking = !state.myersStalking;
+            state.stalkTargetId = null;
+            state.stalkPressure = 0;
+            if (state.myersStalking) {
+              state.possessed = false;
+              log(state, '尾随者模式启动：你的恐惧范围降为 0。停下脚步，盯住猎物。');
+            } else {
+              log(state, '你离开了阴影，恐惧范围恢复。');
+            }
             break;
         }
         break;
