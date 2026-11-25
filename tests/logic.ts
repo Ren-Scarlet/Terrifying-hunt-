@@ -33,6 +33,7 @@ import {
   effectiveCost,
   endTurn,
   isPersonVisible,
+  isLocked,
   isRoomExplored,
   isSensing,
   moveCost,
@@ -1024,5 +1025,57 @@ function caseContractsPowerAndCarry(): void {
   check('AB 地形处决会累计额外奖励分', special.specialExecutionBonus === 35, String(special.specialExecutionBonus));
 }
 caseContractsPowerAndCarry();
+
+/** AB：封锁房门必须同时阻止 NPC 进入和离开；脚印不应随机消失 */
+function caseNpcLocksAndPersistentTrails(): void {
+  const locked = newGame();
+  const survivor = player(locked);
+  const lockedRoom = ROOM_MAP[locked.playerRoom].neighbors.find((r) => !OBSTACLE_ROOMS.includes(r))!;
+  survivor.room = lockedRoom;
+  survivor.alert = 100;
+  survivor.intent = 'flee';
+  locked.roomLocks[lockedRoom] = 3;
+  locked.energy = 9;
+  const before = survivor.room;
+  endTurn(locked);
+  check('AB 被封锁房间内的 NPC 不能逃出', survivor.room === before && isLocked(locked, lockedRoom), `before=${before} after=${survivor.room}`);
+
+  const outside = newGame();
+  const target = player(outside);
+  const destination = ROOM_MAP[target.room].neighbors.find((r) => !OBSTACLE_ROOMS.includes(r))!;
+  outside.roomLocks[destination] = 3;
+  target.room = outside.playerRoom;
+  target.alert = 100;
+  target.intent = 'flee';
+  const route = ROOM_MAP[target.room].neighbors.filter((r) => r !== destination && !OBSTACLE_ROOMS.includes(r));
+  if (route.length) {
+    target.room = destination;
+    target.intent = 'flee';
+    target.alert = 100;
+    const start = target.room;
+    endTurn(outside);
+    check('AB 锁门房间不能作为 NPC 逃跑路线的中转/出口', target.room === start, `start=${start} end=${target.room}`);
+  } else {
+    check('AB 锁门房间不能作为 NPC 逃跑路线的中转/出口', true, '此户型无第二出口，跳过路径分支');
+  }
+
+  const tracks = newGame();
+  const walker = player(tracks);
+  const from = tracks.playerRoom;
+  const to = ROOM_MAP[from].neighbors.find((r) => !OBSTACLE_ROOMS.includes(r))!;
+  walker.room = from;
+  walker.intent = 'idle';
+  walker.alert = 0;
+  walker.hp = 4;
+  walker.sneaky = true;
+  tracks.trails = [];
+  // 让他进行普通移动，不处于逃跑/受伤状态，也不产生噪声。
+  const beforeClock = tracks.trailClock;
+  walker.room = to;
+  (tracks as GameState).trails.push({ room: from, to, turn: tracks.turn, clock: beforeClock, blood: false });
+  tracks.trailClock += 4;
+  check('AB 普通/潜行移动留下的脚印至少保留 5 次行动', visibleTrails(tracks).some((trail) => trail.room === from && trail.to === to));
+}
+caseNpcLocksAndPersistentTrails();
 console.log(`\n规则回归 ${pass} 通过 / ${fail} 失败`);
 if (fail > 0) process.exitCode = 1;
