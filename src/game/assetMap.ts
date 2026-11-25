@@ -46,8 +46,28 @@ export const ASSET_PATHS: AssetPaths = {
   },
 };
 
+/** 新卡牌复用仓库内已有的白色技能图案，避免只有紫色稀有度底图。 */
+const CARD_ART_FALLBACKS: Record<string, string> = {
+  unbreakable: 'clean',
+  hex_huntress: 'fear',
+  hex_noed: 'blackout',
+  scourge_shrine: 'execute',
+  distressing: 'fear',
+  hell: 'ghost_light',
+  iron_grasp: 'choke',
+  deerstalker: 'search',
+  hex_ruin: 'block_gate',
+  bitter_murmur: 'aim',
+  sloppy_butcher: 'shuriken',
+  insidious: 'silent_step',
+  myers_eclipse_light: 'night_cover',
+  myers_last_best: 'final_blow',
+  myers_plaything: 'bait',
+};
+
 export function cardImage(defId: string): string | undefined {
-  return ASSET_PATHS.cards[defId];
+  const fallback = CARD_ART_FALLBACKS[defId];
+  return fallback ? ASSET_PATHS.cards[fallback] : ASSET_PATHS.cards[defId];
 }
 
 export function characterImage(id: string): string | undefined {
