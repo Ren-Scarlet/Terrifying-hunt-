@@ -1358,7 +1358,6 @@ function tryCall(state: GameState, person: Person): boolean {
 
 function finishCall(state: GameState, person: Person, device: string): void {
   state.npcAlarmed = true;
-  state.npcAlarmed = true;
   addWanted(state, 3);
   addAlarm(state, 15);
   state.lastCrimeRoom = person.room;
