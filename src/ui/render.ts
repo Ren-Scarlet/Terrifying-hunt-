@@ -12,6 +12,7 @@ import {
   ATTACK_COST,
   BASE_AP,
   BLEEDOUT_TURNS,
+  DOWNED_LOCK_TURNS,
   ESCAPE_ROOMS,
   FRENZY_AP_BONUS,
   FRENZY_MAX,
@@ -62,6 +63,7 @@ import {
 import { getPersonProfile, type PersonProfile } from '../game/people';
 import { SURVIVOR_MAP } from '../game/survivors';
 import { isCardTuned } from '../game/tuning';
+import { isMuted } from './audio';
 import type { GameState, Person, RoomId, SaveData } from '../game/types';
 
 const escape = (s: string) =>
@@ -72,6 +74,19 @@ const TYPE_RARITY: Record<string, string> = { attack: 'visceral', skill: 'very-r
 
 const icon = (name: Parameters<typeof uiIcon>[0], cls = 'ui-icon') =>
   `<img class="${cls}" src="${uiIcon(name)}" alt="" aria-hidden="true">`;
+
+/** 三件道具按你的设计各配一张图；其余道具仍用文字角标 */
+const ITEM_ICONS: Partial<Record<NonNullable<Person['item']>, Parameters<typeof uiIcon>[0]>> = {
+  medkit: 'medkit',
+  toolbox: 'toolbox',
+  flashlight: 'flashlight',
+};
+const itemIconHtml = (item: NonNullable<Person['item']>): string => {
+  const key = ITEM_ICONS[item];
+  return key ? `<img class="item-icon" src="${uiIcon(key)}" alt="" aria-hidden="true">` : '';
+};
+const itemBadge = (item: NonNullable<Person['item']>, uses: number): string =>
+  `<i class="chip-item" title="手里拿着${escape(SURVIVOR_ITEM_LABEL[item])} · 还能用 ${uses} 次">${itemIconHtml(item)}${escape(SURVIVOR_ITEM_LABEL[item])}×${uses}</i>`;
 
 function detailCardHtml(
   title: string,
@@ -134,8 +149,8 @@ export function getKiller(owner?: string): KillerProfile {
 export function defaultDetailHtml(): string {
   return detailCardHtml('信息面板', '悬停卡牌看完整效果 · 点人物看他的打算', '档案', [
     `每回合 ${BASE_AP} 点行动点：走路、挥刀、出牌、搜索柜子全从这一个池子里扣。想多追几间屋就少出牌，想连砍就别乱跑。`,
-    '伤害只有一个来源：左下角的「挥刀」（1 点行动点）。健康 → 受伤 → 倒地 → 补刀致死；砍完要么做别的事、要么花 1 点「擦刀」，才能砍第二刀。卡牌只负责功能，不造成伤害。',
-    '相邻房间只看得见轮廓，看不见人。推门就是照面，人当场跑；追不上就低头看鞋印（只留最近两次行动），或者听哪间屋传来乌鸦叫——那是有人刚经过。',
+    '伤害只有一个来源：左下角的「挥刀」（1 点行动点）。健康 → 受伤 → 倒地；倒地后要隔 2 回合才能补刀处决，这期间同伴可能把人救走。砍完要么做别的事、要么花 1 点「擦刀」，才能砍第二刀。卡牌只负责功能，不造成伤害。',
+    '相邻房间只看得见轮廓，看不见人。推门就是照面，人当场跑；追不上就低头看鞋印（只看得见当前房间、只留最近两次行动），或者听哪间屋传来乌鸦叫——那是有人刚经过。',
     '屋里的道具箱会给他们发道具（医疗包 / 工具箱 / 信号弹 / 钥匙 / 武器 / 烟雾弹），发电机会被他们修好、直接推一大截团队进度。你用不了这些，但可以花 1 点行动点砸掉：道具箱砸烂就再也发不出东西，发电机被砸会掉进度并停机两回合。',
     '严格踩着脚印连续追才攒【杀戮】；随便走不涨。满 50 后每回合多 2 点行动点，路怎么走你自己点，不会替你瞬移。',
     '他们也在忙自己的事：修电闸、凑钥匙、找后门。团队进度一旦做满，幸存者集体逃走，你就输了。有人藏进柜子时，点「搜索」翻出来（1 点行动点）。',
@@ -183,9 +198,10 @@ function personChip(person: Person, attackable = false): string {
       ? ''
       : `<span class="chip-alert ${alertLevel}" title="警觉 ${person.alert}/100：越高越可能立刻逃跑">${person.alert}</span>`;
   const bleedLeft = Math.max(0, BLEEDOUT_TURNS - person.downedTurns);
+  const lockLeft = Math.max(0, DOWNED_LOCK_TURNS - person.downedTurns);
   const stateMark =
     health === 'downed'
-      ? `<span class="chip-state downed" title="倒地：还有 ${bleedLeft} 回合可处决，同伴可能把他救起">倒 ${bleedLeft}</span>`
+      ? `<span class="chip-state downed" title="${lockLeft > 0 ? '刚倒下：还要等 ' + lockLeft + ' 回合才能补刀，同伴可能把他救走' : '可以补刀处决了；再过 ' + bleedLeft + ' 回合会自己流干'}">${lockLeft > 0 ? `锁 ${lockLeft}` : `倒 ${bleedLeft}`}</span>`
       : health === 'injured'
         ? '<span class="chip-state injured" title="受伤：再挨一下就会倒地">伤</span>'
         : '';
@@ -204,7 +220,7 @@ function personChip(person: Person, attackable = false): string {
   return `<button type="button" class="person-chip ${cls} ${health === 'downed' ? 'is-downed' : ''} ${attackable ? 'can-hit' : ''}" data-action="person" data-person-id="${person.id}"${attackable ? ' data-attack="1"' : ''}
     title="${escape(person.name)} · ${HEALTH_LABEL[health]} · 警觉 ${person.alert}/100 · ${escape(ARCH_LABEL[person.archetype])} · ${escape(GOAL_LABEL[person.goal])} · 正在${escape(label)}${note}">
     ${img ? `<img src="${img}" alt="" onerror="this.style.display='none'">` : ''}
-    <span>${escape(person.name)}</span>${intentDot(person)}${stateMark}${alertMark}${watchMark}${person.item ? `<i class="chip-item" title="手里拿着${escape(SURVIVOR_ITEM_LABEL[person.item])} · 还能用 ${person.itemUses} 次">${escape(SURVIVOR_ITEM_LABEL[person.item])}×${person.itemUses}</i>` : ''}
+    <span>${escape(person.name)}</span>${intentDot(person)}${stateMark}${alertMark}${watchMark}${person.item ? itemBadge(person.item, person.itemUses) : ''}
   </button>`;
 }
 
@@ -254,7 +270,7 @@ export function personDetailHtml(state: GameState, personId: string): string {
     if (person.sneaky) paras.push('老练：有时会踮着脚走路，不留鞋印、也不惊动乌鸦——但不会一直这样。');
     if (person.goal === 'objective' || person.goal === 'key') paras.push('他正为团队目标忙：进度做满，幸存者会集体从后门逃走，你直接失败。');
     if (person.armed) paras.push('他手里有武器：进门时可能反击，让你下回合少走一步。');
-    if (health === 'downed') paras.push('倒地：本回合内可以被处决，也可能被同伴救起。');
+    if (health === 'downed') paras.push(person.downedTurns >= DOWNED_LOCK_TURNS ? '倒地：已经可以补刀处决，但同伴仍可能把他救起。' : `倒地：还要等 ${DOWNED_LOCK_TURNS - person.downedTurns} 回合才能补刀，这是同伴的救援窗口。`);
     if (threat) paras.push(`威胁：这名角色会主动对抗你，别把他当普通平民。`);
     if (profile.role === 'police') {
       paras.push(
@@ -363,7 +379,7 @@ export function renderGuide(): string {
           <div class="guide-card">${icon('mission')}<b>1 · 接取契约</b><p>每局随机获得任务。主目标旁会显示${icon('missionTarget', 'ui-icon tiny')}标记，告诉你要击杀谁、需要多少证据或仪式进度。</p></div>
           <div class="guide-card">${icon('darkCell')}<b>2 · 现场布局</b><p>布局牌（绿色）在行动阶段打出：剪断电话线、封死逃生点、装窃听。布局打早了才有用。</p></div>
           <div class="guide-card">${icon('escape')}<b>3 · 相邻只看轮廓，推门才是照面</b><p>隔壁房间<b>看得见名字、看不见人</b>——找人得自己走过去，或者靠侦查 / 感知牌。只要没打伏击，屋里的人<b>门一开就转身跑</b>；想拿先手先打<b>静止隐身</b>。跑掉的人留下<b>鞋印</b>；更远的地方会传来<b>乌鸦叫、地板响</b>，房间上亮起「动静」角标，那是有人刚经过。</p></div>
-          <div class="guide-card">${icon('bloodPoint')}<b>4 · 行动点、脚印与杀戮</b><p>每回合 <b>${BASE_AP} 点行动点</b>：走路、挥刀、出牌、<b>搜索柜子</b>全从这一个池子里扣；砍完想立刻再砍，就花 1 点<b>擦刀</b>——但擦刀时幸存者也会跟着动。伤害只从「挥刀」来（1 点），同屋多人<b>点谁砍谁</b>；有人钻进柜子就点<b>搜索</b>翻出来。<b>鞋印</b>只留最近两次行动，严格踩着它连续追才攒<b>杀戮</b>，随便走不涨；满 50 后每回合多 2 点行动点，<b>路你自己走，不会瞬移</b>。砍中人或被击晕清零。</p></div>
+          <div class="guide-card">${icon('bloodPoint')}<b>4 · 行动点、脚印与杀戮</b><p>每回合 <b>${BASE_AP} 点行动点</b>：走路、挥刀、出牌、<b>搜索柜子</b>全从这一个池子里扣；砍完想立刻再砍，就花 1 点<b>擦刀</b>——但擦刀时幸存者也会跟着动。伤害只从「挥刀」来（1 点），同屋多人<b>点谁砍谁</b>；有人钻进柜子就点<b>搜索</b>翻出来。<b>鞋印</b>只看得见当前房间（留最近两次行动），严格踩着它连续追才攒<b>杀戮</b>，随便走不涨；满 50 后每回合多 2 点行动点，<b>路你自己走，不会瞬移</b>。砍中人或被击晕清零。</p></div>
           <div class="guide-card">${icon('missionTarget')}<b>5 · 他们也在赶进度</b><p>幸存者各有目的：修电闸、凑钥匙、报警、躲柜子。<b>蓝框房间</b>是他们的目标点，谁在那儿做事都会弄出动静。资源栏的<b>团队目标</b>一旦做满，他们集体从后门逃走，<b>你直接失败</b>——你追得越凶，他们越没空干活。老练的家伙偶尔会踮着脚走，不留脚印也不惊动乌鸦。</p></div>
         </div>
         <div class="guide-note">
@@ -587,7 +603,8 @@ function threatRowsHtml(state: GameState): string {
  * 只显示 visibleTrails 里的几段——跟丢了、走得久了，旧的脚印就没了。
  */
 function trailOverlay(state: GameState): string {
-  const segs = visibleTrails(state);
+  // 只画当前房间里的鞋印：别处的痕迹不再隔墙可见（引擎里仍保留完整线索给杀戮/追击牌用）
+  const segs = visibleTrails(state).filter((t) => t.room === state.playerRoom);
   if (!segs.length) return '';
   const centerOf = (id: RoomId) => {
     const r = ROOM_MAP[id].rect;
@@ -775,8 +792,8 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
         <span><b>${escape(p.name)} ${alertLabel}</b>
           <small class="goal-line">${escape(ARCH_LABEL[p.archetype])} · ${escape(GOAL_LABEL[p.goal])}</small>
           <small>${where} · ${HEALTH_LABEL[health]} · ${escape(intentLabel)}</small>
-          ${health === 'downed' ? `<small class="roster-bleed">倒地 · 还剩 ${Math.max(0, BLEEDOUT_TURNS - p.downedTurns)} 回合可处决，可能被救起</small>` : ''}
-          ${p.item ? `<small class="roster-item">携带 ${escape(SURVIVOR_ITEM_LABEL[p.item])} ×${p.itemUses}</small>` : ''}
+          ${health === 'downed' ? `<small class="roster-bleed">倒地 · ${p.downedTurns >= DOWNED_LOCK_TURNS ? `可以补刀处决，${Math.max(0, BLEEDOUT_TURNS - p.downedTurns)} 回合后自己流干` : `还要等 ${DOWNED_LOCK_TURNS - p.downedTurns} 回合才能补刀`} · 可能被救起</small>` : ''}
+          ${p.item ? `<small class="roster-item">携带 ${itemIconHtml(p.item)}${escape(SURVIVOR_ITEM_LABEL[p.item])} ×${p.itemUses}</small>` : ''}
           ${p.watchValue > 0 || p.watched ? `<small class="roster-watch">夜幕 ${p.watched ? '已锁定 · 下一刀击倒' : `监视 ${p.watchValue}/100`}</small>` : ''}</span>
       </button>`;
     })
@@ -802,7 +819,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
   state.people
     .filter((p) => p.role !== 'police' && p.hp <= 0)
     .forEach((p) => {
-      statusBits.push(`<span class="status-badge downed">${escape(p.name)} 倒地 · 还剩 ${Math.max(0, BLEEDOUT_TURNS - p.downedTurns)} 回合可处决 · 可能被同伴救起</span>`);
+      statusBits.push(`<span class="status-badge downed">${escape(p.name)} 倒地 · ${p.downedTurns >= DOWNED_LOCK_TURNS ? '现在可以补刀处决' : `还要等 ${DOWNED_LOCK_TURNS - p.downedTurns} 回合才能补刀`} · 可能被同伴救起</span>`);
     });
   const statusHtml = statusBits.length ? `<div class="status-strip">${statusBits.join('')}</div>` : '';
 
@@ -818,8 +835,8 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
       <span class="atk-meta">${sabotageMeta}</span>
     </button>`;
   const atkTitle = possessed
-    ? `恶魔附身（剩 ${state.possessTurns} 回合）：每一刀都直接把还站着的人放倒，倒地的人直接补刀致死。消耗 ${ATTACK_COST} 点行动点。`
-    : `挥刀：消耗 ${ATTACK_COST} 点行动点，健康→受伤→倒地，倒地的人再补一刀即死。砍完要再做一件事（或花 ${WIPE_COST} 点擦刀）才能砍第二刀。`;
+    ? `恶魔附身（剩 ${state.possessTurns} 回合）：每一刀都直接把还站着的人放倒。消耗 ${ATTACK_COST} 点行动点。`
+    : `挥刀：消耗 ${ATTACK_COST} 点行动点，健康→受伤→倒地；倒地后要隔 ${DOWNED_LOCK_TURNS} 回合才能补刀处决。砍完要再做一件事（或花 ${WIPE_COST} 点擦刀）才能砍第二刀。`;
   const attackBtn = `<button class="btn attack ${atkOk ? '' : 'spent'} ${possessed ? 'possessed' : ''}" data-action="attack" ${atkOk ? '' : 'disabled'}
       title="${escape(atkOk ? atkTitle : atkReason)}">
       <span class="atk-name">${possessed ? '附身 · 挥刀' : '挥刀'}</span>
@@ -873,6 +890,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
         <div class="panel map-panel">
           <div class="panel-heading"><h2>房屋平面</h2><span>绿边=能走（标行动点） · 黄=障碍多1点 · 蓝框=他们的目标点 · ！动静=有人刚经过 · ？？？=没进去过</span>
             <button class="btn ghost mini" data-action="guide">玩法指引</button>
+            <button class="btn ghost mini audio-toggle" data-action="mute" title="开关音效与背景音乐">${isMuted() ? '音效 关' : '音效 开'}</button>
           </div>
           ${statusHtml}
           <div class="floorplan" style="--ar:${layoutAspectNum().toFixed(4)};aspect-ratio:${layoutAspect()}">
@@ -887,7 +905,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
             <span>${icon('obstacle', 'ui-icon tiny')} 障碍物</span>
             <span class="legend-intent"><i class="intent-dot i-flee"></i> 逃跑中 <i class="intent-dot i-call"></i> 打电话 <i class="intent-dot i-escape"></i> 翻篱笆 <i class="intent-dot i-rescue"></i> 救援</span>
             <span class="legend-fog">？ 最后确认位置</span>
-            <span class="legend-trail"><i class="legend-claw"></i> 鞋印：只留最近两次行动，跟丢了就断</span>
+            <span class="legend-trail"><i class="legend-claw"></i> 鞋印：只看得见当前房间，跟丢了就断</span>
             <span class="legend-noise">${icon('crow', 'crow-icon tiny')} 动静：乌鸦叫 / 地板响，有人刚经过（短线索）</span>
             <span class="legend-objective">蓝框：他们的团队目标点</span>
             <span class="legend-sites">${icon('itemBox', 'ui-icon tiny')} 道具箱 ${icon('generator', 'ui-icon tiny')} 发电机：他们能用，你只能砸</span>

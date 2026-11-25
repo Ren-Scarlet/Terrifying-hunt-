@@ -40,6 +40,9 @@ export const ASSET_PATHS: AssetPaths = {
     crow: 'assets/ui/crow.webp',
     itemBox: 'assets/ui/item-box.webp',
     generator: 'assets/ui/generator.webp',
+    toolbox: 'assets/ui/toolbox.webp',
+    medkit: 'assets/ui/medkit.webp',
+    flashlight: 'assets/ui/flashlight.webp',
   },
 };
 

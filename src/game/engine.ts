@@ -42,8 +42,10 @@ import type {
 
 /** NPC 能逃出这栋房子的地方 */
 export const ESCAPE_ROOMS: RoomId[] = ['garden'];
-/** 倒地后撑不过这么多回合就会死 */
-export const BLEEDOUT_TURNS = 3;
+/** 倒地后撑不过这么多回合就会自动流血而死 */
+export const BLEEDOUT_TURNS = 4;
+/** 倒地后要隔这么多回合才能补刀 / 处决：这段时间是同伴真正的救援窗口 */
+export const DOWNED_LOCK_TURNS = 2;
 /** 团队警戒上限：到 100 直接判负 */
 export const ALARM_MAX = 100;
 /** 站在后院的人至少要有这么高的警觉，才会想到翻篱笆（否则只是路过） */
@@ -270,7 +272,7 @@ function findVictim(
   if (targetId) {
     const picked = inRoom.find((p) => p.id === targetId);
     if (!picked) return undefined;
-    if (picked.hp <= 0 && !allowDowned) return undefined;
+    if (picked.hp <= 0 && (!allowDowned || !canExecuteNow(picked))) return undefined;
     if (picked.hp > maxHp) return undefined;
     return picked;
   }
@@ -283,7 +285,7 @@ function findVictim(
   const standing = rank(inRoom.filter((p) => p.hp > 0 && p.hp <= maxHp));
   if (standing) return standing;
   if (!allowDowned) return undefined;
-  return rank(inRoom.filter((p) => p.hp <= 0));
+  return rank(inRoom.filter((p) => canExecuteNow(p)));
 }
 
 export function isLocked(state: GameState, room: RoomId): boolean {
@@ -718,7 +720,11 @@ function damagePerson(state: GameState, person: Person, amount: number): void {
   person.blockedTurns = 0;
 
   if (before <= 0) {
-    // 已经倒地：这一下就是补刀
+    // 已经倒地：过了保护期才是补刀，否则这一刀落不下去
+    if (!canExecuteNow(person)) {
+      log(state, `${person.name} 刚倒下，刀还落不下去——再等 ${DOWNED_LOCK_TURNS - person.downedTurns} 回合。`);
+      return;
+    }
     killPerson(state, person);
     return;
   }
@@ -731,7 +737,7 @@ function damagePerson(state: GameState, person: Person, amount: number): void {
     person.intent = 'stunned';
     person.activity = '倒在地上，动不了';
     person.alert = 100;
-    log(state, `${person.name} 被打倒在地上。他还没有死——再打一次，或者等他自己流干。`);
+    log(state, `${person.name} 被打倒在地上。他还没死——要隔 ${DOWNED_LOCK_TURNS} 回合才能补刀，这期间同伴能把他救走。`);
     addAlarm(state, 4);
     peopleInRoom(state, person.room)
       .filter((p) => p.id !== person.id && p.role !== 'police')
@@ -762,9 +768,18 @@ function damagePerson(state: GameState, person: Person, amount: number): void {
   }
 }
 
+/** 倒地者是否已经过了「不能被补刀」的保护期 */
+function canExecuteNow(person: Person): boolean {
+  return person.hp <= 0 && person.downedTurns >= DOWNED_LOCK_TURNS;
+}
+
 function executePerson(state: GameState, person: Person): void {
   if (person.hp > 0) {
     log(state, `${person.name} 还站着，处决需要先把他打倒。`);
+    return;
+  }
+  if (!canExecuteNow(person)) {
+    log(state, `${person.name} 刚倒下，还撑得住——再等 ${DOWNED_LOCK_TURNS - person.downedTurns} 回合才能处决。`);
     return;
   }
   addAlarm(state, 8);
@@ -922,9 +937,9 @@ export function runOps(state: GameState, ops: Op[]): void {
         break;
       }
       case 'execute': {
-        const list = selectPeople(state, op.who).filter((p) => p.hp <= 0);
+        const list = selectPeople(state, op.who).filter((p) => canExecuteNow(p));
         if (!list.length) {
-          log(state, '没有倒地的人可以处决。');
+          log(state, '没有倒地够久的人可以处决（刚倒下的人要等两回合）。');
           break;
         }
         list.forEach((p) => executePerson(state, p));
@@ -1954,7 +1969,11 @@ function npcTurn(state: GameState): void {
           log(state, `发电机重新亮了起来，他们离逃出去又近了一大步（团队进度 ${state.teamProgress}/${TEAM_GOAL_MAX}）。`);
         }
       } else if ((person.goal === 'objective' || person.goal === 'key') && state.teamProgress < TEAM_GOAL_MAX) {
-        state.teamProgress = Math.min(TEAM_GOAL_MAX, state.teamProgress + teamWorkGain(state));
+        // 工具箱：按你的设计，推进团队目标也更快（不只是修发电机）
+        const hasToolbox = person.item === 'toolbox' && person.itemUses > 0;
+        const gain = teamWorkGain(state) * (hasToolbox ? 2 : 1);
+        if (hasToolbox) consumeItem(state, person);
+        state.teamProgress = Math.min(TEAM_GOAL_MAX, state.teamProgress + gain);
         person.intent = 'work';
         person.activity = `在${roomName(person.room)}${state.teamGoalLabel}`;
         addDisturbance(state, person.room);
@@ -2729,6 +2748,14 @@ export function attackBlockReason(state: GameState, targetId?: string): string {
   if (!state.attackReady) return '刀还没收回来：先挪一步或出一张牌';
   if (state.energy < ATTACK_COST) return `需要 ${ATTACK_COST} 点行动点`;
   if (findVictim(state, state.playerRoom, Infinity, true, targetId)) return '';
+  // 屋里只剩刚倒下的人：这 2 回合是救援窗口，刀还不能落下去
+  const lockedDowned = peopleInRoom(state, state.playerRoom).filter(
+    (p) => p.hp <= 0 && !canExecuteNow(p),
+  );
+  if (lockedDowned.length) {
+    const wait = Math.min(...lockedDowned.map((p) => DOWNED_LOCK_TURNS - p.downedTurns));
+    return `他刚倒下，还要等 ${wait} 回合才能补刀（这期间同伴可能把他救走）`;
+  }
   const onlyPolice = peopleInRoom(state, state.playerRoom).some((p) => p.role === 'police');
   return onlyPolice ? '屋里只有警察——他不能攻击，别在他眼皮底下动手' : '这间屋子里没有人';
 }

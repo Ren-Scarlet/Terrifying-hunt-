@@ -500,21 +500,40 @@ button { font-family: inherit; cursor: pointer; }
 }
 .footprint {
   position: absolute;
-  width: 28px; height: 28px;
+  width: 30px; height: 30px;
   transform: translate(-50%, -50%) rotate(var(--rot, 0deg));
-  background: #9c3323;
+  background: #ff7048;
   -webkit-mask: url('/assets/ui/trail.webp') center / contain no-repeat;
   mask: url('/assets/ui/trail.webp') center / contain no-repeat;
-  opacity: .58;
-  filter: drop-shadow(0 0 4px #b03420) drop-shadow(0 0 10px #8d1c0e88);
+  opacity: .92;
+  filter:
+    drop-shadow(0 0 3px #ffd9b0)
+    drop-shadow(0 0 8px #ff8a44)
+    drop-shadow(0 0 16px #ff4418)
+    drop-shadow(0 0 28px #cf1c08);
+  animation: trailGlow 1.5s ease-in-out infinite;
   transition: opacity .2s ease;
 }
-.footprint.fresh { opacity: .95; background: #d0402c; animation: trailGlow 2.4s ease-in-out infinite; }
-.footprint.blood { background: #e13a20; }
-.footprint.blood.fresh { filter: drop-shadow(0 0 5px #ff5230) drop-shadow(0 0 12px #b3200caa); }
+.footprint.fresh { background: #ffa070; animation-duration: .95s; }
+.footprint.blood { background: #ff4a26; }
+.footprint.blood.fresh { background: #ff7a4a; }
 @keyframes trailGlow {
-  0%, 100% { filter: drop-shadow(0 0 2px #c03420) drop-shadow(0 0 5px #8d1c0e66); }
-  50% { filter: drop-shadow(0 0 6px #ff6140) drop-shadow(0 0 13px #c02a14bb); }
+  0%, 100% {
+    opacity: .82;
+    filter:
+      drop-shadow(0 0 2px #ffb98a)
+      drop-shadow(0 0 6px #ff5a24)
+      drop-shadow(0 0 12px #e8300c)
+      drop-shadow(0 0 22px #a81808);
+  }
+  50% {
+    opacity: 1;
+    filter:
+      drop-shadow(0 0 5px #fff2dc)
+      drop-shadow(0 0 12px #ff9a54)
+      drop-shadow(0 0 22px #ff4c14)
+      drop-shadow(0 0 38px #e0260c);
+  }
 }
 .legend-claw {
   display: inline-block; width: 12px; height: 14px; margin-right: 4px;
@@ -1890,6 +1909,13 @@ button, .room-hit, .hand-row { touch-action: manipulation; }
   font-style: normal; font-size: 9.5px; padding: 0 4px; border-radius: 2px;
   background: #20303a; color: #a9cfe4; border: 1px solid #3a5c6e;
 }
+.item-icon {
+  width: 15px; height: 15px; object-fit: contain;
+  vertical-align: -3px; margin-right: 3px;
+  filter: drop-shadow(0 0 3px #8fd0ff);
+}
+.roster-item .item-icon { width: 16px; height: 16px; }
+.audio-toggle { white-space: nowrap; }
 
 /* ---------- 手机：地图保持可读尺寸，横向滑动看完整栋房子 ---------- */
 @media (max-width: 720px) {

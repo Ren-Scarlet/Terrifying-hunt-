@@ -7,6 +7,7 @@ import {
   ARCH_LABEL,
   BASE_AP,
   BLEEDOUT_TURNS,
+  DOWNED_LOCK_TURNS,
   FRENZY_AP_BONUS,
   SEARCH_COST,
   TEAM_GOAL_MAX,
@@ -200,6 +201,7 @@ function caseFinisher(): void {
   const v = player(s);
   v.room = s.playerRoom;
   v.hp = 0;
+  v.downedTurns = DOWNED_LOCK_TURNS;
   v.alert = 0;
   v.hidden = false;
   v.intent = 'stunned';
@@ -213,6 +215,7 @@ function caseFinisher(): void {
   const v2 = player(s2);
   v2.room = s2.playerRoom;
   v2.hp = 0;
+  v2.downedTurns = DOWNED_LOCK_TURNS;
   const before2 = s2.people.length;
   const ok2 = play(s2, 'execute');
   check('F 处决牌也能结束倒地者', ok2 && s2.people.length < before2, ok2 ? (s2.people.length < before2 ? '已处决' : 'hp=' + v2.hp) : '牌被拒绝');
@@ -632,7 +635,22 @@ function caseSurvivorItems(): void {
 function caseNewMechanics() {
   check('Z 行动点上限为 4', BASE_AP === 4, `BASE_AP=${BASE_AP}`);
   check('Z 拉扯型幸存者已注册', ARCH_LABEL.kiter === '拉扯型');
-  check('Z 倒地流血 3 回合', BLEEDOUT_TURNS === 3);
+  check('Z 倒地 2 回合后才能补刀', DOWNED_LOCK_TURNS === 2 && BLEEDOUT_TURNS > DOWNED_LOCK_TURNS, `lock=${DOWNED_LOCK_TURNS} bleed=${BLEEDOUT_TURNS}`);
+
+  // 倒地保护期：砍倒当回合不能补刀，满 2 回合才能处决
+  const e = newGame();
+  e.people.forEach((p) => { p.item = null; p.itemUses = 0; p.alert = 0; });
+  const freshDown = e.people.find((p) => p.role !== 'police')!;
+  freshDown.room = e.playerRoom;
+  freshDown.hp = 0;
+  freshDown.downedTurns = 0;
+  e.attackReady = true;
+  const denied = !attack(e, freshDown.id);
+  check('Z 刚倒下 2 回合内不能补刀', denied && e.people.some((p) => p.id === freshDown.id));
+  freshDown.downedTurns = DOWNED_LOCK_TURNS;
+  e.attackReady = true;
+  const executed = attack(e, freshDown.id);
+  check('Z 满 2 回合后可以处决', executed && !e.people.some((p) => p.id === freshDown.id));
 
   // 擦刀：砍完刀锋收不回来，花 1 点原地擦刀就能再砍
   const b = newGame();

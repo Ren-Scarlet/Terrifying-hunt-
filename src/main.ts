@@ -39,6 +39,7 @@ import {
 } from './ui/render';
 import { renderAdmin } from './ui/admin';
 import { mountFloorplanScene, type SceneHandle } from './ui/scene';
+import { playSfx, toggleMute, unlockAudio } from './ui/audio';
 
 type Screen = 'menu' | 'game' | 'result';
 
@@ -125,9 +126,24 @@ function flash(cls: 'hit-kill' | 'hit-alert'): void {
   window.setTimeout(() => document.body.classList.remove(cls), 520);
 }
 
+/** 引擎日志里刚发生的事 → 补上对应音效（不侵入纯逻辑层） */
+let lastLogHead = '';
+function sfxFromLogs(): void {
+  if (!game) return;
+  const head = game.log[0] ?? '';
+  if (head === lastLogHead) return;
+  lastLogHead = head;
+  if (/致盲|击晕|手电筒|逼退/.test(head)) playSfx('stun');
+  else if (/乌鸦|动静/.test(head)) playSfx('crow');
+  else if (/翻出了/.test(head)) playSfx('pickup');
+  else if (/发电机/.test(head)) playSfx('generator');
+}
+
 function afterAction(): void {
   pulseFeedback();
+  sfxFromLogs();
   if (game && game.phase === 'gameover' && screen !== 'result') {
+    playSfx(game.result === 'win' ? 'win' : 'lose');
     screen = 'result';
     if (!resultApplied) {
       resultApplied = true;
@@ -181,6 +197,14 @@ app.addEventListener('click', (event) => {
   const target = (event.target as HTMLElement).closest<HTMLElement>('[data-action]');
   if (!target) return;
   const action = target.dataset.action;
+  // 浏览器要求先有用户交互才允许出声
+  unlockAudio();
+
+  if (action === 'mute') {
+    toggleMute();
+    afterAction();
+    return;
+  }
 
   if (action === 'start' || action === 'again') {
     startGame();
@@ -375,30 +399,37 @@ app.addEventListener('click', (event) => {
   if (action === 'move') {
     const room = target.dataset.room as RoomId | undefined;
     if (room) movePlayer(game, room);
+    playSfx('step');
     afterAction();
     return;
   }
 
   if (action === 'attack') {
+    const kills = game.kills;
     attack(game);
+    playSfx('attack');
+    if (game.kills > kills) playSfx('kill');
     afterAction();
     return;
   }
 
   if (action === 'wipe') {
     wipeBlade(game);
+    playSfx('wipe');
     afterAction();
     return;
   }
 
   if (action === 'sabotage') {
     sabotageSiteItem(game);
+    playSfx('sabotage');
     afterAction();
     return;
   }
 
   if (action === 'search') {
     searchRoom(game);
+    playSfx('click');
     afterAction();
     return;
   }
@@ -406,12 +437,14 @@ app.addEventListener('click', (event) => {
   if (action === 'play') {
     const cardUid = target.dataset.uid;
     if (cardUid) playCard(game, cardUid);
+    playSfx('click');
     afterAction();
     return;
   }
 
   if (action === 'end-turn') {
     endTurn(game);
+    playSfx('endturn');
     afterAction();
     return;
   }
