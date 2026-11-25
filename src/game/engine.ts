@@ -305,6 +305,11 @@ function playerIsHidden(state: GameState): boolean {
   return alarmSuppressed(state);
 }
 
+/** 尾随者模式会把迈尔斯的实际恐惧范围压到 0。 */
+function effectiveFearRadius(state: GameState): number {
+  return state.killer === '迈克尔·迈尔斯' && state.myersStalking ? 0 : state.fearRadius;
+}
+
 /** 正在被「追击」的人：这一瞬间他已经贴到你身上，不再触发转身就跑 */
 let chasedId: string | null = null;
 
@@ -529,12 +534,40 @@ export function isSensing(state: GameState): boolean {
 function npcReact(state: GameState): void {
   if (state.result) return;
   const before = snapshotRooms(state);
+  const fearRadius = effectiveFearRadius(state);
+  if (fearRadius === 0) {
+    recordTrails(state, before);
+    rememberVisible(state);
+    return;
+  }
   for (const person of npcs(state)) {
     if (state.result) return;
     if (!state.people.some((p) => p.id === person.id)) continue;
     // 倒地、藏着、被按住的人在原地等；屋里的人留给进门反应与回合结算
     if (person.hp <= 0 || person.hidden) continue;
     if (person.blockedTurns > 0 || state.pinnedPeople.includes(person.id)) continue;
+
+    // 恐惧范围：相邻房间先起疑；范围 2 的杀手会在隔壁直接引发逃跑，两格外也会察觉。
+    const distanceToPlayer = roomDistance(person.room, state.playerRoom);
+    if (fearRadius >= 2 && distanceToPlayer === 1 && person.alert < 45) {
+      person.awareness = Math.max(person.awareness, 2);
+      person.alert = Math.max(person.alert, 45);
+      person.intent = 'flee';
+      person.activity = '察觉到杀手逼近，立刻逃跑';
+      if (person.movesThisTurn < REACT_MOVE_CAP && fleeAway(state, person, true)) person.movesThisTurn += 1;
+      continue;
+    } else if (fearRadius >= 1 && distanceToPlayer === 1 && person.awareness === 0) {
+      person.awareness = 1;
+      person.alert = Math.max(person.alert, 12);
+      person.intent = 'wary';
+      person.activity = '听见附近有动静，停下来观察';
+    } else if (fearRadius >= 2 && distanceToPlayer === 2 && person.awareness === 0) {
+      person.awareness = 1;
+      person.alert = Math.max(person.alert, 12);
+      person.intent = 'wary';
+      person.activity = '远处传来令人不安的动静';
+    }
+
     // 同房间的目击者也要有动作：刚被砍的那个人本回合已经反应过，不重复
     const sameRoom = person.room === state.playerRoom;
     if (sameRoom && person.id === state.lastAttackedId) continue;
@@ -580,6 +613,16 @@ function rememberVisible(state: GameState): void {
 function afterPlayerAction(state: GameState): void {
   if (state.result) return;
   npcReact(state);
+  // 恶魔附身以行动而非回合计时；每次行动消耗 20 点尾随值。
+  if (state.killer === '迈克尔·迈尔斯' && state.possessed) {
+    state.stalkMeter = Math.max(0, state.stalkMeter - 20);
+    if (state.stalkMeter === 0) {
+      state.possessed = false;
+      log(state, '尾随值耗尽，恶魔附身结束。');
+    } else {
+      log(state, `恶魔附身消耗 20 点尾随值（剩余 ${state.stalkMeter}/100）。`);
+    }
+  }
   // 玩家的一次行动结束：痕迹的寿命按行动数走，不是按回合。
   // 这让「跟着脚印走」变成一段短线索，走错再回头就真的断了。
   state.trailClock += 1;
@@ -1083,6 +1126,12 @@ function npcOnPlayerEnter(state: GameState): void {
     (p) => p.role !== 'police' && p.hp > 0,
   );
 
+  // 恐惧范围为 0 时，幸存者无法侦测玩家；迈尔斯可在同屋静默尾随。
+  if (effectiveFearRadius(state) === 0) {
+    here.forEach((person) => { person.activity = '没有察觉到你的存在'; });
+    return;
+  }
+
   here.forEach((person) => {
     const threat = SURVIVOR_MAP[person.id]?.threat;
 
@@ -1553,6 +1602,50 @@ function actByArchetype(state: GameState, person: Person): void {
       fleeAway(state, person);
       return;
     }
+  }
+}
+
+/** 迈尔斯保持静止时，持续尾随视野内的同一名幸存者。 */
+function updateMyersStalking(state: GameState): void {
+  if (state.killer !== '迈克尔·迈尔斯' || !state.myersStalking || state.myersMovedThisTurn || state.possessed) return;
+  const visible = npcs(state).filter((p) => p.hp > 0 && !p.hidden && p.role !== 'police' && isPersonVisible(state, p));
+  let target = visible.find((p) => p.id === state.stalkTargetId);
+  if (!target) {
+    target = visible[0];
+    state.stalkTargetId = target?.id ?? null;
+    state.stalkPressure = 0;
+  }
+  if (!target) {
+    log(state, '你静静地等待着，但视野里没有可尾随的猎物。');
+    return;
+  }
+
+  state.stalkMeter = Math.min(100, state.stalkMeter + 20);
+  state.stalkPressure = Math.min(100, state.stalkPressure + 25);
+  log(state, `你持续凝视着 ${target.name}：尾随值 ${state.stalkMeter}/100。`);
+
+  if (state.stalkPressure >= 40) {
+    target.awareness = Math.max(target.awareness, 1);
+    target.alert = Math.max(target.alert, 18);
+    target.intent = 'wary';
+    target.activity = '总觉得有人在暗处盯着自己';
+  }
+  if (state.stalkPressure >= 60) {
+    const detected = random() < (state.stalkPressure >= 85 ? 0.55 : 0.3);
+    if (detected) {
+      target.awareness = 3;
+      target.alert = 100;
+      target.intent = 'flee';
+      log(state, `${target.name} 突然发现了暗处的迈尔斯！`);
+    } else {
+      target.awareness = Math.max(target.awareness, 2);
+      target.alert = Math.max(target.alert, 55);
+      target.intent = 'flee';
+      log(state, `${target.name} 越来越不安，决定立刻离开这间房间。`);
+    }
+    if (target.movesThisTurn < REACT_MOVE_CAP && fleeAway(state, target, true)) target.movesThisTurn += 1;
+    state.stalkTargetId = null;
+    state.stalkPressure = 0;
   }
 }
 
@@ -2179,7 +2272,8 @@ export function effectiveCost(defId: string, state: GameState): number {
 export function moveCost(state: GameState, room: RoomId): number {
   // 恶魔附身能直接撞开障碍物，不额外花行动点
   const obstacle = isObstacle(room) && !state.clearedObstacles.includes(room) && !state.possessed ? 1 : 0;
-  return (state.barricades.includes(room) ? 2 : 1) + obstacle;
+  const stalkingSlowdown = state.killer === '迈克尔·迈尔斯' && state.myersStalking ? 1 : 0;
+  return (state.barricades.includes(room) ? 2 : 1) + obstacle + stalkingSlowdown;
 }
 
 export function canMoveTo(state: GameState, room: RoomId): boolean {
@@ -2222,6 +2316,11 @@ export function movePlayer(state: GameState, room: RoomId): boolean {
   }
 
   const from = state.playerRoom;
+  if (state.killer === '迈克尔·迈尔斯' && state.myersStalking) {
+    state.myersMovedThisTurn = true;
+    state.stalkTargetId = null;
+    state.stalkPressure = 0;
+  }
   const fromRect = ROOM_MAP[from].rect;
   const toRect = ROOM_MAP[room].rect;
   const dx = toRect.left + toRect.width / 2 - (fromRect.left + fromRect.width / 2);
@@ -2412,7 +2511,7 @@ export function attack(state: GameState, targetId?: string): boolean {
     target.watchValue = 0;
     log(state, `夜幕锁定 ${target.name}：这一刀直接把他放倒。`);
   }
-  damagePerson(state, target, heavy || nightfallKill ? 2 : 1);
+  damagePerson(state, target, heavy && state.killer === '迈克尔·迈尔斯' ? SURVIVOR_MAX_HP : heavy || nightfallKill ? 2 : 1);
   afterPlayerAction(state);
   checkImmediateWin(state);
   return true;
@@ -2754,12 +2853,8 @@ export function endTurn(state: GameState): void {
     }
   }
 
-  // 迈尔斯的尾随值随时间消退
-  if (state.killer === '迈克尔·迈尔斯' && state.stalkMeter > 0) {
-    const decay = Math.min(state.stalkMeter, 8);
-    state.stalkMeter -= decay;
-    log(state, `尾随值 -${decay}（当前 ${state.stalkMeter}/100）。`);
-  }
+  // 尾随者模式只有在整回合保持静止、且视野内有猎物时才积累尾随值。
+  updateMyersStalking(state);
 
   if (TOTEM_ROOMS.includes(state.playerRoom)) {
     state.bonusEnergyNextTurn = 1;
@@ -2801,14 +2896,15 @@ export function endTurn(state: GameState): void {
   state.freeMove = false;
   state.discount = 0;
   state.bonusDamage = 0;
-  // 恶魔附身按回合倒计时，归零就恢复正常刀锋
-  if (state.possessed) {
+  // 迈尔斯的附身按行动消耗尾随值；其他来源仍兼容旧回合计时。
+  if (state.possessed && state.killer !== '迈克尔·迈尔斯') {
     state.possessTurns = Math.max(0, state.possessTurns - 1);
     if (state.possessTurns === 0) {
       state.possessed = false;
       log(state, '恶魔附身消退，刀锋恢复了原本的重量。');
     }
   }
+  state.myersMovedThisTurn = false;
   state.noAlarmTurn = false;
   state.killsThisTurn = 0;
   state.revealedThisTurn = false;
