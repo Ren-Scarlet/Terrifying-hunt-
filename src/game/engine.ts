@@ -1354,6 +1354,11 @@ function finishCall(state: GameState, person: Person, device: string): void {
 
 /** 按行为类型行动一步 */
 function actByArchetype(state: GameState, person: Person): void {
+  // 房间锁作用于整扇门，任何原型都不能从锁住的房间直接穿门离开。
+  if (isLocked(state, person.room)) {
+    person.activity = '房门被封锁，无法离开';
+    return;
+  }
   switch (person.archetype) {
     case 'kiter': {
       // 拉扯型：不硬拼，绕远路、抹脚印、必要时丢烟雾，专门把追逐拖长
