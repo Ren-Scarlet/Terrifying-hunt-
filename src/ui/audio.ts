@@ -99,17 +99,19 @@ export function unlockAudio(): void {
 
 /** 主界面放角色选择的音乐，对局里换另一首。幂等：同一轨不会重播 */
 export function setMusic(track: MusicTrack | null): void {
-  if (track !== null && musicMissing.has(track)) return;
   if (track === musicTrack) {
     unlockAudio();
     return;
   }
+  // 先停止上一首，再判断新曲目是否存在；否则缺失 bgm.mp3 时会提前返回，
+  // 让 menu.mp3 在主界面切入游戏后继续播放。
   musicTrack = track;
   if (music) {
     music.pause();
+    music.currentTime = 0;
     music = null;
   }
-  if (!track) return;
+  if (!track || musicMissing.has(track)) return;
   const el = new Audio(src(MUSIC_FILES[track]));
   el.loop = true;
   el.volume = MUSIC_VOLUME[track];
