@@ -2,6 +2,8 @@ import './style.css';
 import { CARD_MAP } from './game/cards';
 import {
   attack,
+  carryPerson,
+  executeCarriedPerson,
   createGame,
   discardCard,
   drawCardAction,
@@ -417,6 +419,22 @@ app.addEventListener('click', (event) => {
         detailCardUid = null;
       }
     }
+    return;
+  }
+
+  if (action === 'carry') {
+    if (!game || screen !== 'game') return;
+    const personId = target.dataset.personId;
+    if (personId) carryPerson(game, personId);
+    afterAction();
+    return;
+  }
+
+  if (action === 'execute-fridge' || action === 'execute-microwave') {
+    if (!game || screen !== 'game') return;
+    executeCarriedPerson(game, action === 'execute-fridge' ? 'fridge' : 'microwave');
+    playSfx('kill');
+    afterAction();
     return;
   }
 

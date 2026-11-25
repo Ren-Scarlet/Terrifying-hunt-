@@ -22,6 +22,10 @@ import {
   currentScore,
   sabotageSiteItem,
   attack,
+  carryPerson,
+  executeCarriedPerson,
+  isRoomLit,
+  missionTaskProgress,
   attackBlockReason,
   canAttack,
   canMoveTo,
@@ -975,5 +979,50 @@ function caseAidAndPressure(): void {
 
 caseAidAndPressure();
 
+
+/** AB：组合契约、独立电闸联动、搬运与地形处决 */
+function caseContractsPowerAndCarry(): void {
+  const contract = newGame();
+  check('AB 每局契约至少包含两个组合目标', (contract.mission.tasks?.length ?? 0) >= 2, String(contract.mission.tasks?.length));
+  const alarmTask = { id: 'test-alarm', kind: 'no_alarm' as const, label: '阻止报警', target: 1 };
+  check('AB 未发生报警时无报警目标保持完成', missionTaskProgress(contract, alarmTask) === 1);
+  contract.npcAlarmed = true;
+  check('AB 幸存者成功报警后无报警目标失败', missionTaskProgress(contract, alarmTask) === 0);
+  check('AB 组合目标均为已支持类型', (contract.mission.tasks ?? []).every((task) => ['kill_count', 'marked_kill', 'execute', 'no_alarm', 'break_circuit'].includes(task.kind)));
+  const grid = newGame();
+  const circuit = grid.powerCircuits[0];
+  const affected = circuit.affectedRooms[0];
+  check('AB 区域初始有照明', isRoomLit(grid, affected));
+  grid.people = [];
+  grid.playerRoom = circuit.breakerRoom;
+  grid.energy = BASE_AP;
+  const broken = sabotageSiteItem(grid);
+  check('AB 破坏独立电闸后对应区域断电', broken && circuit.broken && !isRoomLit(grid, affected));
+  check('AB 其他供电回路仍保持照明', isRoomLit(grid, 'bedroom'));
+
+  const carry = newGame();
+  carry.people = carry.people.filter((p) => p.role !== 'police').slice(0, 1);
+  const victim = carry.people[0];
+  victim.room = carry.playerRoom; victim.hp = 0; victim.downedTurns = 2; carry.energy = 30;
+  const picked = carryPerson(carry, victim.id);
+  check('AB 玩家可以抱起同屋倒地幸存者', picked && carry.carryPersonId === victim.id);
+  let frontier: Array<{ room: RoomId; path: RoomId[] }> = [{ room: carry.playerRoom, path: [] }];
+  let route: RoomId[] = []; const seen = new Set<RoomId>([carry.playerRoom]);
+  while (frontier.length && !route.length) {
+    const current = frontier.shift()!;
+    if (current.path.length === 3) { route = current.path; break; }
+    for (const next of ROOM_MAP[current.room].neighbors) if (!seen.has(next)) { seen.add(next); frontier.push({ room: next, path: [...current.path, next] }); }
+  }
+  carry.freeMove = true; for (const room of route) movePlayer(carry, room);
+  check('AB 搬运达到三间房后挣脱并恢复受伤状态', route.length === 3 && carry.carryPersonId === null && victim.hp === 2, 'route=' + route.length + ' hp=' + victim.hp);
+  const special = newGame();
+  special.people = special.people.filter((p) => p.role !== 'police').slice(0, 1);
+  const target = special.people[0]; target.room = 'kitchen'; target.hp = 0; target.downedTurns = DOWNED_LOCK_TURNS;
+  special.playerRoom = 'kitchen'; special.carryPersonId = target.id; special.carryDistance = 1; special.energy = BASE_AP;
+  const executed = executeCarriedPerson(special, 'fridge');
+  check('AB 厨房冰箱特殊处决会击杀目标并计入处决数', executed && special.executions === 1 && !special.people.some((p) => p.id === target.id));
+  check('AB 地形处决会累计额外奖励分', special.specialExecutionBonus === 35, String(special.specialExecutionBonus));
+}
+caseContractsPowerAndCarry();
 console.log(`\n规则回归 ${pass} 通过 / ${fail} 失败`);
 if (fail > 0) process.exitCode = 1;

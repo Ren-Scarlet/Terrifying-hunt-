@@ -66,6 +66,12 @@ export function createGame(
     log: [],
     kills: 0,
     killsThisTurn: 0,
+    executions: 0,
+    survivorKills: 0,
+    specialExecutionBonus: 0,
+    npcAlarmed: false,
+    carryPersonId: null,
+    carryDistance: 0,
     evidence: 0,
     markedKilled: 0,
     decoyRoom: null,
@@ -119,6 +125,12 @@ export function createGame(
     survivorTotal: people.filter((person) => person.role !== 'police').length,
     teamGoalLabel: '',
     siteItems: [],
+    powerCircuits: [
+      { id: 'main-floor', name: '主楼照明', breakerRoom: 'basement', affectedRooms: ['basement', 'hall', 'kitchen', 'dining', 'study'], broken: false },
+      { id: 'upper-floor', name: '二层照明', breakerRoom: 'workshop', affectedRooms: ['workshop', 'bedroom', 'nursery', 'guestroom', 'attic'], broken: false },
+      { id: 'east-wing', name: '东翼照明', breakerRoom: 'conservatory', affectedRooms: ['conservatory', 'garden', 'balcony', 'foyer', 'garage'], broken: false },
+      { id: 'service-wing', name: '服务区照明', breakerRoom: 'laundry', affectedRooms: ['laundry', 'corridor', 'storage', 'wine', 'chapel', 'stairwell', 'bathroom', 'library'], broken: false },
+    ],
   };
   // 团队目标：随机挑 3 间房作为「电闸 / 钥匙柜」，再给每个人派一个个人目的。
   // 不定死：有人修装置、有人找钥匙，也有人只是想报警或躲起来。
@@ -130,7 +142,8 @@ export function createGame(
 
   // 场地物品：道具箱固定 2 个，发电机随机 1~2 台，撒在能走的房间里。
   // 杀手用不了它们，但能砸——去哪边、什么时候砸，多了一层取舍。
-  const sitePool = shuffle(objPool.filter((id) => !state.objectiveRooms.includes(id)));
+  const breakerRooms = state.powerCircuits.map((circuit) => circuit.breakerRoom);
+  const sitePool = shuffle(objPool.filter((id) => !state.objectiveRooms.includes(id) && !breakerRooms.includes(id)));
   const genCount = GENERATOR_MIN + Math.floor(random() * (GENERATOR_MAX - GENERATOR_MIN + 1));
   const items: SiteItem[] = [];
   for (let i = 0; i < ITEM_BOX_COUNT; i++) {

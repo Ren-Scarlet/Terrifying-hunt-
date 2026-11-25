@@ -41,6 +41,8 @@ import {
   SITE_ITEM_LABEL,
   SURVIVOR_ITEM_LABEL,
   sabotageBlockReason,
+  missionTaskProgress,
+  isRoomLit,
 } from '../../game/engine';
 import { KILLERS, type KillerProfile } from '../../game/killers';
 import { roomName } from '../../game/missions';
@@ -83,6 +85,11 @@ function roomFeatures(state: GameState, roomId: RoomId): string {
         `<span class="room-feature site ${i.kind} ${down ? 'broken' : ''}" title="${label}：${status}。你用不了它，但可以花 ${SABOTAGE_COST} 点行动点砸掉">${icon(i.kind === 'itemBox' ? 'itemBox' : 'generator', 'ui-icon tiny')}</span>`,
       );
     });
+  const lighting = state.powerCircuits.find((c) => c.affectedRooms.includes(roomId));
+  if (lighting) parts.push(`<span class="room-feature light ${lighting.broken ? 'off' : 'on'}" title="${escape(lighting.name)}：${lighting.broken ? '断电' : '供电中'}">${lighting.broken ? '☾' : '💡'}</span>`);
+  const circuitAt = state.powerCircuits.find((c) => c.breakerRoom === roomId);
+  if (circuitAt) parts.push(`<span class="room-feature breaker ${circuitAt.broken ? 'broken' : ''}" title="${escape(circuitAt.name)}：${circuitAt.broken ? '已破坏' : '可破坏；影响 ' + circuitAt.affectedRooms.map(roomName).join('、')}">⚡</span>`);
+  if (roomId === 'kitchen') parts.push('<span class="room-feature execution-site" title="特殊处决地点：冰箱 / 微波炉">☠</span>');
   if (roomId === EXIT_ROOM) parts.push(`<span class="room-feature escape" title="撤离点：任务完成的撤离位置">${icon('escape', 'ui-icon tiny')}</span>`);
   if (state.escapeRooms.includes(roomId)) parts.push(`<span class="room-feature escape-npc" title="团队第4阶段开启的逃生点">${icon('escape', 'ui-icon tiny')}</span>`);
   if (TOTEM_ROOMS.includes(roomId)) parts.push(`<span class="room-feature totem" title="图腾：在此结束回合，下回合 +1 行动点">${icon('totem', 'ui-icon tiny')}</span>`);
@@ -232,30 +239,16 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
   const isMyers = killer.owner === '迈克尔·迈尔斯';
 
   // 任务条：目标 / 达成条件 / 失败条件 / 实时进度 / 倒计时，一眼看清这一局要做什么
-  const need = m.targetCount ?? 2;
-  const atExit = state.playerRoom === EXIT_ROOM;
   const left = Math.max(0, m.turns - state.turn + 1);
   const urgent = left <= 5;
-  let progress = '';
-  let objectiveDone = false;
-  switch (m.kind) {
-    case 'assassinate':
-      progress = `名单 ${state.markedKilled}/${need} · 撤离 ${atExit ? '✓' : '✗'}`;
-      objectiveDone = state.markedKilled >= need && atExit;
-      break;
-    case 'bodyCount':
-      progress = `击杀 ${state.kills}/${need}`;
-      objectiveDone = state.kills >= need;
-      break;
-    case 'evidence':
-      progress = `证据 ${state.evidence}/${need} · 撤离 ${atExit ? '✓' : '✗'}`;
-      objectiveDone = state.evidence >= need && atExit;
-      break;
-    case 'escape':
-      progress = `标记 ${state.markedKilled}/1 · 撤离 ${atExit ? '✓' : '✗'}`;
-      objectiveDone = state.markedKilled >= 1 && atExit;
-      break;
-  }
+  const tasks = m.tasks ?? [];
+  const objectiveDone = tasks.length > 0 && tasks.every((task) => missionTaskProgress(state, task) >= task.target);
+  const progress = tasks.map((task) => {
+    const value = missionTaskProgress(state, task);
+    const failed = task.kind === 'no_alarm' && state.npcAlarmed;
+    const done = value >= task.target;
+    return `<span class="mission-task ${done ? 'done' : failed ? 'failed' : ''}"><b>${done ? '✓' : failed ? '✕' : '○'}</b> ${escape(task.label)} <em>${task.kind === 'no_alarm' ? (failed ? '已报警' : '保持中') : `${Math.min(value, task.target)}/${task.target}`}</em></span>`;
+  }).join('');
 
   const rooms = ROOMS.map((room) => {
     const visible = isRoomVisible(state, room.id);
@@ -285,6 +278,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
     const adjacent = ROOM_MAP[state.playerRoom].neighbors.includes(room.id);
     const obstacleOpen = OBSTACLE_ROOMS.includes(room.id) && !state.clearedObstacles.includes(room.id);
     const isObjective = state.objectiveRooms.includes(room.id);
+    const darkRoom = !isRoomLit(state, room.id);
     const noise = visibleDisturbances(state).find((d) => d.room === room.id);
     // 感知：看不见的房间也会浮出红色人影——只有影子，没有名字
     const sensed =
@@ -295,7 +289,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
     const r = room.rect;
     const style = `left:${r.left}%;top:${r.top}%;width:${r.width}%;height:${r.height}%`;
     return `
-      <div class="room ${isPlayer ? 'current' : ''} ${reachable ? 'reachable' : 'disabled'} ${adjacent ? 'adjacent' : ''} ${obstacleOpen ? 'obstacle' : ''} ${isObjective ? 'objective' : ''} ${room.id === 'garden' ? 'outdoor' : ''} ${locked ? 'locked' : ''} ${barricaded ? 'barricaded' : ''} ${explored ? 'explored' : 'unexplored'} ${visible ? 'in-sight' : 'fogged'}"
+      <div class="room ${isPlayer ? 'current' : ''} ${reachable ? 'reachable' : 'disabled'} ${adjacent ? 'adjacent' : ''} ${obstacleOpen ? 'obstacle' : ''} ${isObjective ? 'objective' : ''} ${darkRoom ? 'dark-room' : 'lit-room'} ${room.id === 'garden' ? 'outdoor' : ''} ${locked ? 'locked' : ''} ${barricaded ? 'barricaded' : ''} ${explored ? 'explored' : 'unexplored'} ${visible ? 'in-sight' : 'fogged'}"
         style="${style}" data-room="${room.id}" title="${escape(room.name)}${explored ? `：${escape(room.desc)}` : '：还没进去过'}${isObjective ? ' · 他们的目标点' : ''}">
         ${reachable ? `<button type="button" class="room-hit" data-action="move" data-room="${room.id}"
           aria-label="移动到${escape(room.name)}（需 ${cost} 点行动点）"></button>` : ''}
@@ -323,7 +317,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
           : `<div class="room-unknown">未探索</div>
              <div class="room-features">${roomFeatures(state, room.id)}</div>`}
         <div class="room-people">
-          ${people.map((p) => personChip(p, isPlayer && canAttack(state, p.id))).join('')}
+          ${people.map((p) => personChip(p, isPlayer && canAttack(state, p.id), isPlayer && p.hp <= 0 && !state.carryPersonId)).join('')}
           ${police ? personChip(police) : ''}
           ${ghosts.map(() => '<span class="ghost-chip" title="最后确认位置：人可能已经走了">?</span>').join('')}
         </div>
@@ -418,8 +412,9 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
   const atkReason = attackBlockReason(state);
   const possessed = state.possessed;
   const sabotageReason = sabotageBlockReason(state);
-  const sabotageTitle = sabotageReason ?? `破坏：砸掉这间屋子的道具箱 / 发电机，消耗 ${SABOTAGE_COST} 点行动点。会惊动乌鸦，把人引过来。`;
-  const sabotageMeta = sabotageReason ? escape(sabotageReason) : `${SABOTAGE_COST} 点 · 砸设施`;
+  const breakerHere = state.powerCircuits.find((c) => c.breakerRoom === state.playerRoom && !c.broken);
+  const sabotageTitle = sabotageReason ?? (breakerHere ? `破坏${breakerHere.name}，使 ${breakerHere.affectedRooms.map(roomName).join('、')}断电。消耗 ${SABOTAGE_COST} 点行动点。` : `破坏这间屋子的道具箱 / 发电机，消耗 ${SABOTAGE_COST} 点行动点。`);
+  const sabotageMeta = sabotageReason ? escape(sabotageReason) : `${SABOTAGE_COST} 点 · ${breakerHere ? '破坏区域电闸' : '砸设施'}`;
   const sabotageBtn = `<button class="btn sabotage ${sabotageReason ? 'spent' : ''}" data-action="sabotage" ${sabotageReason ? 'disabled' : ''}
       title="${escape(sabotageTitle)}">
       <span class="atk-name">破坏</span>
@@ -442,6 +437,11 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
   const searchOk = state.phase === 'playing' && state.energy >= SEARCH_COST;
   const cabinetHere = CABINET_ROOMS.includes(state.playerRoom);
   const hiddenHere = state.people.some((p) => p.room === state.playerRoom && p.hidden);
+  const carried = state.carryPersonId ? state.people.find((p) => p.id === state.carryPersonId) : null;
+  const specialExecution = carried && state.playerRoom === 'kitchen' && carried.downedTurns >= DOWNED_LOCK_TURNS
+    ? `<button class="btn execution" data-action="execute-fridge">冰箱处决 · +35</button><button class="btn execution" data-action="execute-microwave">微波炉处决 · +35</button>`
+    : '';
+  const carryStatus = carried ? `<div class="status-badge carrying">抱着 ${escape(carried.name)} · 已搬运 ${state.carryDistance}/3 间房</div>` : '';
   const searchBtn = `<button class="btn search" data-action="search" ${searchOk ? '' : 'disabled'}
       title="${escape(searchOk ? (cabinetHere ? `搜索这间屋子的柜子：消耗 ${SEARCH_COST} 点行动点，把藏起来的人翻出来。` : `搜索这间屋子：消耗 ${SEARCH_COST} 点行动点。`) : '行动点不足')}">
       <span class="atk-name">搜索</span>
@@ -462,7 +462,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
         <div class="mission-icon">${icon('missionTarget', 'ui-icon')}</div>
         <div class="mission-content">
           <div class="mission-title">${escape(m.title)}<em>奖励 ${m.reward}</em></div>
-          <div class="mission-objective"><b>目标</b>${escape(m.objective ?? m.desc)}</div>
+          <div class="mission-objective"><b>全部完成</b><div class="mission-task-list">${progress}</div></div>
           <div class="mission-rules">
             <span class="mission-ok">✓ 成功：${escape(m.successText ?? '达成主目标')}</span>
             <span class="mission-fail">✕ 失败：${escape(m.failText ?? '超时或被捕')}</span>
@@ -483,7 +483,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
             <button class="btn ghost mini" data-action="guide">玩法指引</button>
             <button class="btn ghost mini audio-toggle" data-action="mute" title="开关音效与背景音乐">${isMuted() ? '音效 关' : '音效 开'}</button>
           </div>
-          ${statusHtml}
+          ${statusHtml}${carryStatus}
           <div class="floorplan" style="--ar:${layoutAspectNum().toFixed(4)};aspect-ratio:${layoutAspect()}">
             ${rooms}
             ${trailOverlay(state)}
@@ -536,7 +536,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
             <button class="btn draw-card" data-action="draw" ${state.energy < DRAW_CARD_COST || (state.drawPile.length === 0 && state.discardPile.length === 0) || selectingDiscards ? 'disabled' : ''} title="消耗 ${DRAW_CARD_COST} 点行动点，从牌库抽 1 张">${DRAW_CARD_COST} 点 · 抽 1 张</button>
             ${wipeBtn}
             ${searchBtn}
-            ${sabotageBtn}
+            ${sabotageBtn}${specialExecution}
             <div class="power-row">${powerButtonHtml(state, killer)}</div>
             <button class="btn primary end-turn" data-action="end-turn" ${selectingDiscards ? 'disabled' : ''}>结束回合</button>
             <button class="btn ghost" data-action="give-up">放弃任务</button>
