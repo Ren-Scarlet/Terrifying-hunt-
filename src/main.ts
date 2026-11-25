@@ -398,7 +398,7 @@ app.addEventListener('click', (event) => {
   }
 
   // 超过手牌上限时，必须先逐张选择弃牌；禁止用结束回合或其他动作绕过。
-  if (game.hand.length > 6 && action !== 'discard' && action !== 'mute') {
+  if (game && screen === 'game' && game.hand.length > 6 && action !== 'discard' && action !== 'mute') {
     return;
   }
 
