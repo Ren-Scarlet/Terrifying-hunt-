@@ -2431,8 +2431,20 @@ export function playCard(state: GameState, cardUid: string): boolean {
   }
 
   runOps(state, def.ops);
-  // 出了牌，刀就收回来了：下一刀可以砍
-  state.attackReady = true;
+  // 不屈不挠把「擦刀」作为卡牌效果免费结算：不检查也不扣行动点，
+  // 并且与普通擦刀一样移除「把最好的留在最后」的印记。
+  if (card.defId === 'unbreakable') {
+    state.attackReady = true;
+    if (state.killer === '迈克尔·迈尔斯' && state.myersLastBestActive && state.myersLastBestMarks > 0) {
+      const removed = Math.min(2, state.myersLastBestMarks);
+      state.myersLastBestMarks -= removed;
+      log(state, `把最好的留在最后：免费擦刀移除 ${removed} 枚专属印记（剩余 ${state.myersLastBestMarks}）。`);
+    }
+    log(state, '不屈不挠：抽牌并免费擦刀（不消耗行动点）。');
+  } else {
+    // 其他卡牌仍按原规则收回刀锋。
+    state.attackReady = true;
+  }
   afterPlayerAction(state);
   checkImmediateWin(state);
   return true;

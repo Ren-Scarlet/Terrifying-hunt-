@@ -46,18 +46,18 @@ export const ASSET_PATHS: AssetPaths = {
   },
 };
 
-/** 新卡牌复用仓库内已有的白色技能图案，避免只有紫色稀有度底图。 */
+/** 新卡牌按技能含义映射到仓库内最接近的白色图案；避免使用语义相反的图标。 */
 const CARD_ART_FALLBACKS: Record<string, string> = {
   unbreakable: 'clean',
-  hex_huntress: 'fear',
+  hex_huntress: 'harvest',
   hex_noed: 'blackout',
-  scourge_shrine: 'execute',
+  scourge_shrine: 'lure',
   distressing: 'fear',
   hell: 'ghost_light',
   iron_grasp: 'choke',
   deerstalker: 'search',
-  hex_ruin: 'block_gate',
-  bitter_murmur: 'aim',
+  hex_ruin: 'poltergeist',
+  bitter_murmur: 'wiretap',
   sloppy_butcher: 'shuriken',
   insidious: 'silent_step',
   myers_eclipse_light: 'night_cover',

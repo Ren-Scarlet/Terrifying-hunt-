@@ -1226,6 +1226,30 @@ caseNpcAwarenessAndDialogue();
 
 /** 新版通用卡池、限时情报与迈尔斯专属印记。 */
 function caseNewPerkSystem(): void {
+  const freeWipe = createGame(['unbreakable', 'clean'], undefined, '迈克尔·迈尔斯');
+  const freeWipeVictim = freeWipe.people.find((person) => person.role !== 'police')!;
+  freeWipeVictim.room = freeWipe.playerRoom;
+  freeWipeVictim.hp = 4;
+  freeWipeVictim.bloodSacrifice = false;
+  freeWipe.hand = [{ uid: 'test-unbreakable', defId: 'unbreakable' }];
+  freeWipe.energy = 1;
+  freeWipe.myersLastBestActive = true;
+  freeWipe.myersLastBestMarks = 2;
+  const firstHit = withRandomSource(() => 0.99, () => attack(freeWipe, freeWipeVictim.id));
+  const energyAfterHit = freeWipe.energy;
+  const freeWipePlayed = playCard(freeWipe, 'test-unbreakable');
+  check(
+    '不屈不挠：0行动点时仍能抽牌并免费擦刀',
+    firstHit && energyAfterHit === 0 && freeWipePlayed && freeWipe.energy === 0 && freeWipe.attackReady,
+    `攻击后行动点=${energyAfterHit}，结算后=${freeWipe.energy}，attackReady=${freeWipe.attackReady}`,
+  );
+  check('不屈不挠：免费擦刀同样移除至多两枚终局印记', freeWipe.myersLastBestMarks === 1, `攻击获得 1 枚后移除 2 枚，剩余=${freeWipe.myersLastBestMarks}`);
+
+  check('天灾：鬼魔神龛使用钩子图案而非恩赐解脱图案', cardImage('scourge_shrine')?.endsWith('/lure.png') ?? false, cardImage('scourge_shrine') ?? '无图标');
+  check('猎杀戾气使用血腥/利爪图案', cardImage('hex_huntress')?.endsWith('/harvest.png') ?? false);
+  check('粉碎希望使用诅咒/灵异图案', cardImage('hex_ruin')?.endsWith('/poltergeist.png') ?? false);
+  check('苦涩低语使用聆听/耳语图案', cardImage('bitter_murmur')?.endsWith('/wiretap.png') ?? false);
+
   const pool = deckCardsForKiller('迈克尔·迈尔斯');
   check('新版通用初始卡池恰好 12 张', pool.filter((card) => card.pool === 'initial').length === 12);
   check('迈尔斯专属卡恰好 3 张', pool.filter((card) => card.killerOnly === '迈克尔·迈尔斯').length === 3);
@@ -1262,9 +1286,13 @@ function caseNewPerkSystem(): void {
   const food = createGame(['myers_plaything'], undefined, '迈克尔·迈尔斯');
   const sacrifice = food.people.find((person) => person.bloodSacrifice)!;
   sacrifice.room = food.playerRoom;
+  // 阻止卡牌结算后的 NPC 自主行动干扰「立即离开视线」的断言；
+  // 卡牌自身仍会直接把血祭品移动到迷雾房间。
+  sacrifice.blockedTurns = 2;
   food.energy = 6;
   food.hand = [{ uid: 'test-food-1', defId: 'myers_plaything' }];
-  check('戏耍食物要求视野内有血祭品、获得印记并将其送出视线', playCard(food, 'test-food-1') && food.myersFoodMarks === 1 && !isPersonVisible(food, sacrifice));
+  const firstFoodPlayed = withRandomSource(() => 0.99, () => playCard(food, 'test-food-1'));
+  check('戏耍食物要求视野内有血祭品、获得印记并将其送出视线', firstFoodPlayed && food.myersFoodMarks === 1 && !isPersonVisible(food, sacrifice), `played=${firstFoodPlayed} marks=${food.myersFoodMarks} room=${sacrifice.room} player=${food.playerRoom} visible=${isPersonVisible(food, sacrifice)} blocked=${sacrifice.blockedTurns}`);
   sacrifice.room = food.playerRoom;
   food.hand = [{ uid: 'test-food-2', defId: 'myers_plaything' }];
   const energyBeforeSecondFood = food.energy;
