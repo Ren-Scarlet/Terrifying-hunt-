@@ -42,6 +42,7 @@ export const ROOMS: Room[] = BLUEPRINTS.map((b) => ({
   x: 0,
   y: 0,
   rect: { left: 0, top: 0, width: 0, height: 0 },
+  size: 'medium',
   neighbors: [],
 }));
 
@@ -71,31 +72,80 @@ export const RADIO_ROOMS: RoomId[] = ['basement'];
 export const WEAPON_ROOMS: RoomId[] = ['kitchen', 'garage', 'conservatory'];
 
 /* ==================================================================== */
-/*  户型生成                                                            */
+/*  不规则房间布局生成                                                    */
 /* ==================================================================== */
 
-const COLS = 8;
-const ROWS = 4;
-/** 平面图画布的内边距与格子之间的缝（百分比），保证相邻房间之间留出墙体 */
-const PAD = 2;
-const GAP = 2;
-const CELL_W = (100 - PAD * 2) / COLS;
-const CELL_H = (100 - PAD * 2) / ROWS;
+/**
+ * 地图由 16×12 个基础单位组成，但这些单位不再一格对应一间房。
+ * BSP 矩形分割会把地图切成 23 个不同面积的完整房间：
+ * 小房间约 4–6 单位，普通房间约 7–11 单位，大厅/室外区域更大。
+ * 房间仍然是单个移动节点，面积只影响地图空间表现，不改变行动点消耗。
+ */
+const GRID_COLS = 16;
+const GRID_ROWS = 12;
+const PAD = 1.8;
+const GAP = 0.72;
+const MIN_REGION_AREA = 4;
 
-interface Cell {
-  col: number;
-  row: number;
+interface Region {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
 }
 
-const cellKey = (c: Cell) => c.row * COLS + c.col;
+interface RegionEdge {
+  a: number;
+  b: number;
+}
 
-function cellNeighbors(c: Cell): Cell[] {
-  const out: Cell[] = [];
-  if (c.col > 0) out.push({ col: c.col - 1, row: c.row });
-  if (c.col < COLS - 1) out.push({ col: c.col + 1, row: c.row });
-  if (c.row > 0) out.push({ col: c.col, row: c.row - 1 });
-  if (c.row < ROWS - 1) out.push({ col: c.col, row: c.row + 1 });
-  return out;
+interface SplitOption {
+  axis: 'vertical' | 'horizontal';
+  min: number;
+  max: number;
+}
+
+function regionArea(region: Region): number {
+  return region.width * region.height;
+}
+
+function splitOptions(region: Region): SplitOption[] {
+  const options: SplitOption[] = [];
+  if (region.width >= 2) {
+    const min = Math.max(1, Math.ceil(MIN_REGION_AREA / region.height));
+    const max = region.width - min;
+    if (min <= max) options.push({ axis: 'vertical', min, max });
+  }
+  if (region.height >= 2) {
+    const min = Math.max(1, Math.ceil(MIN_REGION_AREA / region.width));
+    const max = region.height - min;
+    if (min <= max) options.push({ axis: 'horizontal', min, max });
+  }
+  return options;
+}
+
+function splitRegion(region: Region, option: SplitOption): [Region, Region] {
+  const cut = option.min + Math.floor(random() * (option.max - option.min + 1));
+  if (option.axis === 'vertical') {
+    return [
+      { left: region.left, top: region.top, width: cut, height: region.height },
+      { left: region.left + cut, top: region.top, width: region.width - cut, height: region.height },
+    ];
+  }
+  return [
+    { left: region.left, top: region.top, width: region.width, height: cut },
+    { left: region.left, top: region.top + cut, width: region.width, height: region.height - cut },
+  ];
+}
+
+function regionsTouch(a: Region, b: Region): boolean {
+  const verticalTouch =
+    (a.left + a.width === b.left || b.left + b.width === a.left) &&
+    Math.min(a.top + a.height, b.top + b.height) > Math.max(a.top, b.top);
+  const horizontalTouch =
+    (a.top + a.height === b.top || b.top + b.height === a.top) &&
+    Math.min(a.left + a.width, b.left + b.width) > Math.max(a.left, b.left);
+  return verticalTouch || horizontalTouch;
 }
 
 function shuffle<T>(list: T[]): T[] {
@@ -107,228 +157,192 @@ function shuffle<T>(list: T[]): T[] {
   return arr;
 }
 
-interface Span {
-  /** 房间区左上角所在的格子 */
-  col: number;
-  row: number;
-  /** 房间区横竖占了几格 */
-  w: number;
-  h: number;
-}
-
-function cellRect(c: Cell, span: Span): Room['rect'] {
-  const cw = (100 - PAD * 2) / span.w;
-  const ch = (100 - PAD * 2) / span.h;
+function cellRect(region: Region): Room['rect'] {
+  const unitW = (100 - PAD * 2) / GRID_COLS;
+  const unitH = (100 - PAD * 2) / GRID_ROWS;
   return {
-    left: PAD + (c.col - span.col) * cw + GAP / 2,
-    top: PAD + (c.row - span.row) * ch + GAP / 2,
-    width: cw - GAP,
-    height: ch - GAP,
+    left: PAD + region.left * unitW + GAP / 2,
+    top: PAD + region.top * unitH + GAP / 2,
+    width: region.width * unitW - GAP,
+    height: region.height * unitH - GAP,
   };
 }
 
-const sameCell = (a: Cell, b: Cell) => a.col === b.col && a.row === b.row;
-const isAdjacentCell = (a: Cell, b: Cell) =>
-  Math.abs(a.col - b.col) + Math.abs(a.row - b.row) === 1;
-
-/** 本局房间区的横竖跨度，渲染时用它决定平面图的宽高比 */
-let spanRef: Span = { col: 0, row: 0, w: COLS, h: ROWS };
-
-/** 平面图该用的宽高比，例如 "4 / 3" */
+/** 平面图使用完整布局画布的固定比例；所有房间都在这张画布内。 */
 export function layoutAspect(): string {
-  return `${spanRef.w} / ${spanRef.h}`;
+  return `${GRID_COLS} / ${GRID_ROWS}`;
 }
 
-/** 同一比例的数值形式，给 CSS 反推宽度用（如 1.75） */
 export function layoutAspectNum(): number {
-  return spanRef.w / spanRef.h;
+  return GRID_COLS / GRID_ROWS;
 }
 
 /**
- * 重排整栋房子。每次开局调用一次，之后所有邻居/坐标都从 ROOM_MAP 现取。
- * @returns 本局的户型摘要，方便调试台打印。
+ * 每局重新切分整张平面图。
+ * 邻接关系由矩形真实共边计算，随后只在这些真实门位中选出连通的门网。
  */
 export function buildLayout(): string {
-  // ① 从一颗种子格随机生长，长出一块连通但不规整的房间区
-  const grown = new Map<number, Cell>();
-  const seed: Cell = {
-    col: Math.floor(random() * COLS),
-    row: Math.floor(random() * ROWS),
-  };
-  grown.set(cellKey(seed), seed);
-  while (grown.size < ROOMS.length) {
-    const frontier: Cell[] = [];
-    for (const c of grown.values()) {
-      for (const n of cellNeighbors(c)) {
-        if (!grown.has(cellKey(n))) frontier.push(n);
-      }
+  const regions: Region[] = [
+    { left: 0, top: 0, width: GRID_COLS, height: GRID_ROWS },
+  ];
+
+  // 反复切分面积最大的几个候选区域，避免所有房间都长成相同大小。
+  while (regions.length < ROOMS.length) {
+    const candidates = regions
+      .map((region, index) => ({ region, index, area: regionArea(region), options: splitOptions(region) }))
+      .filter((candidate) => candidate.options.length > 0)
+      .sort((a, b) => b.area - a.area);
+    if (!candidates.length) {
+      throw new Error('地图布局无法继续分割：可用区域不足。');
     }
-    if (!frontier.length) break;
-    const pick = frontier[Math.floor(random() * frontier.length)];
-    grown.set(cellKey(pick), pick);
+
+    const shortlist = candidates.slice(0, Math.min(4, candidates.length));
+    const chosen = shortlist[Math.floor(random() * shortlist.length)];
+    const preferredAxis = chosen.region.width / chosen.region.height >= 1 ? 'vertical' : 'horizontal';
+    let option = chosen.options.find((item) => item.axis === preferredAxis) ?? chosen.options[0];
+    if (chosen.options.length > 1 && random() < 0.2) {
+      option = chosen.options.find((item) => item.axis !== option.axis) ?? option;
+    }
+    const [first, second] = splitRegion(chosen.region, option);
+    regions.splice(chosen.index, 1, first, second);
   }
 
-  const pool = [...grown.values()];
-  const byKey = new Map<number, Cell>();
-  pool.forEach((c) => byKey.set(cellKey(c), c));
-
-  const candidates: Array<[number, number]> = [];
-  pool.forEach((c) => {
-    for (const n of cellNeighbors(c)) {
-      const k = cellKey(n);
-      if (!byKey.has(k)) continue;
-      if (cellKey(c) < k) candidates.push([cellKey(c), k]);
+  // 所有共边区域构成物理邻接图；不接触的房间绝不会凭空出现门。
+  const physicalEdges: RegionEdge[] = [];
+  for (let i = 0; i < regions.length; i += 1) {
+    for (let j = i + 1; j < regions.length; j += 1) {
+      if (regionsTouch(regions[i], regions[j])) physicalEdges.push({ a: i, b: j });
     }
-  });
-
-  // ② 随机 Prim 长出一棵生成树。不是「所有相邻的房间都通」——
-  //    门少一半，走廊才有意义，追人的时候才会被门卡住。
-  const inTree = new Set<number>([cellKey(pool[0])]);
-  const treeEdges: Array<[number, number]> = [];
-  let guard = 0;
-  while (inTree.size < pool.length && guard < 600) {
-    guard += 1;
-    const frontier = candidates.filter(([a, b]) => inTree.has(a) !== inTree.has(b));
-    if (!frontier.length) break;
-    const [a, b] = frontier[Math.floor(random() * frontier.length)];
-    treeEdges.push([a, b]);
-    inTree.add(a);
-    inTree.add(b);
   }
 
-  // ③ 再开几条环路：完全没有环的房子会变成死胡同迷宫，追人时只能硬堵
-  const used = new Set(treeEdges.map(([a, b]) => `${a}-${b}`));
-  // 环路数量跟着房间数走：屋子越大，绕路的可能越多，但始终以生成树为主
-  const extras = shuffle(candidates.filter(([a, b]) => !used.has(`${a}-${b}`))).slice(
-    0,
-    Math.max(3, Math.round(ROOMS.length / 5)),
-  );
-  const edges = [...treeEdges, ...extras];
-
-  const adjacency = new Map<number, Cell[]>();
-  pool.forEach((c) => adjacency.set(cellKey(c), []));
-  edges.forEach(([a, b]) => {
-    adjacency.get(a)!.push(byKey.get(b)!);
-    adjacency.get(b)!.push(byKey.get(a)!);
+  const physicalAdj = regions.map(() => [] as number[]);
+  physicalEdges.forEach(({ a, b }) => {
+    physicalAdj[a].push(b);
+    physicalAdj[b].push(a);
   });
 
-  const depthFrom = (from: Cell): Map<number, number> => {
-    const dist = new Map<number, number>([[cellKey(from), 0]]);
-    let frontier = [from];
-    let depth = 0;
-    while (frontier.length) {
-      const next: Cell[] = [];
-      for (const c of frontier) {
-        for (const n of adjacency.get(cellKey(c)) ?? []) {
-          if (dist.has(cellKey(n))) continue;
-          dist.set(cellKey(n), depth + 1);
-          next.push(n);
-        }
+  const depthFrom = (start: number): Map<number, number> => {
+    const distances = new Map<number, number>([[start, 0]]);
+    const queue = [start];
+    for (let cursor = 0; cursor < queue.length; cursor += 1) {
+      const current = queue[cursor];
+      for (const next of physicalAdj[current]) {
+        if (distances.has(next)) continue;
+        distances.set(next, distances.get(current)! + 1);
+        queue.push(next);
       }
-      if (!next.length) break;
-      depth += 1;
-      frontier = next;
     }
-    return dist;
+    return distances;
   };
 
-  // ④ 大厅放在最「中心」的格子：进门口在房子中间，去哪个方向都要走一段
-  const center = pool.reduce((best, c) =>
-    (depthFrom(c).size > depthFrom(best).size
-      ? c
-      : depthFrom(c).size === depthFrom(best).size
-        ? Math.max(...depthFrom(c).values()) < Math.max(...depthFrom(best).values())
-          ? c
-          : best
-        : best),
-  );
+  // 大厅优先落在门网中心附近；距离相同时，选更接近建筑几何中心的区域。
+  const geometricCenter = { x: GRID_COLS / 2, y: GRID_ROWS / 2 };
+  const centerIndex = regions.reduce((best, region, index) => {
+    const distance = depthFrom(index);
+    const bestDistance = depthFrom(best);
+    const eccentricity = Math.max(...distance.values());
+    const bestEccentricity = Math.max(...bestDistance.values());
+    const geometricOffset =
+      Math.abs(region.left + region.width / 2 - geometricCenter.x) +
+      Math.abs(region.top + region.height / 2 - geometricCenter.y);
+    const bestRegion = regions[best];
+    const bestOffset =
+      Math.abs(bestRegion.left + bestRegion.width / 2 - geometricCenter.x) +
+      Math.abs(bestRegion.top + bestRegion.height / 2 - geometricCenter.y);
+    return eccentricity < bestEccentricity ||
+      (eccentricity === bestEccentricity && geometricOffset < bestOffset)
+      ? index
+      : best;
+  }, 0);
 
-  const distanceFrom = depthFrom(center);
-  const farthest = [...distanceFrom.entries()].sort((a, b) => b[1] - a[1]);
+  // 先在真实邻接图上生成一棵树，再加少量环路；保证整栋建筑始终连通。
+  const visited = new Set<number>([centerIndex]);
+  const treeEdges: RegionEdge[] = [];
+  while (visited.size < regions.length) {
+    const frontier = physicalEdges.filter((edge) => visited.has(edge.a) !== visited.has(edge.b));
+    if (!frontier.length) throw new Error('地图房间邻接图意外断开。');
+    const edge = frontier[Math.floor(random() * frontier.length)];
+    treeEdges.push(edge);
+    visited.add(visited.has(edge.a) ? edge.b : edge.a);
+  }
 
-  // ⑤ 后院挂在最远的「叶子」上：只有一个门。车库就在门内侧，
-  //    于是玩家撤离的门和幸存者翻篱笆的地方是同一处——守后院既是防逃跑，也是守退路。
-  const leafKeys = pool
-    .filter((c) => !sameCell(c, center) && (adjacency.get(cellKey(c)) ?? []).length === 1)
-    .map(cellKey);
-  const orderedLeaves = farthest.filter(([k]) => leafKeys.includes(k)).map(([k]) => byKey.get(k)!);
-  const orderedAll = farthest.filter(([k]) => !sameCell(byKey.get(k)!, center)).map(([k]) => byKey.get(k)!);
-  const exitCell = orderedLeaves[0] ?? orderedAll[0] ?? pool[pool.length - 1];
-  const exitDoorCell = (adjacency.get(cellKey(exitCell)) ?? [])[0] ?? center;
+  const treeAdj = regions.map(() => [] as number[]);
+  treeEdges.forEach(({ a, b }) => {
+    treeAdj[a].push(b);
+    treeAdj[b].push(a);
+  });
 
-  const rest = shuffle(
-    ROOMS.filter((r) => r.id !== ENTRY_ROOM && r.id !== 'garden' && r.id !== EXIT_ROOM),
-  );
-  const openCells = shuffle(
-    pool.filter(
-      (c) => !sameCell(c, center) && !sameCell(c, exitCell) && !sameCell(c, exitDoorCell),
-    ),
-  );
+  // 后院是建筑外围的叶节点，唯一入口固定连接车库。
+  const centerDistances = depthFrom(centerIndex);
+  const gardenCandidates = regions
+    .map((_, index) => index)
+    .filter((index) => treeAdj[index].length === 1 && index !== centerIndex && treeAdj[index][0] !== centerIndex);
+  const leafPool = gardenCandidates.length
+    ? gardenCandidates
+    : regions.map((_, index) => index).filter((index) => treeAdj[index].length === 1 && index !== centerIndex);
+  if (!leafPool.length) throw new Error('地图布局没有可用的后院出口区域。');
+  const gardenIndex = leafPool.sort((a, b) =>
+    (centerDistances.get(b) ?? 0) - (centerDistances.get(a) ?? 0) ||
+    regionArea(regions[b]) - regionArea(regions[a]),
+  )[0];
+  const garageIndex = treeAdj[gardenIndex][0];
 
-  // 摆位按「房间区的外接矩形」拉伸到整张平面图：房子长什么样就铺满画布，
-  // 不会因为随机缺口而在角落里留一大片黑。
-  const span: Span = {
-    col: Math.min(...pool.map((c) => c.col)),
-    row: Math.min(...pool.map((c) => c.row)),
-    w: Math.max(...pool.map((c) => c.col)) - Math.min(...pool.map((c) => c.col)) + 1,
-    h: Math.max(...pool.map((c) => c.row)) - Math.min(...pool.map((c) => c.row)) + 1,
-  };
-  spanRef = span;
+  // 剩余房间按空间定位：公共区域优先分配大块，储藏/设备类优先分配小块。
+  const sizeOrder: RoomId[] = [
+    'conservatory', 'dining', 'library', 'chapel', 'kitchen', 'foyer',
+    'workshop', 'bedroom', 'guestroom', 'nursery', 'study', 'corridor',
+    'stairwell', 'balcony', 'attic', 'wine', 'bathroom', 'laundry',
+    'storage', 'basement',
+  ];
+  const roomById = new Map<RoomId, Room>(ROOMS.map((room) => [room.id, room]));
+  const regionRooms = new Map<number, Room>();
+  regionRooms.set(centerIndex, roomById.get(ENTRY_ROOM)!);
+  regionRooms.set(gardenIndex, roomById.get('garden')!);
+  regionRooms.set(garageIndex, roomById.get(EXIT_ROOM)!);
 
-  const place = (room: Room, cell: Cell) => {
-    room.x = cell.col;
-    room.y = cell.row;
-    room.rect = cellRect(cell, span);
+  const freeRegions = regions
+    .map((_, index) => index)
+    .filter((index) => !regionRooms.has(index))
+    .sort((a, b) => regionArea(regions[b]) - regionArea(regions[a]));
+  const freeRooms = sizeOrder.map((id) => roomById.get(id)!);
+  freeRegions.forEach((index, order) => regionRooms.set(index, freeRooms[order]));
+
+  const span = { col: 0, row: 0, w: GRID_COLS, h: GRID_ROWS };
+  void span;
+  ROOMS.forEach((room) => {
     room.neighbors = [];
-  };
-
-  const byId: Record<string, Room> = {};
-  ROOMS.forEach((r) => {
-    byId[r.id] = r;
   });
 
-  place(byId[ENTRY_ROOM], center);
-  place(byId[EXIT_ROOM], exitDoorCell);
-  place(byId.garden, exitCell);
-  rest.forEach((room, i) => {
-    const cell = openCells[i];
-    if (cell) place(room, cell);
+  regions.forEach((region, index) => {
+    const room = regionRooms.get(index)!;
+    room.x = region.left;
+    room.y = region.top;
+    room.rect = cellRect(region);
+    const area = regionArea(region);
+    room.size = room.id === 'garden' ? 'open' : area >= 12 ? 'large' : area >= 7 ? 'medium' : 'small';
   });
 
-  // ⑥ 门就从生成树的边来。后院的那一格只保留通往车库的那一条边。
-  const roomAt = (key: number): Room | undefined => {
-    const cell = byKey.get(key);
-    if (!cell) return undefined;
-    return ROOMS.find((r) => r.x === cell.col && r.y === cell.row);
-  };
-  ROOMS.forEach((room) => {
-    const self = pool.find((c) => c.col === room.x && c.row === room.y);
-    if (!self) return;
-    const near = (adjacency.get(cellKey(self)) ?? [])
-      .map((c) => roomAt(cellKey(c)))
-      .filter((r): r is Room => !!r)
-      .map((r) => r.id);
-    if (room.id === 'garden') {
-      const keep = near.includes(EXIT_ROOM) ? EXIT_ROOM : near[0];
-      room.neighbors = keep ? [keep] : [];
-      return;
-    }
-    room.neighbors = near;
+  const extraEdges = shuffle(
+    physicalEdges.filter((edge) => !treeEdges.some((tree) =>
+      (tree.a === edge.a && tree.b === edge.b) || (tree.a === edge.b && tree.b === edge.a),
+    ) && edge.a !== gardenIndex && edge.b !== gardenIndex),
+  ).slice(0, Math.max(3, Math.round(ROOMS.length / 6)));
+  const selectedEdges = [...treeEdges, ...extraEdges];
+
+  selectedEdges.forEach(({ a, b }) => {
+    const roomA = regionRooms.get(a)!;
+    const roomB = regionRooms.get(b)!;
+    if (!roomA.neighbors.includes(roomB.id)) roomA.neighbors.push(roomB.id);
+    if (!roomB.neighbors.includes(roomA.id)) roomB.neighbors.push(roomA.id);
   });
 
-  // ⑦ 对称：只要一方认了这条门，另一方也要认
-  ROOMS.forEach((room) => {
-    room.neighbors = room.neighbors.filter((id) => {
-      const other = ROOM_MAP[id];
-      if (!other) return false;
-      if (other.neighbors.includes(room.id)) return true;
-      if (other.id === 'garden') return false;
-      other.neighbors.push(room.id);
-      return true;
-    });
-  });
+  // 明确守住后院只有车库这一道门，避免后院成为多方向逃生捷径。
+  const garden = roomById.get('garden')!;
+  garden.neighbors = [EXIT_ROOM];
+  const garage = roomById.get(EXIT_ROOM)!;
+  if (!garage.neighbors.includes('garden')) garage.neighbors.push('garden');
 
-  return ROOMS.map((r) => `${r.name}(${r.x},${r.y})`).join(' ');
+  return ROOMS.map((room) => `${room.name}(${room.x},${room.y},${room.size})`).join(' ');
 }
 
 // 模块加载时先铺一套，保证在 createGame 之前访问 ROOM_MAP 也不会炸
