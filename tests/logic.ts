@@ -103,18 +103,24 @@ function caseDrawAndDiscardRules(): void {
 
   const flee = newGame();
   const victim = player(flee);
-  const exit = ROOM_MAP[flee.playerRoom].neighbors.find((r) => !OBSTACLE_ROOMS.includes(r));
-  if (exit) {
-    victim.room = flee.playerRoom;
+  const escapeSetup = Object.values(ROOM_MAP).find((room) =>
+    room.neighbors.filter((r) => !OBSTACLE_ROOMS.includes(r)).length >= 2,
+  );
+  if (escapeSetup) {
+    const playerNeighbor = escapeSetup.neighbors.find((r) => !OBSTACLE_ROOMS.includes(r))!;
+    flee.playerRoom = playerNeighbor;
+    victim.room = escapeSetup.id;
     victim.hp = 2;
     victim.alert = 100;
     victim.intent = 'flee';
+    victim.hidden = false;
+    victim.blockedTurns = 0;
     victim.movesThisTurn = 3;
     const beforeRoom = victim.room;
     endTurn(flee);
     check('回合结束：同屋幸存者即使移动次数用尽也会尝试逃跑', victim.room !== beforeRoom || !flee.people.some((p) => p.id === victim.id), `room=${victim.room}`);
   } else {
-    check('回合结束：同屋幸存者即使移动次数用尽也会尝试逃跑', true, '没有可用出口，跳过');
+    check('回合结束：同屋幸存者即使移动次数用尽也会尝试逃跑', false, '随机户型没有两条可走出口');
   }
 }
 
