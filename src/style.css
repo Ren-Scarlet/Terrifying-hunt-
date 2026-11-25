@@ -2017,3 +2017,32 @@ button, .room-hit, .hand-row { touch-action: manipulation; }
 .blood-sacrifice-tag { color: #ef8290 !important; font-weight: 700; }
 .person-chip.blood-sacrifice { border-color: #8c3342; }
 .chip-sacrifice { color: #f08a98; font-size: 11px; line-height: 1; }
+
+
+/* 手牌上限与主动抽牌 */
+.hand-limit-warning {
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(220, 75, 75, .55);
+  border-radius: 9px;
+  color: #ffb2a8;
+  background: rgba(120, 28, 28, .18);
+  font-weight: 700;
+}
+.card.discard-choice {
+  border: 2px dashed rgba(239, 105, 95, .9);
+  cursor: pointer;
+}
+.card.discard-choice:hover {
+  transform: translateY(-5px);
+  border-color: #ff7168;
+  box-shadow: 0 0 0 2px rgba(255, 113, 104, .2);
+}
+.btn.draw-card {
+  border-color: rgba(120, 180, 220, .55);
+  color: #c5e8ff;
+}
+.btn.draw-card:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
