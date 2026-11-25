@@ -76,7 +76,7 @@ export const CARDS: CardDef[] = [
     unlocked: true,
     precheck: { cond: { c: 'downedHere' }, hint: '当前房间没有倒地的人，处决需要先把目标打倒。' },
     ops: [
-      { op: 'execute', who: 'downedAny' },
+      { op: 'execute', who: 'downedHere' },
       { op: 'wanted', amount: 3 },
       { op: 'log', text: '你蹲下去，把最后一点声音按回他喉咙里。' },
     ],
