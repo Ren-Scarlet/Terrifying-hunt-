@@ -338,6 +338,8 @@ export interface GameState {
   /** 最近有人经过的房间：乌鸦叫 / 地板响，给玩家一个不靠技能的找人方向 */
   disturbances: Disturbance[];
   playerRoom: RoomId;
+  /** 玩家已进入查看选择模式，等待点选一个相邻房间；此时尚未消耗 AP。 */
+  lookingAround: boolean;
   /** 玩家当前朝向的单位向量；用于判断正前方一格房间 */
   playerFacing: { x: number; y: number };
   people: Person[];
