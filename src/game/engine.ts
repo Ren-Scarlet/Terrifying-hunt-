@@ -45,6 +45,8 @@ import type {
   Trail,
   SiteItem,
   SiteItemKind,
+  MissionTask,
+  PowerCircuit,
   SurvivorItem,
 } from './types';
 
@@ -648,6 +650,7 @@ function resolveDest(state: GameState, dest: Dest): RoomId {
 /* ==================================================================== */
 
 function killPerson(state: GameState, person: Person): void {
+  if (state.carryPersonId === person.id) { state.carryPersonId = null; state.carryDistance = 0; }
   if (!state.people.some((p) => p.id === person.id)) return;
   state.people = state.people.filter((p) => p.id !== person.id);
   state.pinnedPeople = state.pinnedPeople.filter((id) => id !== person.id);
@@ -702,6 +705,7 @@ function damagePerson(state: GameState, person: Person, amount: number): void {
       log(state, `${person.name} 刚倒下，刀还落不下去——再等 ${DOWNED_LOCK_TURNS - person.downedTurns} 回合。`);
       return;
     }
+    state.executions += 1;
     killPerson(state, person);
     return;
   }
@@ -747,6 +751,61 @@ function damagePerson(state: GameState, person: Person, amount: number): void {
 }
 
 /** 倒地者是否已经过了「不能被补刀」的保护期 */
+function dropCarriedPerson(state: GameState, message: string): void {
+  if (!state.carryPersonId) return;
+  const person = state.people.find((p) => p.id === state.carryPersonId);
+  state.carryPersonId = null;
+  state.carryDistance = 0;
+  if (!person) return;
+  person.hp = SURVIVOR_INJURED_HP;
+  person.downedTurns = 0;
+  person.alert = 100;
+  person.intent = 'flee';
+  person.goal = 'exit';
+  person.activity = '挣脱后拖着伤口逃跑';
+  log(state, message);
+}
+
+export function carryPerson(state: GameState, personId: string): boolean {
+  if (state.phase !== 'playing' || state.carryPersonId || state.energy < 1) return false;
+  const person = state.people.find((p) => p.id === personId);
+  if (!person || person.role === 'police' || person.hp > 0 || person.room !== state.playerRoom) return false;
+  state.energy -= 1;
+  state.carryPersonId = person.id;
+  state.carryDistance = 0;
+  person.activity = '被杀手抱起搬运';
+  log(state, `你抱起了倒地的${person.name}。再移动 3 间房，他就可能挣脱。`);
+  afterPlayerAction(state);
+  return true;
+}
+
+export function executeCarriedPerson(state: GameState, method: 'fridge' | 'microwave'): boolean {
+  if (!state.carryPersonId || state.phase !== 'playing') return false;
+  const person = state.people.find((p) => p.id === state.carryPersonId);
+  if (!person || person.room !== state.playerRoom || !canExecuteNow(person)) {
+    log(state, '怀里的人尚不能处决，或已经不在现场。');
+    return false;
+  }
+  if (state.energy < 1) { log(state, '行动点不足，无法完成特殊处决。'); return false; }
+  if (state.playerRoom !== 'kitchen') { log(state, '这里没有可用的特殊处决地形。'); return false; }
+  state.energy -= 1;
+  const name = person.name;
+  state.carryPersonId = null;
+  state.carryDistance = 0;
+  state.executions += 1;
+  const flavor = method === 'fridge'
+    ? `你把${name}塞进冰箱，沉重的门缓缓合上……一切归于寂静。`
+    : `你将${name}按在微波炉旁，刺耳的嗡鸣吞没了最后的挣扎声。`;
+  log(state, `特殊处决：${flavor}（额外奖励 +35 分）。`);
+  killPerson(state, person);
+  state.scoreBreakdown.push({ label: `地形处决 · ${method === 'fridge' ? '冰箱' : '微波炉'}`, value: 35 });
+  state.attackReady = true;
+  addAlarm(state, 8);
+  afterPlayerAction(state);
+  checkImmediateWin(state);
+  return true;
+}
+
 function canExecuteNow(person: Person): boolean {
   return person.hp <= 0 && person.downedTurns >= DOWNED_LOCK_TURNS;
 }
@@ -761,6 +820,7 @@ function executePerson(state: GameState, person: Person): void {
     return;
   }
   addAlarm(state, 8);
+  state.executions += 1;
   log(state, `你处决了 ${person.name}。`);
   killPerson(state, person);
 }
@@ -1158,6 +1218,7 @@ function consumeItem(state: GameState, person: Person): void {
  * 追势清零，并且幸存者们立刻借这个空档各做一件事。
  */
 function interruptPlayer(state: GameState, reason: string, actorId: string): void {
+  dropCarriedPerson(state, '你被打断，怀里的人趁机挣脱并逃走了。');
   // 恶魔附身是迈尔斯的专属底牌：这段时间里障碍伏击与手电筒都拿他没办法
   if (state.possessed) {
     log(state, `${reason} 恶魔附身下的你连眼都没眨，这一下没起作用。`);
@@ -1297,6 +1358,8 @@ function tryCall(state: GameState, person: Person): boolean {
 }
 
 function finishCall(state: GameState, person: Person, device: string): void {
+  state.npcAlarmed = true;
+  state.npcAlarmed = true;
   addWanted(state, 3);
   addAlarm(state, 15);
   state.lastCrimeRoom = person.room;
@@ -1499,6 +1562,15 @@ function npcTurn(state: GameState): void {
         person.intent = 'stunned';
       }
       continue;
+    }
+
+    // 供电区域：灯光让幸存者更警觉；正在执行团队工作的人效率更高。
+    if (isRoomLit(state, person.room)) {
+      person.alert = clamp(person.alert + 4, 0, 100);
+      if (person.goal === 'objective' || person.goal === 'generator' || person.goal === 'key' || person.intent === 'work') {
+        addTeamProgress(state, 2);
+        log(state, `${roomName(person.room)}仍有照明，${person.name}借着灯光加快了行动（团队进度 +2）。`);
+      }
     }
 
     // 流血
@@ -2051,6 +2123,12 @@ export function movePlayer(state: GameState, room: RoomId): boolean {
   state.energy -= cost;
   state.playerRoom = room;
   markExplored(state, room);
+  if (state.carryPersonId) {
+    const carried = state.people.find((p) => p.id === state.carryPersonId);
+    if (carried) carried.room = room;
+    state.carryDistance += 1;
+    if (state.carryDistance >= 3) dropCarriedPerson(state, '搬运距离太远，幸存者挣脱你的控制，恢复受伤状态逃跑了。');
+  }
   log(
     state,
     state.freeMove
@@ -2301,13 +2379,18 @@ export function searchRoom(state: GameState): boolean {
 /* ------------------------------------------------------------------ */
 
 /** 为什么现在砸不了：用于按钮禁用与日志 */
+export function isRoomLit(state: GameState, room: RoomId): boolean {
+  return !state.powerCircuits.some((c) => c.broken && c.affectedRooms.includes(room));
+}
+
 export function sabotageBlockReason(state: GameState): string | null {
   if (state.phase !== 'playing') return '这一局已经结束了。';
   if (state.energy < SABOTAGE_COST) return `行动点不足：破坏需要 ${SABOTAGE_COST} 点。`;
+  const breaker = state.powerCircuits.some((c) => c.breakerRoom === state.playerRoom && !c.broken);
   const here = state.siteItems.filter(
     (i) => i.room === state.playerRoom && !i.broken && (i.kind === 'itemBox' ? i.charges > 0 : true),
   );
-  if (!here.length) return '这间屋子没有还能破坏的设施。';
+  if (!here.length && !breaker) return '这间屋子没有还能破坏的设施。';
   return null;
 }
 
@@ -2323,28 +2406,32 @@ export function sabotageSiteItem(state: GameState): boolean {
     log(state, reason);
     return false;
   }
+  const circuit = state.powerCircuits.find((c) => c.breakerRoom === state.playerRoom && !c.broken);
   const item = state.siteItems.find(
     (i) => i.room === state.playerRoom && !i.broken && (i.kind === 'itemBox' ? i.charges > 0 : true),
   );
-  if (!item) return false;
+  if (!circuit && !item) return false;
   state.energy -= SABOTAGE_COST;
 
-  if (item.kind === 'itemBox') {
+  if (circuit) {
+    circuit.broken = true;
+    log(state, `你砸毁了${circuit.name}控制箱！${circuit.affectedRooms.map(roomName).join('、')}立即断电，灯光熄灭。`);
+  } else if (item!.kind === 'itemBox') {
     item.broken = true;
     item.charges = 0;
     log(state, `你砸烂了${roomName(item.room)}的道具箱——从今往后，没人能从这里翻到道具了。`);
   } else {
-    const before = item.progress;
-    item.progress = Math.max(0, item.progress - SABOTAGE_GEN_LOSS);
-    if (item.charged) {
-      item.charged = false;
+    const before = item!.progress;
+    item!.progress = Math.max(0, item!.progress - SABOTAGE_GEN_LOSS);
+    if (item!.charged) {
+      item!.charged = false;
       reduceTeamProgress(state, SABOTAGE_TEAM_LOSS);
       log(state, `已经通电的线路被你扯断，他们的团队进度倒退了 ${SABOTAGE_TEAM_LOSS}。`);
     }
-    item.jammedTurns = GENERATOR_JAM_TURNS;
+    item!.jammedTurns = GENERATOR_JAM_TURNS;
     // 停机而不是永久报废：他们还能修回来，破坏是「拖时间」而非一劳永逸
-    item.broken = false;
-    log(state, `你砸了${roomName(item.room)}的发电机，修复进度 ${before}% → ${item.progress}%，停机 ${GENERATOR_JAM_TURNS} 回合。`);
+    item!.broken = false;
+    log(state, `你砸了${roomName(item!.room)}的发电机，修复进度 ${before}% → ${item!.progress}%，停机 ${GENERATOR_JAM_TURNS} 回合。`);
   }
 
   addDisturbance(state, state.playerRoom);
@@ -2411,16 +2498,20 @@ export function usePower(state: GameState, powerId: string): boolean {
 /*  胜负                                                                */
 /* ==================================================================== */
 
+export function missionTaskProgress(state: GameState, task: MissionTask): number {
+  switch (task.kind) {
+    case 'kill_count': return state.kills;
+    case 'marked_kill': return state.markedKilled;
+    case 'execute': return state.executions;
+    case 'no_alarm': return state.npcAlarmed ? 0 : 1;
+    case 'break_circuit': return state.powerCircuits.filter((c) => c.broken).length;
+  }
+}
+
 function checkImmediateWin(state: GameState): void {
   if (state.result) return;
-  const m = state.mission;
-  if (m.kind === 'assassinate' && state.markedKilled >= (m.targetCount ?? 2) && state.playerRoom === EXIT_ROOM) {
-    finish(state, 'win');
-  } else if (m.kind === 'evidence' && state.evidence >= (m.targetCount ?? 2) && state.playerRoom === EXIT_ROOM) {
-    finish(state, 'win');
-  } else if (m.kind === 'escape' && state.markedKilled >= 1 && state.playerRoom === EXIT_ROOM) {
-    finish(state, 'win');
-  }
+  const tasks = state.mission.tasks ?? [];
+  if (tasks.length > 0 && tasks.every((task) => missionTaskProgress(state, task) >= task.target)) finish(state, 'win');
 }
 
 function finish(state: GameState, result: ResultKind): void {
@@ -2510,11 +2601,8 @@ export function endTurn(state: GameState): void {
   if (state.phase !== 'playing') return;
 
   const m = state.mission;
-  // 挂机类任务（在房间里连续停留数回合）已删除：赢只能靠杀够人 / 杀掉关键人物再撤离。
-  if (m.kind === 'bodyCount' && state.kills >= (m.targetCount ?? 3)) {
-    finish(state, 'win');
-    return;
-  }
+  checkImmediateWin(state);
+  if (state.result) return;
 
   // 守尸惩罚：站在倒地者房间干等，其他人会把团队任务往前赶一大截
   const downedHere = npcs(state).some((p) => p.hp <= 0 && p.room === state.playerRoom);
