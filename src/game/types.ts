@@ -233,6 +233,15 @@ export type MissionKind =
   | 'evidence'
   | 'escape';
 
+export type MissionTaskKind = 'kill_count' | 'marked_kill' | 'execute' | 'no_alarm' | 'break_circuit';
+
+export interface MissionTask {
+  id: string;
+  kind: MissionTaskKind;
+  label: string;
+  target: number;
+}
+
 export interface Mission {
   id: string;
   kind: MissionKind;
@@ -241,6 +250,8 @@ export interface Mission {
   turns: number;
   reward: number;
   targetCount?: number;
+  /** 本局必须完成的组合契约目标 */
+  tasks?: MissionTask[];
   /** 允许逃走的 NPC 上限已删除：改成「每逃一人扣分，人全跑光才判负」 */
   /** 一句话主目标：任务条上永远看得见 */
   objective?: string;
@@ -267,6 +278,14 @@ export interface ScoreLine {
 export type GamePhase = 'menu' | 'setup' | 'playing' | 'gameover';
 
 export type ResultKind = 'win' | 'caught' | 'timeout' | 'failed';
+
+export interface PowerCircuit {
+  id: string;
+  name: string;
+  breakerRoom: RoomId;
+  affectedRooms: RoomId[];
+  broken: boolean;
+}
 
 export interface GameState {
   phase: GamePhase;
@@ -310,6 +329,10 @@ export interface GameState {
   log: string[];
   kills: number;
   killsThisTurn: number;
+  executions: number;
+  npcAlarmed: boolean;
+  carryPersonId: string | null;
+  carryDistance: number;
   evidence: number;
   markedKilled: number;
   decoyRoom: RoomId | null;
@@ -402,6 +425,8 @@ export interface GameState {
   teamGoalLabel: string;
   /** 本局随机摆下的道具箱 / 发电机：杀手用不了，但能砸 */
   siteItems: SiteItem[];
+  /** 独立区域电闸及其供电范围 */
+  powerCircuits: PowerCircuit[];
 }
 
 export interface SaveData {
