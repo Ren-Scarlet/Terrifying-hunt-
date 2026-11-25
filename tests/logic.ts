@@ -3,7 +3,7 @@
  * 运行：npm run check
  */
 import { CARD_MAP, CARDS, STARTING_DECK, deckCardsForKiller } from '../src/game/data/cards';
-import { KILLERS } from '../src/game/data/killers';
+import { ACTIVE_KILLERS, KILLERS, STARTER_KILLERS } from '../src/game/data/killers';
 import {
   ARCH_LABEL,
   BASE_AP,
@@ -62,6 +62,16 @@ import { nearestOf, roomDistance } from '../src/game/navigation';
 
 let pass = 0;
 let fail = 0;
+
+check('初期可选杀手严格限定为设陷者、护士、迈尔斯',
+  ACTIVE_KILLERS.map((killer) => killer.owner).join('|') === '设陷者|护士|迈克尔·迈尔斯' &&
+  STARTER_KILLERS.join('|') === '设陷者|护士|迈克尔·迈尔斯',
+  ACTIVE_KILLERS.map((killer) => killer.owner).join('、'),
+);
+check('未开放杀手资料仍保留在内部数据库，便于后续实装',
+  KILLERS.length > ACTIVE_KILLERS.length && !!KILLERS.find((killer) => killer.owner === '幽灵'),
+  `数据库 ${KILLERS.length} 位 / 当前开放 ${ACTIVE_KILLERS.length} 位`,
+);
 
 function check(name: string, ok: boolean, detail = ''): void {
   if (ok) pass += 1;
