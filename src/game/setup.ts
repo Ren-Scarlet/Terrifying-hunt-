@@ -126,10 +126,10 @@ export function createGame(
     teamGoalLabel: '',
     siteItems: [],
     powerCircuits: [
-      { id: 'main-floor', name: '主楼照明', breakerRoom: 'basement', affectedRooms: ['hall', 'kitchen', 'dining', 'study'], broken: false },
-      { id: 'upper-floor', name: '二层照明', breakerRoom: 'workshop', affectedRooms: ['bedroom', 'nursery', 'guestroom', 'attic'], broken: false },
-      { id: 'east-wing', name: '东翼照明', breakerRoom: 'conservatory', affectedRooms: ['garden', 'balcony', 'foyer'], broken: false },
-      { id: 'service-wing', name: '服务区照明', breakerRoom: 'laundry', affectedRooms: ['corridor', 'storage', 'wine', 'chapel', 'stairwell', 'bathroom', 'library'], broken: false },
+      { id: 'main-floor', name: '主楼照明', breakerRoom: 'basement', affectedRooms: ['basement', 'hall', 'kitchen', 'dining', 'study'], broken: false },
+      { id: 'upper-floor', name: '二层照明', breakerRoom: 'workshop', affectedRooms: ['workshop', 'bedroom', 'nursery', 'guestroom', 'attic'], broken: false },
+      { id: 'east-wing', name: '东翼照明', breakerRoom: 'conservatory', affectedRooms: ['conservatory', 'garden', 'balcony', 'foyer', 'garage'], broken: false },
+      { id: 'service-wing', name: '服务区照明', breakerRoom: 'laundry', affectedRooms: ['laundry', 'corridor', 'storage', 'wine', 'chapel', 'stairwell', 'bathroom', 'library'], broken: false },
     ],
   };
   // 团队目标：随机挑 3 间房作为「电闸 / 钥匙柜」，再给每个人派一个个人目的。
