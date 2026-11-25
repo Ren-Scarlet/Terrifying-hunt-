@@ -132,6 +132,35 @@ function caseDrawAndDiscardRules(): void {
   }
 }
 
+/** 迈尔斯尾随模式与杀手恐惧范围。 */
+function caseMyersStalkingAndFearRadius(): void {
+  const s = newGame();
+  const victim = player(s);
+  check('恐惧范围：普通杀手基础值默认为 1', s.fearRadius === 1);
+  const next = openNeighbor(s.playerRoom);
+  s.energy = 9;
+  const beforeCost = moveCost(s, next);
+  runOps(s, [{ op: 'flag', key: 'myersStalk' }]);
+  check('迈尔斯：尾随者技能切换开启潜行模式', s.myersStalking);
+  check('迈尔斯：尾随模式移动额外消耗 1 点行动点', moveCost(s, next) === beforeCost + 1);
+
+  const stealth = newGame();
+  const hiddenTarget = player(stealth);
+  const stealthRoom = openNeighbor(stealth.playerRoom);
+  hiddenTarget.room = stealthRoom;
+  runOps(stealth, [{ op: 'flag', key: 'myersStalk' }]);
+  stealth.energy = 9;
+  movePlayer(stealth, stealthRoom);
+  check('迈尔斯：尾随者模式进入幸存者所在房间也不会被察觉', hiddenTarget.alert === 0 && hiddenTarget.awareness === 0, `alert=${hiddenTarget.alert} awareness=${hiddenTarget.awareness}`);
+
+  victim.room = s.playerRoom;
+  const beforeStalk = s.stalkMeter;
+  endTurn(s);
+  check('迈尔斯：静止观察视野内幸存者会积累尾随值', s.stalkMeter > beforeStalk, `stalk=${s.stalkMeter}`);
+  const normal = createGame(['silent_step'], undefined, '设陷者');
+  check('恐惧范围：其他杀手仍保持默认 1', normal.fearRadius === 1);
+}
+
 function caseNavigationUtilities(): void {
   const state = newGame();
   const start = state.playerRoom;
@@ -354,7 +383,7 @@ function caseFinisher(): void {
   s3.possessed = true;
   s3.possessTurns = 3;
   attack(s3, v3.id);
-  check('F 恶魔附身额外伤害使健康者进入受伤', v3.hp === 2 && conditionOf(v3) === 'injured', `hp=${v3.hp}`);
+  check('F 迈尔斯恶魔附身一刀击倒健康幸存者', v3.hp === 0 && conditionOf(v3) === 'downed', `hp=${v3.hp}`);
 }
 
 /** G：卡牌数据仍然挂着正确的指令，而且不再直接造成伤害 */
@@ -943,6 +972,7 @@ function caseMergeAndMissions(): void {
   check('Z 每逃一人扣 15 分', currentScore(sc) === base - 30, `${base} → ${currentScore(sc)}`);
 }
 
+caseMyersStalkingAndFearRadius();
 caseNavigationUtilities();
 caseMergeAndMissions();
 caseDrawAndDiscardRules();

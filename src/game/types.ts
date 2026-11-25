@@ -368,6 +368,14 @@ export interface GameState {
   /** 被处刑者锁住、无法逃离的目标 */
   pinnedPeople: string[];
 
+  /** 杀手基础恐惧范围：0潜行、1同屋惊动/隔壁起疑、2可感知两格外 */
+  fearRadius: number;
+  /** 迈尔斯是否处于尾随者模式：移动缓慢且无法侦测 */
+  myersStalking: boolean;
+  /** 本回合是否移动过；移动会打断尾随积累 */
+  myersMovedThisTurn: boolean;
+  /** 当前目标持续尾随压力 0–100 */
+  stalkPressure: number;
   /** 迈尔斯：尾随值 0–100，满值可进入恶魔附身 */
   stalkMeter: number;
   stalkTargetId: string | null;

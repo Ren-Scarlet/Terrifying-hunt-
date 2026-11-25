@@ -28,6 +28,8 @@ export interface KillerProfile {
   portrait?: string;
   school: KillerSchool;
   sourceNote: string;
+  /** 恐惧范围：0潜行、1基础范围、2远距离感知；默认 1 */
+  fearRadius?: 0 | 1 | 2;
   /** 被动说明。引擎里真正实现被动的是迈尔斯（尾随值）。 */
   passive?: { name: string; short: string };
   powers: KillerPower[];
@@ -206,36 +208,30 @@ export const KILLERS: KillerProfile[] = [
     icon: 'assets/dbd/powers/迈克尔·迈尔斯.png',
     portrait: 'assets/characters/killers/迈尔斯.webp',
     school: 'grounded',
+    fearRadius: 1,
     passive: {
-      name: '尾随',
-      short: '只有主动凝视别人时才会积累尾随值——走过去不会自动涨，也不会随时间凭空出现。',
+      name: '尾随者',
+      short: '开启尾随者后恐惧范围降为 0，移动更慢；保持静止并凝视视野内的幸存者可积累尾随值。持续盯梢会让目标起疑、逃离或识破你。',
     },
     sourceNote: NOTE,
     powers: [
       {
         id: 'myers_gaze',
-        name: '凝视',
-        desc: '主动发动：尾随值 +30。看清相邻所有房间，并记住其中还没察觉你的人（2 回合内位置不掉线）；同房间的人被你看得发毛，警觉 -15。',
+        name: '尾随者',
+        desc: '切换尾随者模式：恐惧范围降为 0，幸存者即使与你同处一室也无法侦测你；但移动额外消耗 1 点行动点。保持静止并持续观察视野内的幸存者，每回合积累尾随值。目标被盯梢过久会起疑逃离，也可能检定识破你。',
         cooldown: 1,
-        ops: [
-          { op: 'stalk', amount: 30 },
-          { op: 'scout', adj: true, turns: 1 },
-          { op: 'track', who: 'unawareNearby', turns: 2 },
-          { op: 'alert', who: 'allHere', amount: -15 },
-          { op: 'log', text: '你站在门口，一动不动地看着他。' },
-        ],
+        ops: [{ op: 'flag', key: 'myersStalk' }],
       },
       {
         id: 'myers_possess',
         name: '恶魔附身',
-        desc: '尾随值满 100 才能发动：接下来 3 回合进入附身，每一刀造成 2 点伤害（健康者受伤、受伤者倒地），尾随值清零。',
+        desc: '尾随值达到 100 后解锁。开启后每次行动消耗 20 点尾随值，归零时退出；附身期间每次挥刀都能直接击倒一名站立的幸存者。',
         cooldown: 3,
         ultimate: true,
         requires: [{ c: 'stalk', gte: 100 }],
         ops: [
           { op: 'flag', key: 'possessReady' },
-          { op: 'stalk', amount: -100 },
-          { op: 'log', text: '面具合上了。接下来几刀不需要理由，也不需要第二下。' },
+          { op: 'log', text: '面具合上了。尾随积攒的恶意终于找到了出口。' },
         ],
       },
     ],
