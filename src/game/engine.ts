@@ -622,6 +622,34 @@ function afterPlayerAction(state: GameState): void {
 /* ==================================================================== */
 
 
+function nextStepToward(
+  state: GameState,
+  from: RoomId,
+  to: RoomId,
+  avoid: RoomId[] = [],
+  respectLocks = true,
+): RoomId | null {
+  if (from === to) return null;
+  const blocked = new Set<RoomId>(avoid);
+  const queue: RoomId[][] = [[from]];
+  const seen = new Set<RoomId>([from]);
+  while (queue.length) {
+    const path = queue.shift()!;
+    const current = path[path.length - 1];
+    for (const next of ROOM_MAP[current].neighbors) {
+      if (seen.has(next)) continue;
+      if (blocked.has(next) && next !== to) continue;
+      if (respectLocks && isLocked(state, next) && next !== to) continue;
+      if (!canStand(state, next) && next !== to) continue;
+      seen.add(next);
+      const newPath = [...path, next];
+      if (next === to) return newPath[1];
+      queue.push(newPath);
+    }
+  }
+  return null;
+}
+
 function farthestRoom(state: GameState, from: RoomId): RoomId {
   const pool = ROOMS.map((r) => r.id).filter(
     (r) => r !== from && r !== state.playerRoom && canStand(state, r) && !isLocked(state, r),
