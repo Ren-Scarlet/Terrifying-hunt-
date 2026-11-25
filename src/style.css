@@ -907,7 +907,21 @@ button { font-family: inherit; cursor: pointer; }
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
+  /* 底部内边距交给常驻操作栏自己带，避免按钮组下面多出一条空白 */
+  padding-bottom: 0;
   border-color: #2e2b26;
+}
+/* 操作栏常驻面板底部：矮屏 / 手机上菜单内容有两三屏高，
+   开始按钮不能要求用户先滚到底。sticky 让它始终贴住可视区底边，
+   横向负 margin 铺满面板，滚动时内容从它上方滑过。 */
+.menu-modal > .actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 6;
+  margin: 16px -24px 0;
+  padding: 14px 24px 20px;
+  background: linear-gradient(180deg, rgba(9, 10, 12, 0) 0%, #0a0c0e 26%, #090a0c 100%);
+  border-top: 1px solid #ffffff0a;
 }
 /* 菜单背后的一束暖光 + 一点冷光：不让整块面板变成一块死黑的板 */
 .menu-modal::before {
@@ -1762,13 +1776,13 @@ button { font-family: inherit; cursor: pointer; }
 .result-modal.is-win { border-color: #6b542f; }
 .result-modal.is-lose { border-color: #5a2b22; }
 
-/* 底部吸附区：资源条 + 手牌一起贴在视口底部 */
+/* 底部区：资源条 + 手牌。
+   以前这里用 position:sticky 把它整体吸在视口底部，但地图高度是固定的、自身不滚动，
+   于是牌区被上拉后直接盖住地图下半截（1366x768 重叠 113px，1440x700 重叠 231px），
+   被盖住的房间永远看不到。改成正常流：地图完整，整页一起纵向滚动。 */
 .bottom-dock {
-  position: sticky; bottom: 10px; z-index: 30;
+  position: static;
   display: flex; flex-direction: column; gap: 6px;
-}
-@media (max-width: 720px) {
-  .bottom-dock { position: static; }
 }
 .panel.hand { position: static; box-shadow: 0 14px 30px #000b, inset 0 1px #ffffff09; }
 .resource-bar { padding: 7px 10px; }
