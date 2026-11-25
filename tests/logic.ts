@@ -35,6 +35,7 @@ import {
   endTurn,
   isPersonVisible,
   isRoomVisible,
+  lookAround,
   isLocked,
   isRoomExplored,
   isSensing,
