@@ -103,12 +103,14 @@ function caseDrawAndDiscardRules(): void {
 
   const flee = newGame();
   const victim = player(flee);
+  // 选一间至少有两个普通出口的房间，并让玩家与幸存者处于同一房间。
+  // 原测试把玩家放在隔壁，实际没有覆盖 npcTurn 的「同屋最终逃跑」分支；
+  // movesThisTurn 已满的隔壁幸存者按规则不会在这里额外移动。
   const escapeSetup = Object.values(ROOM_MAP).find((room) =>
     room.neighbors.filter((r) => !OBSTACLE_ROOMS.includes(r)).length >= 2,
   );
   if (escapeSetup) {
-    const playerNeighbor = escapeSetup.neighbors.find((r) => !OBSTACLE_ROOMS.includes(r))!;
-    flee.playerRoom = playerNeighbor;
+    flee.playerRoom = escapeSetup.id;
     victim.room = escapeSetup.id;
     victim.hp = 2;
     victim.alert = 100;
