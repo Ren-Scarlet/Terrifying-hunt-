@@ -144,7 +144,8 @@ function workPressure(state: GameState): number {
 
 /** 追一个人越久、杀的人越多，其他人干活越快；这是「守着一个人追 / 一路屠杀」的代价 */
 function scaleSurvivorProgress(state: GameState, person: Person, amount: number): number {
-  let multiplier = state.distressingActive ? 0.8 : 1;
+  const radius = effectiveFearRadius(state);
+  let multiplier = state.distressingActive && radius > 0 && roomDistance(person.room, state.playerRoom) <= radius ? 0.8 : 1;
   if (state.killer === '迈克尔·迈尔斯' && state.myersEclipseMarks > 0) {
     const marks = Math.min(5, state.myersEclipseMarks);
     multiplier *= person.bloodSacrifice ? 1 + marks * 0.05 : Math.max(0.65, 1 - marks * 0.05);
@@ -2593,7 +2594,7 @@ export function attack(state: GameState, targetId?: string): boolean {
         log(state, '难逃一死生效：图腾仍然存留，你获得 2 点额外行动点。');
       }
     }
-    if (state.killer === '迈克尔·迈尔斯' && state.myersLastBestActive && !target.bloodSacrifice) {
+    if (state.killer === '迈克尔·迈尔斯' && state.myersLastBestActive && target.role !== 'police' && !target.bloodSacrifice) {
       state.myersLastBestMarks = Math.min(8, state.myersLastBestMarks + 1);
       log(state, `把最好的留在最后印记 +1（${state.myersLastBestMarks}/8）。`);
     }
