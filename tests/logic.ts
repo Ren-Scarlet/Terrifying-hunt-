@@ -141,27 +141,35 @@ function caseAmbush(): void {
 
 /** C：「疾速残暴」把两间房的距离抹平，追上去还能补刀 */
 function casePursue(): void {
-  const s = newGame();
-  const v = player(s);
-  const start = s.playerRoom;
-  const hop1 = openNeighbor(start);
-  const hop2 = ROOM_MAP[hop1].neighbors.find((r) => r !== start)!;
-  v.room = hop2;
-  v.hp = 1;
-  v.intent = 'flee';
+  // 户型是随机的：有的局入口只有一条死路，凑不出「两跳走廊」，重开一局再试
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const s = newGame();
+    const start = s.playerRoom;
+    const hop1 = ROOM_MAP[start].neighbors.find((r) => !OBSTACLE_ROOMS.includes(r))
+      ?? ROOM_MAP[start].neighbors[0];
+    const hop2 = ROOM_MAP[hop1]?.neighbors.find((r) => r !== start);
+    if (!hop2) continue;
 
-  // 追击牌把你送到他原来所在的房间；贴住之后他会立刻再跑——这是新节奏：
-  // 「追上」不再等于「按住」，同屋的目击者会跑、会干活、会拿手电筒照你。
-  const targetRoom = v.room;
-  play(s, 'sprint');
-  const followed = s.playerRoom === targetRoom;
-  check('C 追击牌能贴到目标房间', followed, `玩家在 ${s.playerRoom}，目标原在 ${targetRoom}，现在在 ${v.room}`);
+    const v = player(s);
+    v.room = hop2;
+    v.hp = 1;
+    v.intent = 'flee';
 
-  if (s.playerRoom === v.room) {
-    const hp = v.hp;
-    const hit = attack(s);
-    check('C 追上后能补刀', hit && v.hp < hp, `hp ${hp} → ${v.hp}`);
+    // 追击牌把你送到他原来所在的房间；贴住之后他会立刻再跑——这是新节奏：
+    // 「追上」不再等于「按住」，同屋的目击者会跑、会干活、会拿手电筒照你。
+    const targetRoom = v.room;
+    play(s, 'sprint');
+    const followed = s.playerRoom === targetRoom;
+    check('C 追击牌能贴到目标房间', followed, `玩家在 ${s.playerRoom}，目标原在 ${targetRoom}，现在在 ${v.room}`);
+
+    if (s.playerRoom === v.room) {
+      const hp = v.hp;
+      const hit = attack(s);
+      check('C 追上后能补刀', hit && v.hp < hp, `hp ${hp} → ${v.hp}`);
+    }
+    return;
   }
+  check('C 追击牌能贴到目标房间', false, '连续 10 局都凑不出两跳走廊');
 }
 
 /** D：没打卡牌，一进门就被看见 → 对方当场跑 */
@@ -757,6 +765,73 @@ function caseMergeAndMissions(): void {
 }
 
 caseMergeAndMissions();
+
+/** 本轮：人人可救援 / 主动赶去救 / 连杀之后团队进度被催快 */
+function caseAidAndPressure(): void {
+  const originalRandom = Math.random;
+
+  // 同屋救援：把原型换成普通「警觉型」，验证不再只有救援型会拉人
+  const a = newGame();
+  a.people.forEach((p) => { p.item = null; p.itemUses = 0; p.alert = 0; p.hidden = false; p.hp = 2; });
+  const pair = a.people.filter((p) => p.role !== 'police').slice(0, 2);
+  const away = ROOM_MAP[a.playerRoom].neighbors.find((r) => !OBSTACLE_ROOMS.includes(r))
+    ?? ROOM_MAP[a.playerRoom].neighbors[0];
+  pair[0].room = away;
+  pair[0].hp = 0;
+  pair[0].downedTurns = 0;
+  pair[1].room = away;
+  pair[1].archetype = 'alert';
+  Math.random = () => 0.01;
+  endTurn(a);
+  Math.random = originalRandom;
+  check('AA 非救援型也会拉起同屋倒地同伴', pair[0].hp === 1, `hp=${pair[0].hp} down=${pair[0].downedTurns}`);
+
+  // 主动赶路：倒地的人在另一间屋，附近的人会放下手里的活往那边走
+  const b = newGame();
+  b.people.forEach((p) => { p.item = null; p.itemUses = 0; p.alert = 0; p.hidden = false; p.hp = 2; });
+  const folk = b.people.filter((p) => p.role !== 'police').slice(0, 2);
+  const near = ROOM_MAP[b.playerRoom].neighbors.find((r) => !OBSTACLE_ROOMS.includes(r))
+    ?? ROOM_MAP[b.playerRoom].neighbors[0];
+  const far = ROOM_MAP[near].neighbors.find((r) => r !== b.playerRoom && !OBSTACLE_ROOMS.includes(r)) ?? near;
+  folk[0].room = near;
+  folk[0].hp = 0;
+  folk[0].downedTurns = 0;
+  folk[1].room = far;
+  folk[1].archetype = 'alert';
+  folk[1].intent = 'idle';
+  Math.random = () => 0.01;
+  endTurn(b);
+  Math.random = originalRandom;
+  check(
+    'AA 幸存者会主动朝倒地同伴赶过去',
+    folk[1].room === near || folk[1].intent === 'rescue' || folk[1].activity.includes('赶去'),
+    `room=${folk[1].room} intent=${folk[1].intent} activity=${folk[1].activity}`,
+  );
+
+  // 击杀压力：死了 3 个人后，目标房干活一回合推进明显快于基础值 5
+  let delta = 0;
+  for (let attempt = 0; attempt < 5 && delta < 7; attempt += 1) {
+    const w = newGame();
+    w.siteItems = [];
+    w.people.forEach((p) => { p.item = null; p.itemUses = 0; p.alert = 0; p.hidden = false; p.hp = 2; });
+    const room = w.objectiveRooms.find((r) => r !== w.playerRoom);
+    if (!room) continue;
+    const worker = w.people.filter((p) => p.role !== 'police')[0];
+    worker.goal = 'objective';
+    worker.room = room;
+    worker.intent = 'idle';
+    worker.movesThisTurn = 0;
+    w.kills = 3;
+    const before = w.teamProgress;
+    Math.random = () => 0.5;
+    endTurn(w);
+    Math.random = originalRandom;
+    delta = w.teamProgress - before;
+  }
+  check('AA 连杀三人后团队目标推得更快', delta >= 7, `一回合推进 ${delta}`);
+}
+
+caseAidAndPressure();
 
 console.log(`\n规则回归 ${pass} 通过 / ${fail} 失败`);
 if (fail > 0) process.exitCode = 1;

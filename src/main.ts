@@ -39,7 +39,7 @@ import {
 } from './ui/render';
 import { renderAdmin } from './ui/admin';
 import { mountFloorplanScene, type SceneHandle } from './ui/scene';
-import { playSfx, toggleMute, unlockAudio } from './ui/audio';
+import { playSfx, setMusic, toggleMute, unlockAudio } from './ui/audio';
 
 type Screen = 'menu' | 'game' | 'result';
 
@@ -68,6 +68,8 @@ let lastWanted = 0;
 const app = document.getElementById('app')!;
 
 function render(): void {
+  // 菜单（含商店/牌组/平衡面板）放角色选择曲，进入对局换背景曲；同一首不会重播
+  setMusic(screen === 'menu' || !game ? 'menu' : 'bgm');
   let html = '';
   if (adminOpen) {
     html = renderAdmin();
@@ -133,7 +135,9 @@ function sfxFromLogs(): void {
   const head = game.log[0] ?? '';
   if (head === lastLogHead) return;
   lastLogHead = head;
-  if (/致盲|击晕|手电筒|逼退/.test(head)) playSfx('stun');
+  if (/恶魔附身：/.test(head)) playSfx('possess');
+  else if (/停止了呼吸|处决了/.test(head)) playSfx('kill');
+  else if (/致盲|击晕|手电筒|逼退/.test(head)) playSfx('stun');
   else if (/乌鸦|动静/.test(head)) playSfx('crow');
   else if (/翻出了/.test(head)) playSfx('pickup');
   else if (/发电机/.test(head)) playSfx('generator');
@@ -208,6 +212,7 @@ app.addEventListener('click', (event) => {
 
   if (action === 'start' || action === 'again') {
     startGame();
+    playSfx('start');
     return;
   }
 

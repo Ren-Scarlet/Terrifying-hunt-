@@ -97,6 +97,23 @@ export const WIPE_COST = 1;
 const GUARD_TEAM_GAIN = 9;
 /** 每多追同一名幸存者一回合，其他人的工作效率 +25%，最多翻倍 */
 const CHASE_WORK_BONUS = 0.25;
+/** 同屋有倒地同伴时，各原型把人拉起来的意愿（0~1）：人人都可能救，只是有人更奋不顾身 */
+const RESCUE_EAGERNESS: Record<Archetype, number> = {
+  rescuer: 1,
+  brave: 0.85,
+  caller: 0.6,
+  alert: 0.55,
+  defiant: 0.45,
+  kiter: 0.4,
+  hider: 0.3,
+};
+/** 同伴倒地后主动「赶过去」的意愿，再打个折：有人会先保自己 */
+const AID_RUN_RATE = 0.8;
+/** 每击杀一名幸存者，其他人的干活效率加成（恐惧催出来的拼命） */
+const KILL_PRESSURE = 0.15;
+const KILL_PRESSURE_MAX = 0.6;
+/** 场上有人倒地还没死时，全体效率再抬一截 */
+const DOWNED_URGENCY = 0.25;
 /** 鬼面夜幕每回合累积的监视值 */
 const WATCH_GAIN = 34;
 /** 医疗包要连续治这么多回合才生效，不能一下就把人治好 */
@@ -110,9 +127,17 @@ function itemUsesFor(item: SurvivorItem): number {
   return item === 'toolbox' || item === 'flashlight' || item === 'medkit' ? 2 : 1;
 }
 
-/** 追一个人越久，其他人干活越快；这是「守着一个人追」的代价 */
+/** 同伴一个个倒下，剩下的人会红着眼拼命：击杀数与场上倒地者都会催他们干活更快 */
+function workPressure(state: GameState): number {
+  const downed = state.people.some((p) => p.role !== 'police' && p.hp <= 0);
+  return Math.min(KILL_PRESSURE_MAX, state.kills * KILL_PRESSURE) + (downed ? DOWNED_URGENCY : 0);
+}
+
+/** 追一个人越久、杀的人越多，其他人干活越快；这是「守着一个人追 / 一路屠杀」的代价 */
 function teamWorkGain(state: GameState): number {
-  return Math.round(OBJECTIVE_GAIN * (1 + Math.min(1, state.chaseTurns * CHASE_WORK_BONUS)));
+  return Math.round(
+    OBJECTIVE_GAIN * (1 + Math.min(1, state.chaseTurns * CHASE_WORK_BONUS) + workPressure(state)),
+  );
 }
 
 /* ---------- 场地物品：道具箱 / 发电机 ---------- */
@@ -1576,11 +1601,11 @@ function barricadeRoom(state: GameState, person: Person): void {
   addAlarm(state, 2);
 }
 
-/** 救援型 / 英勇型：治疗或拉起同伴，玩家在场时不敢动手 */
+/** 同屋有倒地同伴就拉起他：任何人都会救，只是意愿不同；玩家在场时没人敢动手 */
 function tryRescue(state: GameState, person: Person): boolean {
-  if (person.archetype !== 'rescuer' && person.archetype !== 'brave') return false;
   if (person.room === state.playerRoom) return false;
   if (person.blockedTurns > 0) return false;
+  if (Math.random() > RESCUE_EAGERNESS[person.archetype]) return false;
   const allies = peopleInRoom(state, person.room).filter(
     (p) => p.id !== person.id && p.role !== 'police',
   );
@@ -1599,6 +1624,22 @@ function tryRescue(state: GameState, person: Person): boolean {
     return true;
   }
   return false;
+}
+
+/** 有人倒地时，幸存者会主动赶过去：救援优先于日常目标，但没人敢闯玩家守着的房间 */
+function tryAidRun(state: GameState, person: Person): boolean {
+  if (person.hidden || person.blockedTurns > 0) return false;
+  if (Math.random() > RESCUE_EAGERNESS[person.archetype] * AID_RUN_RATE) return false;
+  const downed = npcs(state)
+    .filter((p) => p.hp <= 0 && p.room !== state.playerRoom)
+    .sort((a, b) => roomDistance(person.room, a.room) - roomDistance(person.room, b.room))[0];
+  if (!downed || downed.room === person.room) return false;
+  const step = nextStepToward(state, person.room, downed.room, [state.playerRoom]);
+  if (!step) return false;
+  person.room = step;
+  person.intent = 'rescue';
+  person.activity = `朝${downed.name}倒下的地方赶去`;
+  return true;
 }
 
 /** 求救型：打电话（1 回合）或用无线电（2 回合）报警 */
@@ -1705,15 +1746,20 @@ function actByArchetype(state: GameState, person: Person): void {
     }
     case 'rescuer': {
       if (tryRescue(state, person)) return;
+      // 倒地者优先于受伤者：以前只找站着的人，救援型永远不会走向被砍倒的同伴
+      const downed = npcs(state)
+        .filter((p) => p.hp <= 0 && p.room !== state.playerRoom)
+        .sort((a, b) => roomDistance(person.room, a.room) - roomDistance(person.room, b.room))[0];
       const wounded = standing(state)
         .filter((p) => p.hp === 1 && p.room !== person.room)
         .sort((a, b) => roomDistance(person.room, a.room) - roomDistance(person.room, b.room))[0];
-      if (wounded) {
-        const step = nextStepToward(state, person.room, wounded.room, [state.playerRoom]);
+      const target = downed ?? wounded;
+      if (target) {
+        const step = nextStepToward(state, person.room, target.room, [state.playerRoom]);
         if (step) {
           person.room = step;
           person.intent = 'flee';
-          person.activity = '赶去救受伤的人';
+          person.activity = downed ? `赶去救倒地的 ${target.name}` : '赶去救受伤的人';
           return;
         }
       }
@@ -1896,6 +1942,9 @@ function npcTurn(state: GameState): void {
     // 手里有道具的人会挑时机用掉它（救人、报警、开后门、抹掉脚印…）
     if (useSurvivorItem(state, person)) continue;
 
+    // 还有人倒在地上：没被吓破胆的人会放下手里的活，朝那边赶过去
+    if (person.intent !== 'escape' && person.intent !== 'call' && tryAidRun(state, person)) continue;
+
     // 跑了一整回合的人会喘不上气：找个角落停下来，甚至钻进柜子。
     // 这就是「痕迹」能兑现的地方——你不是追上他，是跟着地板上的划痕找到他。
     const ranFar = person.movesThisTurn >= 2 && roomDistance(state.playerRoom, person.room) >= 2;
@@ -1972,7 +2021,8 @@ function npcTurn(state: GameState): void {
       );
       if (gen) {
         const hasToolbox = person.item === 'toolbox' && person.itemUses > 0;
-        const gain = GENERATOR_GAIN * (hasToolbox ? 2 : 1);
+        // 危急时刻发电机也修得更快：同伴的死亡和倒地都在催他们
+        const gain = Math.round(GENERATOR_GAIN * (1 + workPressure(state))) * (hasToolbox ? 2 : 1);
         gen.progress = Math.min(100, gen.progress + gain);
         if (hasToolbox) consumeItem(state, person);
         person.intent = 'work';
