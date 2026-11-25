@@ -9,12 +9,12 @@ import type { KillerPower } from '../effect';
  *    · powers[0]  主力技：冷却 1 回合，每回合都能用，负责建立节奏
  *    · powers[1]  大招：冷却 3 回合，效果强烈，个别还带开启条件
  *
- *  能力效果同样由 effect.ts 的指令描述，改 ops 就能改效果。
- *  图标取自 public/assets/dbd/powers（选人界面那一批），立绘取自
- *  public/assets/characters/killers；没有立绘的杀手会退回用力量图标。
+ *  能力效果由 effect.ts 的指令描述。数值可以在游戏主菜单的「平衡调整」里
+ *  直接改（冷却、每条指令的数值），改完保存即生效。
  *
- *  被动（passive）目前只有迈尔斯的尾随值在引擎里实现，其余杀手的强度
- *  全部集中在两个主动能力上，避免出现「被动和主动效果重复」的混乱。
+ *  注意伤害尺度：健康 / 受伤 / 倒地各两格血，1 点伤害只是受伤，
+ *  2 点伤害才能把健康的人打倒。处决类能力必须先用 `execute` 并带
+ *  `requires: [{ c: 'downedHere' }]`，不能凭空秒人。
  */
 
 export type KillerSchool = 'supernatural' | 'grounded';
@@ -123,11 +123,11 @@ export const KILLERS: KillerProfile[] = [
       {
         id: 'nurse_breath',
         name: '窒息之息',
-        desc: '当前房间所有人受到 3 点伤害，并被压在原地 1 回合。',
+        desc: '当前房间所有人受 1 点伤害（健康变受伤），并被压在原地 1 回合。',
         cooldown: 3,
         ultimate: true,
         ops: [
-          { op: 'damage', who: 'allHere', amount: 3 },
+          { op: 'damage', who: 'allHere', amount: 1 },
           { op: 'block', who: 'allHere', turns: 1 },
           { op: 'log', text: '空气突然变得很重，他们连喊都喊不出来。' },
         ],
@@ -144,22 +144,22 @@ export const KILLERS: KillerProfile[] = [
       {
         id: 'huntress_axe',
         name: '投斧',
-        desc: '对全场警觉最高的人造成 2 点伤害，不论他躲在哪个房间。',
+        desc: '对全场警觉最高的人造成 1 点伤害，不论他躲在哪个房间。',
         cooldown: 1,
         ops: [
-          { op: 'damage', who: 'highestAlert', amount: 2 },
+          { op: 'damage', who: 'highestAlert', amount: 1 },
           { op: 'log', text: '斧头穿过走廊，钉在了某扇门框上——后面有人在喘气。' },
         ],
       },
       {
         id: 'huntress_volley',
         name: '连投',
-        desc: '对全场警觉最高的人造成 3 点伤害，再对另一人造成 2 点。',
+        desc: '对全场警觉最高的人造成 2 点伤害，再对另一人造成 1 点。',
         cooldown: 3,
         ultimate: true,
         ops: [
-          { op: 'damage', who: 'highestAlert', amount: 3 },
-          { op: 'damage', who: 'randomAny', amount: 2 },
+          { op: 'damage', who: 'highestAlert', amount: 2 },
+          { op: 'damage', who: 'randomAny', amount: 1 },
           { op: 'log', text: '一把接一把，房子里的每一道门都成了靶子。' },
         ],
       },
@@ -176,10 +176,11 @@ export const KILLERS: KillerProfile[] = [
       {
         id: 'ghost_stalk',
         name: '夜幕潜行',
-        desc: '通缉值 -1，本回合所有目击无效。',
+        desc: '通缉值 -1，团队警戒 -10，本回合所有目击无效。',
         cooldown: 1,
         ops: [
           { op: 'wanted', amount: -1 },
+          { op: 'alarm', amount: -10 },
           { op: 'flag', key: 'noAlarm' },
           { op: 'log', text: '你只是站在阴影里，什么都没有做。' },
         ],
@@ -187,13 +188,13 @@ export const KILLERS: KillerProfile[] = [
       {
         id: 'ghost_nightfall',
         name: '夜袭',
-        desc: '本回合步数 +3、目击无效，且下次攻击 +3 伤害。',
+        desc: '本回合步数 +3、目击无效，且下次攻击 +2 伤害。',
         cooldown: 3,
         ultimate: true,
         ops: [
           { op: 'steps', amount: 3 },
           { op: 'flag', key: 'noAlarm' },
-          { op: 'bonusDamage', amount: 3 },
+          { op: 'bonusDamage', amount: 2 },
           { op: 'log', text: '灯灭了，房子开始按你的节奏呼吸。' },
         ],
       },
@@ -214,10 +215,11 @@ export const KILLERS: KillerProfile[] = [
       {
         id: 'myers_gaze',
         name: '凝视',
-        desc: '尾随值 +30，并让当前房间所有人的警觉 -15。',
+        desc: '尾随值 +30，侦查当前房间，并让房间里所有人的警觉 -15。',
         cooldown: 1,
         ops: [
           { op: 'stalk', amount: 30 },
+          { op: 'scout', to: 'here', turns: 1 },
           { op: 'alert', who: 'allHere', amount: -15 },
           { op: 'log', text: '你站在门口，一动不动地看着他。' },
         ],
@@ -225,12 +227,12 @@ export const KILLERS: KillerProfile[] = [
       {
         id: 'myers_possess',
         name: '恶魔附身',
-        desc: '尾随值满 100 才能发动：处决当前房间的一名目标，之后尾随值清零。',
+        desc: '尾随值满 100 且房间里有倒地的人才能发动：直接处决，之后尾随值清零。',
         cooldown: 3,
         ultimate: true,
-        requires: [{ c: 'stalk', gte: 100 }],
+        requires: [{ c: 'stalk', gte: 100 }, { c: 'downedHere' }],
         ops: [
-          { op: 'kill', who: 'victim' },
+          { op: 'execute', who: 'downedAny' },
           { op: 'wanted', amount: 1 },
           { op: 'stalk', amount: -100 },
           { op: 'log', text: '面具合上了。那一刻不需要刀，也不需要理由。' },
@@ -260,12 +262,12 @@ export const KILLERS: KillerProfile[] = [
       {
         id: 'sadako_tape',
         name: '录像带',
-        desc: '全场所有人受到 2 点伤害，并暴露位置。',
+        desc: '全场所有人受 1 点伤害，并暴露位置 2 回合。',
         cooldown: 3,
         ultimate: true,
         ops: [
-          { op: 'damage', who: 'allAny', amount: 2 },
-          { op: 'reveal' },
+          { op: 'damage', who: 'allAny', amount: 1 },
+          { op: 'scout', all: true, turns: 2 },
           { op: 'log', text: '七天，从这一秒开始算。' },
         ],
       },
@@ -281,18 +283,18 @@ export const KILLERS: KillerProfile[] = [
       {
         id: 'freddy_sleep',
         name: '入梦',
-        desc: '让全场警觉最高的人陷入梦境：2 回合无法移动，并暴露位置。',
+        desc: '让全场警觉最高的人陷入梦境：2 回合无法移动，并持续暴露位置。',
         cooldown: 1,
         ops: [
           { op: 'block', who: 'highestAlert', turns: 2 },
-          { op: 'reveal' },
+          { op: 'track', who: 'highestAlert', turns: 2 },
           { op: 'log', text: '他在走廊里坐了下来，像是突然很困。' },
         ],
       },
       {
         id: 'freddy_nightmare',
         name: '梦魇降临',
-        desc: '全场陷入噩梦：所有人警觉 +25、受到 1 点伤害，并僵住 1 回合。',
+        desc: '全场陷入噩梦：所有人警觉 +25、受 1 点伤害，并僵住 1 回合。',
         cooldown: 3,
         ultimate: true,
         ops: [
@@ -315,11 +317,11 @@ export const KILLERS: KillerProfile[] = [
       {
         id: 'cannibal_sprint',
         name: '电锯冲刺',
-        desc: '本回合步数 +2、下次攻击 +2 伤害，但引擎声让通缉值 +1。',
+        desc: '本回合步数 +2、下次攻击 +1 伤害，但引擎声让通缉值 +1。',
         cooldown: 1,
         ops: [
           { op: 'steps', amount: 2 },
-          { op: 'bonusDamage', amount: 2 },
+          { op: 'bonusDamage', amount: 1 },
           { op: 'wanted', amount: 1 },
           { op: 'log', text: '引擎拉响，走廊尽头的人开始跑。' },
         ],
@@ -327,11 +329,11 @@ export const KILLERS: KillerProfile[] = [
       {
         id: 'cannibal_slaughter',
         name: '狂锯',
-        desc: '对当前房间所有人造成 4 点伤害，通缉值 +3。',
+        desc: '对当前房间所有人造成 2 点伤害（健康直接倒地），通缉值 +3。',
         cooldown: 3,
         ultimate: true,
         ops: [
-          { op: 'damage', who: 'allHere', amount: 4 },
+          { op: 'damage', who: 'allHere', amount: 2 },
           { op: 'wanted', amount: 3 },
           { op: 'log', text: '他不再挑选目标了。' },
         ],
@@ -359,12 +361,12 @@ export const KILLERS: KillerProfile[] = [
       {
         id: 'executioner_judge',
         name: '处刑',
-        desc: '击杀当前房间生命值最低的一人，通缉值 +2。',
+        desc: '处决当前房间一名倒地的人，通缉值 +2。必须先把他打倒。',
         cooldown: 3,
         ultimate: true,
-        requires: [{ c: 'peopleHere', gte: 1 }],
+        requires: [{ c: 'downedHere' }],
         ops: [
-          { op: 'kill', who: 'lowestHpHere' },
+          { op: 'execute', who: 'downedAny' },
           { op: 'wanted', amount: 2 },
           { op: 'log', text: '他跪了下来，因为知道自己该跪。' },
         ],
@@ -392,11 +394,11 @@ export const KILLERS: KillerProfile[] = [
       {
         id: 'demogorgon_maul',
         name: '群体撕裂',
-        desc: '当前房间所有人受到 3 点伤害，并被按在原地 1 回合。',
+        desc: '当前房间所有人受到 2 点伤害，并被按在原地 1 回合。',
         cooldown: 3,
         ultimate: true,
         ops: [
-          { op: 'damage', who: 'allHere', amount: 3 },
+          { op: 'damage', who: 'allHere', amount: 2 },
           { op: 'block', who: 'allHere', turns: 1 },
           { op: 'log', text: '花瓣一样的口器张开，房间里的空气被抽走了一半。' },
         ],
@@ -447,12 +449,12 @@ export const KILLERS: KillerProfile[] = [
       {
         id: 'pig_ambush',
         name: '伏击',
-        desc: '本回合目击无效、步数 +1，且下次攻击 +2 伤害。',
+        desc: '本回合目击无效、步数 +1，且下次攻击 +1 伤害。',
         cooldown: 1,
         ops: [
           { op: 'flag', key: 'noAlarm' },
           { op: 'steps', amount: 1 },
-          { op: 'bonusDamage', amount: 2 },
+          { op: 'bonusDamage', amount: 1 },
           { op: 'log', text: '你蹲下去，等到脚步声刚好经过。' },
         ],
       },

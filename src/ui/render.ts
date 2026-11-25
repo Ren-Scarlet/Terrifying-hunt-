@@ -7,15 +7,23 @@ import {
   uiIcon,
 } from '../game/assetMap';
 import {
+  ALARM_MAX,
+  ARCH_LABEL,
   ESCAPE_ROOMS,
   GOAL_LABEL,
+  HEALTH_LABEL,
   INTENT_LABEL,
   canMoveTo,
   canUsePower,
+  conditionOf,
   currentScore,
   effectiveCost,
   getStars,
   isLocked,
+  isPersonVisible,
+  isRoomExplored,
+  isRoomVisible,
+  knownPeople,
   moveCost,
   powerBlockReason,
   powerCooldown,
@@ -32,6 +40,7 @@ import {
 } from '../game/rooms';
 import { getPersonProfile, type PersonProfile } from '../game/people';
 import { SURVIVOR_MAP } from '../game/survivors';
+import { isCardTuned } from '../game/tuning';
 import type { GameState, Person, RoomId, SaveData } from '../game/types';
 
 const escape = (s: string) =>
@@ -103,10 +112,10 @@ export function getKiller(owner?: string): KillerProfile {
 
 export function defaultDetailHtml(): string {
   return detailCardHtml('信息面板', '悬停或选中卡牌、点击人物查看资料', '档案', [
-    '点击手牌查看完整效果；点击房间中的人物头像查看档案、目的和警觉。',
-    '每个人都有目的：想打电话的会摸向书房，想逃的会往后院跑。先看目的，再决定杀谁。',
-    '堵门的房间要多花 1 步才能进；「所向无敌」可以直接撞开。',
-    '两个杀手能力分开冷却：主力技每回合可用，大招要等 3 回合。',
+    '地图分三层：没进过的房间只看得见轮廓；进过的房间看得见家具和出口；只有你现在所在的房间和相邻房间，才看得见里面的人。',
+    '每个人都会先躲、先跑、先报警。点人物头像能看到他的行为类型和目的——警觉型会喊人，求救型会摸向电话，救援型会去拉倒地的人。',
+    '伤害只能把人从健康打成受伤，再打成倒地。倒地的人不会自己死：再补一次伤害或用处决牌，否则他会被同伴救起来。',
+    '顶部「警戒」是整栋房子的紧张程度，满 100 直接失败。剪电话、拉电闸、制造噪声、锁门隔离，都是在压这个数字。',
   ]);
 }
 
@@ -143,14 +152,21 @@ function personChip(person: Person): string {
           : 'target'
         : 'civilian';
   const img = characterImage(person.id);
+  const health = conditionOf(person);
   const alertMark =
     person.alert >= 70 ? '<span class="chip-alert high">!</span>'
       : person.alert >= 35 ? '<span class="chip-alert">?</span>' : '';
+  const stateMark =
+    health === 'downed'
+      ? '<span class="chip-state downed" title="倒地：可以处决，也可能被救起">倒</span>'
+      : health === 'injured'
+        ? '<span class="chip-state injured" title="受伤：再挨一下就会倒地">伤</span>'
+        : '';
   const label = person.intent === 'idle' ? person.activity : INTENT_LABEL[person.intent];
-  return `<button type="button" class="person-chip ${cls}" data-action="person" data-person-id="${person.id}"
-    title="${escape(person.name)} · 生命 ${person.hp} · 警觉 ${person.alert}/100 · ${escape(GOAL_LABEL[person.goal])} · 正在${escape(label)}">
+  return `<button type="button" class="person-chip ${cls} ${health === 'downed' ? 'is-downed' : ''}" data-action="person" data-person-id="${person.id}"
+    title="${escape(person.name)} · ${HEALTH_LABEL[health]} · 警觉 ${person.alert}/100 · ${escape(ARCH_LABEL[person.archetype])} · ${escape(GOAL_LABEL[person.goal])} · 正在${escape(label)}">
     ${img ? `<img src="${img}" alt="" onerror="this.style.display='none'">` : ''}
-    <span>${escape(person.name)}</span>${intentDot(person)}${alertMark}
+    <span>${escape(person.name)}</span>${intentDot(person)}${stateMark}${alertMark}
   </button>`;
 }
 
@@ -181,7 +197,19 @@ export function personDetailHtml(state: GameState, personId: string): string {
   const threat = SURVIVOR_MAP[personId]?.threat;
   const paras = [...profile.bio, `习惯：${profile.habit}`, `秘密：${profile.secret}`];
   if (person) {
-    paras.push(`目的：${GOAL_LABEL[person.goal]}。警觉 ${person.alert}/100，当前${INTENT_LABEL[person.intent]}。`);
+    const health = conditionOf(person);
+    paras.push(
+      `状态：${HEALTH_LABEL[health]}（${person.hp}/2）。行为类型：${ARCH_LABEL[person.archetype]}。`,
+      `目的：${GOAL_LABEL[person.goal]}。警觉 ${person.alert}/100，当前${INTENT_LABEL[person.intent]}。`,
+    );
+    if (isPersonVisible(state, person)) {
+      paras.push(`位置：${roomName(person.room)}。`);
+    } else {
+      paras.push(`位置：${roomName(person.lastSeenRoom)}（最后确认于第 ${person.lastSeenTurn} 回合，现在不知道在哪）。`);
+    }
+    if (person.hidden) paras.push('他躲起来了：不搜索这间屋子，你打不到他。');
+    if (person.armed) paras.push('他手里有武器：进门时可能反击，让你下回合少走一步。');
+    if (health === 'downed') paras.push('倒地：本回合内可以被处决，也可能被同伴救起。');
     if (threat) paras.push(`威胁：这名角色会主动对抗你，别把他当普通平民。`);
   } else {
     paras.push('档案状态：已从现场消失。');
@@ -268,6 +296,7 @@ export function renderMenu(save: SaveData): string {
           <button class="btn" data-action="deck">编辑牌组</button>
           <button class="btn" data-action="shop">卡牌商店</button>
           <button class="btn ghost" data-action="guide">玩法指引</button>
+          <button class="btn ghost mini admin-entry" data-action="admin">平衡调整</button>
         </div>
       </div>
     </div>
@@ -283,8 +312,8 @@ export function renderGuide(): string {
         <div class="guide-grid">
           <div class="guide-card">${icon('mission')}<b>1 · 接取契约</b><p>每局随机获得任务。主目标旁会显示${icon('missionTarget', 'ui-icon tiny')}标记，告诉你要击杀谁、需要多少证据或仪式进度。</p></div>
           <div class="guide-card">${icon('darkCell')}<b>2 · 现场布局</b><p>布局牌（绿色）在行动阶段打出：剪断电话线、封死逃生点、装窃听。布局打早了才有用。</p></div>
-          <div class="guide-card">${icon('escape')}<b>3 · 他们想跑</b><p>点人物头像能看到他的<b>目的</b>：想打电话的会往书房摸，想逃的会往${icon('escape', 'ui-icon tiny')}后院跑。跑到后院的人只要再撑一回合就翻出去了。</p></div>
-          <div class="guide-card">${icon('bloodPoint')}<b>4 · 卡牌与评分</b><p>每回合恢复 3 能量与 2 步数，结束回合弃掉手牌重抽 5 张。跑掉的人会扣分，标记目标跑掉直接判负。</p></div>
+          <div class="guide-card">${icon('escape')}<b>3 · 他们想跑</b><p>点人物头像能看到他的<b>目的</b>和<b>行为原型</b>：想打电话的会往书房摸，想逃的会往${icon('escape', 'ui-icon tiny')}后院跑。跑到后院的人只要再撑一回合就翻出去了。顶栏的<b>团队警戒</b>满了直接判负——所以别让他们一直喊。</p></div>
+          <div class="guide-card">${icon('bloodPoint')}<b>4 · 伤害与评分</b><p>每回合恢复 3 能量与 3 步数，结束回合弃掉手牌重抽 5 张。<b>伤害只能推进一档</b>：健康 → 受伤 → 倒地，倒地的人要再补一次才会死。跑掉的人会扣分，标记目标跑掉直接判负。</p></div>
         </div>
         <div class="guide-note">
           ${icon('totem', 'ui-icon tiny')} 图腾：在此结束回合，下回合 +1 能量。
@@ -415,8 +444,25 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
   const maxEscaped = m.maxEscaped ?? 2;
 
   const rooms = ROOMS.map((room) => {
-    const people = state.people.filter((p) => p.room === room.id && p.role !== 'police');
-    const police = state.people.find((p) => p.room === room.id && p.role === 'police');
+    const visible = isRoomVisible(state, room.id);
+    const explored = isRoomExplored(state, room.id);
+    // 只有看得见的房间才显示人；藏起来的人连"在不在"都不给
+    const people = visible
+      ? state.people.filter((p) => p.room === room.id && p.role !== 'police' && !p.hidden)
+      : [];
+    const police = visible
+      ? state.people.find((p) => p.room === room.id && p.role === 'police')
+      : undefined;
+    // 离开视野后，最后确认的位置还留一个问号，逼你自己去确认
+    const ghosts = !visible
+      ? state.people.filter(
+          (p) =>
+            p.role !== 'police' &&
+            p.lastSeenRoom === room.id &&
+            p.lastSeenTurn > 0 &&
+            state.turn - p.lastSeenTurn <= 1,
+        )
+      : [];
     const isPlayer = state.playerRoom === room.id;
     const reachable = canMoveTo(state, room.id);
     const locked = isLocked(state, room.id);
@@ -425,19 +471,22 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
     const r = room.rect;
     const style = `left:${r.left}%;top:${r.top}%;width:${r.width}%;height:${r.height}%`;
     return `
-      <div class="room ${isPlayer ? 'current' : ''} ${reachable ? 'reachable' : 'disabled'} ${room.id === 'garden' ? 'outdoor' : ''} ${locked ? 'locked' : ''} ${barricaded ? 'barricaded' : ''}"
-        style="${style}" data-room="${room.id}" title="${escape(room.name)}：${escape(room.desc)}">
+      <div class="room ${isPlayer ? 'current' : ''} ${reachable ? 'reachable' : 'disabled'} ${room.id === 'garden' ? 'outdoor' : ''} ${locked ? 'locked' : ''} ${barricaded ? 'barricaded' : ''} ${explored ? 'explored' : 'unexplored'} ${visible ? 'in-sight' : 'fogged'}"
+        style="${style}" data-room="${room.id}" title="${escape(room.name)}${explored ? `：${escape(room.desc)}` : '：还没进去过'}">
         ${reachable ? `<button type="button" class="room-hit" data-action="move" data-room="${room.id}"
           aria-label="移动到${escape(room.name)}${cost > 1 ? `（堵门，需 ${cost} 步）` : ''}"></button>` : ''}
         <div class="room-head">
-          <span class="room-name">${escape(room.name)}</span>
+          <span class="room-name">${explored ? escape(room.name) : '？？？'}</span>
           ${isPlayer ? '<span class="room-tag">你在</span>' : locked ? '<span class="room-tag lock">封锁</span>' : barricaded ? `<span class="room-tag bar">堵门 ${cost}步</span>` : ''}
         </div>
-        <div class="room-desc">${escape(room.desc)}</div>
-        <div class="room-features">${roomFeatures(room.id)}</div>
+        ${explored
+          ? `<div class="room-desc">${escape(room.desc)}</div>
+             <div class="room-features">${roomFeatures(room.id)}</div>`
+          : `<div class="room-unknown">未探索</div>`}
         <div class="room-people">
           ${people.map(personChip).join('')}
           ${police ? personChip(police) : ''}
+          ${ghosts.map(() => '<span class="ghost-chip" title="最后确认位置：人可能已经走了">?</span>').join('')}
         </div>
       </div>
     `;
@@ -463,6 +512,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
           ${disabled ? 'disabled' : ''} title="${escape(def.desc)}">
           <span class="card-type">${escape(TYPE_NAMES[def.type] ?? def.type)}</span>
           <span class="card-cost">${cost}</span>
+          ${isCardTuned(def.id) ? '<span class="card-tuned" title="这张卡使用了你在平衡调整里改过的数值">调</span>' : ''}
           ${perkIconHtml(def.id)}
           <div class="card-name">${escape(def.name)}</div>
           <div class="card-desc">${escape(def.desc)}</div>
@@ -472,20 +522,26 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
     })
     .join('');
 
-  const roster = state.people
-    .filter((p) => p.role !== 'police')
+  const known = knownPeople(state);
+  const unknownCount = state.people.filter((p) => p.role !== 'police').length - known.length;
+  const roster = known
+    .sort((a, b) => Number(isPersonVisible(state, b)) - Number(isPersonVisible(state, a)) || b.alert - a.alert)
     .map((p) => {
       const img = characterImage(p.id);
+      const vis = isPersonVisible(state, p);
+      const health = conditionOf(p);
       const alertLabel = p.alert >= 70
         ? '<em class="alert-tag high">警觉</em>'
         : p.alert >= 35 ? '<em class="alert-tag">留意</em>' : '';
       const intentLabel = p.intent === 'idle' ? GOAL_LABEL[p.goal] : INTENT_LABEL[p.intent];
-      return `<button class="roster-person ${p.room === state.playerRoom ? 'here' : ''} ${p.marked ? 'marked' : ''} ${p.intent === 'escape' ? 'escaping' : ''}"
-        data-action="person" data-person-id="${p.id}" title="${escape(p.name)}：${escape(GOAL_LABEL[p.goal])}，当前${escape(INTENT_LABEL[p.intent])}">
+      const where = vis ? roomName(p.room) : `最后在${roomName(p.lastSeenRoom)}`;
+      return `<button class="roster-person ${p.room === state.playerRoom ? 'here' : ''} ${p.marked ? 'marked' : ''} ${p.intent === 'escape' ? 'escaping' : ''} ${vis ? '' : 'unknown'} ${health === 'downed' ? 'downed' : ''}"
+        data-action="person" data-person-id="${p.id}"
+        title="${escape(p.name)}：${escape(ARCH_LABEL[p.archetype])}，${escape(GOAL_LABEL[p.goal])}，${escape(HEALTH_LABEL[health])}${vis ? '' : '，位置待确认'}">
         ${img ? `<img src="${img}" alt="" onerror="this.style.display='none'">` : ''}
         <span><b>${escape(p.name)} ${alertLabel}</b>
-          <small class="goal-line">${escape(GOAL_LABEL[p.goal])}</small>
-          <small>${roomName(p.room)} · ${p.hp} HP · ${escape(intentLabel)}</small></span>
+          <small class="goal-line">${escape(ARCH_LABEL[p.archetype])} · ${escape(GOAL_LABEL[p.goal])}</small>
+          <small>${where} · ${HEALTH_LABEL[health]} · ${escape(intentLabel)}</small></span>
       </button>`;
     })
     .join('');
@@ -514,6 +570,11 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
         <div class="stat wanted"><b>${state.wanted}/${state.arrestThreshold}</b><small>通缉/逮捕</small></div>
         <div class="stat"><b>${state.kills}</b><small>击杀</small></div>
         <div class="stat ${state.escaped > 0 ? 'escaped' : ''}"><b>${state.escaped}/${maxEscaped}</b><small>逃走</small></div>
+        <div class="stat alarm-stat ${state.alarm >= 70 ? 'hot' : state.alarm >= 40 ? 'warm' : ''}" title="团队警戒：满 ${ALARM_MAX} 任务失败。剪电话、断电、制造噪声、锁门都能压低它。">
+          <b>${state.alarm}<i>/${ALARM_MAX}</i></b>
+          <div class="alarm-track"><span style="width:${state.alarm}%"></span></div>
+          <small>团队警戒</small>
+        </div>
         <div class="stat score"><b>${currentScore(state)}</b><small>预计得分</small></div>
       </div>
     </div>
@@ -546,7 +607,8 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
             <span>${icon('totem', 'ui-icon tiny')} 图腾</span>
             <span>${icon('cabinet', 'ui-icon tiny')} 柜子</span>
             <span>${icon('obstacle', 'ui-icon tiny')} 障碍物</span>
-            <span class="legend-intent"><i class="intent-dot i-flee"></i> 逃跑中 <i class="intent-dot i-call"></i> 打电话 <i class="intent-dot i-escape"></i> 翻篱笆</span>
+            <span class="legend-intent"><i class="intent-dot i-flee"></i> 逃跑中 <i class="intent-dot i-call"></i> 打电话 <i class="intent-dot i-escape"></i> 翻篱笆 <i class="intent-dot i-rescue"></i> 救援</span>
+            <span class="legend-fog">？？？ 未探索 · ? 最后确认位置</span>
           </div>
         </div>
 
@@ -564,7 +626,8 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
       <div class="side-column">
         <div class="panel roster-panel">
           <div class="panel-heading"><h2>在场人物</h2><span>${here.length} 人在你的房间${policeHere ? ' · 警察也在' : ''}</span></div>
-          <div class="roster">${roster}</div>
+          <div class="roster">${roster || '<div class="roster-empty">还没有确认任何人的位置。走进房间，或者用侦查卡。</div>'}</div>
+          ${unknownCount > 0 ? `<div class="roster-unknown">还有 ${unknownCount} 个人没有被确认</div>` : ''}
         </div>
         <div class="panel">
           <h2>信息面板</h2>

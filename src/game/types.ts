@@ -10,7 +10,9 @@ export type RoomId =
   | 'garage'
   | 'garden'
   | 'attic'
-  | 'storage';
+  | 'storage'
+  | 'nursery'
+  | 'laundry';
 
 export type CardType = 'attack' | 'skill' | 'tactic' | 'setup';
 
@@ -58,6 +60,17 @@ export interface CardInstance {
 
 export type PersonRole = 'target' | 'civilian' | 'police';
 
+/**
+ * 六种行为类型。决定这名 NPC 被惊动后做什么，而不是所有 NPC 都用同一套反应。
+ *   alert    警觉型：发现杀手就逃，逃跑路上通知同伴
+ *   defiant  反抗型：堵门、拿武器反击，会让你掉步数
+ *   caller   求救型：摸向电话/无线电报警
+ *   rescuer  救援型：治疗受伤、拉起倒地的人
+ *   hider    躲藏型：钻进柜子/床底，不搜出来就找不到
+ *   brave    英勇型：找武器、聚人、正面挡路
+ */
+export type Archetype = 'alert' | 'defiant' | 'caller' | 'rescuer' | 'hider' | 'brave';
+
 /** NPC 这一回合的打算，会显示在平面图上供玩家预判 */
 export type NpcIntent =
   | 'idle'
@@ -67,18 +80,26 @@ export type NpcIntent =
   | 'call'
   | 'hide'
   | 'escape'
-  | 'stunned';
+  | 'stunned'
+  | 'heal'
+  | 'rescue';
 
 /** 个人目的：决定他慌乱时往哪跑，是这一局 NPC 的行为主轴 */
-export type NpcGoal = 'phone' | 'exit' | 'hide' | 'gather' | 'weapon' | 'panic';
+export type NpcGoal = 'phone' | 'exit' | 'hide' | 'gather' | 'weapon' | 'panic' | 'help';
+
+/** 健康 / 受伤 / 倒地。死亡等于从 people 里移除，所以没有第四态。 */
+export type Health = 'healthy' | 'injured' | 'downed';
 
 export interface Person {
   id: string;
   name: string;
   role: PersonRole;
   room: RoomId;
+  /** 2 = 健康，1 = 受伤，0 = 倒地。伤害只能推进一档，击杀必须走处决 */
   hp: number;
   marked: boolean;
+  /** 行为类型 */
+  archetype: Archetype;
   /** 警觉度 0–100：越高越可能逃离玩家所在房间 */
   alert: number;
   /** 当前行为，用于档案与人物名单 */
@@ -89,10 +110,23 @@ export interface Person {
   goal: NpcGoal;
   /** 被限制移动的剩余回合（支配、钉住、恐惧、夹子） */
   blockedTurns: number;
-  /** 流血：每回合结束掉血，被「辣手屠夫」类卡牌造成 */
+  /** 流血：每回合结束掉血 */
   bleed: number;
+  /** 倒地后已经过去的回合数，撑满 BLEEDOUT 就死 */
+  downedTurns: number;
   /** 已经跑到逃生点的人，再待一回合就会真的逃出去（0 未开始，1 正在翻篱笆） */
   escapeProgress: number;
+  /** 打电话 / 用无线电的进度：电话 1 回合，无线电要 2 回合 */
+  callTurns: number;
+  /** 躲在柜子/床底：不搜出来就看不见，也吃不到大部分卡牌 */
+  hidden: boolean;
+  /** 找到武器：反抗时能让玩家掉步数 */
+  armed: boolean;
+  /** 被追踪的剩余回合：位置始终可见 */
+  trackedTurns: number;
+  /** 玩家最后一次看到他的房间与回合，用于地图上的"最后已知位置" */
+  lastSeenRoom: RoomId;
+  lastSeenTurn: number;
 }
 
 export type MissionKind =
@@ -145,6 +179,10 @@ export interface GameState {
   steps: number;
   maxSteps: number;
   wanted: number;
+  /** 最后一次被追查/目击的回合号：通缉值只在这个回合里保持，之后开始降温 */
+  heatTurn: number;
+  /** 警察已经盯上你几回合：连续两回合同屋才会真的被铐走 */
+  policeLock: number;
   playerRoom: RoomId;
   people: Person[];
   hand: CardInstance[];
@@ -204,6 +242,18 @@ export interface GameState {
   cooldowns: Record<string, number>;
   /** 本局结果说明（为什么失败），给结算面板用 */
   resultReason: string;
+
+  /* ---------- 战争迷雾与团队警戒 ---------- */
+  /** 团队警戒 0–100：不是某个人的警觉，而是整栋房子的紧张程度。满值任务失败 */
+  alarm: number;
+  /** 已探索的房间：进过、或侦查过 */
+  explored: RoomId[];
+  /** 临时视野：房间 -> 还看得见几回合 */
+  scouted: Partial<Record<RoomId, number>>;
+  /** 本回合被制造噪声的房间：会把附近的人吸过去 */
+  noiseRoom: RoomId | null;
+  /** 消防斧/电闸这类设施被破坏后的标记 */
+  sabotage: string[];
 }
 
 export interface SaveData {

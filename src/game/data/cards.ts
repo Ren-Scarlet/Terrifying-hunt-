@@ -2,39 +2,44 @@ import type { CardDef } from '../types';
 
 /**
  * ============================================================================
- *  卡牌数据库 —— 你以后唯一需要改的文件
+ *  卡牌数据库
  * ============================================================================
  *
  *  每张卡的「效果」由 ops 里的指令列表描述，引擎会逐条执行。
  *  指令清单、可选对象（who）与条件的完整写法见 src/game/effect.ts 顶部。
  *
- *  常见改法：
- *    · 改数值            → 改 amount / turns / gte
- *    · 加一个附带效果     → 往 ops 数组里再写一条指令
- *    · 做成有条件的卡     → { op:'if', cond:{...}, then:[...], else:[...] }
- *    · 让它不能空放       → 补一个 precheck，不满足时不扣能量也不弃牌
+ *  平衡调整不必改这个文件：游戏主菜单 →「平衡调整」可以可视化改费用、
+ *  改每条指令的数值、改杀手冷却，改完点保存即生效，还能导出成数据备份。
  *
- *  卡名采用《黎明杀机》图鉴技能的官方中文名，与 public/assets/dbd/perks
- *  里的图标严格一一对应；sourceSkill 记录英文原名，sourceText 记录原技能
- *  效果，仅作考据，不参与结算。
+ *  —— 六种战术职责（每张卡至少占一种）——
+ *    搜寻   猎鹿者 / 黑暗启迪 / 致命追踪者：点亮地图、找出躲藏者
+ *    诱导   鬼鸦谍影 / 人肉烧烤 / 支配之力：制造噪声，把人挪到你想要的位置
+ *    破坏   失效开关 / 厄咒：直面黑暗：剪电话、拉电闸
+ *    封锁   死锁 / 花言巧语：锁房间、钉死后院
+ *    潜行   静止隐身 / 折磨路径 / 恐惧释放：压通缉、压警戒
+ *    追猎   辣手屠夫 / 牢牢紧握 / 优胜劣汰 / 恩赐解脱：受伤 → 倒地 → 处决
+ *
+ *  —— 生死规则 ——
+ *    伤害只能推进一档：健康 → 受伤 → 倒地。倒地的人不会自己死，
+ *    必须再补一次伤害或用「处决」类卡牌才会死亡；期间可能被同伴救起。
  */
 
 export const CARDS: CardDef[] = [
   /* ------------------------------------------------------------------ */
-  /* 攻击：靠卡牌造成伤害                                                 */
+  /* 追猎：把目标从健康打到倒地，再处决                                   */
   /* ------------------------------------------------------------------ */
   {
     id: 'shuriken',
     name: '辣手屠夫',
     cost: 1,
     type: 'attack',
-    desc: '对当前房间的一名目标造成 2 点伤害，并使其流血：之后每次回合结束再掉 1 点生命。',
+    desc: '对当前房间的一名目标造成 1 点伤害并使其流血：每回合结束再掉 1 点。伤口会自己把人拖垮。',
     flavor: '伤口不深，但一直不肯合上。',
     sourceSkill: 'Sloppy Butcher',
     sourceText: '普通攻击命中后使逃生者出血、重伤。',
     unlocked: true,
     ops: [
-      { op: 'damage', who: 'victim', amount: 2 },
+      { op: 'damage', who: 'victim', amount: 1 },
       { op: 'bleed', who: 'victim', amount: 1 },
     ],
   },
@@ -43,13 +48,13 @@ export const CARDS: CardDef[] = [
     name: '牢牢紧握',
     cost: 2,
     type: 'attack',
-    desc: '对当前房间的一名目标造成 4 点伤害；活下来的人会被你死死按住，无法逃离。',
+    desc: '对当前房间的一名目标造成 2 点伤害（健康直接倒地），并把他按在原地，本回合无法被救走。',
     flavor: '抓稳了，就别指望他还能自己走。',
     sourceSkill: 'Iron Grasp',
     sourceText: '搬运逃生者时，其扭动速度大幅减慢。',
     unlocked: true,
     ops: [
-      { op: 'damage', who: 'victim', amount: 4 },
+      { op: 'damage', who: 'victim', amount: 2 },
       { op: 'pin', who: 'victim' },
     ],
   },
@@ -58,15 +63,16 @@ export const CARDS: CardDef[] = [
     name: '恩赐解脱',
     cost: 3,
     type: 'attack',
-    desc: '立即击杀当前房间的一名目标；现场痕迹让通缉值再 +3。',
+    desc: '处决当前房间一名已经倒地的人。必须先把他打倒——这一刀不会凭空生效。通缉值 +3。',
     flavor: '名单上的人不该开口。',
     sourceSkill: 'Coup de Grâce',
     sourceText: '消耗印记使突进攻击距离增加。',
     unlocked: true,
-    precheck: { cond: { c: 'victimHere' }, hint: '当前房间没有可以下手的人。' },
+    precheck: { cond: { c: 'downedHere' }, hint: '当前房间没有倒地的人，处决需要先把目标打倒。' },
     ops: [
-      { op: 'kill', who: 'victim' },
+      { op: 'execute', who: 'downedAny' },
       { op: 'wanted', amount: 3 },
+      { op: 'log', text: '你蹲下去，把最后一点声音按回他喉咙里。' },
     ],
   },
   {
@@ -74,15 +80,16 @@ export const CARDS: CardDef[] = [
     name: '鲜血回响',
     cost: 2,
     type: 'attack',
-    desc: '若本回合已击杀过目标，对当前房间所有目标造成 3 点伤害并让他们流血。',
+    desc: '若本回合已经杀过人：全场所有受伤或倒地的人再受 1 点伤害并流血。恐慌会沿着血迹传开。',
     flavor: '第一个之后，剩下的只是惯性。',
     sourceSkill: 'Blood Echo',
     sourceText: '钩住逃生者后，所有受伤逃生者陷入疲劳与出血。',
     unlocked: false,
     precheck: { cond: { c: 'killsThisTurn', gte: 1 }, hint: '本回合还没有击杀，鲜血暂时不会回响。' },
     ops: [
-      { op: 'damage', who: 'targetsHere', amount: 3 },
-      { op: 'bleed', who: 'targetsHere', amount: 1 },
+      { op: 'damage', who: 'injuredAny', amount: 1 },
+      { op: 'bleed', who: 'injuredAny', amount: 1 },
+      { op: 'alarm', amount: 8 },
     ],
   },
   {
@@ -90,20 +97,20 @@ export const CARDS: CardDef[] = [
     name: '优胜劣汰',
     cost: 1,
     type: 'attack',
-    desc: '对当前房间生命值不高于 2 的目标造成 5 点伤害；没有合适目标时不会浪费。',
+    desc: '对当前房间受伤最重的人造成 2 点伤害：受伤的直接倒地，倒地的直接死亡。',
     flavor: '结束要干脆。',
     sourceSkill: 'Cull the Weak',
     sourceText: '钩住非血祭品时积累印记，拖慢其他人。',
     unlocked: false,
-    precheck: { cond: { c: 'victimHere', maxHp: 2 }, hint: '当前房间没有生命值不高于 2 的目标。' },
-    ops: [{ op: 'damage', who: 'lowestHpHere', amount: 5, maxHp: 2 }],
+    precheck: { cond: { c: 'injuredHere' }, hint: '当前房间没有受伤或倒地的人。' },
+    ops: [{ op: 'damage', who: 'lowestHpHere', amount: 2 }],
   },
   {
     id: 'break_in',
     name: '所向无敌',
     cost: 1,
     type: 'skill',
-    desc: '撞碎当前房间的堵门，本回合移动无视相邻限制并清除相邻的障碍物。',
+    desc: '撞碎堵门，本回合移动无视相邻限制并清除相邻的障碍物。',
     flavor: '墙从来不是真正的边界。',
     sourceSkill: 'Brutal Strength',
     sourceText: '破坏木板、墙壁和发电机的速度加快。',
@@ -111,25 +118,27 @@ export const CARDS: CardDef[] = [
     ops: [
       { op: 'flag', key: 'clearBarricade' },
       { op: 'flag', key: 'freeMove' },
+      { op: 'alarm', amount: 4 },
       { op: 'log', text: '你撞开挡路的家具，木屑落了一地。' },
     ],
   },
 
   /* ------------------------------------------------------------------ */
-  /* 技能：改变自身的状态与节奏                                           */
+  /* 潜行：压低通缉与团队警戒                                             */
   /* ------------------------------------------------------------------ */
   {
     id: 'silent_step',
     name: '静止隐身',
     cost: 1,
     type: 'skill',
-    desc: '通缉值 -2，本回合不会惊动任何目击者。',
+    desc: '通缉值 -2，团队警戒 -8，本回合不会惊动任何目击者。',
     flavor: '影子不会留下脚印。',
     sourceSkill: 'Insidious',
     sourceText: '闲置后获得无法侦测状态。',
     unlocked: true,
     ops: [
       { op: 'wanted', amount: -2 },
+      { op: 'alarm', amount: -8 },
       { op: 'flag', key: 'noAlarm' },
     ],
   },
@@ -153,14 +162,14 @@ export const CARDS: CardDef[] = [
     name: '折磨路径',
     cost: 1,
     type: 'skill',
-    desc: '通缉值 -1，本回合目击者不会报警。',
+    desc: '抹掉痕迹：通缉值 -1、团队警戒 -10，并让相邻房间的地面重新安静下来。',
     flavor: '地板干净得像什么都没发生。',
     sourceSkill: 'Trail of Torment',
     sourceText: '破坏发电机后获得无法侦测状态。',
     unlocked: true,
     ops: [
       { op: 'wanted', amount: -1 },
-      { op: 'flag', key: 'noAlarm' },
+      { op: 'alarm', amount: -10 },
     ],
   },
   {
@@ -168,14 +177,15 @@ export const CARDS: CardDef[] = [
     name: '黑暗启迪',
     cost: 0,
     type: 'skill',
-    desc: '抽 1 张牌。',
+    desc: '抽 1 张牌，同时侦查全场：地图点亮，所有人的位置显形 2 回合。',
     flavor: '黑暗是你最好的同伙。',
     sourceSkill: 'Darkness Revealed',
     sourceText: '搜索储物柜时显示附近逃生者气场。',
     unlocked: true,
     ops: [
       { op: 'draw', amount: 1 },
-      { op: 'log', text: '你在黑暗里摸到了另一样东西。' },
+      { op: 'scout', all: true, turns: 2 },
+      { op: 'log', text: '你闭上眼睛，听见了每一扇门后面的呼吸。' },
     ],
   },
   {
@@ -183,13 +193,14 @@ export const CARDS: CardDef[] = [
     name: '厄咒：猎手摇篮曲',
     cost: 1,
     type: 'skill',
-    desc: '本回合后续卡牌费用 -1（最低为 0）。',
+    desc: '本回合后续卡牌费用 -1（最低为 0），团队警戒 -5。',
     flavor: '低语比喊叫更致命。',
     sourceSkill: 'Hex: Huntress Lullaby',
     sourceText: '每层印记让检定更难，五层时没有预警。',
     unlocked: false,
     ops: [
       { op: 'discount', amount: 1 },
+      { op: 'alarm', amount: -5 },
       { op: 'log', text: '摇篮曲响起来，房子里的人开始走神。' },
     ],
   },
@@ -210,7 +221,7 @@ export const CARDS: CardDef[] = [
     name: '恐惧释放',
     cost: 2,
     type: 'skill',
-    desc: '本回合无人报警，当前房间所有人的警觉 -20。',
+    desc: '本回合无人报警，当前房间所有人警觉 -20，团队警戒 -12。',
     flavor: '他们听见了，却不敢说。',
     sourceSkill: 'Distressing',
     sourceText: '恐惧范围扩大，范围内逃生者修理变慢。',
@@ -218,6 +229,7 @@ export const CARDS: CardDef[] = [
     ops: [
       { op: 'flag', key: 'noAlarm' },
       { op: 'alert', who: 'allHere', amount: -20 },
+      { op: 'alarm', amount: -12 },
     ],
   },
   {
@@ -225,7 +237,7 @@ export const CARDS: CardDef[] = [
     name: '小丑恐惧症',
     cost: 2,
     type: 'skill',
-    desc: '全场所有 NPC 僵住 1 回合无法移动，本回合无人报警。',
+    desc: '全场所有人僵住 1 回合无法移动、无法救援，本回合无人报警。',
     flavor: '他们不是不想跑，是腿不听使唤。',
     sourceSkill: 'Coulrophobia',
     sourceText: '恐惧范围内的逃生者治疗变慢、检定更难。',
@@ -236,19 +248,40 @@ export const CARDS: CardDef[] = [
       { op: 'log', text: '整栋房子安静下来，连呼吸都停了半拍。' },
     ],
   },
+
+  /* ------------------------------------------------------------------ */
+  /* 搜寻：把战争迷雾打开                                                 */
+  /* ------------------------------------------------------------------ */
   {
     id: 'aim',
     name: '猎鹿者',
     cost: 1,
     type: 'skill',
-    desc: '暴露全场所有人的位置，本回合下次攻击伤害 +2。',
+    desc: '侦查全场 3 回合，并追踪警觉最高的那个人：接下来 3 回合他的位置始终可见。下次攻击 +1 伤害。',
     flavor: '找准那一个瞬间。',
     sourceSkill: 'Deerstalker',
     sourceText: '显示濒死逃生者的气场。',
     unlocked: false,
     ops: [
-      { op: 'reveal' },
-      { op: 'bonusDamage', amount: 2 },
+      { op: 'scout', all: true, turns: 3 },
+      { op: 'track', who: 'highestAlert', turns: 3 },
+      { op: 'bonusDamage', amount: 1 },
+    ],
+  },
+  {
+    id: 'search',
+    name: '囤积者',
+    cost: 1,
+    type: 'skill',
+    desc: '搜索当前房间：把躲在柜子、床底的人揪出来（他们无法再躲），证据 +1。',
+    flavor: '每一张纸都可能是一把钥匙。',
+    sourceSkill: 'Hoarder',
+    sourceText: '额外生成箱子，并提示有人开箱。',
+    unlocked: false,
+    ops: [
+      { op: 'search' },
+      { op: 'evidence', amount: 1 },
+      { op: 'log', text: '你翻开每一个能藏人的角落。' },
     ],
   },
   {
@@ -266,31 +299,16 @@ export const CARDS: CardDef[] = [
       { op: 'wanted', amount: -2 },
     ],
   },
-  {
-    id: 'search',
-    name: '囤积者',
-    cost: 1,
-    type: 'skill',
-    desc: '证据 +1。',
-    flavor: '每一张纸都可能是一把钥匙。',
-    sourceSkill: 'Hoarder',
-    sourceText: '额外生成箱子，并提示有人开箱。',
-    unlocked: false,
-    ops: [
-      { op: 'evidence', amount: 1 },
-      { op: 'log', text: '你翻出一份不该留在这里的档案。' },
-    ],
-  },
 
   /* ------------------------------------------------------------------ */
-  /* 战术：操控警察与 NPC 的走向                                          */
+  /* 诱导：制造噪声、把人挪到你要的位置                                   */
   /* ------------------------------------------------------------------ */
   {
     id: 'false_lead',
     name: '鬼祟追杀',
     cost: 2,
     type: 'tactic',
-    desc: '本回合没有人能逃出这栋房子，并把一个目标引向错误方向。',
+    desc: '本回合没有人能移动，并把一名目标引向远处的房间。',
     flavor: '他们会跑，只是跑错了方向。',
     sourceSkill: 'Furtive Chase',
     sourceText: '钩住血祭品后获得急速与无法侦测。',
@@ -302,33 +320,19 @@ export const CARDS: CardDef[] = [
     ],
   },
   {
-    id: 'lock_door',
-    name: '死锁',
-    cost: 1,
-    type: 'tactic',
-    desc: '当前房间封锁 2 回合：NPC 与警察都无法穿过。',
-    flavor: '一扇门，换一分钟。',
-    sourceSkill: 'Deadlock',
-    sourceText: '修理进度最高的发电机被封锁。',
-    unlocked: true,
-    ops: [
-      { op: 'lockRoom', room: 'here', turns: 2 },
-      { op: 'block', who: 'allHere', turns: 1 },
-    ],
-  },
-  {
     id: 'bait',
     name: '鬼鸦谍影',
     cost: 1,
     type: 'tactic',
-    desc: '惊动乌鸦：暴露全场位置，并把警觉最高的人引到相邻房间。',
+    desc: '惊动乌鸦：把当前房间的人引到相邻房间，并侦查那里 1 回合。制造噪声会降低团队警戒。',
     flavor: '让他们追逐声音，而不是你。',
     sourceSkill: 'Spies from the Shadows',
     sourceText: '逃生者惊动乌鸦时获得提示。',
     unlocked: true,
     ops: [
-      { op: 'reveal' },
-      { op: 'move', who: 'highestAlert', to: 'adjacent' },
+      { op: 'lure', to: 'adjacent', count: 2 },
+      { op: 'scout', to: 'adjacent', turns: 1 },
+      { op: 'alarm', amount: -4 },
     ],
   },
   {
@@ -344,22 +348,39 @@ export const CARDS: CardDef[] = [
     precheck: { cond: { c: 'targetAway' }, hint: '没有可以被支配的目标。' },
     ops: [{ op: 'move', who: 'victim', to: 'here', clearAlert: true }],
   },
+  {
+    id: 'lock_door',
+    name: '死锁',
+    cost: 1,
+    type: 'tactic',
+    desc: '当前房间封锁 2 回合：NPC 与警察都无法穿过，房间内的人也动不了 1 回合。',
+    flavor: '一扇门，换一分钟。',
+    sourceSkill: 'Deadlock',
+    sourceText: '修理进度最高的发电机被封锁。',
+    unlocked: true,
+    ops: [
+      { op: 'lockRoom', room: 'here', turns: 2 },
+      { op: 'block', who: 'allHere', turns: 1 },
+    ],
+  },
 
   /* ------------------------------------------------------------------ */
-  /* 布局：布置现场，改变整局的规则                                       */
+  /* 破坏与封锁：切断他们的求救与退路                                     */
   /* ------------------------------------------------------------------ */
   {
     id: 'cut_line',
     name: '失效开关',
     cost: 1,
     type: 'setup',
-    desc: '剪断电话线：本局再没有人能打电话报警。',
+    desc: '剪断电话线：本局再没有人能打电话报警，正在打电话的人会被打断。',
     flavor: '沉默从一根线开始。',
     sourceSkill: "Dead Man's Switch",
     sourceText: '逃生者停止修理时封锁发电机。',
     unlocked: true,
     ops: [
+      { op: 'sabotage', key: 'phone' },
       { op: 'flag', key: 'phoneCut' },
+      { op: 'alarm', amount: -6 },
       { op: 'log', text: '电话线被剪断，听筒里只剩下沙沙声。' },
     ],
   },
@@ -368,14 +389,15 @@ export const CARDS: CardDef[] = [
     name: '人肉烧烤',
     cost: 1,
     type: 'setup',
-    desc: '把一名目标引到远处房间并清空警觉，同时暴露全场位置。',
+    desc: '在远处制造动静，把两个人引过去，团队警戒 -5。',
     flavor: '一声脆响，就够了。',
     sourceSkill: 'Barbecue & Chilli',
     sourceText: '钩住逃生者后显示远处逃生者气场。',
     unlocked: true,
     ops: [
-      { op: 'move', who: 'victim', to: 'far', clearAlert: true },
-      { op: 'reveal' },
+      { op: 'lure', to: 'far', count: 2 },
+      { op: 'alarm', amount: -5 },
+      { op: 'log', text: '远处的铁皮桶倒了一地，脚步朝那边去了。' },
     ],
   },
   {
@@ -398,13 +420,14 @@ export const CARDS: CardDef[] = [
     name: '厄咒：闹鬼之地',
     cost: 1,
     type: 'setup',
-    desc: '本局目击造成的通缉值再 -1（可与失效开关叠加）。',
+    desc: '本局目击造成的通缉值再 -1（可与失效开关叠加），团队警戒 -8。',
     flavor: '家具自己移动时，没人顾得上门口。',
     sourceSkill: 'Hex: Haunted Ground',
     sourceText: '图腾被净化时让所有逃生者陷入危险状态。',
     unlocked: false,
     ops: [
       { op: 'flag', key: 'poltergeist' },
+      { op: 'alarm', amount: -8 },
       { op: 'log', text: '椅子自己挪了位置，没有人敢承认自己看见了。' },
     ],
   },
@@ -413,14 +436,16 @@ export const CARDS: CardDef[] = [
     name: '厄咒：直面黑暗',
     cost: 2,
     type: 'setup',
-    desc: '拉闸断电：本回合所有目击无效，并封锁逃生点 1 回合。',
+    desc: '拉闸断电：本回合所有目击无效，封锁逃生点 1 回合，团队警戒 -10。',
     flavor: '黑暗是最好的共犯。',
     sourceSkill: 'Hex: Face the Darkness',
     sourceText: '恐惧范围外的人会尖叫并暴露气场。',
     unlocked: false,
     ops: [
+      { op: 'sabotage', key: 'lights' },
       { op: 'flag', key: 'noAlarm' },
       { op: 'flag', key: 'exitBlocked', value: 1 },
+      { op: 'alarm', amount: -10 },
       { op: 'log', text: '总闸落下，整栋房子连同后院一起沉进黑里。' },
     ],
   },
@@ -429,13 +454,14 @@ export const CARDS: CardDef[] = [
     name: '花言巧语',
     cost: 2,
     type: 'setup',
-    desc: '封死逃生点 2 回合，期间没有人能翻出后院。',
+    desc: '封死逃生点 2 回合，并把车库锁死：期间没有人能翻出后院。',
     flavor: '他们被一扇不该锁的门挡住了。',
     sourceSkill: 'Bamboozle',
     sourceText: '翻窗后封锁该窗户。',
     unlocked: false,
     ops: [
       { op: 'flag', key: 'exitBlocked', value: 2 },
+      { op: 'lockRoom', room: 'exit', turns: 2 },
       { op: 'log', text: '你把后门的木条一根根钉死。' },
     ],
   },
@@ -444,14 +470,14 @@ export const CARDS: CardDef[] = [
     name: '致命追踪者',
     cost: 1,
     type: 'setup',
-    desc: '本回合步数 +2，并暴露全场所有人的位置。',
+    desc: '本回合步数 +2，侦查全场 2 回合。',
     flavor: '跟着光走的人，不会回头看。',
     sourceSkill: 'Lethal Pursuer',
     sourceText: '开局显示所有逃生者气场。',
     unlocked: false,
     ops: [
       { op: 'steps', amount: 2 },
-      { op: 'reveal' },
+      { op: 'scout', all: true, turns: 2 },
     ],
   },
   {
@@ -459,12 +485,15 @@ export const CARDS: CardDef[] = [
     name: '厄咒：惩戒',
     cost: 2,
     type: 'setup',
-    desc: '本局警察逮捕阈值提高 1。',
+    desc: '本局警察逮捕阈值提高 1，团队警戒 -8。',
     flavor: '给他们一份错误的档案，他们会照着查。',
     sourceSkill: 'Hex: Retribution',
     sourceText: '逃生者祝福图腾时陷入浑然不觉。',
     unlocked: false,
-    ops: [{ op: 'arrestThreshold', amount: 1 }],
+    ops: [
+      { op: 'arrestThreshold', amount: 1 },
+      { op: 'alarm', amount: -8 },
+    ],
   },
 ];
 
@@ -482,6 +511,7 @@ export const STARTING_DECK: string[] = [
   'shuriken',
   'choke',
   'choke',
+  'final_blow',
   'silent_step',
   'silent_step',
   'sprint',

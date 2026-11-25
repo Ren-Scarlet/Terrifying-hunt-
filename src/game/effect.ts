@@ -5,12 +5,11 @@ import type { RoomId } from './types';
  *  效果程序（Effect DSL）
  * ============================================================================
  *
- * 这是整个游戏里唯一需要你改的地方：卡牌效果、杀手能力全部由下面的
- * 「指令列表」描述，engine.ts 里的解释器会逐条执行。改数字、改顺序、
- * 加条件都在 src/game/data/cards.ts 与 src/game/data/killers.ts 里，
- * 不需要动引擎，也不需要 AI。
+ * 卡牌效果、杀手能力全部由下面的「指令列表」描述，engine.ts 的解释器逐条执行。
+ * 平时调平衡不需要改引擎，在游戏主菜单的「平衡调整」里直接改数字即可，
+ * 想写成固定数据就改 src/game/data/cards.ts 与 src/game/data/killers.ts。
  *
- * 一条指令长这样：{ op: 'damage', who: 'victim', amount: 2 }
+ * 一条指令长这样：{ op: 'damage', who: 'victim', amount: 1 }
  *
  * —— 可选的对象（who）——
  *   victim        当前房间最优先的一个人（标记目标 > 目标 > 平民）
@@ -22,23 +21,41 @@ import type { RoomId } from './types';
  *   markedAny     全场被标记的目标
  *   allAny        全场所有非警察
  *   fleeing       全场正在逃跑的人
+ *   downedAny     全场倒地的人（处决 / 救援的对象）
+ *   injuredAny    全场受伤的人（治疗的对象）
  *   randomAny     全场随机一人
  *
- * —— 可选的指令（op）——
- *   damage     造成伤害          { who, amount, maxHp? }
- *   kill       直接击杀          { who }
- *   wanted     通缉值增减        { amount }（负数就是降低）
- *   alert      警觉度增减        { who, amount }
- *   block      无法移动 N 回合   { who, turns }
- *   pin        击杀前无法逃离    { who }
- *   move       强制移动          { who, to, clearAlert? }
- *   draw       抽牌              { amount }
- *   energy     能量增减          { amount }
- *   steps      步数增减          { amount }
- *   evidence   证据增减          { amount }
- *   heal       恢复生命          { who, amount }
- *   bleed      流血（回合结束掉血）{ who, amount }
- *   flag       设置一个全局开关  { key, value? }
+ * —— 伤害与生死 ——
+ *   damage     造成伤害，只能推进一档：健康→受伤→倒地（再打一次才死）
+ *   down       直接把受伤的人击倒（对健康的人无效）
+ *   execute    处决：只能对倒地的人使用，直接死亡
+ *   kill       立即死亡（保留给真正的即死效果，正常流程请用 execute）
+ *   heal       治疗：受伤→健康；倒地的人救不起来，要用 rescue
+ *   rescue     救援：倒地→受伤
+ *   bleed      流血：每回合结束掉血
+ *
+ * —— 情报与掌控 ——
+ *   scout      侦查一个房间（或全场），点亮地图、看见里面的人
+ *   search     搜索当前房间：把躲在柜子里的人揪出来
+ *   track      追踪一个人 N 回合，位置始终可见
+ *   reveal     暴露全场所有人的位置（写进日志）
+ *   lure       制造噪声，把附近的人吸引到指定房间
+ *   alarm      团队警戒值增减（满 100 任务失败）
+ *
+ * —— 移动与封锁 ——
+ *   block      无法移动 N 回合        { who, turns }
+ *   pin        击杀前无法逃离         { who }
+ *   move       强制移动              { who, to, clearAlert? }
+ *   teleportPlayer  把自己挪走        { to }
+ *   lockRoom   锁住房间 N 回合        { room, turns }
+ *   sabotage   破坏设施              { key: 'phone' | 'exit' | 'radio' | 'lights' }
+ *   flag       设置一个全局开关        { key, value? }
+ *
+ * —— 资源 ——
+ *   draw / energy / steps / evidence / discount / bonusDamage / arrestThreshold
+ *   wanted / wantedHalf / stalk / silenceAlarm / stun
+ *
+ * —— 流程 ——
  *   log        往行动日志写一句   { text }
  *   if         条件分支          { cond, then, else? }
  *
@@ -48,8 +65,8 @@ import type { RoomId } from './types';
  *   poltergeist    灵异事件，目击导致的通缉再 -1
  *   policeBlocked  警察下回合无法移动
  *   noAlarm        本回合所有目击无效
- *   exitBlocked    封锁逃生点（配合 turns）
- *   clearbarricade 拆掉当前房间的堵门
+ *   exitBlocked    封锁逃生点（配合 value 指定回合）
+ *   clearBarricade 拆掉当前房间的堵门
  *   freeMove       本回合移动无视相邻限制
  *   possessReady   允许进入恶魔附身
  */
@@ -68,6 +85,8 @@ export type Who =
   | 'markedAny'
   | 'allAny'
   | 'fleeing'
+  | 'downedAny'
+  | 'injuredAny'
   | 'randomAny';
 
 export type Dest = 'here' | 'adjacent' | 'far' | 'exit' | 'garden' | RoomId;
@@ -83,6 +102,8 @@ export type FlagKey =
   | 'freeMove'
   | 'possessReady';
 
+export type SabotageKey = 'phone' | 'exit' | 'radio' | 'lights';
+
 /* ------------------------------------------------------------------ */
 /* 条件                                                                */
 /* ------------------------------------------------------------------ */
@@ -92,17 +113,23 @@ export type Cond =
   | { c: 'peopleHere'; gte: number }
   /** 当前房间有没有能下手的人（可选限定血量上限） */
   | { c: 'victimHere'; maxHp?: number }
+  /** 当前房间有没有倒地的人：处决类卡牌的前提 */
+  | { c: 'downedHere' }
+  /** 当前房间有没有受伤的人：治疗类卡牌的前提 */
+  | { c: 'injuredHere' }
   /** 场上有没有不在你房间里的目标 */
   | { c: 'targetAway' }
   | { c: 'energy'; gte: number }
   | { c: 'wanted'; gte?: number; lte?: number }
+  | { c: 'alarm'; gte?: number; lte?: number }
   | { c: 'stalk'; gte: number }
   | { c: 'possession' }
   | { c: 'flag'; key: FlagKey }
   | { c: 'room'; is: RoomId }
   | { c: 'markedAlive' }
   | { c: 'escaped'; gte: number }
-  | { c: 'hasThreat'; v: 'alarm' | 'lead' | 'team' | 'spiritual' };
+  | { c: 'hasThreat'; v: 'alarm' | 'lead' | 'team' | 'spiritual' }
+  | { c: 'hasArchetype'; a: 'alert' | 'defiant' | 'caller' | 'rescuer' | 'hider' | 'brave' };
 
 /* ------------------------------------------------------------------ */
 /* 指令                                                                */
@@ -110,6 +137,10 @@ export type Cond =
 
 export type Op =
   | { op: 'damage'; who: Who; amount: number; maxHp?: number }
+  /** 把受伤的人击倒；对健康的人无效 */
+  | { op: 'down'; who: Who }
+  /** 处决倒地的人 */
+  | { op: 'execute'; who: Who }
   | { op: 'kill'; who: Who }
   | { op: 'wanted'; amount: number }
   /** 通缉值减半（向下取整） */
@@ -123,9 +154,23 @@ export type Op =
   | { op: 'teleportPlayer'; to: Dest }
   /** 锁住一个房间：NPC 与警察都无法穿过，玩家可以进 */
   | { op: 'lockRoom'; room: Dest; turns: number }
+  /** 侦查：点亮房间并看见里面的人 */
+  | { op: 'scout'; to?: Dest; all?: boolean; turns?: number }
+  /** 搜索当前房间，把藏起来的人揪出来 */
+  | { op: 'search' }
+  /** 追踪一个人 N 回合 */
+  | { op: 'track'; who: Who; turns: number }
+  /** 制造噪声：把附近的人吸到目标房间 */
+  | { op: 'lure'; to: Dest; count: number }
+  /** 团队警戒值增减 */
+  | { op: 'alarm'; amount: number }
+  /** 破坏设施 */
+  | { op: 'sabotage'; key: SabotageKey }
   | { op: 'draw'; amount: number }
   | { op: 'energy'; amount: number }
   | { op: 'steps'; amount: number }
+  /** 玩家下回合少走几步（反抗型 NPC 的反击也用这条） */
+  | { op: 'stun'; amount: number }
   | { op: 'evidence'; amount: number }
   /** 本回合后续卡牌费用减少 */
   | { op: 'discount'; amount: number }
@@ -136,6 +181,8 @@ export type Op =
   /** 暴露全场所有人的位置（写进日志 + 地图上显示意图） */
   | { op: 'reveal' }
   | { op: 'heal'; who: Who; amount: number }
+  /** 救援倒地的人：倒地 → 受伤 */
+  | { op: 'rescue'; who: Who }
   | { op: 'bleed'; who: Who; amount: number }
   /** 尾随值增减（迈尔斯专用，其它杀手没有这条槽） */
   | { op: 'stalk'; amount: number }

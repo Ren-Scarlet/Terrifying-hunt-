@@ -9,6 +9,15 @@ import {
   usePower,
 } from './game/engine';
 import { loadSave, writeSave } from './game/save';
+import {
+  applyTuning,
+  exportTuning,
+  resetTuning,
+  setCardCost,
+  setCardOpValue,
+  setPowerCooldown,
+  setPowerOpValue,
+} from './game/tuning';
 import { ROOM_MAP } from './game/rooms';
 import type { GameState, RoomId, SaveData } from './game/types';
 import {
@@ -24,9 +33,13 @@ import {
   renderShop,
   shopPrice,
 } from './ui/render';
+import { renderAdmin } from './ui/admin';
 import { mountFloorplanScene, type SceneHandle } from './ui/scene';
 
 type Screen = 'menu' | 'game' | 'result';
+
+// 先把手动调的平衡数据套进卡牌与能力，之后任何界面读到的都是最新值
+applyTuning();
 
 let save: SaveData = loadSave();
 let game: GameState | null = null;
@@ -34,6 +47,7 @@ let screen: Screen = 'menu';
 let editorOpen = false;
 let shopOpen = false;
 let guideOpen = false;
+let adminOpen = false;
 let editorDeck: string[] = [...save.deck];
 let resultApplied = false;
 /** 本局新解锁的卡牌，用于结算面板只提示真正新增的那张 */
@@ -50,7 +64,9 @@ const app = document.getElementById('app')!;
 
 function render(): void {
   let html = '';
-  if (editorOpen) {
+  if (adminOpen) {
+    html = renderAdmin();
+  } else if (editorOpen) {
     html = renderDeckEditor(editorDeck, save.unlockedCards);
   } else if (shopOpen) {
     html = renderShop(save);
@@ -172,8 +188,54 @@ app.addEventListener('click', (event) => {
     game = null;
     editorOpen = false;
     shopOpen = false;
+    adminOpen = false;
     lastNewCard = null;
     render();
+    return;
+  }
+
+  if (action === 'admin') {
+    adminOpen = true;
+    render();
+    return;
+  }
+
+  if (action === 'admin-close') {
+    adminOpen = false;
+    render();
+    return;
+  }
+
+  if (action === 'admin-reset') {
+    resetTuning();
+    render();
+    return;
+  }
+
+  if (action === 'admin-export') {
+    const box = document.getElementById('adminExport') as HTMLElement | null;
+    const text = document.getElementById('adminExportText') as HTMLTextAreaElement | null;
+    if (box) box.hidden = false;
+    if (text) {
+      text.value = exportTuning();
+      text.focus();
+      text.select();
+    }
+    return;
+  }
+
+  if (action === 'admin-hide-export') {
+    const box = document.getElementById('adminExport') as HTMLElement | null;
+    if (box) box.hidden = true;
+    return;
+  }
+
+  if (action === 'admin-copy') {
+    const text = document.getElementById('adminExportText') as HTMLTextAreaElement | null;
+    if (text) {
+      text.select();
+      void navigator.clipboard?.writeText(text.value);
+    }
     return;
   }
 
@@ -323,6 +385,46 @@ app.addEventListener('click', (event) => {
   if (action === 'give-up') {
     giveUp(game);
     afterAction();
+  }
+});
+
+/* 平衡调整：任何输入/下拉变化都直接写回运行中的数据 */
+app.addEventListener('change', (event) => {
+  const el = (event.target as HTMLElement).closest<HTMLInputElement | HTMLSelectElement>('[data-tune]');
+  if (!el) return;
+  const key = el.dataset.tune ?? '';
+  const parts = key.split('|');
+  const raw = el.value;
+  const isNumber = el instanceof HTMLInputElement && el.type === 'number';
+  // 数字框被清空时不写回，避免把可选字段（如 maxHp）误设成 0
+  if (isNumber && raw.trim() === '') return;
+  const value: number | string = isNumber ? Number(raw) : raw;
+  let ok = false;
+
+  if (parts[0] === 'card' && parts.length >= 3) {
+    const id = parts[1];
+    const path = parts[2];
+    if (path === 'cost') {
+      setCardCost(id, Number(value));
+      ok = true;
+    } else {
+      ok = setCardOpValue(id, path, value);
+    }
+  } else if (parts[0] === 'power' && parts.length >= 4) {
+    const owner = parts[1];
+    const powerId = parts[2];
+    const path = parts.slice(3).join('|');
+    if (path === 'cooldown') {
+      setPowerCooldown(owner, powerId, Number(value));
+      ok = true;
+    } else {
+      ok = setPowerOpValue(owner, powerId, path, value);
+    }
+  }
+
+  if (ok) {
+    el.classList.add('tune-saved');
+    window.setTimeout(() => el.classList.remove('tune-saved'), 700);
   }
 });
 

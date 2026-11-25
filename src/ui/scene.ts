@@ -1,4 +1,4 @@
-import { isLocked } from '../game/engine';
+import { isLocked, isRoomExplored } from '../game/engine';
 import { ROOMS, ROOM_MAP } from '../game/rooms';
 import type { GameState, RoomId } from '../game/types';
 
@@ -292,12 +292,14 @@ function tileFill(c: Ctx, tex: HTMLCanvasElement, r: Rect, offset: number): void
 
 const ROOM_MATERIAL: Record<RoomId, MatKind> = {
   attic: 'woodV',
+  nursery: 'carpet',
   bedroom: 'carpet',
   study: 'wood',
   storage: 'concrete',
   hall: 'wood',
   corridor: 'woodV',
   kitchen: 'tile',
+  laundry: 'tile',
   basement: 'concrete',
   garage: 'concrete',
   garden: 'grass',
@@ -306,12 +308,14 @@ const ROOM_MATERIAL: Record<RoomId, MatKind> = {
 /** 每个房间的环境色（正片叠底），决定这个空间是暖木、冷瓷砖还是湿水泥 */
 const ROOM_TINT: Record<RoomId, string> = {
   attic: 'rgba(78,58,34,.6)',
+  nursery: 'rgba(66,52,60,.58)',
   bedroom: 'rgba(76,44,48,.58)',
   study: 'rgba(70,54,32,.55)',
   storage: 'rgba(54,56,48,.58)',
   hall: 'rgba(84,56,30,.58)',
   corridor: 'rgba(60,50,38,.6)',
   kitchen: 'rgba(48,62,70,.55)',
+  laundry: 'rgba(44,58,64,.58)',
   basement: 'rgba(38,52,46,.62)',
   garage: 'rgba(48,54,62,.6)',
   garden: 'rgba(38,54,36,.58)',
@@ -342,6 +346,7 @@ interface WindowLight {
 
 const WINDOWS: Partial<Record<RoomId, WindowLight[]>> = {
   attic: [{ side: 'left', p: 0.32, w: 0.3 }],
+  nursery: [{ side: 'top', p: 0.5, w: 0.26 }],
   bedroom: [{ side: 'top', p: 0.42, w: 0.34 }],
   study: [
     { side: 'top', p: 0.6, w: 0.3 },
@@ -353,6 +358,7 @@ const WINDOWS: Partial<Record<RoomId, WindowLight[]>> = {
     { side: 'left', p: 0.38, w: 0.28 },
     { side: 'bottom', p: 0.34, w: 0.22 },
   ],
+  laundry: [{ side: 'bottom', p: 0.6, w: 0.18 }],
   basement: [{ side: 'bottom', p: 0.42, w: 0.14 }],
   garage: [{ side: 'right', p: 0.44, w: 0.26 }],
 };
@@ -361,21 +367,25 @@ const BULBS: Partial<Record<RoomId, Bulb[]>> = {
   hall: [{ x: 0.5, y: 0.4, r: 0.78, color: [255, 208, 150], power: 0.92, flicker: 0.05, fixture: 'bulb' }],
   study: [{ x: 0.62, y: 0.3, r: 0.44, color: [255, 198, 132], power: 0.8, flicker: 0.07 }],
   kitchen: [{ x: 0.46, y: 0.34, r: 0.62, color: [250, 232, 196], power: 0.66, flicker: 0.24, fixture: 'tube' }],
+  laundry: [{ x: 0.44, y: 0.3, r: 0.5, color: [206, 224, 232], power: 0.44, flicker: 0.48, fixture: 'tube' }],
   corridor: [{ x: 0.5, y: 0.4, r: 0.5, color: [206, 222, 240], power: 0.4, flicker: 0.55, fixture: 'tube' }],
   basement: [{ x: 0.52, y: 0.6, r: 0.42, color: [255, 162, 92], power: 0.52, flicker: 0.38, fixture: 'bulb' }],
   attic: [{ x: 0.52, y: 0.52, r: 0.34, color: [255, 196, 128], power: 0.32, flicker: 0.14, fixture: 'bulb' }],
+  nursery: [{ x: 0.7, y: 0.3, r: 0.36, color: [255, 206, 176], power: 0.34, flicker: 0.2, fixture: 'bulb' }],
   garage: [{ x: 0.3, y: 0.36, r: 0.44, color: [200, 216, 232], power: 0.3, flicker: 0.62, fixture: 'tube' }],
 };
 
 /** 房间整体环境光的强度：没有灯的房间也要能读出地面，只是更暗 */
 const ROOM_AMBIENT: Record<RoomId, number> = {
   attic: 0.22,
+  nursery: 0.28,
   bedroom: 0.32,
   study: 0.28,
   storage: 0.24,
   hall: 0.36,
   corridor: 0.28,
   kitchen: 0.34,
+  laundry: 0.3,
   basement: 0.26,
   garage: 0.28,
   garden: 0.36,
@@ -433,6 +443,15 @@ const PROPS: Record<RoomId, Prop[]> = {
     { k: 'crate', x: 0.36, y: 0.66, w: 0.34, h: 0.22, rot: 2 },
     { k: 'sheet', x: 0.72, y: 0.64, w: 0.26, h: 0.3, rot: -4 },
     { k: 'clutter', x: 0.84, y: 0.34, w: 0.18, h: 0.2 },
+  ],
+  nursery: [
+    { k: 'rug', x: 0.5, y: 0.62, w: 0.66, h: 0.5 },
+    { k: 'bed', x: 0.28, y: 0.28, w: 0.34, h: 0.3 },
+    { k: 'wardrobe', x: 0.82, y: 0.26, w: 0.2, h: 0.34 },
+    { k: 'chair', x: 0.66, y: 0.68, w: 0.15, h: 0.15, rot: -18 },
+    { k: 'lamp', x: 0.2, y: 0.72, w: 0.08, h: 0.08 },
+    { k: 'clutter', x: 0.72, y: 0.86, w: 0.24, h: 0.14 },
+    { k: 'clutter', x: 0.42, y: 0.5, w: 0.16, h: 0.12 },
   ],
   bedroom: [
     { k: 'rug', x: 0.5, y: 0.64, w: 0.7, h: 0.44 },
@@ -497,6 +516,15 @@ const PROPS: Record<RoomId, Prop[]> = {
     { k: 'crate', x: 0.85, y: 0.74, w: 0.19, h: 0.18, rot: 6 },
     { k: 'puddle', x: 0.4, y: 0.46, w: 0.28, h: 0.24 },
     { k: 'clutter', x: 0.55, y: 0.86, w: 0.2, h: 0.14 },
+  ],
+  laundry: [
+    { k: 'counter', x: 0.22, y: 0.2, w: 0.36, h: 0.22 },
+    { k: 'fridge', x: 0.62, y: 0.2, w: 0.18, h: 0.26 },
+    { k: 'pipes', x: 0.5, y: 0.08, w: 0.9, h: 0.07 },
+    { k: 'puddle', x: 0.44, y: 0.62, w: 0.5, h: 0.26 },
+    { k: 'shelf', x: 0.86, y: 0.66, w: 0.16, h: 0.3 },
+    { k: 'clutter', x: 0.2, y: 0.7, w: 0.24, h: 0.2 },
+    { k: 'crate', x: 0.5, y: 0.3, w: 0.18, h: 0.16, rot: 10 },
   ],
   garage: [
     { k: 'car', x: 0.44, y: 0.56, w: 0.72, h: 0.58 },
@@ -1896,11 +1924,23 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
     ctx.globalCompositeOperation = 'source-over';
     ctx.drawImage(refs.darkCv, 0, 0, w, h);
 
+    /* —— 战争迷雾：没进过的房间只留一个轮廓，里面的家具和人不给看 —— */
+    for (const room of ROOMS) {
+      if (isRoomExplored(state, room.id)) continue;
+      const r = rectOf(room.id, view);
+      ctx.fillStyle = 'rgba(4,5,6,.88)';
+      ctx.fillRect(r.x, r.y, r.w, r.h);
+      ctx.strokeStyle = 'rgba(126,120,108,.10)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
+    }
+
     /* —— 加色光 —— */
     ctx.globalCompositeOperation = 'lighter';
 
     // 灯泡暖光
     for (const room of ROOMS) {
+      if (!isRoomExplored(state, room.id)) continue;
       const bulbs = BULBS[room.id];
       if (!bulbs) continue;
       const r = rectOf(room.id, view);
@@ -1919,6 +1959,7 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
 
     // 月光冷调 + 窗棂影
     for (const room of ROOMS) {
+      if (!isRoomExplored(state, room.id)) continue;
       const wins = WINDOWS[room.id];
       if (!wins) continue;
       const r = rectOf(room.id, view);
