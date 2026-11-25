@@ -261,7 +261,11 @@ function validateOps(value: unknown, baseline: Op[]): value is Op[] {
     if (!isRecord(candidate) || candidate.op !== base.op) return false;
     const keys = Object.keys(base);
     const optional = OPTIONAL_OP_FIELDS[candidate.op as string] ?? [];
-    if (Object.keys(candidate).some((key) => !keys.includes(key))) return false;
+    const candidateKeys = Object.keys(candidate);
+    if (candidateKeys.some((key) => !keys.includes(key) && !optional.includes(key))) return false;
+    for (const key of candidateKeys) {
+      if (!keys.includes(key) && !validateOptionalField(candidate.op as string, key, candidate[key])) return false;
+    }
     if (keys.some((key) => !optional.includes(key) && !(key in candidate))) return false;
     for (const key of keys) {
       const current = candidate[key];
