@@ -397,6 +397,11 @@ app.addEventListener('click', (event) => {
     return;
   }
 
+  // 超过手牌上限时，必须先逐张选择弃牌；禁止用结束回合或其他动作绕过。
+  if (game.hand.length > 6 && action !== 'discard' && action !== 'mute') {
+    return;
+  }
+
   if (action === 'person') {
     const personId = target.dataset.personId;
     if (personId && game && screen === 'game') {
@@ -424,11 +429,6 @@ app.addEventListener('click', (event) => {
   }
 
   if (!game || screen !== 'game') return;
-
-  // 超过手牌上限时，必须先逐张选择弃牌；禁止用结束回合或其他动作绕过。
-  if (game.hand.length > 6 && action !== 'discard' && action !== 'mute') {
-    return;
-  }
 
   if (action === 'draw') {
     drawCardAction(game);
