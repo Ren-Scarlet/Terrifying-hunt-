@@ -78,18 +78,32 @@ interface Door {
 function sideTo(id: RoomId, nid: RoomId): Door | null {
   const r = ROOM_MAP[id].rect;
   const nr = ROOM_MAP[nid].rect;
-  const dx = nr.left + nr.width / 2 - (r.left + r.width / 2);
-  const dy = nr.top + nr.height / 2 - (r.top + r.height / 2);
-  if (Math.abs(dx) > Math.abs(dy)) {
-    const top = Math.max(r.top, nr.top);
-    const bottom = Math.min(r.top + r.height, nr.top + nr.height);
-    const p = bottom > top ? ((top + bottom) / 2 - r.top) / r.height : 0.5;
-    return { side: dx > 0 ? 'right' : 'left', p: clamp(p, 0.12, 0.88) };
+  const right = r.left + r.width;
+  const bottom = r.top + r.height;
+  const otherRight = nr.left + nr.width;
+  const otherBottom = nr.top + nr.height;
+  const overlapX = Math.min(right, otherRight) - Math.max(r.left, nr.left);
+  const overlapY = Math.min(bottom, otherBottom) - Math.max(r.top, nr.top);
+  // 房间尺寸不再相同，不能再用中心点方向猜门在哪一面。
+  // 直接判断矩形是否真实共边（布局会在两边之间留一条窄墙缝）。
+  const edgeTolerance = 1;
+  if (Math.abs(right - nr.left) <= edgeTolerance && overlapY > 0) {
+    const p = ((Math.max(r.top, nr.top) + Math.min(bottom, otherBottom)) / 2 - r.top) / r.height;
+    return { side: 'right', p: clamp(p, 0.12, 0.88) };
   }
-  const left = Math.max(r.left, nr.left);
-  const right = Math.min(r.left + r.width, nr.left + nr.width);
-  const p = right > left ? ((left + right) / 2 - r.left) / r.width : 0.5;
-  return { side: dy > 0 ? 'bottom' : 'top', p: clamp(p, 0.12, 0.88) };
+  if (Math.abs(r.left - otherRight) <= edgeTolerance && overlapY > 0) {
+    const p = ((Math.max(r.top, nr.top) + Math.min(bottom, otherBottom)) / 2 - r.top) / r.height;
+    return { side: 'left', p: clamp(p, 0.12, 0.88) };
+  }
+  if (Math.abs(bottom - nr.top) <= edgeTolerance && overlapX > 0) {
+    const p = ((Math.max(r.left, nr.left) + Math.min(right, otherRight)) / 2 - r.left) / r.width;
+    return { side: 'bottom', p: clamp(p, 0.12, 0.88) };
+  }
+  if (Math.abs(r.top - otherBottom) <= edgeTolerance && overlapX > 0) {
+    const p = ((Math.max(r.left, nr.left) + Math.min(right, otherRight)) / 2 - r.left) / r.width;
+    return { side: 'top', p: clamp(p, 0.12, 0.88) };
+  }
+  return null;
 }
 
 function hasNeighborOn(id: RoomId, side: Door['side']): boolean {
