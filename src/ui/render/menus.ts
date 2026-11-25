@@ -1,13 +1,13 @@
 import { CARDS, deckCardsForKiller } from '../../game/cards';
 import { BASE_AP } from '../../game/engine';
-import { KILLERS } from '../../game/killers';
+import { ACTIVE_KILLERS } from '../../game/killers';
 import type { SaveData } from '../../game/types';
 import { detailCardHtml, escape, getKiller, icon, killerFaceHtml, perkIconHtml, powerIconHtml } from './shared';
 
 export function renderMenu(save: SaveData): string {
   const killer = getKiller(save.killer);
   const canAfford = save.darkCells >= 2;
-  const picker = KILLERS.map((k) => {
+  const picker = ACTIVE_KILLERS.map((k) => {
     const unlocked = save.unlockedKillers.includes(k.owner);
     const disabled = !unlocked && !canAfford;
     return `<button class="killer-choice ${k.owner === killer.owner ? 'selected' : ''} ${unlocked ? '' : 'locked'}"

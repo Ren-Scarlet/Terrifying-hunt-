@@ -1,5 +1,5 @@
 import { CARDS } from '../game/data/cards';
-import { KILLERS } from '../game/data/killers';
+import { ACTIVE_KILLERS } from '../game/data/killers';
 import type { Op } from '../game/effect';
 import { exportTuning, hasTuning } from '../game/tuning';
 import { DEST_OPTIONS, EFFECT_OPS, FLAG_OPTIONS, SABOTAGE_OPTIONS, WHO_OPTIONS, type EffectFieldType } from '../game/effectCatalog';
@@ -83,7 +83,7 @@ function cardBlock(): string {
 }
 
 function powerBlock(): string {
-  return KILLERS.map((killer) => {
+  return ACTIVE_KILLERS.map((killer) => {
     const powers = killer.powers
       .map(
         (power) => `<div class="tune-card">
@@ -138,7 +138,7 @@ export function renderAdmin(): string {
             <div class="admin-grid">${cardBlock()}</div>
           </section>
           <section>
-            <h2>杀手能力 <small>${KILLERS.length} 位 · 冷却与效果数值</small></h2>
+            <h2>杀手能力 <small>${ACTIVE_KILLERS.length} 位 · 冷却与效果数值</small></h2>
             ${powerBlock()}
           </section>
         </div>

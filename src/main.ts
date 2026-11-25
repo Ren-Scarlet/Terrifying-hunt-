@@ -20,6 +20,7 @@ import {
   wipeBlade,
 } from './game/engine';
 import { loadSave, writeSave } from './game/save';
+import { STARTER_KILLERS } from './game/killers';
 import {
   applyTuning,
   exportTuning,
@@ -342,7 +343,7 @@ app.addEventListener('click', (event) => {
 
   if (action === 'killer') {
     const owner = target.dataset.owner;
-    if (owner) {
+    if (owner && STARTER_KILLERS.includes(owner)) {
       const allowed = new Set(deckCardsForKiller(owner).map((card) => card.id));
       const compatibleDeck = save.deck.filter((id) => allowed.has(id));
       save = { ...save, killer: owner, deck: compatibleDeck.length >= 10 ? compatibleDeck : [...STARTING_DECK] };
@@ -354,7 +355,7 @@ app.addEventListener('click', (event) => {
 
   if (action === 'unlock-killer') {
     const owner = target.dataset.owner;
-    if (owner && !save.unlockedKillers.includes(owner) && save.darkCells >= 2) {
+    if (owner && STARTER_KILLERS.includes(owner) && !save.unlockedKillers.includes(owner) && save.darkCells >= 2) {
       save = {
         ...save,
         darkCells: save.darkCells - 2,

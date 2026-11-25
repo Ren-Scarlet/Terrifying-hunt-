@@ -479,5 +479,8 @@ export const KILLER_MAP: Record<string, KillerProfile> = KILLERS.reduce(
   {} as Record<string, KillerProfile>,
 );
 
-/** 初始解锁的杀手 */
-export const STARTER_KILLERS = ['设陷者', '幽灵', '护士', '女猎手', '鬼面', '迈克尔·迈尔斯'];
+/** 当前正式开放的初期角色。其余资料保留在数据库中，待机制实装后再开放。 */
+export const ACTIVE_KILLER_NAMES = ['设陷者', '护士', '迈克尔·迈尔斯'] as const;
+export const ACTIVE_KILLERS = ACTIVE_KILLER_NAMES.map((name) => KILLER_MAP[name]);
+/** 初始解锁名单与当前开放名单保持一致。 */
+export const STARTER_KILLERS: string[] = [...ACTIVE_KILLER_NAMES];

@@ -52,7 +52,7 @@ export function loadSave(): SaveData {
       ? parsed.unlockedCards.filter((id): id is string => typeof id === 'string' && !!CARD_MAP[id])
       : [];
     const unlockedKillers = Array.isArray(parsed.unlockedKillers)
-      ? parsed.unlockedKillers.filter((k): k is string => typeof k === 'string' && !!KILLER_MAP[k])
+      ? parsed.unlockedKillers.filter((k): k is string => typeof k === 'string' && !!KILLER_MAP[k] && STARTER_KILLERS.includes(k))
       : [];
     // 初始就解锁的内容永远保留，避免旧存档把初始卡组里的卡判成未解锁。
     STARTER_CARDS.forEach((id) => { if (!unlockedCards.includes(id)) unlockedCards.push(id); });
