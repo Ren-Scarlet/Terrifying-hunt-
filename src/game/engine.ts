@@ -66,6 +66,12 @@ const ESCAPE_ALERT_MIN = 35;
 /** 挥刀 / 搜索各自消耗 1 点行动点：唯一的伤害来源，不能免费 */
 export const ATTACK_COST = 1;
 export const SEARCH_COST = 1;
+/** 主动抽牌消耗的行动点；每次抽 1 张。 */
+export const DRAW_CARD_COST = 1;
+/** 手牌上限；超过时必须由玩家选择弃牌。 */
+export const HAND_LIMIT = 6;
+/** 每次牌库耗尽并洗回弃牌堆，幸存者团队进度增加。 */
+const DECK_SHUFFLE_TEAM_GAIN = 5;
 /**
  * 一个人一回合最多能跑几间屋（含被砍后夺路而逃的那两步）。
  * 玩家一回合 4 点行动点，这个数字必须比它能走的格数小，否则永远追不上；
@@ -1553,12 +1559,19 @@ function npcTurn(state: GameState): void {
 
     // 玩家就在这一间：先跑，跑不掉再对抗
     if (person.room === state.playerRoom) {
-      if (person.archetype === 'defiant' && person.armed && random() < 0.6) {
+      // 同屋幸存者在回合结算时必须获得一次最终逃跑机会。
+      // 本回合行动期间的反应移动次数不能让玩家把受伤目标留在原地反复攻击。
+      if (
+        person.archetype === 'defiant' &&
+        person.armed &&
+        person.movesThisTurn < REACT_MOVE_CAP &&
+        random() < 0.6
+      ) {
         counterAttack(state, person);
         continue;
       }
-      if (person.movesThisTurn < REACT_MOVE_CAP && fleeAway(state, person)) {
-        person.movesThisTurn += 1;
+      if (fleeAway(state, person)) {
+        person.movesThisTurn = Math.min(REACT_MOVE_CAP, person.movesThisTurn + 1);
         continue;
       }
       if (person.archetype === 'defiant' && person.movesThisTurn < REACT_MOVE_CAP) {
@@ -2449,6 +2462,50 @@ export function currentScore(state: GameState): number {
   );
 }
 
+/** 从牌库抽牌；每次耗尽并洗回弃牌堆都会推进幸存者团队进度。 */
+function drawForPlayer(state: GameState, count: number): number {
+  const reshuffles = drawCards(state, count);
+  if (reshuffles > 0) {
+    const gain = reshuffles * DECK_SHUFFLE_TEAM_GAIN;
+    addTeamProgress(state, gain);
+    log(state, `牌库耗尽，弃牌堆重新洗牌（幸存者团队进度 +${gain}）。`);
+  }
+  return reshuffles;
+}
+
+/** 主动抽 1 张牌，消耗 1 点行动点；手牌超限时必须先弃牌。 */
+export function drawCardAction(state: GameState): boolean {
+  if (state.phase !== 'playing') return false;
+  if (state.hand.length > HAND_LIMIT) {
+    log(state, `手牌超过上限 ${HAND_LIMIT} 张，请先选择弃牌。`);
+    return false;
+  }
+  if (state.energy < DRAW_CARD_COST) {
+    log(state, '行动点不足，无法主动抽牌。');
+    return false;
+  }
+  if (state.drawPile.length === 0 && state.discardPile.length === 0) {
+    log(state, '牌库与弃牌堆都已耗尽，无法抽牌。');
+    return false;
+  }
+  state.energy -= DRAW_CARD_COST;
+  drawForPlayer(state, 1);
+  log(state, `你花费 ${DRAW_CARD_COST} 点行动点主动抽了 1 张牌。`);
+  afterPlayerAction(state);
+  return true;
+}
+
+/** 玩家选择一张手牌弃掉；弃牌不消耗行动点，也不触发幸存者行动。 */
+export function discardCard(state: GameState, cardUid: string): boolean {
+  if (state.phase !== 'playing' || state.hand.length <= HAND_LIMIT) return false;
+  const index = state.hand.findIndex((card) => card.uid === cardUid);
+  if (index < 0) return false;
+  const [card] = state.hand.splice(index, 1);
+  state.discardPile.push(card);
+  log(state, `你选择弃掉「${CARD_MAP[card.defId]?.name ?? card.defId}」。`);
+  return true;
+}
+
 export function endTurn(state: GameState): void {
   if (state.phase !== 'playing') return;
 
@@ -2581,10 +2638,7 @@ export function endTurn(state: GameState): void {
     return;
   }
 
-  // 手牌每回合弃掉重抽，避免玩家把整副牌囤在手里。
-  state.discardPile.push(...state.hand);
-  state.hand = [];
-
+  // 手牌保留；每个新回合只补 1 张，不再整手弃掉重抽。
   state.turn += 1;
   // 杀戮满值 = 移动力提升：每回合多 2 点行动点，但绝不替玩家走第二步
   const frenzyBonus = state.frenzy >= FRENZY_THRESHOLD ? FRENZY_AP_BONUS : 0;
@@ -2600,7 +2654,10 @@ export function endTurn(state: GameState): void {
   state.people.forEach((p) => {
     p.movesThisTurn = 0;
   });
-  drawCards(state, 5);
+  drawForPlayer(state, 1);
+  if (state.hand.length > HAND_LIMIT) {
+    log(state, `当前手牌 ${state.hand.length} 张，超过上限 ${HAND_LIMIT}，请先选择弃牌。`);
+  }
   log(state, `新回合开始，行动点恢复${frenzyBonus ? `（杀戮 +${frenzyBonus}）` : ''}。`);
 }
 
