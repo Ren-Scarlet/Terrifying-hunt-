@@ -562,16 +562,23 @@ button { font-family: inherit; cursor: pointer; }
 .card:disabled { opacity: .34; cursor: not-allowed; filter: grayscale(.65) brightness(.78); }
 .card:focus-visible { outline: 1px solid #b3945f; outline-offset: 2px; }
 
-/* 图标：底下压一块暗金属盘，图标本身几乎去色，别让紫色稀有度框跳出来 */
+/* 图标：保留《黎明杀机》技能图标的紫色菱形稀有度底，这是它最好认的特征。
+   只压一点亮度让它融进暗场，不能去色——去掉紫底就等于去掉了这套图标的身份。 */
 .card .dbd-perk {
   width: 70px; height: 70px;
   margin: 10px auto 9px;
-  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, .8));
+  filter:
+    drop-shadow(0 5px 9px rgba(0, 0, 0, .82))
+    drop-shadow(0 0 14px rgba(126, 79, 168, .16));
 }
-.card .dbd-perk-bg { filter: grayscale(.92) brightness(.62) contrast(1.1); opacity: .85; }
-.card .dbd-perk-glyph {
-  filter: grayscale(.35) sepia(.18) brightness(1.02) contrast(1.05);
+.card .dbd-perk-bg {
+  filter: saturate(.92) brightness(.84) contrast(1.06);
   opacity: .95;
+}
+.card .dbd-perk-glyph {
+  /* 图标本体是透明底的白色线条，保持白才压得住紫底 */
+  filter: drop-shadow(0 1px 3px #000c) contrast(1.04) brightness(1.02);
+  opacity: .97;
 }
 
 .card-type {
@@ -867,7 +874,7 @@ button { font-family: inherit; cursor: pointer; }
   background: #14181b;
   box-shadow: 0 6px 16px #000b;
 }
-.deck-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(228px, 1fr)); gap: 8px; margin-top: 14px; }
+.deck-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(262px, 1fr)); gap: 8px; margin-top: 14px; }
 .deck-row {
   display: flex; align-items: center; gap: 9px;
   padding: 9px;
@@ -878,9 +885,26 @@ button { font-family: inherit; cursor: pointer; }
 .deck-row:hover { border-color: #3d362c; background: linear-gradient(180deg, #121518, #0b0d0f); }
 .deck-row.locked { opacity: .42; }
 .deck-row-info { flex: 1; min-width: 0; }
-.deck-row-info b { display: block; font-size: 11.5px; letter-spacing: .4px; }
+.deck-row-info b { display: block; font-size: 11.5px; letter-spacing: .4px; margin-bottom: 3px; }
 .deck-row-info small { color: var(--faint); font-size: 9.5px; line-height: 1.45; }
-.source-skill { color: #8b7d92; font-size: 9px; }
+/* 描述固定两行截断，牌组里 29 张卡的行高才会齐 */
+.deck-desc {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  color: #6f6a62;
+  font-size: 9.5px;
+  line-height: 1.5;
+  margin-bottom: 4px;
+}
+.source-skill {
+  display: block;
+  color: #8b7d92; font-size: 8.5px; letter-spacing: .2px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  padding-top: 3px;
+  border-top: 1px solid #ffffff08;
+}
 .dbd-perk.compact { width: 44px; height: 44px; margin: 0; }
 .counter { display: flex; align-items: center; gap: 4px; }
 .counter button {
@@ -1031,10 +1055,10 @@ button { font-family: inherit; cursor: pointer; }
   position: absolute; inset: 0; width: 100%; height: 100%;
   object-fit: contain; pointer-events: none;
 }
-/* 稀有度底框本来是紫/蓝色，放到这层冷灰褐的画面里会立刻变成"贴纸"，
-   统一压成旧金属色，只留明度层次 */
-.dbd-perk-bg, .dbd-power-bg { filter: grayscale(.9) brightness(.72) contrast(1.06); }
-.dbd-perk-glyph, .dbd-power-glyph { filter: grayscale(.4) sepia(.18) brightness(1.02); }
+/* 稀有度底框是紫/蓝菱形，这是技能图标的辨识特征——保留原色，只压亮度让它融进暗场。
+   详情页、牌组、商店里的图标与卡面必须一致，否则同一张卡会出现两种颜色。 */
+.dbd-perk-bg, .dbd-power-bg { filter: saturate(.94) brightness(.85) contrast(1.05); }
+.dbd-perk-glyph, .dbd-power-glyph { filter: drop-shadow(0 1px 3px #000c) contrast(1.04); }
 .dbd-perk-glyph { filter: drop-shadow(0 2px 5px #000b); }
 .dbd-power { position: relative; width: 80px; height: 80px; margin: 0 0 14px; flex: 0 0 auto; }
 

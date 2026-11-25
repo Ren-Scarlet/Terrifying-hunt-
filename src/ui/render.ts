@@ -344,7 +344,8 @@ export function renderDeckEditor(deck: string[], unlocked: string[]): string {
         ${perkIconHtml(card.id, 'compact')}
         <div class="deck-row-info">
           <b>${escape(card.name)} <span style="color:var(--accent)">${card.cost}</span></b>
-          <small>${isUnlocked ? escape(card.desc) : '未解锁 · 可在商店购买'}<br><span class="source-skill">图标原型：${escape(card.sourceSkill)} · 效果为本作原创</span></small>
+          <span class="deck-desc">${isUnlocked ? escape(card.desc) : '未解锁 · 可在商店购买'}</span>
+          <span class="source-skill" title="图标原型：${escape(card.sourceSkill)}">${escape(card.sourceSkill)}</span>
         </div>
         <div class="counter">
           <button data-action="deck-remove" data-id="${card.id}" ${count === 0 ? 'disabled' : ''}>−</button>
