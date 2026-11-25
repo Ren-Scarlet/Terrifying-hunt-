@@ -85,6 +85,8 @@ function roomFeatures(state: GameState, roomId: RoomId): string {
         `<span class="room-feature site ${i.kind} ${down ? 'broken' : ''}" title="${label}：${status}。你用不了它，但可以花 ${SABOTAGE_COST} 点行动点砸掉">${icon(i.kind === 'itemBox' ? 'itemBox' : 'generator', 'ui-icon tiny')}</span>`,
       );
     });
+  const lighting = state.powerCircuits.find((c) => c.affectedRooms.includes(roomId));
+  if (lighting) parts.push(`<span class="room-feature light ${lighting.broken ? 'off' : 'on'}" title="${escape(lighting.name)}：${lighting.broken ? '断电' : '供电中'}">${lighting.broken ? '☾' : '💡'}</span>`);
   const circuitAt = state.powerCircuits.find((c) => c.breakerRoom === roomId);
   if (circuitAt) parts.push(`<span class="room-feature breaker ${circuitAt.broken ? 'broken' : ''}" title="${escape(circuitAt.name)}：${circuitAt.broken ? '已破坏' : '可破坏；影响 ' + circuitAt.affectedRooms.map(roomName).join('、')}">⚡</span>`);
   if (roomId === 'kitchen') parts.push('<span class="room-feature execution-site" title="特殊处决地点：冰箱 / 微波炉">☠</span>');
