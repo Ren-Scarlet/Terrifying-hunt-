@@ -3,6 +3,7 @@
  * 运行：npm run check
  */
 import { CARD_MAP, CARDS } from '../src/game/data/cards';
+import { KILLERS } from '../src/game/data/killers';
 import {
   ARCH_LABEL,
   BASE_AP,
@@ -29,6 +30,7 @@ import {
   moveCost,
   movePlayer,
   playCard,
+  runOps,
   searchRoom,
   visibleDisturbances,
   visibleTrails,
@@ -250,11 +252,18 @@ function caseFinisher(): void {
   remoteDowned.room = openNeighbor(scoped.playerRoom);
   remoteDowned.hp = 0;
   remoteDowned.downedTurns = DOWNED_LOCK_TURNS;
-  const scopedPlayed = play(scoped, 'execute');
+  runOps(scoped, CARD_MAP.execute!.ops);
   check(
     'F 处决牌只处决当前房间目标',
-    scopedPlayed && !scoped.people.some((p) => p.id === localDowned.id) && scoped.people.some((p) => p.id === remoteDowned.id),
+    !scoped.people.some((p) => p.id === localDowned.id) && scoped.people.some((p) => p.id === remoteDowned.id),
     `local=${scoped.people.some((p) => p.id === localDowned.id)} remote=${scoped.people.some((p) => p.id === remoteDowned.id)}`,
+  );
+
+  const executioner = KILLERS.find((killer) => killer.owner === '处刑者');
+  const ultimate = executioner?.powers.find((power) => power.id === 'executioner_judge');
+  check(
+    'F 处刑者大招也使用当前房间目标',
+    ultimate?.ops.some((op) => op.op === 'execute' && op.who === 'downedHere') ?? false,
   );
 
   const s3 = newGame();
