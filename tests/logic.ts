@@ -1059,11 +1059,16 @@ function caseNpcLocksAndPersistentTrails(): void {
   }
 
   const tracks = newGame();
-  const walker = player(tracks);
-  const next = openNeighbor(tracks.playerRoom);
-  const beyond = ROOM_MAP[next].neighbors.find((r) => r !== tracks.playerRoom && !OBSTACLE_ROOMS.includes(r));
-  if (beyond) {
-    walker.room = beyond;
+  const routeStart = Object.values(ROOM_MAP).find((room) =>
+    room.neighbors.some((next) => ROOM_MAP[next].neighbors.some((exit) => exit !== room.id && !OBSTACLE_ROOMS.includes(exit))),
+  );
+  if (routeStart) {
+    const next = routeStart.neighbors.find((candidate) =>
+      ROOM_MAP[candidate].neighbors.some((exit) => exit !== routeStart.id && !OBSTACLE_ROOMS.includes(exit)),
+    )!;
+    const walker = player(tracks);
+    tracks.playerRoom = routeStart.id;
+    walker.room = next;
     walker.intent = 'flee';
     walker.alert = 100;
     walker.hp = 4;
@@ -1077,8 +1082,8 @@ function caseNpcLocksAndPersistentTrails(): void {
     tracks.trailClock += 4;
     check('AB 脚印在 5 次玩家行动内仍可追踪', visibleTrails(tracks).some((trail) => trail.to === walker.room));
   } else {
-    check('AB 潜行 NPC 移动仍会留下脚印', true, '当前布局没有两跳路线，跳过');
-    check('AB 脚印在 5 次玩家行动内仍可追踪', true, '当前布局没有两跳路线，跳过');
+    check('AB 潜行 NPC 移动仍会留下脚印', true, '地图无可测试的两跳路线，跳过');
+    check('AB 脚印在 5 次玩家行动内仍可追踪', true, '地图无可测试的两跳路线，跳过');
   }
 }
 caseNpcLocksAndPersistentTrails();
