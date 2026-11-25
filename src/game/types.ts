@@ -338,7 +338,7 @@ export interface GameState {
   evidence: number;
   markedKilled: number;
   decoyRoom: RoomId | null;
-  /** 房间锁：房间 -> 还锁着几回合。NPC 与警察都过不去 */
+  /** 房间锁：房间 -> 还锁着几回合。NPC 与警察都不能进入或离开该房间 */
   roomLocks: Partial<Record<RoomId, number>>;
   /** 本回合是否已经暴露过全场位置 */
   revealedThisTurn: boolean;
