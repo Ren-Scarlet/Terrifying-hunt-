@@ -202,7 +202,7 @@ function caseMyersStalkingAndFearRadius(): void {
     usePower(exitStalk, 'myers_gaze_exit') && !exitStalk.myersStalking);
 
   check('卡牌图标：新版初始卡和迈尔斯专属卡都有可用白色图案资源',
-    ['unbreakable','hex_huntress','hex_noed','scourge_shrine','distressing','hell','iron_grasp','deerstalker','hex_ruin','bitter_murmur','sloppy_butcher','insidious','myers_eclipse_light','myers_last_best','myers_plaything'].every((id) => !!cardImage(id) && cardImage(id)!.includes('/assets/dbd/perks/')));
+    ['unbreakable','hex_huntress','hex_noed','scourge_shrine','distressing','hell','iron_grasp','deerstalker','hex_ruin','bitter_murmur','sloppy_butcher','insidious','myers_eclipse_light','myers_last_best','myers_plaything'].every((id) => !!cardImage(id) && cardImage(id)!.includes('assets/dbd/perks/')));
   const normal = createGame(['silent_step'], undefined, '设陷者');
   check('恐惧范围：其他杀手仍保持默认 1', normal.fearRadius === 1);
 }
