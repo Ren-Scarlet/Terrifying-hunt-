@@ -218,7 +218,10 @@ const DEST_VALUES = new Set([
 function validateCondition(value: unknown, baseline: unknown): boolean {
   if (!isRecord(value) || !isRecord(baseline) || value.c !== baseline.c) return false;
   const allowed = Object.keys(baseline);
+  const optional: Record<string, string[]> = { wanted: ['gte', 'lte'], alarm: ['gte', 'lte'], victimHere: ['maxHp'] };
+  const optionalKeys = optional[String(baseline.c)] ?? [];
   if (Object.keys(value).some((key) => !allowed.includes(key))) return false;
+  if (allowed.some((key) => !optionalKeys.includes(key) && !(key in value))) return false;
   for (const key of allowed) {
     if (!(key in value)) continue;
     const v = value[key];
@@ -226,10 +229,18 @@ function validateCondition(value: unknown, baseline: unknown): boolean {
       if (typeof v !== 'number' || !Number.isFinite(v) || Math.abs(v) > 1000) return false;
     } else if (typeof baseline[key] === 'string') {
       if (typeof v !== 'string' || v.length > 100) return false;
+      if (key === 'key' && baseline.c === 'flag' && !FLAG_VALUES.has(v)) return false;
+      if (key === 'v' && baseline.c === 'hasThreat' && !['alarm', 'lead', 'team', 'spiritual'].includes(v)) return false;
+      if (key === 'a' && baseline.c === 'hasArchetype' && !['alert', 'defiant', 'caller', 'rescuer', 'hider', 'brave'].includes(v)) return false;
     }
   }
   return true;
 }
+
+const OPTIONAL_OP_FIELDS: Record<string, string[]> = {
+  damage: ['maxHp'], move: ['clearAlert'], scout: ['to', 'all', 'adj', 'turns'],
+  pursue: ['distance'], flag: ['value'], if: ['else'],
+};
 
 /** 只允许调整基准 DSL 已有的指令和字段，不允许导入时注入新指令。 */
 function validateOps(value: unknown, baseline: Op[]): value is Op[] {
@@ -238,7 +249,9 @@ function validateOps(value: unknown, baseline: Op[]): value is Op[] {
     const base = baseline[index] as unknown as Record<string, unknown>;
     if (!isRecord(candidate) || candidate.op !== base.op) return false;
     const keys = Object.keys(base);
+    const optional = OPTIONAL_OP_FIELDS[candidate.op as string] ?? [];
     if (Object.keys(candidate).some((key) => !keys.includes(key))) return false;
+    if (keys.some((key) => !optional.includes(key) && !(key in candidate))) return false;
     for (const key of keys) {
       const current = candidate[key];
       const original = base[key];
