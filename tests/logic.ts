@@ -1257,7 +1257,8 @@ function caseNewPerkSystem(): void {
 
   const bitter = createGame(['bitter_murmur'], undefined, '迈克尔·迈尔斯');
   const worker = bitter.people.find((person) => person.role !== 'police')!;
-  worker.room = 'attic';
+  const fogRoom = (Object.keys(ROOM_MAP) as Array<keyof typeof ROOM_MAP>).find((room) => room !== bitter.playerRoom && !ROOM_MAP[bitter.playerRoom].neighbors.includes(room))!;
+  worker.room = fogRoom;
   worker.intent = 'work';
   worker.goal = 'objective';
   bitter.hand = [{ uid: 'test-bitter', defId: 'bitter_murmur' }];
