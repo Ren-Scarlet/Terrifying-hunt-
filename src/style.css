@@ -2069,3 +2069,5 @@ button, .room-hit, .hand-row { touch-action: manipulation; }
 .room-feature.execution-site{color:#c77d70;}
 .status-badge.carrying{color:#e3c48a;border-color:#8a6b31;}
 .btn.execution{border:1px solid #8b574a;color:#e5b2a4;background:#241512;}
+
+.room-feature.light{font-size:10px;padding:1px 3px;border-radius:3px;}.room-feature.light.off{opacity:.4;filter:grayscale(1);}.room.dark-room{background-color:#090a0d;}
