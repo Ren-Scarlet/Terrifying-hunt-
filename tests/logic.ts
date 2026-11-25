@@ -588,7 +588,7 @@ function caseTeamGoal(): void {
   worker.room = openNeighbor(s.playerRoom);
   worker.item = 'key';
   worker.itemUses = 1;
-  worker.alert = 0;
+  worker.alert = 100;
   worker.hidden = false;
   endTurn(s);
   check('S 第四阶段完成后出现两个逃生点', s.teamStage === 4 && s.escapeRooms.length === 2, `stage=${s.teamStage} exits=${s.escapeRooms.join(',')}`);
@@ -773,7 +773,7 @@ function caseSurvivorItems(): void {
   const p3 = s3.people.find((x) => x.role !== 'police')!;
   p3.item = 'key';
   p3.itemUses = 1;
-  p3.alert = 0;
+  p3.alert = 100;
   s3.playerRoom = 'hall';
   const before = s3.teamProgress;
   endTurn(s3);
@@ -969,6 +969,7 @@ function caseAidAndPressure(): void {
     worker.goal = 'objective';
     worker.room = room;
     worker.intent = 'idle';
+    worker.alert = 100;
     worker.movesThisTurn = 0;
     w.kills = 3;
     const before = w.teamProgress;
