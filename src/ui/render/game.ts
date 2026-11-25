@@ -541,7 +541,8 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
             <button class="btn primary end-turn" data-action="end-turn" ${selectingDiscards ? 'disabled' : ''}>结束回合</button>
             <button class="btn ghost" data-action="give-up">放弃任务</button>
           </div>
-          <div class="hand-row">${hand || '<div style="color:var(--muted);font-size:13px">手牌已空，结束回合重新抽牌。</div>'}</div>
+          <div class="hand-count">手牌 ${state.hand.length}/${HAND_LIMIT}</div>
+          <div class="hand-row">${hand || '<div style="color:var(--muted);font-size:13px">手牌已空，可花行动点主动抽牌。</div>'}</div>
         </div>
         </div>
       </div>
