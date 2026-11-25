@@ -14,7 +14,7 @@ export function itemUsesFor(item: SurvivorItem): number {
 }
 
 
-const ACTIVITIES = [
+export const ACTIVITIES = [
   '在翻找抽屉',
   '靠在窗边抽烟',
   '整理桌上的文件',

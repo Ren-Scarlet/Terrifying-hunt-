@@ -1,5 +1,5 @@
 import { CARD_MAP } from '../game/cards';
-import { characterImage } from '../game/assetMap';
+import { characterImage, uiIcon } from '../game/assetMap';
 import {
   ALARM_MAX,
   ARCH_LABEL,
@@ -58,7 +58,7 @@ import {
 
 import { isCardTuned } from '../game/tuning';
 import { isMuted } from './audio';
-import { escape, icon, itemBadge, personChip, intentDot, shadowFigures, perkIconHtml } from './render/shared';
+import { escape, icon, itemBadge, itemIconHtml, personChip, intentDot, shadowFigures, perkIconHtml, TYPE_NAMES, killerFaceHtml, defaultDetailHtml } from './render/shared';
 export { killerFaceHtml, getKiller, defaultDetailHtml, cardDetailHtml, personDetailHtml } from './render/shared';
 export { renderMenu, renderGuide, shopPrice, renderShop, renderDeckEditor } from './render/menus';
 import type { GameState, Person, RoomId, SaveData } from '../game/types';

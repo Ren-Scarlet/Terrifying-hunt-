@@ -6,7 +6,7 @@ import { createGame } from './setup';
 export { drawCards } from './deck';
 export { createGame } from './setup';
 export { BASE_AP, SABOTAGE_COST, ITEM_BOX_CHARGES, GENERATOR_JAM_TURNS } from './constants';
-import { createPeople, itemUsesFor } from './npc/factory';
+import { ACTIVITIES, createPeople, itemUsesFor } from './npc/factory';
 import { ARCH_DESC, ARCH_LABEL, GOAL_LABEL, HEALTH_LABEL, INTENT_LABEL, SITE_ITEM_LABEL, SURVIVOR_ITEM_LABEL } from './npc/catalog';
 export { ARCH_DESC, ARCH_LABEL, GOAL_LABEL, HEALTH_LABEL, INTENT_LABEL, SITE_ITEM_LABEL, SURVIVOR_ITEM_LABEL } from './npc/catalog';
 export { ESCAPE_ROOMS } from './constants';

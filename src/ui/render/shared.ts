@@ -10,13 +10,13 @@ import { getPersonProfile, type PersonProfile } from '../../game/people';
 import { SURVIVOR_MAP } from '../../game/survivors';
 import type { GameState, Person, SaveData } from '../../game/types';
 
-const escape = (s: string) =>
+export const escape = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
-const TYPE_NAMES: Record<string, string> = { attack: '攻击', skill: '技能', tactic: '战术', setup: '布局' };
-const TYPE_RARITY: Record<string, string> = { attack: 'visceral', skill: 'very-rare', tactic: 'rare', setup: 'uncommon' };
+export const TYPE_NAMES: Record<string, string> = { attack: '攻击', skill: '技能', tactic: '战术', setup: '布局' };
+export const TYPE_RARITY: Record<string, string> = { attack: 'visceral', skill: 'very-rare', tactic: 'rare', setup: 'uncommon' };
 
-const icon = (name: Parameters<typeof uiIcon>[0], cls = 'ui-icon') =>
+export const icon = (name: Parameters<typeof uiIcon>[0], cls = 'ui-icon') =>
   `<img class="${cls}" src="${uiIcon(name)}" alt="" aria-hidden="true">`;
 
 /** 三件道具按你的设计各配一张图；其余道具仍用文字角标 */
@@ -25,14 +25,14 @@ const ITEM_ICONS: Partial<Record<NonNullable<Person['item']>, Parameters<typeof 
   toolbox: 'toolbox',
   flashlight: 'flashlight',
 };
-const itemIconHtml = (item: NonNullable<Person['item']>): string => {
+export const itemIconHtml = (item: NonNullable<Person['item']>): string => {
   const key = ITEM_ICONS[item];
   return key ? `<img class="item-icon" src="${uiIcon(key)}" alt="" aria-hidden="true">` : '';
 };
-const itemBadge = (item: NonNullable<Person['item']>, uses: number): string =>
+export const itemBadge = (item: NonNullable<Person['item']>, uses: number): string =>
   `<i class="chip-item" title="手里拿着${escape(SURVIVOR_ITEM_LABEL[item])} · 还能用 ${uses} 次">${itemIconHtml(item)}${escape(SURVIVOR_ITEM_LABEL[item])}×${uses}</i>`;
 
-function detailCardHtml(
+export function detailCardHtml(
   title: string,
   subtitle: string,
   rarityLabel: string,
@@ -57,7 +57,7 @@ function detailCardHtml(
   `;
 }
 
-function perkIconHtml(defId: string, size = ''): string {
+export function perkIconHtml(defId: string, size = ''): string {
   return `
     <div class="dbd-perk ${size}">
       <img class="dbd-perk-bg" src="${PERK_RARITY_BG}" alt="" onerror="this.style.display='none'">
@@ -77,7 +77,7 @@ export function killerFaceHtml(killer: KillerProfile, cls = ''): string {
     </span>`;
 }
 
-function powerIconHtml(killer: KillerProfile): string {
+export function powerIconHtml(killer: KillerProfile): string {
   return `
     <div class="dbd-power">
       <img class="dbd-power-bg" src="${POWER_RARITY_BG}" alt="" onerror="this.style.display='none'">
@@ -119,12 +119,12 @@ export function cardDetailHtml(state: GameState, cardUid: string): string {
   );
 }
 
-function intentDot(person: Person): string {
+export function intentDot(person: Person): string {
   if (person.intent === 'idle') return '';
   return `<i class="intent-dot i-${person.intent}" title="${escape(INTENT_LABEL[person.intent])}"></i>`;
 }
 
-function personChip(person: Person, attackable = false): string {
+export function personChip(person: Person, attackable = false): string {
   const cls =
     person.role === 'police'
       ? 'police'
@@ -169,11 +169,11 @@ function personChip(person: Person, attackable = false): string {
 }
 
 /** 感知到的红色人影：看得出「有人」，看不出是谁 */
-function shadowFigures(count: number): string {
+export function shadowFigures(count: number): string {
   return Array.from({ length: Math.min(3, count) }, () => '<span class="shadow-figure"></span>').join('');
 }
 
-function personPortraitHtml(profile: PersonProfile): string {
+export function personPortraitHtml(profile: PersonProfile): string {
   const img = profile.portrait
     ? `<img class="person-detail-img" src="${profile.portrait}" alt="${escape(profile.name)}立绘"
         onerror="this.style.display='none'">`
