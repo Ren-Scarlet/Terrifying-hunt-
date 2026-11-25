@@ -604,7 +604,7 @@ function nextStepToward(
     for (const next of ROOM_MAP[current].neighbors) {
       if (seen.has(next)) continue;
       if (blocked.has(next) && next !== to) continue;
-      if (respectLocks && isLocked(state, next) && next !== to) continue;
+      if (respectLocks && isLocked(state, next)) continue;
       if (!canStand(state, next) && next !== to) continue;
       seen.add(next);
       const newPath = [...path, next];
