@@ -10,6 +10,7 @@ import {
   BLEEDOUT_TURNS,
   DOWNED_LOCK_TURNS,
   HAND_LIMIT,
+  LOOK_COST,
   drawCardAction,
   discardCard,
   FRENZY_AP_BONUS,
