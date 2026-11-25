@@ -882,6 +882,8 @@ function selectPeople(state: GameState, who: Who): Person[] {
       return standing(state);
     case 'fleeing':
       return standing(state).filter((p) => p.intent === 'flee' || p.intent === 'escape');
+    case 'downedHere':
+      return peopleInRoom(state, state.playerRoom).filter((p) => p.role !== 'police' && p.hp <= 0);
     case 'downedAny':
       return npcs(state).filter((p) => p.hp <= 0);
     case 'injuredAny':
