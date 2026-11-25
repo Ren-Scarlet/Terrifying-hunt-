@@ -1051,7 +1051,7 @@ button { font-family: inherit; cursor: pointer; }
 }
 .deck-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(262px, 1fr)); gap: 8px; margin-top: 14px; }
 .deck-row {
-  display: flex; align-items: center; gap: 9px;
+  display: flex; align-items: flex-start; gap: 9px;
   padding: 9px;
   border: 1px solid #22262a; border-radius: 2px;
   background: linear-gradient(180deg, #0e1113, #0a0c0e);
@@ -1062,12 +1062,11 @@ button { font-family: inherit; cursor: pointer; }
 .deck-row-info { flex: 1; min-width: 0; }
 .deck-row-info b { display: block; font-size: 11.5px; letter-spacing: .4px; margin-bottom: 3px; }
 .deck-row-info small { color: var(--faint); font-size: 9.5px; line-height: 1.45; }
-/* 描述固定两行截断，牌组里 29 张卡的行高才会齐 */
+/* 构筑界面优先保证规则可读；长描述自然换行，不再截断。 */
 .deck-desc {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  display: block;
+  white-space: normal;
+  overflow: visible;
   color: #6f6a62;
   font-size: 9.5px;
   line-height: 1.5;
@@ -1076,7 +1075,7 @@ button { font-family: inherit; cursor: pointer; }
 .source-skill {
   display: block;
   color: #8b7d92; font-size: 8.5px; letter-spacing: .2px;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  white-space: normal; overflow: visible; overflow-wrap: anywhere;
   padding-top: 3px;
   border-top: 1px solid #ffffff08;
 }
@@ -2126,3 +2125,9 @@ button, .room-hit, .hand-row { touch-action: manipulation; }
 .myers-mark-strip b{color:#e6b0a9;font-variant-numeric:tabular-nums}
 .room-feature.totem.cursed{filter:drop-shadow(0 0 5px rgba(220,35,45,.75))}
 .room-feature.trail-highlight{color:#ff6666;text-shadow:0 0 7px rgba(255,45,45,.8);font-size:16px}
+
+/* 构筑卡片随完整描述自然增长，计数按钮保持在右侧。 */
+.deck-row-info { overflow-wrap: anywhere; }
+.deck-row .counter { flex: 0 0 auto; align-self: center; }
+.dbd-perk-fallback { position:absolute; inset:0; display:grid; place-items:center; color:#fff; font-size:27px; line-height:1; text-shadow:0 1px 4px #000; }
+.dbd-perk.compact .dbd-perk-fallback { font-size:19px; }

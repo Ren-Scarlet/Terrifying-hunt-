@@ -107,6 +107,7 @@ function powerButtonHtml(state: GameState, killer: KillerProfile): string {
       const ok = canUsePower(state, p.id);
       const reason = powerBlockReason(state, p.id);
       const total = Math.max(1, p.cooldown);
+      const actionHint = p.id === 'myers_gaze' ? (!ok && reason ? reason : (state.myersStalking ? '尾随行动 · 1 AP / +10' : '点击尾随 · 1 AP / +10')) : (cd > 0 ? '冷却 ' + cd + ' 回合' : reason || (p.ultimate ? '可以发动' : '可以使用'));
       const pips = Array.from({ length: total }, (_, i) => {
         const filled = i < cd;
         return `<i class="${filled ? 'on' : ''}"></i>`;
@@ -117,12 +118,14 @@ function powerButtonHtml(state: GameState, killer: KillerProfile): string {
         <span class="power-art"><img class="power-glyph" src="${killer.icon}" alt="" onerror="this.style.display='none'"></span>
         <span class="power-body">
           <b>${escape(p.name)}${p.ultimate ? '<em>大招</em>' : ''}</b>
-          <small>${cd > 0 ? `冷却 ${cd} 回合` : reason || (p.ultimate ? '可以发动' : '可以使用')}</small>
+          <small>${escape(actionHint)}</small>
         </span>
         <span class="power-pips">${pips}</span>
       </button>`;
     })
-    .join('');
+    .join('') + (killer.owner === '迈克尔·迈尔斯' && state.myersStalking
+      ? '<button class="btn ghost mini" data-action="power" data-power="myers_gaze_exit" title="退出尾随姿态，恢复恐惧范围与正常移动速度">退出尾随</button>'
+      : '');
 }
 
 /**

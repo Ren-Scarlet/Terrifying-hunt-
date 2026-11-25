@@ -45,8 +45,10 @@ import {
   visibleDisturbances,
   visibleTrails,
   wipeBlade,
+  usePower,
 } from '../src/game/engine';
 import { OBSTACLE_ROOMS, ROOM_MAP } from '../src/game/rooms';
+import { cardImage } from '../src/game/assetMap';
 import { SURVIVOR_MAP } from '../src/game/survivors';
 import { generateMission } from '../src/game/missions';
 import type { GameState, RoomId } from '../src/game/types';
@@ -153,10 +155,54 @@ function caseMyersStalkingAndFearRadius(): void {
   movePlayer(stealth, stealthRoom);
   check('迈尔斯：尾随者模式进入幸存者所在房间也不会被察觉', hiddenTarget.alert === 0 && hiddenTarget.awareness === 0, `alert=${hiddenTarget.alert} awareness=${hiddenTarget.awareness}`);
 
-  victim.room = s.playerRoom;
-  const beforeStalk = s.stalkMeter;
-  endTurn(s);
-  check('迈尔斯：静止观察视野内幸存者会积累尾随值', s.stalkMeter > beforeStalk, `stalk=${s.stalkMeter}`);
+  const stalking = newGame();
+  const prey = player(stalking);
+  const farRoom = (Object.keys(ROOM_MAP) as RoomId[]).find((room) =>
+    room !== stalking.playerRoom && !ROOM_MAP[stalking.playerRoom].neighbors.includes(room),
+  ) ?? openNeighbor(stalking.playerRoom);
+  stalking.people.forEach((person) => {
+    if (person.role !== 'police') {
+      person.room = farRoom;
+      person.hidden = false;
+      person.intent = 'idle';
+      person.alert = 0;
+      person.awareness = 0;
+    }
+  });
+  prey.room = stalking.playerRoom;
+  prey.intent = 'idle';
+  prey.hp = 4;
+  stalking.energy = 5;
+  const stalkStart = stalking.stalkMeter;
+  check('迈尔斯：第一次点击尾随立即进入姿态、消耗 1 AP 并增加 10 尾随值',
+    usePower(stalking, 'myers_gaze') && stalking.myersStalking && stalking.stalkMeter === stalkStart + 10 && stalking.energy === 4,
+    `stalk=${stalking.stalkMeter} AP=${stalking.energy}`);
+  check('迈尔斯：第二次点击继续消耗行动并使目标开始起疑',
+    usePower(stalking, 'myers_gaze') && stalking.stalkMeter === stalkStart + 20 && stalking.energy === 3 && stalking.stalkPressure === 40 && prey.awareness >= 1,
+    `stalk=${stalking.stalkMeter} pressure=${stalking.stalkPressure} awareness=${prey.awareness}`);
+  const thirdStalk = withRandomSource(() => 0.99, () => usePower(stalking, 'myers_gaze'));
+  check('迈尔斯：持续盯梢第三次时目标逃离，不能稳定刷同一人',
+    thirdStalk && stalking.stalkMeter === stalkStart + 30 && stalking.stalkPressure === 0 && prey.intent === 'flee',
+    `stalk=${stalking.stalkMeter} intent=${prey.intent}`);
+
+  const noPrey = newGame();
+  const hiddenRoom = (Object.keys(ROOM_MAP) as RoomId[]).find((room) =>
+    room !== noPrey.playerRoom && !ROOM_MAP[noPrey.playerRoom].neighbors.includes(room),
+  ) ?? openNeighbor(noPrey.playerRoom);
+  noPrey.people.forEach((person) => { if (person.role !== 'police') { person.room = hiddenRoom; person.hidden = true; person.trackedTurns = 0; person.revealedActions = 0; } });
+  noPrey.energy = 4;
+  check('迈尔斯：视野内没有幸存者时尾随不能使用也不扣 AP',
+    !usePower(noPrey, 'myers_gaze') && noPrey.energy === 4 && noPrey.stalkMeter === 0 && !noPrey.myersStalking);
+
+  const exitStalk = newGame();
+  const exitPrey = player(exitStalk);
+  exitPrey.room = exitStalk.playerRoom;
+  runOps(exitStalk, [{ op: 'flag', key: 'myersStalk' }]);
+  check('迈尔斯：可以主动退出尾随姿态并恢复正常移动',
+    usePower(exitStalk, 'myers_gaze_exit') && !exitStalk.myersStalking);
+
+  check('卡牌图标：新版初始卡和迈尔斯专属卡都有可用白色图案资源',
+    ['unbreakable','hex_huntress','hex_noed','scourge_shrine','distressing','hell','iron_grasp','deerstalker','hex_ruin','bitter_murmur','sloppy_butcher','insidious','myers_eclipse_light','myers_last_best','myers_plaything'].every((id) => !!cardImage(id) && cardImage(id)!.includes('assets/dbd/perks/')));
   const normal = createGame(['silent_step'], undefined, '设陷者');
   check('恐惧范围：其他杀手仍保持默认 1', normal.fearRadius === 1);
 }

@@ -1627,49 +1627,7 @@ function actByArchetype(state: GameState, person: Person): void {
   }
 }
 
-/** 迈尔斯保持静止时，持续尾随视野内的同一名幸存者。 */
-function updateMyersStalking(state: GameState): void {
-  if (state.killer !== '迈克尔·迈尔斯' || !state.myersStalking || state.myersMovedThisTurn || state.possessed) return;
-  const visible = npcs(state).filter((p) => p.hp > 0 && !p.hidden && p.role !== 'police' && isPersonVisible(state, p));
-  let target = visible.find((p) => p.id === state.stalkTargetId);
-  if (!target) {
-    target = visible[0];
-    state.stalkTargetId = target?.id ?? null;
-    state.stalkPressure = 0;
-  }
-  if (!target) {
-    log(state, '你静静地等待着，但视野里没有可尾随的猎物。');
-    return;
-  }
-
-  state.stalkMeter = Math.min(100, state.stalkMeter + 20);
-  state.stalkPressure = Math.min(100, state.stalkPressure + 25);
-  log(state, `你持续凝视着 ${target.name}：尾随值 ${state.stalkMeter}/100。`);
-
-  if (state.stalkPressure >= 40) {
-    target.awareness = Math.max(target.awareness, 1);
-    target.alert = Math.max(target.alert, 18);
-    target.intent = 'wary';
-    target.activity = '总觉得有人在暗处盯着自己';
-  }
-  if (state.stalkPressure >= 60) {
-    const detected = random() < (state.stalkPressure >= 85 ? 0.55 : 0.3);
-    if (detected) {
-      target.awareness = 3;
-      target.alert = 100;
-      target.intent = 'flee';
-      log(state, `${target.name} 突然发现了暗处的迈尔斯！`);
-    } else {
-      target.awareness = Math.max(target.awareness, 2);
-      target.alert = Math.max(target.alert, 55);
-      target.intent = 'flee';
-      log(state, `${target.name} 越来越不安，决定立刻离开这间房间。`);
-    }
-    if (target.movesThisTurn < REACT_MOVE_CAP && fleeAway(state, target, true)) target.movesThisTurn += 1;
-    state.stalkTargetId = null;
-    state.stalkPressure = 0;
-  }
-}
+/** 尾随不是自动挂机：每次点击能力都要花 1 AP，并承担被目标察觉的风险。 */
 
 /** 回合结束时 NPC 的一轮行动 */
 function npcTurn(state: GameState): void {
@@ -2776,6 +2734,10 @@ export function canUsePower(state: GameState, powerId: string): boolean {
   const power = killer?.powers.find((p) => p.id === powerId);
   if (!power) return false;
   if (powerCooldown(state, powerId) > 0) return false;
+  if (powerId === 'myers_gaze') {
+    if (state.killer !== '迈克尔·迈尔斯' || state.possessed || state.energy < 1) return false;
+    return npcs(state).some((p) => p.hp > 0 && !p.hidden && p.role !== 'police' && p.intent !== 'flee' && isPersonVisible(state, p));
+  }
   if (power.requires && !power.requires.every((c) => checkCond(state, c))) return false;
   return true;
 }
@@ -2787,6 +2749,11 @@ export function powerBlockReason(state: GameState, powerId: string): string {
   if (!power) return '';
   const cd = powerCooldown(state, powerId);
   if (cd > 0) return `冷却中，还要 ${cd} 回合`;
+  if (powerId === 'myers_gaze') {
+    if (state.possessed) return '恶魔附身期间不能尾随';
+    if (state.energy < 1) return '至少需要 1 点行动点';
+    if (!npcs(state).some((p) => p.hp > 0 && !p.hidden && p.role !== 'police' && p.intent !== 'flee' && isPersonVisible(state, p))) return '前方视野内没有可尾随的幸存者';
+  }
   if (power.requires && !power.requires.every((c) => checkCond(state, c))) {
     const need = power.requires.find((c) => !checkCond(state, c));
     if (need?.c === 'stalk') return `需要尾随值达到 ${need.gte}`;
@@ -2798,6 +2765,66 @@ export function powerBlockReason(state: GameState, powerId: string): string {
 }
 
 export function usePower(state: GameState, powerId: string): boolean {
+  if (powerId === 'myers_gaze_exit') {
+    if (state.killer !== '迈克尔·迈尔斯' || !state.myersStalking) return false;
+    state.myersStalking = false;
+    state.stalkTargetId = null;
+    state.stalkPressure = 0;
+    log(state, '你收起目光，离开尾随姿态；恐惧范围恢复，移动不再迟缓。');
+    state.attackReady = true;
+    afterPlayerAction(state);
+    checkImmediateWin(state);
+    return true;
+  }
+  if (powerId === 'myers_gaze') {
+    if (!canUsePower(state, powerId)) {
+      log(state, powerBlockReason(state, powerId) || '当前无法尾随。');
+      return false;
+    }
+    const visible = npcs(state).filter((p) => p.hp > 0 && !p.hidden && p.role !== 'police' && p.intent !== 'flee' && isPersonVisible(state, p));
+    const target = visible.find((p) => p.id === state.stalkTargetId) ?? visible[0];
+    if (!target) {
+      log(state, '前方已经没有可尾随的猎物。');
+      return false;
+    }
+    if (!state.myersStalking) {
+      state.myersStalking = true;
+      state.stalkTargetId = null;
+      state.stalkPressure = 0;
+      log(state, '你收住脚步，进入尾随姿态：恐惧范围降为 0。');
+    }
+    if (state.stalkTargetId !== target.id) {
+      state.stalkTargetId = target.id;
+      state.stalkPressure = 0;
+    }
+    state.energy -= 1;
+    state.stalkMeter = Math.min(100, state.stalkMeter + 10);
+    state.stalkPressure = Math.min(100, state.stalkPressure + 20);
+    log(state, '你花费 1 点行动点凝视 ' + target.name + '：尾随值 +10（' + state.stalkMeter + '/100）。');
+    if (state.stalkPressure >= 40 && state.stalkPressure < 60) {
+      target.awareness = Math.max(target.awareness, 1);
+      target.alert = Math.max(target.alert, 20);
+      target.intent = 'wary';
+      target.activity = '总觉得有人在暗处盯着自己';
+      log(state, target.name + ' 开始怀疑自己正被什么东西注视。');
+    }
+    if (state.stalkPressure >= 60) {
+      const detected = random() < 0.3;
+      target.awareness = Math.max(target.awareness, detected ? 3 : 2);
+      target.alert = Math.max(target.alert, detected ? 100 : 55);
+      target.intent = 'flee';
+      target.activity = detected ? '发现迈尔斯后惊恐逃跑' : '不安地逃离被注视的位置';
+      if (detected) log(state, target.name + ' 突然发现了暗处的迈尔斯！');
+      else log(state, target.name + ' 察觉到持续的注视，决定立刻逃离。');
+      if (target.movesThisTurn < REACT_MOVE_CAP && fleeAway(state, target, true)) target.movesThisTurn += 1;
+      state.stalkTargetId = null;
+      state.stalkPressure = 0;
+    }
+    state.attackReady = true;
+    afterPlayerAction(state);
+    checkImmediateWin(state);
+    return true;
+  }
   if (!canUsePower(state, powerId)) {
     log(state, powerBlockReason(state, powerId) || '这个能力现在用不了。');
     return false;
@@ -2968,9 +2995,6 @@ export function endTurn(state: GameState): void {
       }
     }
   }
-
-  // 尾随者模式只有在整回合保持静止、且视野内有猎物时才积累尾随值。
-  updateMyersStalking(state);
 
   if (TOTEM_ROOMS.includes(state.playerRoom)) {
     state.bonusEnergyNextTurn = 1;
