@@ -9,7 +9,7 @@ const STARTER_ITEM_RATE = 0.32;
 const STARTER_ITEMS: SurvivorItem[] = ['medkit', 'toolbox', 'flashlight', 'smoke', 'flare'];
 
 /** 每件道具能用几次：工具箱/手电筒/医疗包耐用品 2 次，其余一次 */
-function itemUsesFor(item: SurvivorItem): number {
+export function itemUsesFor(item: SurvivorItem): number {
   return item === 'toolbox' || item === 'flashlight' || item === 'medkit' ? 2 : 1;
 }
 
