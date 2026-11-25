@@ -41,6 +41,8 @@ export interface Room {
   x: number;
   y: number;
   rect: RoomRect;
+  /** 当前地图中房间的实际空间等级，仅影响显示面积与内容密度。 */
+  size: 'small' | 'medium' | 'large' | 'open';
   neighbors: RoomId[];
   desc: string;
 }
