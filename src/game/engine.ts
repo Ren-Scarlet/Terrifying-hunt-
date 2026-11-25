@@ -556,12 +556,12 @@ function npcReact(state: GameState): void {
       person.activity = '察觉到杀手逼近，立刻逃跑';
       if (person.movesThisTurn < REACT_MOVE_CAP && fleeAway(state, person, true)) person.movesThisTurn += 1;
       continue;
-    } else if (fearRadius >= 1 && distanceToPlayer === 1 && person.awareness === 0) {
+    } else if (fearRadius >= 1 && distanceToPlayer === 1 && person.awareness === 0 && person.alert < 40) {
       person.awareness = 1;
       person.alert = Math.max(person.alert, 12);
       person.intent = 'wary';
       person.activity = '听见附近有动静，停下来观察';
-    } else if (fearRadius >= 2 && distanceToPlayer === 2 && person.awareness === 0) {
+    } else if (fearRadius >= 2 && distanceToPlayer === 2 && person.awareness === 0 && person.alert < 40) {
       person.awareness = 1;
       person.alert = Math.max(person.alert, 12);
       person.intent = 'wary';
