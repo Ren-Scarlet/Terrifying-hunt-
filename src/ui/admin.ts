@@ -255,6 +255,15 @@ export function renderAdmin(): string {
           <button class="btn mini ghost" data-action="admin-reset">恢复默认</button>
           <button class="btn primary" data-action="admin-close">返回菜单</button>
         </div>
+        <div class="admin-export admin-import">
+          <label for="adminImportText">导入 JSON 备份</label>
+          <textarea id="adminImportText" rows="5" placeholder="把之前导出的 JSON 粘贴到这里"></textarea>
+          <div class="admin-export-actions">
+            <button class="btn mini" data-action="admin-import">校验并导入</button>
+            <span id="adminImportStatus" role="status" aria-live="polite"></span>
+          </div>
+          <p>导入前会检查卡牌 / 能力 ID、效果指令结构和数值范围；不合法的文件不会覆盖当前配置。</p>
+        </div>
         <div class="admin-export" id="adminExport" hidden>
           <p>把下面这段发给我，就能固化进代码；也可以自己存成备份，下次用「导入」贴回来。</p>
           <textarea id="adminExportText" readonly rows="8">${escape(exportTuning())}</textarea>
