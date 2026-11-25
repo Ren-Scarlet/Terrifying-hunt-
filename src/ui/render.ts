@@ -192,6 +192,7 @@ export function renderMenu(save: SaveData): string {
             <div class="subtitle">A SOLO DECKBUILDING HUNT</div>
             <h1>夜猎<span>档案</span></h1>
             <p class="hero-copy">你不是逃脱者。你是那扇门后不该存在的东西——<br>接下契约，布置现场，然后在警察赶到前完成它。</p>
+            <div class="hero-rule" aria-hidden="true"></div>
             <div class="resource-bar">
               <span>${icon('bloodPoint')} <b>${save.credits}</b> 血点</span>
               <span>${icon('darkCell')} <b>${save.darkCells}</b> 暗金细胞</span>
@@ -350,33 +351,11 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
     const locked = state.lockedRooms.includes(room.id);
     const r = room.rect;
     const style = `left:${r.left}%;top:${r.top}%;width:${r.width}%;height:${r.height}%`;
-    const doors = room.neighbors
-      .map((nid) => {
-        const nr = ROOM_MAP[nid].rect;
-        const dx = nr.left + nr.width / 2 - (r.left + r.width / 2);
-        const dy = nr.top + nr.height / 2 - (r.top + r.height / 2);
-        let side: 'top' | 'bottom' | 'left' | 'right';
-        let p = 50;
-        if (Math.abs(dx) > Math.abs(dy)) {
-          side = dx > 0 ? 'right' : 'left';
-          const top = Math.max(r.top, nr.top);
-          const bottom = Math.min(r.top + r.height, nr.top + nr.height);
-          if (bottom > top) p = (((top + bottom) / 2 - r.top) / r.height) * 100;
-        } else {
-          side = dy > 0 ? 'bottom' : 'top';
-          const left = Math.max(r.left, nr.left);
-          const right = Math.min(r.left + r.width, nr.left + nr.width);
-          if (right > left) p = (((left + right) / 2 - r.left) / r.width) * 100;
-        }
-        return `<span class="door door-${side}" style="--door-p:${Math.max(8, Math.min(92, p)).toFixed(1)}%" aria-hidden="true"></span>`;
-      })
-      .join('');
     return `
       <div class="room ${isPlayer ? 'current' : ''} ${reachable ? 'reachable' : 'disabled'} ${room.id === 'garden' ? 'outdoor' : ''}"
-        style="${style}" title="${escape(room.name)}：${escape(room.desc)}">
+        style="${style}" data-room="${room.id}" title="${escape(room.name)}：${escape(room.desc)}">
         ${reachable ? `<button type="button" class="room-hit" data-action="move" data-room="${room.id}"
           aria-label="移动到${escape(room.name)}"></button>` : ''}
-        ${doors}
         <div class="room-head">
           <span class="room-name">${escape(room.name)}</span>
           ${isPlayer ? '<span class="room-tag">你在</span>' : locked ? '<span class="room-tag">封锁</span>' : ''}
@@ -409,6 +388,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
       return `
         <button class="card ${def.type}" data-action="play" data-uid="${card.uid}" data-card-uid="${card.uid}"
           ${disabled ? 'disabled' : ''} title="${escape(def.desc)}">
+          <span class="card-type">${escape(TYPE_NAMES[def.type] ?? def.type)}</span>
           <span class="card-cost">${cost}</span>
           ${perkIconHtml(def.id)}
           <div class="card-name">${escape(def.name)}</div>
@@ -481,7 +461,6 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
             <button class="btn ghost mini" data-action="guide">玩法指引</button>
           </div>
           <div class="floorplan">
-            <div class="house-wall" aria-hidden="true"></div>
             ${rooms}
             ${playerMarker}
           </div>

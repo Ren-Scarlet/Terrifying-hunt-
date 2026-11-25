@@ -10,6 +10,7 @@ import {
   useKillerAbility,
 } from './game/engine';
 import { loadSave, writeSave } from './game/save';
+import { ROOM_MAP } from './game/rooms';
 import type { GameState, RoomId, SaveData } from './game/types';
 import {
   cardDetailHtml,
@@ -24,6 +25,7 @@ import {
   renderShop,
   shopPrice,
 } from './ui/render';
+import { mountFloorplanScene, type SceneHandle } from './ui/scene';
 
 type Screen = 'menu' | 'game' | 'result';
 
@@ -39,6 +41,11 @@ let resultApplied = false;
 let lastNewCard: string | null = null;
 /** 信息面板当前展示的卡牌，避免同一张牌重复重绘 */
 let detailCardUid: string | null = null;
+/** 平面图下方的场景画布 */
+let scene: SceneHandle | null = null;
+/** 上一次的击杀数与通缉值：用来判断这一手是得手还是暴露了 */
+let lastKills = 0;
+let lastWanted = 0;
 
 const app = document.getElementById('app')!;
 
@@ -57,9 +64,50 @@ function render(): void {
   if (guideOpen) html += renderGuide();
   app.innerHTML = html;
   detailCardUid = null;
+  syncScene();
+}
+
+/** 把场景画布挂到新的平面图节点上；离开对局时销毁 */
+function syncScene(): void {
+  const host = app.querySelector<HTMLElement>('.floorplan');
+  if (!game || !host || screen === 'menu') {
+    if (scene) {
+      scene.destroy();
+      scene = null;
+    }
+    document.body.classList.remove('danger');
+    return;
+  }
+  scene = mountFloorplanScene(host, game);
+
+  const here = game.playerRoom;
+  const policeNear = game.people.some(
+    (p) => p.role === 'police' && (p.room === here || ROOM_MAP[here].neighbors.includes(p.room)),
+  );
+  document.body.classList.toggle('danger', policeNear || game.wanted >= 7);
+}
+
+function pulseFeedback(): void {
+  if (!game) return;
+  const kills = game.kills;
+  const wanted = game.wanted;
+  if (kills > lastKills) flash('hit-kill');
+  else if (wanted > lastWanted) flash('hit-alert');
+  lastKills = kills;
+  lastWanted = wanted;
+}
+
+/** 屏幕边缘闪一下：得手是暗红，暴露是土黄，0.5s 后自动收起 */
+function flash(cls: 'hit-kill' | 'hit-alert'): void {
+  document.body.classList.remove(cls);
+  // 强制重排，让同一个动画能连续触发两次
+  void document.body.offsetWidth;
+  document.body.classList.add(cls);
+  window.setTimeout(() => document.body.classList.remove(cls), 520);
 }
 
 function afterAction(): void {
+  pulseFeedback();
   if (game && game.phase === 'gameover' && screen !== 'result') {
     screen = 'result';
     if (!resultApplied) {
@@ -90,6 +138,8 @@ function afterAction(): void {
 function startGame(): void {
   game = createGame(save.deck, undefined, save.killer ?? '迈克尔·迈尔斯');
   screen = 'game';
+  lastKills = game.kills;
+  lastWanted = game.wanted;
   resultApplied = false;
   lastNewCard = null;
   render();
