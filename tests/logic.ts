@@ -36,6 +36,8 @@ import {
   isPersonVisible,
   isRoomVisible,
   lookAround,
+  lookAtRoom,
+  cancelLookSelection,
   isLocked,
   isRoomExplored,
   isSensing,
@@ -1357,17 +1359,31 @@ const lookFarRoom = (Object.keys(ROOM_MAP) as RoomId[]).find((room) =>
 )!;
 lookTest.energy = LOOK_COST;
 const lookBefore = lookTest.energy;
-const looked = lookAround(lookTest);
+const beganLooking = lookAround(lookTest);
 check(
-  '查看：消耗 1 AP 并同时点亮当前房间所有相邻房间',
-  looked && lookTest.energy === lookBefore - LOOK_COST && lookNeighbors.every((room) => isRoomVisible(lookTest, room)),
-  `neighbors=${lookNeighbors.length} AP ${lookBefore}→${lookTest.energy}`,
+  '查看：点击按钮只进入选房模式，不自动选择或消耗 AP',
+  beganLooking && lookTest.lookingAround && lookTest.energy === lookBefore && Object.keys(lookTest.scouted).length === 0,
+);
+const selectedLookRoom = lookNeighbors[0];
+const invalidLook = lookAtRoom(lookTest, lookFarRoom);
+check('查看：不能选择两格外的房间', !invalidLook && lookTest.lookingAround && lookTest.energy === lookBefore);
+const looked = lookAtRoom(lookTest, selectedLookRoom);
+check(
+  '查看：玩家点选后仅显示所选相邻房间并消耗 1 AP',
+  looked && !lookTest.lookingAround && lookTest.energy === lookBefore - LOOK_COST &&
+    lookTest.scouted[selectedLookRoom] === 1 &&
+    lookNeighbors.filter((room) => room !== selectedLookRoom).every((room) => !lookTest.scouted[room]),
+  `selected=${selectedLookRoom} AP ${lookBefore}→${lookTest.energy}`,
 );
 check('查看：不会把两格外房间一并点亮', !isRoomVisible(lookTest, lookFarRoom), `远处房间=${lookFarRoom}`);
+const cancelLook = newGame();
+const cancelAp = cancelLook.energy;
+lookAround(cancelLook);
+check('查看：取消选房不消耗行动点', cancelLook.lookingAround && cancelLook.energy === cancelAp && cancelLookSelection(cancelLook) && !cancelLook.lookingAround && cancelLook.energy === cancelAp);
 const noApLook = newGame();
 noApLook.energy = 0;
 const noApLookResult = lookAround(noApLook);
-check('查看：行动点不足时不能发动且不消耗额外资源', !noApLookResult && noApLook.energy === 0 && Object.keys(noApLook.scouted).length === 0);
+check('查看：行动点不足时不能进入选房模式', !noApLookResult && !noApLook.lookingAround && noApLook.energy === 0 && Object.keys(noApLook.scouted).length === 0);
 
 caseNewPerkSystem();
 

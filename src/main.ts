@@ -10,6 +10,8 @@ import {
   endTurn,
   giveUp,
   lookAround,
+  lookAtRoom,
+  cancelLookSelection,
   movePlayer,
   playCard,
   searchRoom,
@@ -407,6 +409,9 @@ app.addEventListener('click', (event) => {
   if (game && screen === 'game' && game.hand.length > 6 && action !== 'discard' && action !== 'mute') {
     return;
   }
+  // 查看选房期间只接受选房或取消，避免误触卡牌、移动等其他行动。
+  if (game && screen === 'game' && game.lookingAround &&
+      !['look-select', 'look-cancel', 'mute', 'guide'].includes(action ?? '')) return;
 
   if (action === 'person') {
     const personId = target.dataset.personId;
@@ -498,6 +503,21 @@ app.addEventListener('click', (event) => {
 
   if (action === 'look') {
     lookAround(game);
+    playSfx('click');
+    render();
+    return;
+  }
+
+  if (action === 'look-cancel') {
+    cancelLookSelection(game);
+    playSfx('click');
+    render();
+    return;
+  }
+
+  if (action === 'look-select') {
+    const room = target.dataset.room as RoomId | undefined;
+    if (room) lookAtRoom(game, room);
     playSfx('click');
     afterAction();
     return;

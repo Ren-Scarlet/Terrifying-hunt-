@@ -2629,23 +2629,49 @@ export function wipeBlade(state: GameState): boolean {
 }
 
 /**
- * 查看周围一格：花费 1 AP，短暂点亮当前房间所有直接相邻房间。
- * 只提供视野，不移动玩家；回合结束时视野按现有 scouted 计时规则衰减。
+ * 开始选择查看目标。点击「查看」本身不消耗 AP，也不会自动替玩家选房间。
+ * 玩家随后必须在地图上点选一个与当前位置直接相邻的房间。
  */
 export function lookAround(state: GameState): boolean {
   if (state.phase !== 'playing') return false;
+  if (state.lookingAround) return cancelLookSelection(state);
   if (state.energy < LOOK_COST) {
     log(state, `行动点不足：查看需要 ${LOOK_COST} 点。`);
     return false;
   }
-  const neighbors = ROOM_MAP[state.playerRoom].neighbors;
-  if (!neighbors.length) {
+  if (!ROOM_MAP[state.playerRoom].neighbors.length) {
     log(state, '周围没有可以查看的相邻房间。');
     return false;
   }
+  state.lookingAround = true;
+  log(state, '请选择地图上一个相邻房间进行查看；确认目标后才会消耗 1 点行动点。');
+  return true;
+}
+
+/** 取消查看选房，不消耗行动点。 */
+export function cancelLookSelection(state: GameState): boolean {
+  if (!state.lookingAround) return false;
+  state.lookingAround = false;
+  log(state, '已取消查看。');
+  return true;
+}
+
+/** 只查看玩家明确点选的一个相邻房间，消耗 1 AP。 */
+export function lookAtRoom(state: GameState, room: RoomId): boolean {
+  if (state.phase !== 'playing' || !state.lookingAround) return false;
+  if (!ROOM_MAP[state.playerRoom].neighbors.includes(room)) {
+    log(state, '只能查看与当前位置直接相邻的房间。');
+    return false;
+  }
+  if (state.energy < LOOK_COST) {
+    state.lookingAround = false;
+    log(state, `行动点不足：查看需要 ${LOOK_COST} 点。`);
+    return false;
+  }
   state.energy -= LOOK_COST;
-  neighbors.forEach((room) => scoutRoom(state, room, 1));
-  log(state, `你停下脚步查看四周（消耗 ${LOOK_COST} 点行动点），确认了 ${neighbors.map(roomName).join('、')}。`);
+  state.lookingAround = false;
+  scoutRoom(state, room, 1);
+  log(state, `你屏住呼吸查看了「${roomName(room)}」（消耗 ${LOOK_COST} 点行动点）。`);
   state.attackReady = true;
   afterPlayerAction(state);
   checkImmediateWin(state);
