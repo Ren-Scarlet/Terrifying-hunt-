@@ -1113,5 +1113,5 @@ function caseNpcAwarenessAndDialogue(): void {
   check('AC 高危信息让 NPC 进入求生并显示逃跑对白', witness.awareness === 3 && witness.dialogue.length > 0);
 }
 caseNpcAwarenessAndDialogue();
-console.log(`\n规则回归 ${pass} 通过 / ${fail} 失败`); ${pass} 通过 / ${fail} 失败`);
+console.log(`\n规则回归 ${pass} 通过 / ${fail} 失败`);
 if (fail > 0) process.exitCode = 1;
