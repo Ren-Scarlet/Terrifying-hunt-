@@ -1218,7 +1218,7 @@ function caseNewPerkSystem(): void {
   sacrifice.room = food.playerRoom;
   food.energy = 6;
   food.hand = [{ uid: 'test-food-1', defId: 'myers_plaything' }];
-  check('戏耍食物要求视野内有血祭品并获得印记', playCard(food, 'test-food-1') && food.myersFoodMarks === 1);
+  check('戏耍食物要求视野内有血祭品、获得印记并将其送出视线', playCard(food, 'test-food-1') && food.myersFoodMarks === 1 && !isPersonVisible(food, sacrifice));
   sacrifice.room = food.playerRoom;
   food.hand = [{ uid: 'test-food-2', defId: 'myers_plaything' }];
   const energyBeforeSecondFood = food.energy;
@@ -1236,6 +1236,33 @@ function caseNewPerkSystem(): void {
   hex.attackReady = true;
   attack(hex, hexVictim.id);
   check('猎杀戾气：首次伤害幸存者后生成地图图腾', hex.hexHuntressUsed && hex.totems.length === 1);
+
+
+  const noed = createGame(['hex_noed'], undefined, '迈克尔·迈尔斯');
+  noed.teamStage = 4;
+  noed.teamProgress = 100;
+  noed.totems = ['attic'];
+  noed.hand = [{ uid: 'test-noed', defId: 'hex_noed' }];
+  noed.energy = 6;
+  const noedEnergy = noed.energy;
+  playCard(noed, 'test-noed');
+  const noedTarget = noed.people.find((person) => person.role !== 'police')!;
+  noedTarget.room = noed.playerRoom;
+  noedTarget.hp = 4;
+  noed.energy = Math.max(noed.energy, 2);
+  noed.attackReady = true;
+  attack(noed, noedTarget.id);
+  check('难逃一死：第四阶段且图腾存留时获得行动并一刀击倒', noed.hexNoedBonusGranted && noedTarget.hp === 0 && noed.energy >= noedEnergy - 2);
+
+  const bitter = createGame(['bitter_murmur'], undefined, '迈克尔·迈尔斯');
+  const worker = bitter.people.find((person) => person.role !== 'police')!;
+  worker.room = 'attic';
+  worker.intent = 'work';
+  worker.goal = 'objective';
+  bitter.hand = [{ uid: 'test-bitter', defId: 'bitter_murmur' }];
+  bitter.energy = 6;
+  playCard(bitter, 'test-bitter');
+  check('苦涩低语显示工作者两次行动但不泄露身份', (worker.revealedActions ?? 0) > 0 && !isPersonVisible(bitter, worker));
 
   const reveal = createGame(['hell'], undefined, '迈克尔·迈尔斯');
   reveal.hand = [{ uid: 'test-hell', defId: 'hell' }];
