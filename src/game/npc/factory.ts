@@ -82,7 +82,7 @@ function makePerson(
     archetype,
     alert: 0,
     awareness: 0,
-    dialogue: '',
+    dialogue: randomOf(['今晚吃什么？', '这里还挺安静的。', '等会儿要不要看电影？', '我有点饿了。', '忙完就去休息吧。']),
     activity: randomOf(ACTIVITIES),
     intent: 'idle',
     goal: goalForArchetype(archetype),
