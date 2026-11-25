@@ -15,6 +15,7 @@ import {
   GOAL_LABEL,
   HEALTH_LABEL,
   INTENT_LABEL,
+  LOOK_COST,
   SEARCH_COST,
   attackBlockReason,
   canAttack,
@@ -458,6 +459,12 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
       <span class="atk-name">搜索</span>
       <span class="atk-meta">${searchOk ? (hiddenHere ? '有动静 · 翻柜子' : `${SEARCH_COST} 点 · 翻柜子`) : '行动点不足'}</span>
     </button>`;
+  const lookOk = state.phase === 'playing' && state.energy >= LOOK_COST;
+  const lookBtn = `<button class="btn search inspect" data-action="look" ${lookOk ? '' : 'disabled'}
+      title="${lookOk ? `查看当前房间周围一格的所有相邻房间，消耗 ${LOOK_COST} 点行动点；不会移动。` : '行动点不足'}">
+      <span class="atk-name">查看</span>
+      <span class="atk-meta">${lookOk ? `${LOOK_COST} 点 · 查看周围一格` : '行动点不足'}</span>
+    </button>`;
 
   return `
     <div class="topbar">
@@ -548,6 +555,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
             <button class="btn draw-card" data-action="draw" ${state.energy < DRAW_CARD_COST || (state.drawPile.length === 0 && state.discardPile.length === 0) || selectingDiscards ? 'disabled' : ''} title="消耗 ${DRAW_CARD_COST} 点行动点，从牌库抽 1 张">${DRAW_CARD_COST} 点 · 抽 1 张</button>
             ${wipeBtn}
             ${searchBtn}
+            ${lookBtn}
             ${sabotageBtn}${specialExecution}
             <div class="power-row">${powerButtonHtml(state, killer)}</div>
             <button class="btn primary end-turn" data-action="end-turn" ${selectingDiscards ? 'disabled' : ''}>结束回合</button>

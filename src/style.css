@@ -813,6 +813,18 @@ button { font-family: inherit; cursor: pointer; }
 .btn.search:hover:not(:disabled) { border-color: #7d9a5e; background: linear-gradient(180deg, #2a3820, #141b10); }
 .btn.search:disabled { opacity: .5; cursor: not-allowed; transform: none; }
 
+/* 查看周围：与搜索并列的基础侦查动作 */
+.btn.search.inspect {
+  border-color: #405b69;
+  background: linear-gradient(180deg, #17252b, #0c1216);
+}
+.btn.search.inspect .atk-name { color: #b7d8e5; }
+.btn.search.inspect .atk-meta { color: #829eaa; }
+.btn.search.inspect:hover:not(:disabled) {
+  border-color: #6b9aaf;
+  background: linear-gradient(180deg, #203640, #101a20);
+}
+
 /* 房间上的动静 / 团队目标角标 */
 .room-tag.noise { background: #2b1b12cc; color: #e6a978; border-color: #6d4227; animation: noisePulse 1.6s ease-in-out infinite; }
 @keyframes noisePulse { 0%, 100% { opacity: .72; } 50% { opacity: 1; box-shadow: 0 0 7px #c2703a55; } }

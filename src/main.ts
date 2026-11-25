@@ -9,6 +9,7 @@ import {
   drawCardAction,
   endTurn,
   giveUp,
+  lookAround,
   movePlayer,
   playCard,
   searchRoom,
@@ -490,6 +491,13 @@ app.addEventListener('click', (event) => {
 
   if (action === 'search') {
     searchRoom(game);
+    playSfx('click');
+    afterAction();
+    return;
+  }
+
+  if (action === 'look') {
+    lookAround(game);
     playSfx('click');
     afterAction();
     return;

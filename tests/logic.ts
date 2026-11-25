@@ -10,6 +10,7 @@ import {
   BLEEDOUT_TURNS,
   DOWNED_LOCK_TURNS,
   HAND_LIMIT,
+  LOOK_COST,
   drawCardAction,
   discardCard,
   FRENZY_AP_BONUS,
@@ -34,6 +35,7 @@ import {
   endTurn,
   isPersonVisible,
   isRoomVisible,
+  lookAround,
   isLocked,
   isRoomExplored,
   isSensing,
@@ -1348,6 +1350,25 @@ function caseNewPerkSystem(): void {
   reveal.energy = 6;
   check('恶灵地狱启动周围一格的限时轮廓', playCard(reveal, 'test-hell') && reveal.revealAuraActions > 0);
 }
+const lookTest = newGame();
+const lookNeighbors = [...ROOM_MAP[lookTest.playerRoom].neighbors];
+const lookFarRoom = (Object.keys(ROOM_MAP) as RoomId[]).find((room) =>
+  room !== lookTest.playerRoom && !lookNeighbors.includes(room),
+)!;
+lookTest.energy = LOOK_COST;
+const lookBefore = lookTest.energy;
+const looked = lookAround(lookTest);
+check(
+  '查看：消耗 1 AP 并同时点亮当前房间所有相邻房间',
+  looked && lookTest.energy === lookBefore - LOOK_COST && lookNeighbors.every((room) => isRoomVisible(lookTest, room)),
+  `neighbors=${lookNeighbors.length} AP ${lookBefore}→${lookTest.energy}`,
+);
+check('查看：不会把两格外房间一并点亮', !isRoomVisible(lookTest, lookFarRoom), `远处房间=${lookFarRoom}`);
+const noApLook = newGame();
+noApLook.energy = 0;
+const noApLookResult = lookAround(noApLook);
+check('查看：行动点不足时不能发动且不消耗额外资源', !noApLookResult && noApLook.energy === 0 && Object.keys(noApLook.scouted).length === 0);
+
 caseNewPerkSystem();
 
 console.log(`\n规则回归 ${pass} 通过 / ${fail} 失败`);

@@ -67,6 +67,7 @@ const ESCAPE_ALERT_MIN = 35;
 /** 挥刀 / 搜索各自消耗 1 点行动点：唯一的伤害来源，不能免费 */
 export const ATTACK_COST = 1;
 export const SEARCH_COST = 1;
+export const LOOK_COST = 1;
 /** 主动抽牌消耗的行动点；每次抽 1 张。 */
 export const DRAW_CARD_COST = 1;
 /** 手牌上限；超过时必须由玩家选择弃牌。 */
@@ -2622,6 +2623,30 @@ export function wipeBlade(state: GameState): boolean {
     log(state, `把最好的留在最后：擦刀移除 ${removed} 枚专属印记（剩余 ${state.myersLastBestMarks}）。`);
   }
   log(state, `你低头把刀上的血慢慢擦干净（消耗 ${WIPE_COST} 点行动点）。这一下动静，够他们做点什么了。`);
+  afterPlayerAction(state);
+  checkImmediateWin(state);
+  return true;
+}
+
+/**
+ * 查看周围一格：花费 1 AP，短暂点亮当前房间所有直接相邻房间。
+ * 只提供视野，不移动玩家；回合结束时视野按现有 scouted 计时规则衰减。
+ */
+export function lookAround(state: GameState): boolean {
+  if (state.phase !== 'playing') return false;
+  if (state.energy < LOOK_COST) {
+    log(state, `行动点不足：查看需要 ${LOOK_COST} 点。`);
+    return false;
+  }
+  const neighbors = ROOM_MAP[state.playerRoom].neighbors;
+  if (!neighbors.length) {
+    log(state, '周围没有可以查看的相邻房间。');
+    return false;
+  }
+  state.energy -= LOOK_COST;
+  neighbors.forEach((room) => scoutRoom(state, room, 1));
+  log(state, `你停下脚步查看四周（消耗 ${LOOK_COST} 点行动点），确认了 ${neighbors.map(roomName).join('、')}。`);
+  state.attackReady = true;
   afterPlayerAction(state);
   checkImmediateWin(state);
   return true;
