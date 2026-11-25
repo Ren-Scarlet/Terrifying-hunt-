@@ -62,6 +62,9 @@ export interface CardDef {
   ops: Op[];
   /** 出牌前的条件检查：不满足时不消耗行动点、不弃牌 */
   precheck?: Precheck;
+  /** initial = 通用初始卡；killer = 对应杀手专属卡；未标记的旧卡仅保留兼容。 */
+  pool?: 'initial' | 'killer';
+  killerOnly?: string;
 }
 
 export interface CardInstance {
@@ -193,6 +196,8 @@ export interface Person {
   watched: boolean;
   /** 被追踪的剩余回合：位置始终可见 */
   trackedTurns: number;
+  /** 通过情报卡显形的剩余玩家行动次数 */
+  revealedActions?: number;
   /** 玩家最后一次看到他的房间与回合，用于地图上的"最后已知位置" */
   lastSeenRoom: RoomId;
   lastSeenTurn: number;
@@ -312,6 +317,14 @@ export interface GameState {
   ambushTurn: number;
   /** 感知生效的回合号：等于当前回合时，地图上会浮出红色人影（只有影子，没有身份） */
   senseTurn: number;
+  /** 周围范围红色轮廓剩余行动次数 */
+  revealAuraActions: number;
+  /** 最近脚印高亮剩余行动次数 */
+  trailRevealActions: number;
+  /** 当前被猎鹿者显现的脚印 */
+  highlightedTrail: Trail | null;
+  /** 静止隐身剩余行动次数 */
+  stealthActions: number;
   /** 这一次挥刀是否已经收回来：砍完必须再做一件事才能砍第二刀 */
   attackReady: boolean;
   /** 玩家已经做了几次行动：痕迹按这个计数衰减，而不是按回合 */
@@ -382,6 +395,21 @@ export interface GameState {
   possessed: boolean;
   /** 恶魔附身剩余回合：>0 时挥刀直接把健康的人放倒 */
   possessTurns: number;
+  /** 三种迈尔斯专属印记分开计数 */
+  myersEclipseMarks: number;
+  myersLastBestActive: boolean;
+  myersLastBestMarks: number;
+  myersFoodMarks: number;
+  /** 通用卡牌的持续效果 */
+  hexHuntressActive: boolean;
+  hexHuntressUsed: boolean;
+  hexNoedActive: boolean;
+  hexNoedBonusGranted: boolean;
+  scourgeShrineReady: boolean;
+  distressingActive: boolean;
+  hexRuinActive: boolean;
+  hexRuinUsed: boolean;
+  totems: RoomId[];
   /** 图腾提供的下回合额外行动点 */
   bonusEnergyNextTurn: number;
   /** 已被破坏的障碍物房间 */
