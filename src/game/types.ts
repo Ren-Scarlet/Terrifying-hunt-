@@ -330,6 +330,8 @@ export interface GameState {
   kills: number;
   killsThisTurn: number;
   executions: number;
+  survivorKills: number;
+  specialExecutionBonus: number;
   npcAlarmed: boolean;
   carryPersonId: string | null;
   carryDistance: number;
