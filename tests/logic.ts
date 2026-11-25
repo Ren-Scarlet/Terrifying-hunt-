@@ -2,7 +2,7 @@
  * 规则回归：玩家反馈打磨出来的边界，改引擎时最先会破的就是这些。
  * 运行：npm run check
  */
-import { CARD_MAP, CARDS } from '../src/game/data/cards';
+import { CARD_MAP, CARDS, STARTING_DECK, deckCardsForKiller } from '../src/game/data/cards';
 import { KILLERS } from '../src/game/data/killers';
 import {
   ARCH_LABEL,
@@ -1177,5 +1177,72 @@ function caseNpcAwarenessAndDialogue(): void {
   check('AC 高危信息让 NPC 进入求生并显示逃跑对白', witness.awareness === 3 && witness.dialogue.length > 0);
 }
 caseNpcAwarenessAndDialogue();
+
+/** 新版通用卡池、限时情报与迈尔斯专属印记。 */
+function caseNewPerkSystem(): void {
+  const pool = deckCardsForKiller('迈克尔·迈尔斯');
+  check('新版通用初始卡池恰好 12 张', pool.filter((card) => card.pool === 'initial').length === 12);
+  check('迈尔斯专属卡恰好 3 张', pool.filter((card) => card.killerOnly === '迈克尔·迈尔斯').length === 3);
+  check('初始牌组只使用新版通用卡牌', STARTING_DECK.length >= 10 && STARTING_DECK.every((id) => pool.some((card) => card.id === id) && !CARD_MAP[id]?.killerOnly));
+  check('其他杀手构筑池不会出现迈尔斯专属卡', !deckCardsForKiller('设陷者').some((card) => card.killerOnly === '迈克尔·迈尔斯'));
+
+  const lastBest = createGame(['myers_last_best'], undefined, '迈克尔·迈尔斯');
+  lastBest.hand = [{ uid: 'test-last-best', defId: 'myers_last_best' }];
+  lastBest.energy = 6;
+  check('把最好的留在最后可以启用被动', playCard(lastBest, 'test-last-best') && lastBest.myersLastBestActive);
+  const prey = lastBest.people.find((person) => person.role !== 'police')!;
+  prey.room = lastBest.playerRoom;
+  prey.hp = 4;
+  prey.bloodSacrifice = false;
+  lastBest.energy = 6;
+  lastBest.attackReady = true;
+  check('把最好的留在最后：攻击非血祭品获得独立印记', attack(lastBest, prey.id) && lastBest.myersLastBestMarks === 1);
+  const beforeWipe = lastBest.energy;
+  const wiped = wipeBlade(lastBest);
+  check('擦刀移除两枚以内的终局印记，擦刀本身只消耗正常行动点', wiped && lastBest.myersLastBestMarks === 0 && lastBest.energy === beforeWipe - 1);
+
+  const eclipse = createGame(['myers_eclipse_light'], undefined, '迈克尔·迈尔斯');
+  const downed = eclipse.people.find((person) => person.role !== 'police')!;
+  downed.room = eclipse.playerRoom;
+  downed.hp = 1;
+  downed.bloodSacrifice = false;
+  eclipse.energy = 6;
+  eclipse.attackReady = true;
+  attack(eclipse, downed.id);
+  eclipse.hand = [{ uid: 'test-eclipse', defId: 'myers_eclipse_light' }];
+  eclipse.energy = 6;
+  check('湮灭之光只能在击倒非血祭品后获得印记', playCard(eclipse, 'test-eclipse') && eclipse.myersEclipseMarks === 1);
+
+  const food = createGame(['myers_plaything'], undefined, '迈克尔·迈尔斯');
+  const sacrifice = food.people.find((person) => person.bloodSacrifice)!;
+  sacrifice.room = food.playerRoom;
+  food.energy = 6;
+  food.hand = [{ uid: 'test-food-1', defId: 'myers_plaything' }];
+  check('戏耍食物要求视野内有血祭品并获得印记', playCard(food, 'test-food-1') && food.myersFoodMarks === 1);
+  sacrifice.room = food.playerRoom;
+  food.hand = [{ uid: 'test-food-2', defId: 'myers_plaything' }];
+  const energyBeforeSecondFood = food.energy;
+  check('戏耍食物每两枚印记增加 1 点行动点', playCard(food, 'test-food-2') && food.myersFoodMarks === 2 && food.energy === energyBeforeSecondFood);
+
+  const hex = createGame(['hex_huntress'], undefined, '迈克尔·迈尔斯');
+  hex.hand = [{ uid: 'test-hex', defId: 'hex_huntress' }];
+  hex.energy = 6;
+  playCard(hex, 'test-hex');
+  const hexVictim = hex.people.find((person) => person.role !== 'police')!;
+  hexVictim.room = hex.playerRoom;
+  hexVictim.hp = 4;
+  hexVictim.bloodSacrifice = false;
+  hex.energy = 6;
+  hex.attackReady = true;
+  attack(hex, hexVictim.id);
+  check('猎杀戾气：首次伤害幸存者后生成地图图腾', hex.hexHuntressUsed && hex.totems.includes(hex.playerRoom));
+
+  const reveal = createGame(['hell'], undefined, '迈克尔·迈尔斯');
+  reveal.hand = [{ uid: 'test-hell', defId: 'hell' }];
+  reveal.energy = 6;
+  check('恶灵地狱启动周围一格的限时轮廓', playCard(reveal, 'test-hell') && reveal.revealAuraActions > 0);
+}
+caseNewPerkSystem();
+
 console.log(`\n规则回归 ${pass} 通过 / ${fail} 失败`);
 if (fail > 0) process.exitCode = 1;
