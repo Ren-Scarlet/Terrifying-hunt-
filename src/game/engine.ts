@@ -2408,11 +2408,13 @@ export function playCard(state: GameState, cardUid: string): boolean {
       sacrifice.intent = 'flee';
       sacrifice.activity = '被迈尔斯戏耍，仓皇逃离视线';
       if (sacrifice.movesThisTurn < REACT_MOVE_CAP) {
-        const outOfSight = ROOM_MAP[sacrifice.room].neighbors.filter((room) =>
+        // 这张牌的核心承诺是「逃离你的视线」：若相邻房间恰好都在视野里，
+        // 让血祭品利用额外行动继续跑到最近的迷雾房间，而不是随机跑进另一间可见房。
+        const unseenRooms = ROOMS.map((room) => room.id).filter((room) =>
           room !== state.playerRoom && !isRoomVisible(state, room) && canStand(state, room) && !isLocked(state, room),
         );
-        if (outOfSight.length) {
-          movePersonTo(state, sacrifice, randomOf(outOfSight));
+        if (unseenRooms.length) {
+          movePersonTo(state, sacrifice, nearestOf(sacrifice.room, unseenRooms));
           sacrifice.movesThisTurn += 1;
         } else if (fleeAway(state, sacrifice, true)) {
           sacrifice.movesThisTurn += 1;
