@@ -66,6 +66,10 @@ export function createGame(
     log: [],
     kills: 0,
     killsThisTurn: 0,
+    executions: 0,
+    npcAlarmed: false,
+    carryPersonId: null,
+    carryDistance: 0,
     evidence: 0,
     markedKilled: 0,
     decoyRoom: null,
@@ -119,6 +123,11 @@ export function createGame(
     survivorTotal: people.filter((person) => person.role !== 'police').length,
     teamGoalLabel: '',
     siteItems: [],
+    powerCircuits: [
+      { id: 'main-floor', name: '主楼照明', breakerRoom: 'basement', affectedRooms: ['hall', 'kitchen', 'dining', 'study'], broken: false },
+      { id: 'upper-floor', name: '二层照明', breakerRoom: 'workshop', affectedRooms: ['bedroom', 'nursery', 'guestroom', 'attic'], broken: false },
+      { id: 'east-wing', name: '东翼照明', breakerRoom: 'conservatory', affectedRooms: ['garden', 'balcony', 'foyer'], broken: false },
+    ],
   };
   // 团队目标：随机挑 3 间房作为「电闸 / 钥匙柜」，再给每个人派一个个人目的。
   // 不定死：有人修装置、有人找钥匙，也有人只是想报警或躲起来。
