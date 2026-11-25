@@ -61,7 +61,7 @@ export function perkIconHtml(defId: string, size = ''): string {
   return `
     <div class="dbd-perk ${size}">
       <img class="dbd-perk-bg" src="${PERK_RARITY_BG}" alt="" onerror="this.style.display='none'">
-      ${cardImage(defId) ? `<img class="dbd-perk-glyph" src="${cardImage(defId)}" alt="" onerror="this.style.display='none'">` : ''}
+      ${cardImage(defId) ? `<img class="dbd-perk-glyph" src="${cardImage(defId)}" alt="" onerror="this.style.display='none'">` : '<span class="dbd-perk-fallback" aria-hidden="true">✦</span>'}
     </div>
   `;
 }
