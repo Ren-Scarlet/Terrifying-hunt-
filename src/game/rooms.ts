@@ -1,3 +1,4 @@
+import { random } from './random';
 import type { Room, RoomId } from './types';
 
 /**
@@ -100,7 +101,7 @@ function cellNeighbors(c: Cell): Cell[] {
 function shuffle<T>(list: T[]): T[] {
   const arr = [...list];
   for (let i = arr.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(random() * (i + 1));
     [arr[i], arr[j]] = [arr[j], arr[i]];
   }
   return arr;
@@ -151,8 +152,8 @@ export function buildLayout(): string {
   // ① 从一颗种子格随机生长，长出一块连通但不规整的房间区
   const grown = new Map<number, Cell>();
   const seed: Cell = {
-    col: Math.floor(Math.random() * COLS),
-    row: Math.floor(Math.random() * ROWS),
+    col: Math.floor(random() * COLS),
+    row: Math.floor(random() * ROWS),
   };
   grown.set(cellKey(seed), seed);
   while (grown.size < ROOMS.length) {
@@ -163,7 +164,7 @@ export function buildLayout(): string {
       }
     }
     if (!frontier.length) break;
-    const pick = frontier[Math.floor(Math.random() * frontier.length)];
+    const pick = frontier[Math.floor(random() * frontier.length)];
     grown.set(cellKey(pick), pick);
   }
 
@@ -189,7 +190,7 @@ export function buildLayout(): string {
     guard += 1;
     const frontier = candidates.filter(([a, b]) => inTree.has(a) !== inTree.has(b));
     if (!frontier.length) break;
-    const [a, b] = frontier[Math.floor(Math.random() * frontier.length)];
+    const [a, b] = frontier[Math.floor(random() * frontier.length)];
     treeEdges.push([a, b]);
     inTree.add(a);
     inTree.add(b);
