@@ -13,7 +13,8 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
+  # PR 检查与 main 正式部署分组，避免互相取消。
+  group: pages-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
