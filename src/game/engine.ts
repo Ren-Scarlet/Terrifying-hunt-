@@ -43,7 +43,7 @@ import type {
 /** NPC 能逃出这栋房子的地方 */
 export const ESCAPE_ROOMS: RoomId[] = ['garden'];
 /** 倒地后撑不过这么多回合就会死 */
-const BLEEDOUT_TURNS = 3;
+export const BLEEDOUT_TURNS = 3;
 /** 团队警戒上限：到 100 直接判负 */
 export const ALARM_MAX = 100;
 /** 站在后院的人至少要有这么高的警觉，才会想到翻篱笆（否则只是路过） */
@@ -55,10 +55,10 @@ export const SEARCH_COST = 1;
 /** 恶魔附身持续回合：期间挥刀伤害翻倍，健康的人一刀倒地 */
 export const POSSESS_TURNS = 3;
 /** 每回合基础行动点：走路、砍人、打牌、搜索全从这一个池子里扣 */
-export const BASE_AP = 7;
+export const BASE_AP = 4;
 /**
  * 一个人一回合最多能跑几间屋（含被砍后夺路而逃的那两步）。
- * 玩家一回合 7 点行动点，这个数字必须比它能走的格数小，否则永远追不上；
+ * 玩家一回合 4 点行动点，这个数字必须比它能走的格数小，否则永远追不上；
  * 但它也不能太小，否则「警觉就跑得很远」只是一句台词。
  */
 const REACT_MOVE_CAP = 3;
@@ -85,6 +85,31 @@ const FRENZY_LOSS = 20;
 export const TEAM_GOAL_MAX = 100;
 /** 一个人在目标房间待一回合推进的进度 */
 const OBJECTIVE_GAIN = 5;
+
+/* ---------- 本轮新增：擦刀 / 守尸 / 追击热度 / 眩晕致盲 / 鬼面夜幕 ---------- */
+/** 擦刀：原地花 1 点收回刀锋，但这一次动作幸存者也会跟着动 */
+export const WIPE_COST = 1;
+/** 站在倒地者房间干等（守尸）时，其他人每回合额外推进的团队进度 */
+const GUARD_TEAM_GAIN = 9;
+/** 每多追同一名幸存者一回合，其他人的工作效率 +25%，最多翻倍 */
+const CHASE_WORK_BONUS = 0.25;
+/** 鬼面夜幕每回合累积的监视值 */
+const WATCH_GAIN = 34;
+/** 医疗包要连续治这么多回合才生效，不能一下就把人治好 */
+const MEDKIT_TURNS = 2;
+/** 开局就带着道具的幸存者比例 */
+const STARTER_ITEM_RATE = 0.32;
+const STARTER_ITEMS: SurvivorItem[] = ['medkit', 'toolbox', 'flashlight', 'smoke', 'flare'];
+
+/** 每件道具能用几次：工具箱/手电筒/医疗包耐用品 2 次，其余一次 */
+function itemUsesFor(item: SurvivorItem): number {
+  return item === 'toolbox' || item === 'flashlight' || item === 'medkit' ? 2 : 1;
+}
+
+/** 追一个人越久，其他人干活越快；这是「守着一个人追」的代价 */
+function teamWorkGain(state: GameState): number {
+  return Math.round(OBJECTIVE_GAIN * (1 + Math.min(1, state.chaseTurns * CHASE_WORK_BONUS)));
+}
 
 /* ---------- 场地物品：道具箱 / 发电机 ---------- */
 /** 砸掉一件设施要花 1 点行动点，算一次玩家行动 */
@@ -113,6 +138,7 @@ export const SURVIVOR_ITEM_LABEL: Record<SurvivorItem, string> = {
   key: '后门钥匙',
   weapon: '防身武器',
   smoke: '烟雾弹',
+  flashlight: '手电筒',
 };
 
 export const SITE_ITEM_LABEL: Record<SiteItemKind, string> = {
@@ -155,6 +181,7 @@ export const ARCH_LABEL: Record<Archetype, string> = {
   rescuer: '救援型',
   hider: '躲藏型',
   brave: '英勇型',
+  kiter: '拉扯型',
 };
 
 export const ARCH_DESC: Record<Archetype, string> = {
@@ -164,6 +191,7 @@ export const ARCH_DESC: Record<Archetype, string> = {
   rescuer: '优先治疗受伤、拉起倒地的同伴，是处决最大的障碍。',
   hider: '钻进柜子或床底，不搜出来就找不到，也打不到。',
   brave: '先去厨房拿武器，再把人聚起来，会正面挡你的路。',
+  kiter: '不跟你硬碰：绕远路、抹脚印、丢烟雾弹，专门把追逐拖长，让你很难贴到他。',
 };
 
 export const HEALTH_LABEL: Record<Health, string> = {
@@ -234,7 +262,10 @@ function findVictim(
   allowDowned = false,
   targetId?: string,
 ): Person | undefined {
-  const inRoom = peopleInRoom(state, room).filter((p) => p.role !== 'police');
+  // 警员默认不在自动选目标的池子里；只有玩家明确点他（袭警）才允许
+  const inRoom = peopleInRoom(state, room).filter(
+    (p) => p.role !== 'police' || (targetId !== undefined && p.id === targetId),
+  );
   // 玩家点了某个人：只打他，不再按「目标 > 平民」自动挑
   if (targetId) {
     const picked = inRoom.find((p) => p.id === targetId);
@@ -489,8 +520,17 @@ function npcReact(state: GameState): void {
     if (!state.people.some((p) => p.id === person.id)) continue;
     // 倒地、藏着、被按住的人在原地等；屋里的人留给进门反应与回合结算
     if (person.hp <= 0 || person.hidden) continue;
-    if (person.room === state.playerRoom) continue;
     if (person.blockedTurns > 0 || state.pinnedPeople.includes(person.id)) continue;
+    // 同房间的目击者也要有动作：刚被砍的那个人本回合已经反应过，不重复
+    const sameRoom = person.room === state.playerRoom;
+    if (sameRoom && person.id === state.lastAttackedId) continue;
+    if (sameRoom) {
+      // 伏击这一下他们根本没察觉，别让「目击者反应」把偷袭白送掉
+      if (state.ambushTurn === state.turn) continue;
+      if (person.movesThisTurn >= REACT_MOVE_CAP) continue;
+      if (witnessInRoom(state, person)) person.movesThisTurn += 1;
+      continue;
+    }
     if (person.movesThisTurn >= REACT_MOVE_CAP) continue;
     // 后院翻篱笆是回合结束的结算，不在这中间偷偷逃出去
     if (wantsToLeave(person)) continue;
@@ -1326,6 +1366,10 @@ function npcOnPlayerEnter(state: GameState): void {
     if (person.hidden) gain = Math.round(gain * 0.3);
     if (hidden && threat !== 'spiritual') gain = Math.round(gain * 0.4);
     person.alert = clamp(person.alert + gain, 0, 100);
+    // 迈尔斯的尾随：盯着看得越久，越不容易被屋里的人察觉
+    if (state.killer === '迈克尔·迈尔斯' && state.stalkMeter >= 60) {
+      person.alert = clamp(person.alert - 20, 0, 100);
+    }
 
     // 看见你就等于确认「杀手在这间屋里」——不会站着等你出牌。
     // 想在他们转身之前动手，就得靠伏击；想在他们跑掉之后补刀，就得靠追击。
@@ -1362,6 +1406,38 @@ function npcOnPlayerEnter(state: GameState): void {
         : `${person.name} 想跑，但门口被你占着——他退到了墙角。`,
     );
   });
+
+  // 追击热度：你越死盯着同一个人，其他人越敢放手干活
+  const chased = here.find((p) => p.hp > 0 && p.role !== 'police');
+  if (chased) {
+    if (state.chaseTargetId === chased.id) state.chaseTurns += 1;
+    else {
+      state.chaseTargetId = chased.id;
+      state.chaseTurns = 1;
+    }
+  } else {
+    state.chaseTargetId = null;
+    state.chaseTurns = 0;
+  }
+
+  // 障碍伏击 / 手电筒致盲：推门这一下会挨一下，幸存者借机行动
+  if (!ambush && !state.possessed) {
+    const flasher = here.find((p) => p.item === 'flashlight' && p.itemUses > 0 && p.hp > 0);
+    const obstacleHere = isObstacle(state.playerRoom) && !state.clearedObstacles.includes(state.playerRoom);
+    const trapper = here.find(
+      (p) => p.hp > 0 && (p.archetype === 'defiant' || p.archetype === 'brave' || p.archetype === 'kiter'),
+    );
+    if (flasher) {
+      consumeItem(state, flasher);
+      interruptPlayer(state, `${flasher.name} 早在门后等着，手电筒一下子照白了你的视野。`, flasher.id);
+    } else if (obstacleHere && trapper && Math.random() < 0.55) {
+      interruptPlayer(
+        state,
+        `${trapper.name} 猛地推倒${roomName(state.playerRoom)}门口的杂物，正好砸在你身上。`,
+        trapper.id,
+      );
+    }
+  }
   // 门口那一步也会在地板上留下痕迹：你至少知道他是从哪儿溜走的
   recordTrails(state, before);
 }
@@ -1369,9 +1445,9 @@ function npcOnPlayerEnter(state: GameState): void {
 /** 反抗型 / 英勇型的正面反击：玩家下回合少走一步 */
 function counterAttack(state: GameState, person: Person): void {
   // 手里有防身武器的人反手更狠：多拖一点行动点
-  const heavy = person.item === 'weapon';
+  const heavy = person.item === 'weapon' && person.itemUses > 0;
   state.stunTurns += heavy ? 2 : 1;
-  if (heavy) person.item = null;
+  if (heavy) consumeItem(state, person);
   // 被反手推开：追势断了，杀戮清零
   state.frenzy = 0;
   state.frenzyStreak = 0;
@@ -1380,6 +1456,81 @@ function counterAttack(state: GameState, person: Person): void {
   person.activity = '握着刀挡在门口';
   addAlarm(state, 4);
   log(state, `${person.name} 抄起武器朝你扑过来——你被逼退了一步（下回合少 ${heavy ? 2 : 1} 点行动点）。`);
+}
+
+/** 消耗一次道具；次数用完就清空，医疗包的治疗进度也一起归零 */
+function consumeItem(state: GameState, person: Person): void {
+  if (!person.item) return;
+  person.itemUses = Math.max(0, person.itemUses - 1);
+  if (person.itemUses <= 0) {
+    person.item = null;
+    person.healTurns = 0;
+  }
+}
+
+/**
+ * 玩家被打断（障碍伏击 / 手电筒致盲）：少 1 点行动点、刀收不回来、
+ * 追势清零，并且幸存者们立刻借这个空档各做一件事。
+ */
+function interruptPlayer(state: GameState, reason: string, actorId: string): void {
+  // 恶魔附身是迈尔斯的专属底牌：这段时间里障碍伏击与手电筒都拿他没办法
+  if (state.possessed) {
+    log(state, `${reason} 恶魔附身下的你连眼都没眨，这一下没起作用。`);
+    return;
+  }
+  state.stunTurns += 1;
+  state.blindTurns = 1;
+  state.attackReady = false;
+  state.frenzy = 0;
+  state.frenzyStreak = 0;
+  state.chaseTargetId = null;
+  state.chaseTurns = 0;
+  log(state, reason);
+  log(state, '你眼前一花，下一回合少 1 点行动点——他们趁这一下动了。');
+  survivorsActOnce(state, actorId);
+}
+
+/** 打断时幸存者的一次额外行动：能跑的跑，跑不了的替团队把活往前推 */
+function survivorsActOnce(state: GameState, actorId: string): void {
+  const before = snapshotRooms(state);
+  for (const p of npcs(state)) {
+    if (p.hp <= 0 || p.hidden) continue;
+    if (p.room === state.playerRoom && p.movesThisTurn < REACT_MOVE_CAP) {
+      fleeAway(state, p);
+      p.movesThisTurn += 1;
+    } else if (state.teamProgress < TEAM_GOAL_MAX) {
+      state.teamProgress = Math.min(TEAM_GOAL_MAX, state.teamProgress + 2);
+    }
+  }
+  void actorId;
+  recordTrails(state, before);
+}
+
+/** 同房间的目击者：另一个人不会站着发呆，会喊人、跑、甚至拿手电筒照你 */
+function witnessInRoom(state: GameState, person: Person): boolean {
+  if (person.item === 'flashlight' && person.itemUses > 0 && person.alert >= 40) {
+    consumeItem(state, person);
+    interruptPlayer(state, `${person.name} 拧亮手电筒，一道白光正打在你脸上。`, person.id);
+    return true;
+  }
+  person.alert = clamp(person.alert + 45, 0, 100);
+  npcs(state)
+    .filter((p) => p.id !== person.id && p.hp > 0 && p.alert < 70)
+    .forEach((p) => {
+      p.alert = clamp(p.alert + 20, 0, 100);
+    });
+  addDisturbance(state, person.room);
+  if (Math.random() < 0.55 && person.movesThisTurn < REACT_MOVE_CAP) {
+    fleeAway(state, person);
+    person.movesThisTurn += 1;
+    log(state, `${person.name} 看见同伴被砍，喊了一声夺路而逃。`);
+  } else {
+    state.teamProgress = Math.min(TEAM_GOAL_MAX, state.teamProgress + 3);
+    person.intent = 'work';
+    person.activity = '趁乱把手里的事往前推了一步';
+    log(state, `${person.name} 没跟着跑，反而趁乱多干了一点活（团队进度 +3）。`);
+  }
+  return true;
 }
 
 function barricadeRoom(state: GameState, person: Person): void {
@@ -1457,6 +1608,27 @@ function finishCall(state: GameState, person: Person, device: string): void {
 /** 按行为类型行动一步 */
 function actByArchetype(state: GameState, person: Person): void {
   switch (person.archetype) {
+    case 'kiter': {
+      // 拉扯型：不硬拼，绕远路、抹脚印、必要时丢烟雾，专门把追逐拖长
+      if (person.item === 'smoke' && person.itemUses > 0 && person.alert >= 25) {
+        consumeItem(state, person);
+        person.alert = Math.max(0, person.alert - 35);
+        state.trails = state.trails.filter((t) => t.room !== person.room);
+        person.activity = '丢下烟雾，脚印断在这里';
+        log(state, `${person.name} 丢出烟雾弹，从你的视线里绕开了。`);
+        return;
+      }
+      const away = ROOM_MAP[person.room].neighbors.filter((r) => r !== state.playerRoom);
+      const step = away.length ? randomOf(away) : nextStepToward(state, person.room, ESCAPE_ROOMS[0], []);
+      if (step) {
+        person.room = step;
+        person.intent = 'flee';
+        person.activity = '绕着远路拉开距离';
+      } else {
+        fleeAway(state, person);
+      }
+      return;
+    }
     case 'caller': {
       if (!state.phoneCut && PHONE_ROOMS.includes(person.room)) {
         tryCall(state, person);
@@ -1768,8 +1940,10 @@ function npcTurn(state: GameState): void {
         (i) => i.kind === 'generator' && i.room === person.room && !i.broken && i.jammedTurns === 0 && !i.charged,
       );
       if (gen) {
-        const gain = GENERATOR_GAIN * (person.item === 'toolbox' ? 2 : 1);
+        const hasToolbox = person.item === 'toolbox' && person.itemUses > 0;
+        const gain = GENERATOR_GAIN * (hasToolbox ? 2 : 1);
         gen.progress = Math.min(100, gen.progress + gain);
+        if (hasToolbox) consumeItem(state, person);
         person.intent = 'work';
         person.activity = `在修发电机（${gen.progress}%）`;
         addDisturbance(state, person.room);
@@ -1780,7 +1954,7 @@ function npcTurn(state: GameState): void {
           log(state, `发电机重新亮了起来，他们离逃出去又近了一大步（团队进度 ${state.teamProgress}/${TEAM_GOAL_MAX}）。`);
         }
       } else if ((person.goal === 'objective' || person.goal === 'key') && state.teamProgress < TEAM_GOAL_MAX) {
-        state.teamProgress = Math.min(TEAM_GOAL_MAX, state.teamProgress + OBJECTIVE_GAIN);
+        state.teamProgress = Math.min(TEAM_GOAL_MAX, state.teamProgress + teamWorkGain(state));
         person.intent = 'work';
         person.activity = `在${roomName(person.room)}${state.teamGoalLabel}`;
         addDisturbance(state, person.room);
@@ -1970,7 +2144,7 @@ const ACTIVITIES = [
   '低声哼着歌',
 ];
 
-const ARCHETYPES: Archetype[] = ['alert', 'defiant', 'caller', 'rescuer', 'hider', 'brave'];
+const ARCHETYPES: Archetype[] = ['alert', 'defiant', 'caller', 'rescuer', 'hider', 'brave', 'kiter'];
 
 /** 按角色设定挑行为类型：有威胁设定的角色往对应的类型靠 */
 function pickArchetype(survivor: (typeof SURVIVORS)[number]): Archetype {
@@ -2002,6 +2176,8 @@ function goalForArchetype(archetype: Archetype): NpcGoal {
       return 'hide';
     case 'defiant':
       return Math.random() < 0.5 ? 'weapon' : 'panic';
+    case 'kiter':
+      return Math.random() < 0.5 ? 'supply' : 'panic';
   }
 }
 
@@ -2013,6 +2189,8 @@ function makePerson(
   marked: boolean,
 ): Person {
   const archetype = pickArchetype(s);
+  // 三成的人开局就带着一件小东西：只有发现他之后才看得到，值得你优先盯
+  const starter: SurvivorItem | null = Math.random() < STARTER_ITEM_RATE ? randomOf(STARTER_ITEMS) : null;
   return {
     id: s.id,
     name: s.name,
@@ -2037,7 +2215,11 @@ function makePerson(
     trackedTurns: 0,
     lastSeenRoom: room,
     lastSeenTurn: 0,
-    item: null,
+    item: starter,
+    itemUses: starter ? itemUsesFor(starter) : 0,
+    healTurns: 0,
+    watchValue: 0,
+    watched: false,
     movesThisTurn: 0,
   };
 }
@@ -2065,6 +2247,7 @@ function pickSupply(state: GameState, person: Person): SurvivorItem {
     key: state.teamProgress < 60 ? 3 + (person.goal === 'key' ? 2 : 0) : 1,
     weapon: (person.archetype === 'defiant' || person.archetype === 'brave' ? 5 : 0) + (state.alarm >= 45 ? 2 : 0),
     smoke: (person.alert >= 25 ? 4 : 1) + (person.sneaky ? 2 : 0),
+    flashlight: (person.archetype === 'defiant' || person.archetype === 'kiter' ? 3 : 1) + (person.alert >= 40 ? 2 : 0),
   };
   const all = Object.keys(score) as SurvivorItem[];
   const best = all.slice().sort((a, b) => score[b] - score[a])[0];
@@ -2081,6 +2264,7 @@ function tryTakeSupply(state: GameState, person: Person): boolean {
   box.charges -= 1;
   const item = pickSupply(state, person);
   person.item = item;
+  person.itemUses = itemUsesFor(item);
   if (item === 'weapon') person.armed = true;
   person.intent = 'work';
   person.activity = `翻出了${SURVIVOR_ITEM_LABEL[item]}`;
@@ -2096,25 +2280,41 @@ function tryTakeSupply(state: GameState, person: Person): boolean {
  */
 function useSurvivorItem(state: GameState, person: Person): boolean {
   const item = person.item;
-  if (!item) return false;
+  if (!item || person.itemUses <= 0) return false;
   switch (item) {
     case 'medkit': {
       const hurt =
         npcs(state).find((p) => p.hp <= 0 && roomDistance(person.room, p.room) <= 2) ??
         npcs(state).find((p) => p.hp === 1 && roomDistance(person.room, p.room) <= 2);
       if (!hurt) return false;
+      // 慢速治疗：要连着两回合，玩家有一整个窗口去打断或先把人处决掉
+      person.healTurns += 1;
+      person.intent = 'heal';
+      if (person.healTurns < MEDKIT_TURNS) {
+        person.activity = `正在给${hurt.name}包扎（还要 ${MEDKIT_TURNS - person.healTurns} 回合）`;
+        log(state, `${person.name} 蹲下来给${hurt.name}包扎，还得要一会儿。`);
+        addDisturbance(state, person.room);
+        return true;
+      }
+      person.healTurns = 0;
       if (hurt.hp <= 0) rescuePerson(state, hurt);
       else healPerson(state, hurt, 1);
-      person.item = null;
-      person.intent = 'heal';
-      person.activity = `用医疗包把${hurt.name}拉了起来`;
-      log(state, `${person.name} 用医疗包救了${hurt.name}——你留下的伤被人补回来了。`);
+      consumeItem(state, person);
+      person.activity = `把${hurt.name}救了回来`;
+      log(state, `${person.name} 用医疗包救回了${hurt.name}——你留下的伤被人补回来了。`);
       addDisturbance(state, person.room);
+      return true;
+    }
+    case 'flashlight': {
+      // 只有和玩家同屋才照得到；不在就先揣着
+      if (person.room !== state.playerRoom) return false;
+      consumeItem(state, person);
+      interruptPlayer(state, `${person.name} 拧亮手电筒，一道白光正打在你脸上。`, person.id);
       return true;
     }
     case 'flare': {
       if (state.alarm >= ALARM_MAX - 12) return false;
-      person.item = null;
+      consumeItem(state, person);
       person.intent = 'call';
       person.activity = '打出了一发信号弹';
       log(state, `${person.name} 打出信号弹，整栋房子的警戒往上窜了一截。`);
@@ -2124,7 +2324,7 @@ function useSurvivorItem(state: GameState, person: Person): boolean {
     }
     case 'key': {
       if (state.teamProgress >= TEAM_GOAL_MAX) return false;
-      person.item = null;
+      consumeItem(state, person);
       state.teamProgress = Math.min(TEAM_GOAL_MAX, state.teamProgress + 12);
       person.intent = 'work';
       person.activity = '用钥匙捅开了后门的锁';
@@ -2134,7 +2334,7 @@ function useSurvivorItem(state: GameState, person: Person): boolean {
     }
     case 'smoke': {
       if (person.alert < 18) return false;
-      person.item = null;
+      consumeItem(state, person);
       person.alert = Math.max(0, person.alert - 35);
       if (CABINET_ROOMS.includes(person.room) && Math.random() < 0.6) person.hidden = true;
       state.trails = state.trails.filter((t) => t.room !== person.room);
@@ -2142,9 +2342,9 @@ function useSurvivorItem(state: GameState, person: Person): boolean {
       log(state, `${person.name} 丢了烟雾弹，脚印和视线一起断在这里。`);
       return true;
     }
-    case 'weapon':
     case 'toolbox':
-      // 要等到「和玩家同屋」/「走到发电机前」才有意义，先留着
+    case 'weapon':
+      // 工具箱在修发电机时生效，武器在反击时生效，都是「等到场合」的装备
       return false;
   }
   return false;
@@ -2214,6 +2414,10 @@ function createPeople(mission: Mission): Person[] {
     lastSeenRoom: POLICE_START,
     lastSeenTurn: 0,
     item: null,
+    itemUses: 0,
+    healTurns: 0,
+    watchValue: 0,
+    watched: false,
     movesThisTurn: 0,
   });
 
@@ -2303,6 +2507,13 @@ export function createGame(
     barricades: [],
     exitBlockedTurns: 0,
     stunTurns: 0,
+    blindTurns: 0,
+    chaseTargetId: null,
+    chaseTurns: 0,
+    guardingTurns: 0,
+    nightfallActive: false,
+    lastAttackedId: null,
+    policeAssaulted: false,
     cooldowns: {},
     roomLocks: {},
     revealedThisTurn: false,
@@ -2379,7 +2590,8 @@ export function effectiveCost(defId: string, state: GameState): number {
  * 否则一个随机长在死角的障碍房会把整条支路变成永远走不到的死路。
  */
 export function moveCost(state: GameState, room: RoomId): number {
-  const obstacle = isObstacle(room) && !state.clearedObstacles.includes(room) ? 1 : 0;
+  // 恶魔附身能直接撞开障碍物，不额外花行动点
+  const obstacle = isObstacle(room) && !state.clearedObstacles.includes(room) && !state.possessed ? 1 : 0;
   return (state.barricades.includes(room) ? 2 : 1) + obstacle;
 }
 
@@ -2435,11 +2647,12 @@ export function movePlayer(state: GameState, room: RoomId): boolean {
   if (state.barricades.includes(room)) {
     state.barricades = state.barricades.filter((r) => r !== room);
   }
+  // 先让屋里的人对「推门」做反应（障碍伏击要在杂物被踢开之前判定）
+  npcOnPlayerEnter(state);
   if (isObstacle(room) && !state.clearedObstacles.includes(room)) {
     state.clearedObstacles.push(room);
     log(state, `你踢开${roomName(room)}门口堆着的杂物，硬挤了进去。`);
   }
-  npcOnPlayerEnter(state);
   // 走出了第一步，刀就收回来了：边走边砍是这个游戏的基本节奏
   state.attackReady = true;
   updateFrenzy(state, from, room);
@@ -2508,7 +2721,8 @@ export function attackBlockReason(state: GameState, targetId?: string): string {
   if (targetId) {
     const picked = state.people.find((p) => p.id === targetId);
     if (!picked) return '这个人已经不在现场了';
-    if (picked.role === 'police') return '警察不能攻击：他一倒，整条街都会封死';
+    // 袭警允许，但代价写在 attack() 里：通缉 +6、警戒 +12、警察立刻锁定你
+    if (picked.role === 'police' && state.policeAssaulted) return '警员已经倒下，别再看了';
     if (picked.room !== state.playerRoom) return '他不在这间屋里';
     if (picked.hidden) return '他躲起来了，先搜索这间屋子';
   }
@@ -2539,8 +2753,43 @@ export function attack(state: GameState, targetId?: string): boolean {
   }
   const target = findVictim(state, state.playerRoom, Infinity, true, targetId)!;
   const heavy = state.possessed;
+  // 带手电筒的人可能从隔壁冲进来照你：这一刀落空，两个人都趁机跑掉
+  const flasher = npcs(state).find(
+    (p) =>
+      p.item === 'flashlight' &&
+      p.itemUses > 0 &&
+      p.hp > 0 &&
+      p.alert >= 40 &&
+      (p.room === state.playerRoom || ROOM_MAP[state.playerRoom].neighbors.includes(p.room)),
+  );
+  if (flasher && Math.random() < 0.55) {
+    consumeItem(state, flasher);
+    if (flasher.room !== state.playerRoom) flasher.room = state.playerRoom;
+    interruptPlayer(
+      state,
+      `${flasher.name} 从旁边冲进来，手电筒正照着你的眼睛——这一刀落空了。`,
+      flasher.id,
+    );
+    if (target.hp > 0) {
+      fleeAway(state, target);
+      target.alert = 100;
+      log(state, `${target.name} 毫发无伤地跟着跑出了屋子。`);
+    }
+    afterPlayerAction(state);
+    checkImmediateWin(state);
+    return false;
+  }
   state.energy -= ATTACK_COST;
   state.attackReady = false;
+  state.lastAttackedId = target.id;
+  if (target.role === 'police') {
+    state.policeAssaulted = true;
+    state.wanted += 6;
+    state.heatTurn = state.turn;
+    state.policeLock = 1;
+    addAlarm(state, 12);
+    log(state, '你居然对警员动了刀——通缉 +6、团队警戒 +12，警察会立刻咬住你。');
+  }
   log(
     state,
     target.hp <= 0
@@ -2549,7 +2798,41 @@ export function attack(state: GameState, targetId?: string): boolean {
         ? `恶魔附身 · 你挥刀砍向 ${target.name}，这一刀直接见骨（消耗 ${ATTACK_COST} 点行动点）。`
         : `你挥刀砍向 ${target.name}（消耗 ${ATTACK_COST} 点行动点）。`,
   );
-  damagePerson(state, target, heavy ? 2 : 1);
+  // 鬼面监视完成：这一刀直接把还站着的人放倒，不必补第二下
+  const nightfallKill = target.watched;
+  if (nightfallKill) {
+    target.watched = false;
+    target.watchValue = 0;
+    log(state, `夜幕锁定 ${target.name}：这一刀直接把他放倒。`);
+  }
+  damagePerson(state, target, heavy || nightfallKill ? 2 : 1);
+  afterPlayerAction(state);
+  checkImmediateWin(state);
+  return true;
+}
+
+/** 擦刀为什么按不下去 */
+export function wipeBlockReason(state: GameState): string {
+  if (state.phase !== 'playing') return '现在不能动手';
+  if (state.attackReady) return '刀锋还干净，不用擦';
+  if (state.energy < WIPE_COST) return `需要 ${WIPE_COST} 点行动点`;
+  return '';
+}
+
+/**
+ * 擦刀：原地花 1 点行动点，把 attackReady 收回来，接着就能再砍/处决。
+ * 代价是这一次动作同样算一次「玩家行动」——幸存者会趁你低头擦刀跑掉、干活、
+ * 甚至去救地上那个人。这就是「守尸」和「追出去」之间的取舍。
+ */
+export function wipeBlade(state: GameState): boolean {
+  const reason = wipeBlockReason(state);
+  if (reason) {
+    log(state, `擦刀：${reason}。`);
+    return false;
+  }
+  state.energy -= WIPE_COST;
+  state.attackReady = true;
+  log(state, `你低头把刀上的血慢慢擦干净（消耗 ${WIPE_COST} 点行动点）。这一下动静，够他们做点什么了。`);
   afterPlayerAction(state);
   checkImmediateWin(state);
   return true;
@@ -2693,6 +2976,10 @@ export function usePower(state: GameState, powerId: string): boolean {
   state.cooldowns[powerId] = power.cooldown;
   log(state, `${killer.owner}·${power.name}：${power.desc}`);
   runOps(state, power.ops);
+  if (state.killer === '鬼面' && powerId === 'ghost_stalk') {
+    state.nightfallActive = true;
+    log(state, '夜幕拉开：接下来每回合盯住相邻房间的一个人，监视值满 100 他就会持续显形。');
+  }
   state.attackReady = true;
   afterPlayerAction(state);
   checkImmediateWin(state);
@@ -2777,6 +3064,47 @@ export function endTurn(state: GameState): void {
   if (m.kind === 'ritual' && state.ritualStreak >= (m.targetCount ?? 2)) {
     finish(state, 'win');
     return;
+  }
+
+  // 守尸惩罚：站在倒地者房间干等，其他人会把团队任务往前赶一大截
+  const downedHere = npcs(state).some((p) => p.hp <= 0 && p.room === state.playerRoom);
+  if (downedHere) {
+    state.guardingTurns += 1;
+    const gain = GUARD_TEAM_GAIN + Math.min(6, state.guardingTurns * 2);
+    state.teamProgress = Math.min(TEAM_GOAL_MAX, state.teamProgress + gain);
+    log(state, `你守在倒地的人旁边没动……其他人趁这段时间把${state.teamGoalLabel}往前赶了一大截（团队进度 +${gain}）。`);
+  } else {
+    state.guardingTurns = 0;
+  }
+
+  // 鬼面「夜幕」：监视相邻房间的人；有人闯进鬼面房间就中断，且他能多跑一步
+  if (state.killer === '鬼面' && state.nightfallActive) {
+    const intruder = npcs(state).find((p) => p.hp > 0 && p.room === state.playerRoom);
+    if (intruder) {
+      state.nightfallActive = false;
+      npcs(state).forEach((p) => {
+        p.watchValue = 0;
+      });
+      if (intruder.movesThisTurn < REACT_MOVE_CAP) {
+        fleeAway(state, intruder);
+        intruder.movesThisTurn += 1;
+      }
+      log(state, `${intruder.name} 一头撞进你所在的房间，夜幕被打断了——他趁乱又多跑了一步。`);
+    } else {
+      const targets = npcs(state).filter(
+        (p) => p.hp > 0 && !p.watched && ROOM_MAP[state.playerRoom].neighbors.includes(p.room),
+      );
+      const watchedTarget = targets.sort((a, b) => b.watchValue - a.watchValue)[0];
+      if (watchedTarget) {
+        watchedTarget.watchValue = Math.min(100, watchedTarget.watchValue + WATCH_GAIN);
+        log(state, `夜幕：你盯着${roomName(watchedTarget.room)}里的${watchedTarget.name}（监视 ${watchedTarget.watchValue}/100）。`);
+        if (watchedTarget.watchValue >= 100) {
+          watchedTarget.watched = true;
+          watchedTarget.trackedTurns = Math.max(watchedTarget.trackedTurns, 99);
+          log(state, `${watchedTarget.name} 的监视值满了：他持续显形，下一刀可以直接把他放倒。`);
+        }
+      }
+    }
   }
 
   // 迈尔斯的尾随值随时间消退
@@ -2878,6 +3206,7 @@ export function endTurn(state: GameState): void {
   );
   state.bonusEnergyNextTurn = 0;
   state.stunTurns = 0;
+  state.blindTurns = 0;
   // 新回合：刀已经收回来，所有人的腿也歇过来了
   state.attackReady = true;
   state.people.forEach((p) => {

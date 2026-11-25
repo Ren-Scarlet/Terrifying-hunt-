@@ -4,7 +4,9 @@
  */
 import { CARD_MAP, CARDS } from '../src/game/data/cards';
 import {
+  ARCH_LABEL,
   BASE_AP,
+  BLEEDOUT_TURNS,
   FRENZY_AP_BONUS,
   SEARCH_COST,
   TEAM_GOAL_MAX,
@@ -27,6 +29,7 @@ import {
   searchRoom,
   visibleDisturbances,
   visibleTrails,
+  wipeBlade,
 } from '../src/game/engine';
 import { OBSTACLE_ROOMS, ROOM_MAP } from '../src/game/rooms';
 import { SURVIVOR_MAP } from '../src/game/survivors';
@@ -143,11 +146,14 @@ function casePursue(): void {
   v.hp = 1;
   v.intent = 'flee';
 
+  // 追击牌把你送到他原来所在的房间；贴住之后他会立刻再跑——这是新节奏：
+  // 「追上」不再等于「按住」，同屋的目击者会跑、会干活、会拿手电筒照你。
+  const targetRoom = v.room;
   play(s, 'sprint');
-  const followed = s.playerRoom === v.room;
-  check('C 追击牌能贴到目标房间', followed, `玩家在 ${s.playerRoom}，目标在 ${v.room}`);
+  const followed = s.playerRoom === targetRoom;
+  check('C 追击牌能贴到目标房间', followed, `玩家在 ${s.playerRoom}，目标原在 ${targetRoom}，现在在 ${v.room}`);
 
-  if (followed) {
+  if (s.playerRoom === v.room) {
     const hp = v.hp;
     const hit = attack(s);
     check('C 追上后能补刀', hit && v.hp < hp, `hp ${hp} → ${v.hp}`);
@@ -605,6 +611,8 @@ function caseSurvivorItems(): void {
   p2.room = s2.siteItems[0].room;
   p2.goal = 'supply';
   p2.alert = 0;
+  // 开局随机带道具是新的设计：这里先清空，只验证「箱子全坏就领不到新道具」
+  s2.people.forEach((x) => { x.item = null; x.itemUses = 0; });
   s2.playerRoom = 'hall';
   endTurn(s2);
   check('Y 道具箱全被破坏后，幸存者拿不到道具', !s2.people.some((x) => x.item !== null));
@@ -612,6 +620,7 @@ function caseSurvivorItems(): void {
   const s3 = newGame();
   const p3 = s3.people.find((x) => x.role !== 'police')!;
   p3.item = 'key';
+  p3.itemUses = 1;
   p3.alert = 0;
   s3.playerRoom = 'hall';
   const before = s3.teamProgress;
@@ -619,8 +628,68 @@ function caseSurvivorItems(): void {
   check('Y 幸存者道具能推进团队进度', s3.teamProgress > before, `${before} → ${s3.teamProgress}`);
 }
 
+/** 本轮：擦刀 / 同屋目击者 / 守尸 / 袭警 / 道具次数 / 拉扯型 */
+function caseNewMechanics() {
+  check('Z 行动点上限为 4', BASE_AP === 4, `BASE_AP=${BASE_AP}`);
+  check('Z 拉扯型幸存者已注册', ARCH_LABEL.kiter === '拉扯型');
+  check('Z 倒地流血 3 回合', BLEEDOUT_TURNS === 3);
+
+  // 擦刀：砍完刀锋收不回来，花 1 点原地擦刀就能再砍
+  const b = newGame();
+  b.people.forEach((p) => { p.item = null; p.itemUses = 0; p.alert = 0; });
+  const victim = b.people.find((p) => p.role !== 'police')!;
+  victim.room = b.playerRoom;
+  victim.hp = 2;
+  b.attackReady = true;
+  attack(b, victim.id);
+  const afterAtk = !b.attackReady && b.energy === BASE_AP - 1;
+  const wiped = wipeBlade(b);
+  check('Z 擦刀收回刀锋且消耗 1 点', afterAtk && wiped && b.attackReady && b.energy === BASE_AP - 2, `ready=${b.attackReady} energy=${b.energy}`);
+
+  // 同屋目击者：另一个人不会站着发呆
+  const g = newGame();
+  g.people.forEach((p) => { p.item = null; p.itemUses = 0; p.alert = 0; });
+  const pair = g.people.filter((p) => p.role !== 'police').slice(0, 2);
+  pair[0].room = g.playerRoom;
+  pair[1].room = g.playerRoom;
+  pair[0].hp = 2;
+  g.attackReady = true;
+  const tp = g.teamProgress;
+  attack(g, pair[0].id);
+  check('Z 同屋另一名幸存者不会站着不动', pair[1].alert > 0 || pair[1].movesThisTurn > 0 || g.teamProgress > tp, `alert=${pair[1].alert} tp=${g.teamProgress}`);
+
+  // 守尸：站在倒地者房间干等，其他人把团队进度赶上去
+  const c = newGame();
+  c.people.forEach((p) => { p.item = null; p.itemUses = 0; p.alert = 0; });
+  const downed = c.people.find((p) => p.role !== 'police')!;
+  downed.room = c.playerRoom;
+  downed.hp = 0;
+  downed.downedTurns = 0;
+  const tp2 = c.teamProgress;
+  endTurn(c);
+  check('Z 守尸会推进团队进度', c.guardingTurns > 0 && c.teamProgress > tp2, `${tp2} → ${c.teamProgress}`);
+
+  // 袭警：现在可以砍警员，但通缉立刻暴涨
+  const f = newGame();
+  f.people.forEach((p) => { p.item = null; p.itemUses = 0; p.alert = 0; });
+  const cop = f.people.find((p) => p.role === 'police')!;
+  cop.room = f.playerRoom;
+  f.attackReady = true;
+  const wanted = f.wanted;
+  attack(f, cop.id);
+  check('Z 可以袭警且通缉暴涨', f.policeAssaulted && f.wanted >= wanted + 6, `${wanted} → ${f.wanted}`);
+
+  // 道具有使用次数
+  const d = newGame();
+  const carrier = d.people.find((p) => p.role !== 'police')!;
+  carrier.item = 'flashlight';
+  carrier.itemUses = 2;
+  check('Z 道具有使用次数', carrier.item === 'flashlight' && carrier.itemUses === 2);
+}
+
 caseSiteItems();
 caseSurvivorItems();
+caseNewMechanics();
 
 console.log(`\n规则回归 ${pass} 通过 / ${fail} 失败`);
 if (fail > 0) process.exitCode = 1;

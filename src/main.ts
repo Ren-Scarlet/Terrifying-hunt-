@@ -10,6 +10,7 @@ import {
   searchRoom,
   sabotageSiteItem,
   usePower,
+  wipeBlade,
 } from './game/engine';
 import { loadSave, writeSave } from './game/save';
 import {
@@ -380,6 +381,12 @@ app.addEventListener('click', (event) => {
 
   if (action === 'attack') {
     attack(game);
+    afterAction();
+    return;
+  }
+
+  if (action === 'wipe') {
+    wipeBlade(game);
     afterAction();
     return;
   }

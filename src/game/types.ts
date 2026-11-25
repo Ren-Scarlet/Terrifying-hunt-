@@ -79,8 +79,9 @@ export type PersonRole = 'target' | 'civilian' | 'police';
  *   rescuer  救援型：治疗受伤、拉起倒地的人
  *   hider    躲藏型：钻进柜子/床底，不搜出来就找不到
  *   brave    英勇型：找武器、聚人、正面挡路
+ *   kiter    拉扯型：专门绕远路、抹脚印、丢烟雾，让玩家很难贴到他
  */
-export type Archetype = 'alert' | 'defiant' | 'caller' | 'rescuer' | 'hider' | 'brave';
+export type Archetype = 'alert' | 'defiant' | 'caller' | 'rescuer' | 'hider' | 'brave' | 'kiter';
 
 /** NPC 这一回合的打算，会显示在平面图上供玩家预判 */
 export type NpcIntent =
@@ -116,7 +117,7 @@ export type NpcGoal =
   | 'generator';
 
 /** 幸存者从道具箱里翻出来的东西：用完即弃，是他们多出来的一条选择 */
-export type SurvivorItem = 'medkit' | 'toolbox' | 'flare' | 'key' | 'weapon' | 'smoke';
+export type SurvivorItem = 'medkit' | 'toolbox' | 'flare' | 'key' | 'weapon' | 'smoke' | 'flashlight';
 
 /** 场地物品：杀手用不了，但可以砸掉 */
 export type SiteItemKind = 'itemBox' | 'generator';
@@ -176,6 +177,14 @@ export interface Person {
   sneaky: boolean;
   /** 从道具箱翻到的东西：用完即弃，是他这一回合多出来的一条路 */
   item: SurvivorItem | null;
+  /** 这件道具还能用几次；归零就清空 */
+  itemUses: number;
+  /** 医疗包慢速治疗进度：攒满 MEDKIT_TURNS 才真正回血 / 拉人 */
+  healTurns: number;
+  /** 鬼面「夜幕」对这名幸存者的监视值 0–100 */
+  watchValue: number;
+  /** 监视完成：持续透视，下一刀可以直接击倒 */
+  watched: boolean;
   /** 被追踪的剩余回合：位置始终可见 */
   trackedTurns: number;
   /** 玩家最后一次看到他的房间与回合，用于地图上的"最后已知位置" */
@@ -351,6 +360,19 @@ export interface GameState {
   exitBlockedTurns: number;
   /** 玩家被 NPC 反击造成的眩晕：下回合行动点减少 */
   stunTurns: number;
+  /** 被手电筒致盲的剩余回合（只做显示，实际惩罚走 stunTurns） */
+  blindTurns: number;
+  /** 连续追同一名幸存者的回合数：其他人干活效率随之提高 */
+  chaseTargetId: string | null;
+  chaseTurns: number;
+  /** 连续站在倒地者房间结束回合（守尸）的回合数 */
+  guardingTurns: number;
+  /** 鬼面夜幕是否正在监视 */
+  nightfallActive: boolean;
+  /** 上一次被玩家砍中的人：同屋目击者要反应，但他本人不重复行动 */
+  lastAttackedId: string | null;
+  /** 是否已经袭击过警员（袭警后警察会更紧地咬住你） */
+  policeAssaulted: boolean;
   /** 杀手能力冷却：powerId -> 剩余回合 */
   cooldowns: Record<string, number>;
   /** 本局结果说明（为什么失败），给结算面板用 */
