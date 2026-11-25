@@ -45,8 +45,6 @@ import type {
   Trail,
   SiteItem,
   SiteItemKind,
-  MissionTask,
-  PowerCircuit,
   SurvivorItem,
 } from './types';
 
@@ -655,6 +653,7 @@ function killPerson(state: GameState, person: Person): void {
   state.people = state.people.filter((p) => p.id !== person.id);
   state.pinnedPeople = state.pinnedPeople.filter((id) => id !== person.id);
   state.kills += 1;
+  if (person.role !== 'police') state.survivorKills += 1;
   state.killsThisTurn += 1;
   if (person.marked) state.markedKilled += 1;
   state.lastCrimeRoom = state.playerRoom;
@@ -798,7 +797,7 @@ export function executeCarriedPerson(state: GameState, method: 'fridge' | 'micro
     : `你将${name}按在微波炉旁，刺耳的嗡鸣吞没了最后的挣扎声。`;
   log(state, `特殊处决：${flavor}（额外奖励 +35 分）。`);
   killPerson(state, person);
-  state.scoreBreakdown.push({ label: `地形处决 · ${method === 'fridge' ? '冰箱' : '微波炉'}`, value: 35 });
+  state.specialExecutionBonus += 35;
   state.attackReady = true;
   addAlarm(state, 8);
   afterPlayerAction(state);
@@ -1218,12 +1217,12 @@ function consumeItem(state: GameState, person: Person): void {
  * 追势清零，并且幸存者们立刻借这个空档各做一件事。
  */
 function interruptPlayer(state: GameState, reason: string, actorId: string): void {
-  dropCarriedPerson(state, '你被打断，怀里的人趁机挣脱并逃走了。');
   // 恶魔附身是迈尔斯的专属底牌：这段时间里障碍伏击与手电筒都拿他没办法
   if (state.possessed) {
     log(state, `${reason} 恶魔附身下的你连眼都没眨，这一下没起作用。`);
     return;
   }
+  dropCarriedPerson(state, '你被打断，怀里的人趁机挣脱并逃走了。');
   state.stunTurns += 1;
   state.blindTurns = 1;
   state.attackReady = false;
@@ -1549,6 +1548,19 @@ function npcTurn(state: GameState): void {
   for (const person of [...npcs(state)]) {
     if (state.result) return;
     if (!state.people.some((p) => p.id === person.id)) continue;
+
+    // 被抱起的人不会参与救援或移动，但仍然会继续流血倒计时。
+    if (person.id === state.carryPersonId) {
+      person.downedTurns += 1;
+      if (person.downedTurns >= BLEEDOUT_TURNS) {
+        log(state, `${person.name} 在你搬运途中停止了呼吸。`);
+        addAlarm(state, 10);
+        killPerson(state, person);
+      } else {
+        person.activity = '被杀手抱着，无法挣脱（倒计时仍在继续）';
+      }
+      continue;
+    }
 
     // 倒地的人不会自己起来，只能等救援或者流血而死
     if (person.hp <= 0) {
@@ -2380,7 +2392,7 @@ export function searchRoom(state: GameState): boolean {
 
 /** 为什么现在砸不了：用于按钮禁用与日志 */
 export function isRoomLit(state: GameState, room: RoomId): boolean {
-  return !state.powerCircuits.some((c) => c.broken && c.affectedRooms.includes(room));
+  return state.powerCircuits.some((c) => !c.broken && c.affectedRooms.includes(room));
 }
 
 export function sabotageBlockReason(state: GameState): string | null {
@@ -2500,7 +2512,7 @@ export function usePower(state: GameState, powerId: string): boolean {
 
 export function missionTaskProgress(state: GameState, task: MissionTask): number {
   switch (task.kind) {
-    case 'kill_count': return state.kills;
+    case 'kill_count': return state.survivorKills;
     case 'marked_kill': return state.markedKilled;
     case 'execute': return state.executions;
     case 'no_alarm': return state.npcAlarmed ? 0 : 1;
@@ -2520,6 +2532,7 @@ function finish(state: GameState, result: ResultKind): void {
   state.phase = 'gameover';
 
   const lines: ScoreLine[] = [{ label: `契约基础分 · ${state.mission.title}`, value: state.mission.reward }];
+  if (state.specialExecutionBonus > 0) lines.push({ label: '地形处决奖励', value: state.specialExecutionBonus });
   lines.push({ label: `凶残 · 击杀 ${state.kills} 人`, value: state.kills * 14 });
   if (state.escaped > 0) lines.push({ label: `逃走 ${state.escaped} 人的失分（每人 -15）`, value: -state.escaped * 15 });
   if (state.alarm >= 60) lines.push({ label: `暴露度 ${state.alarm} 的代价`, value: -Math.round(state.alarm / 5) });
@@ -2546,7 +2559,7 @@ export function currentScore(state: GameState): number {
     0,
     Math.round(
       state.mission.reward +
-        state.kills * 14 -
+        state.kills * 14 + state.specialExecutionBonus -
         state.escaped * 15 -
         Math.round(state.alarm / 5),
     ),
