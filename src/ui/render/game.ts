@@ -299,7 +299,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
     const r = room.rect;
     const style = `left:${r.left}%;top:${r.top}%;width:${r.width}%;height:${r.height}%`;
     return `
-      <div class="room ${isPlayer ? 'current' : ''} ${reachable ? 'reachable' : 'disabled'} ${adjacent ? 'adjacent' : ''} ${state.lookingAround && adjacent ? 'look-target' : ''} ${obstacleOpen ? 'obstacle' : ''} ${isObjective ? 'objective' : ''} ${darkRoom ? 'dark-room' : 'lit-room'} ${room.id === 'garden' ? 'outdoor' : ''} ${locked ? 'locked' : ''} ${barricaded ? 'barricaded' : ''} ${explored ? 'explored' : 'unexplored'} ${visible ? 'in-sight' : 'fogged'}"
+      <div class="room ${isPlayer ? 'current' : ''} ${reachable ? 'reachable' : 'disabled'} ${adjacent ? 'adjacent' : ''} ${state.lookingAround && adjacent ? 'look-target' : ''} ${obstacleOpen ? 'obstacle' : ''} ${isObjective ? 'objective' : ''} ${darkRoom ? 'dark-room' : 'lit-room'} ${room.id === 'garden' ? 'outdoor' : ''} room-size-${room.size} ${locked ? 'locked' : ''} ${barricaded ? 'barricaded' : ''} ${explored ? 'explored' : 'unexplored'} ${visible ? 'in-sight' : 'fogged'}"
         style="${style}" data-room="${room.id}" title="${escape(room.name)}${explored ? `：${escape(room.desc)}` : '：还没进去过'}${isObjective ? ' · 他们的目标点' : ''}">
         ${state.lookingAround && adjacent
           ? `<button type="button" class="room-hit look-hit" data-action="look-select" data-room="${room.id}"
