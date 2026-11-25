@@ -2275,3 +2275,37 @@ button, .room-hit, .hand-row { touch-action: manipulation; }
   .floorplan { width: 780px; min-width: 780px; }
   .hand-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+
+/* 契约指定幸存者：使用文字徽记 + 星标，不再只靠人物边框颜色辨认。 */
+.person-chip .chip-contract-target {
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: 0 0 auto; overflow: visible; white-space: nowrap;
+  padding: 2px 5px; border-radius: 3px;
+  border: 1px solid #d19a55;
+  background: linear-gradient(180deg, #55391d, #2b1c10);
+  color: #ffe0a1; font-size: 10px; font-weight: 900;
+  letter-spacing: .2px; line-height: 1.2;
+  text-shadow: 0 1px 2px #000;
+  box-shadow: 0 0 8px #d19a5544, inset 0 1px #ffe3aa33;
+}
+.person-chip.marked {
+  border: 2px solid #d19a55;
+  box-shadow: 0 0 0 1px #2b1c10, 0 0 13px #d19a5588, 0 2px 8px #000b;
+}
+.roster-person.marked {
+  border: 2px solid #d19a55;
+  background: linear-gradient(90deg, #281d11, #11100d);
+  box-shadow: inset 3px 0 #d19a55, 0 0 10px #d19a552b;
+}
+.contract-target-tag {
+  display: inline-block; width: fit-content; margin-top: 3px;
+  padding: 2px 6px; border: 1px solid #b7833f; border-radius: 3px;
+  background: #3a2915; color: #ffe0a1 !important;
+  font-size: 10.5px !important; font-weight: 900; letter-spacing: .3px;
+}
+.mission-target-names {
+  display: block; margin: 3px 0 1px 17px;
+  color: #f0cb88; font-size: 11px; font-style: normal;
+  font-weight: 700; line-height: 1.5;
+}

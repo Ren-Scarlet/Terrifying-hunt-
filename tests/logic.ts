@@ -53,6 +53,7 @@ import {
 } from '../src/game/engine';
 import { OBSTACLE_ROOMS, ROOM_MAP } from '../src/game/rooms';
 import { cardImage } from '../src/game/assetMap';
+import { personChip } from '../src/ui/render/shared';
 import { SURVIVOR_MAP } from '../src/game/survivors';
 import { generateMission } from '../src/game/missions';
 import type { GameState, RoomId } from '../src/game/types';
@@ -1141,6 +1142,23 @@ function caseContractsPowerAndCarry(): void {
   check('AB 地形处决会累计额外奖励分', special.specialExecutionBonus === 35, String(special.specialExecutionBonus));
 }
 caseContractsPowerAndCarry();
+
+function caseMarkedTargetIdentification(): void {
+  const game = newGame();
+  const marked = game.people.find((person) => person.marked && person.role !== 'police');
+  const ordinary = game.people.find((person) => !person.marked && person.role !== 'police');
+  check('特殊幸存者：每局至少有一名契约指定目标', Boolean(marked));
+  if (marked) {
+    const html = personChip(marked);
+    check('特殊幸存者：地图人物标签明确显示契约目标文字', html.includes('chip-contract-target') && html.includes('契约目标'));
+    check('特殊幸存者：人物标签标题也说明指定击杀身份', html.includes('本局契约指定击杀目标'));
+  }
+  if (ordinary) {
+    const html = personChip(ordinary);
+    check('普通幸存者：不会误显示契约目标徽记', !html.includes('chip-contract-target'));
+  }
+}
+caseMarkedTargetIdentification();
 
 /** AB：封锁房门必须同时阻止 NPC 进入和离开；脚印不应随机消失 */
 function caseNpcLocksAndPersistentTrails(): void {

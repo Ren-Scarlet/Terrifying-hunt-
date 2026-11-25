@@ -135,6 +135,9 @@ export function personChip(person: Person, attackable = false, carryable = false
         : 'civilian';
   const img = characterImage(person.id);
   const health = conditionOf(person);
+  const contractTargetMark = person.marked
+    ? '<span class="chip-contract-target" title="本局契约指定击杀目标">★ 契约目标</span>'
+    : '';
   const sacrificeMark = person.bloodSacrifice ? '<span class="chip-sacrifice" title="本局血祭品">🩸</span>' : '';
   // 头顶上的警戒值：不用再翻日志判断这个人现在有多怕
   const alertLevel = person.alert >= 70 ? 'high' : person.alert >= 35 ? 'mid' : 'low';
@@ -167,7 +170,7 @@ export function personChip(person: Person, attackable = false, carryable = false
   return `<button type="button" class="person-chip ${cls} ${person.bloodSacrifice ? 'blood-sacrifice' : ''} ${health === 'downed' ? 'is-downed' : ''} ${attackable ? 'can-hit' : ''}" data-action="${action}" data-person-id="${person.id}"${attackable ? ' data-attack="1"' : ''}
     title="${escape(person.name)} · ${HEALTH_LABEL[health]} · 警觉 ${person.alert}/100 · ${escape(ARCH_LABEL[person.archetype])} · ${escape(GOAL_LABEL[person.goal])} · 正在${escape(label)}${note}">
     ${img ? `<img src="${img}" alt="" onerror="this.style.display='none'">` : ''}
-    ${dialogue}<span>${escape(person.name)}</span>${sacrificeMark}${intentDot(person)}${stateMark}${alertMark}${watchMark}${person.item ? itemBadge(person.item, person.itemUses) : ''}
+    ${dialogue}<span>${escape(person.name)}</span>${contractTargetMark}${sacrificeMark}${intentDot(person)}${stateMark}${alertMark}${watchMark}${person.item ? itemBadge(person.item, person.itemUses) : ''}
   </button>`;
 }
 

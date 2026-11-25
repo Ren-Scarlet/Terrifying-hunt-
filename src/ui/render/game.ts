@@ -248,12 +248,17 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
   const left = Math.max(0, m.turns - state.turn + 1);
   const urgent = left <= 5;
   const tasks = m.tasks ?? [];
+  const markedTargets = state.people.filter((person) => person.marked && person.role !== 'police');
+  const markedTargetNames = markedTargets.map((person) => person.name);
   const objectiveDone = tasks.length > 0 && tasks.every((task) => missionTaskProgress(state, task) >= task.target);
   const progress = tasks.map((task) => {
     const value = missionTaskProgress(state, task);
     const failed = task.kind === 'no_alarm' && state.npcAlarmed;
     const done = value >= task.target;
-    return `<span class="mission-task ${done ? 'done' : failed ? 'failed' : ''}"><b>${done ? '✓' : failed ? '✕' : '○'}</b> ${escape(task.label)} <em>${task.kind === 'no_alarm' ? (failed ? '已报警' : '保持中') : `${Math.min(value, task.target)}/${task.target}`}</em></span>`;
+    const targetNames = task.kind === 'marked_kill'
+      ? `<small class="mission-target-names">${markedTargetNames.length ? `指定目标：${markedTargetNames.map(escape).join('、')}` : `已击杀指定目标 ${state.markedKilled} 人`}</small>`
+      : '';
+    return `<span class="mission-task ${done ? 'done' : failed ? 'failed' : ''}"><b>${done ? '✓' : failed ? '✕' : '○'}</b> ${escape(task.label)} <em>${task.kind === 'no_alarm' ? (failed ? '已报警' : '保持中') : `${Math.min(value, task.target)}/${task.target}`}</em>${targetNames}</span>`;
   }).join('');
 
   const rooms = ROOMS.map((room) => {
@@ -385,6 +390,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
         ${img ? `<img src="${img}" alt="" onerror="this.style.display='none'">` : ''}
         <span><b>${escape(p.name)} ${alertLabel}</b>
           <small class="goal-line">${escape(ARCH_LABEL[p.archetype])} · ${escape(GOAL_LABEL[p.goal])}</small>
+          ${p.marked ? '<small class="contract-target-tag">★ 契约指定目标</small>' : ''}
           ${p.bloodSacrifice ? '<small class="blood-sacrifice-tag">🩸 血祭品</small>' : ''}
           <small>${where} · ${HEALTH_LABEL[health]} · ${escape(intentLabel)}</small>
           ${health === 'downed' ? `<small class="roster-bleed">倒地 · ${p.downedTurns >= DOWNED_LOCK_TURNS ? `可以补刀处决，${Math.max(0, BLEEDOUT_TURNS - p.downedTurns)} 回合后自己流干` : `还要等 ${DOWNED_LOCK_TURNS - p.downedTurns} 回合才能补刀`} · 可能被救起</small>` : ''}
