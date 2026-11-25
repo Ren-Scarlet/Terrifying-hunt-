@@ -87,7 +87,7 @@ export const TRAIL_TURNS = 3;
  * 痕迹只保留最近这么多次「玩家行动」留下的（不是按回合）。
  * 跟着脚印走，旧的会一步步被擦掉；走错方向再回头，那条线索已经没了。
  */
-const TRAIL_ACTION_WINDOW = 2;
+const TRAIL_ACTION_WINDOW = 5;
 /** 动静（乌鸦叫）也只留最近这么多次行动：短线索，不是常驻雷达 */
 const DISTURBANCE_WINDOW = 3;
 /** 杀戮值上限 / 激活阈值：满值后每回合多 2 行动点，由玩家自己决定怎么走 */
@@ -480,10 +480,9 @@ function recordTrails(state: GameState, before: Map<string, RoomId>): void {
   npcs(state).forEach((p) => {
     const from = before.get(p.id);
     if (!from || from === p.room) return;
-    // 悄悄走：不留鞋印，也不惊动乌鸦
-    if (isQuietMove(state, p)) return;
-    if (leavesTrail(p)) pushTrail(state, from, p.room, p.hp <= SURVIVOR_INJURED_HP);
-    addDisturbance(state, p.room);
+    // 所有实际移动都会留下可追踪的脚印；潜行只压低声音，不再让路线凭空消失。
+    pushTrail(state, from, p.room, p.hp <= SURVIVOR_INJURED_HP);
+    if (!isQuietMove(state, p)) addDisturbance(state, p.room);
   });
 }
 
@@ -594,6 +593,8 @@ function nextStepToward(
   respectLocks = true,
 ): RoomId | null {
   if (from === to) return null;
+  // 房间封锁的是整扇门：房内 NPC 不能穿门离开，房外 NPC 也不能进入。
+  if (respectLocks && isLocked(state, from)) return null;
   const blocked = new Set<RoomId>(avoid);
   const queue: RoomId[][] = [[from]];
   const seen = new Set<RoomId>([from]);
@@ -1006,6 +1007,8 @@ function wantsToLeave(state: GameState, person: Person): boolean {
  */
 function fleeAway(state: GameState, person: Person, quiet = false): boolean {
   if (state.pinnedPeople.includes(person.id) || person.blockedTurns > 0 || person.hp <= 0) return false;
+  // 房门封锁会把房间内的人也困住，不能从锁住的房间直接跑出去。
+  if (isLocked(state, person.room)) return false;
   // 后院是出口：只有本来就打算离开、或者已经吓破胆的人才会往外跑。
   // 否则「被追」等于「自动逃生」，玩家把人逼到院子里反而在帮对手。
   const mayExit =
@@ -1029,11 +1032,9 @@ function fleeAway(state: GameState, person: Person, quiet = false): boolean {
   person.alert = Math.max(0, person.alert - 12);
   person.intent = 'flee';
   person.activity = '夺路而逃';
-  // 老练的人踮着脚走：这一步连脚印都不留，也不惊动乌鸦
-  if (!isQuietMove(state, person)) {
-    pushTrail(state, fromId, person.room, person.hp <= SURVIVOR_INJURED_HP);
-    addDisturbance(state, person.room);
-  }
+  // 逃跑路线始终留下脚印；潜行者只是不制造额外声响。
+  pushTrail(state, fromId, person.room, person.hp <= SURVIVOR_INJURED_HP);
+  if (!isQuietMove(state, person)) addDisturbance(state, person.room);
   if (quiet) return true;
   log(state, `${person.name} 从${from}逃向${roomName(person.room)}。`);
   shout(state, person, 14);
@@ -1724,6 +1725,12 @@ function npcTurn(state: GameState): void {
       continue;
     }
 
+    // 房门被封锁时，NPC 不能离开当前房间；保留原意图，等待封锁解除。
+    if (isLocked(state, person.room)) {
+      person.activity = '房门被封锁，无法离开';
+      continue;
+    }
+
     // 低警觉：不再漫无目的地乱晃，各自朝这一局的个人目标走一步。
     // 到了目标房间就「做事」——推进团队进度，同时弄出动静给玩家一条线索。
     person.intent = 'idle';
@@ -1820,6 +1827,12 @@ function escapePhase(state: GameState): void {
   for (const person of [...npcs(state)]) {
     if (person.hp <= 0) continue;
     if (!state.escapeRooms.includes(person.room)) {
+      person.escapeProgress = 0;
+      continue;
+    }
+    // 逃生点本身的房门被封锁时，NPC 不能穿过房门离开。
+    if (isLocked(state, person.room)) {
+      person.activity = '逃生点房门被封锁，无法离开';
       person.escapeProgress = 0;
       continue;
     }
