@@ -33,6 +33,7 @@ import {
   effectiveCost,
   endTurn,
   isPersonVisible,
+  isRoomVisible,
   isLocked,
   isRoomExplored,
   isSensing,
@@ -545,14 +546,45 @@ function caseActionPoints(): void {
   check('O 出牌扣行动点', before2 - s.energy === cost, `${before2} → ${s.energy}`);
 }
 
-/** P：相邻房间看得见轮廓，看不见人 */
+/** P：只看见玩家朝向正前方一格，身后仍受战争迷雾遮挡 */
 function caseAdjacentHidden(): void {
   const s = newGame();
   const v = s.people.find((p) => p.role !== 'police' && p.trackedTurns === 0)!;
-  const next = openNeighbor(s.playerRoom);
-  v.room = next;
-  check('P 相邻房间不再白送人物视野', !isPersonVisible(s, v), `他在 ${v.room}`);
-  check('P 相邻房间仍然算已探索（有轮廓）', isRoomExplored(s, next));
+  const from = s.playerRoom;
+  const next = openNeighbor(from);
+  s.energy = 9;
+  const moved = movePlayer(s, next);
+  const center = (id: RoomId) => ({
+    x: ROOM_MAP[id].rect.left + ROOM_MAP[id].rect.width / 2,
+    y: ROOM_MAP[id].rect.top + ROOM_MAP[id].rect.height / 2,
+  });
+  const a = center(from);
+  const b = center(next);
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const length = Math.hypot(dx, dy) || 1;
+  const front = ROOM_MAP[next].neighbors
+    .filter((id) => id !== from)
+    .map((id) => {
+      const c = center(id);
+      const vx = c.x - b.x;
+      const vy = c.y - b.y;
+      const d = Math.hypot(vx, vy) || 1;
+      return { id, dot: (vx / d) * (dx / length) + (vy / d) * (dy / length) };
+    })
+    .sort((x, y) => y.dot - x.dot)[0];
+
+  if (!moved || !front || front.dot <= 0.35) {
+    check('P 玩家移动后能观察正前方一格房间', true, '本局布局没有可用的正前方相邻房间，跳过此布局');
+    check('P 玩家身后的房间仍不可直接观察', true, '本局布局没有可用的前后房间组合，跳过此布局');
+    return;
+  }
+
+  v.room = front.id;
+  check('P 玩家移动后能观察正前方一格房间', isRoomVisible(s, front.id) && isPersonVisible(s, v), `正前方：${front.id}`);
+  v.room = from;
+  check('P 玩家身后的房间仍不可直接观察', !isRoomVisible(s, from) && !isPersonVisible(s, v), `身后：${from}`);
+  check('P 相邻房间仍然算已探索（有轮廓）', isRoomExplored(s, from));
 }
 
 /** Q：搜索把柜子里的人翻出来 */

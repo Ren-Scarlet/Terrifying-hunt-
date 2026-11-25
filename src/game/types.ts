@@ -325,6 +325,8 @@ export interface GameState {
   /** 最近有人经过的房间：乌鸦叫 / 地板响，给玩家一个不靠技能的找人方向 */
   disturbances: Disturbance[];
   playerRoom: RoomId;
+  /** 玩家当前朝向的单位向量；用于判断正前方一格房间 */
+  playerFacing: { x: number; y: number };
   people: Person[];
   hand: CardInstance[];
   drawPile: CardInstance[];

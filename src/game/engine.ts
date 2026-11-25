@@ -355,14 +355,38 @@ export { roomName };
 /* ==================================================================== */
 
 /**
+ * 取得玩家当前朝向正前方的一间相邻房间。
+ * 房间位置每局随机生成，因此按房间中心点与朝向向量计算，而不是写死上下左右。
+ */
+function forwardRoom(state: GameState): RoomId | null {
+  const current = ROOM_MAP[state.playerRoom];
+  const cx = current.rect.left + current.rect.width / 2;
+  const cy = current.rect.top + current.rect.height / 2;
+  let best: RoomId | null = null;
+  let bestDot = 0.35;
+
+  for (const neighborId of current.neighbors) {
+    const neighbor = ROOM_MAP[neighborId];
+    const dx = neighbor.rect.left + neighbor.rect.width / 2 - cx;
+    const dy = neighbor.rect.top + neighbor.rect.height / 2 - cy;
+    const length = Math.hypot(dx, dy);
+    if (length <= 0) continue;
+    const dot = (dx / length) * state.playerFacing.x + (dy / length) * state.playerFacing.y;
+    if (dot > bestDot) {
+      bestDot = dot;
+      best = neighborId;
+    }
+  }
+  return best;
+}
+
+/**
  * 当前能不能看见这个房间里的「人」。
- *
- * 只有你站着的这一间、以及被侦查 / 感知临时点亮的房间才看得见人。
- * 相邻房间只给你轮廓和名字（explored），不再白送「隔壁有谁」——
- * 找人要靠走进去、脚印、乌鸦动静，或者侦查 / 感知卡牌。
+ * 玩家所在房间与正前方一格可直接观察；侦查 / 感知仍可临时点亮其他房间。
+ * 其他相邻房间只显示轮廓，不会白送人物位置。
  */
 export function isRoomVisible(state: GameState, room: RoomId): boolean {
-  if (room === state.playerRoom) return true;
+  if (room === state.playerRoom || room === forwardRoom(state)) return true;
   return (state.scouted[room] ?? 0) > 0;
 }
 
@@ -2198,6 +2222,12 @@ export function movePlayer(state: GameState, room: RoomId): boolean {
   }
 
   const from = state.playerRoom;
+  const fromRect = ROOM_MAP[from].rect;
+  const toRect = ROOM_MAP[room].rect;
+  const dx = toRect.left + toRect.width / 2 - (fromRect.left + fromRect.width / 2);
+  const dy = toRect.top + toRect.height / 2 - (fromRect.top + fromRect.height / 2);
+  const length = Math.hypot(dx, dy) || 1;
+  state.playerFacing = { x: dx / length, y: dy / length };
   state.energy -= cost;
   state.playerRoom = room;
   markExplored(state, room);
