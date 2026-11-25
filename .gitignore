@@ -3,3 +3,4 @@ dist/
 .dbd-cache/
 *.log
 .tmpshot/
+.workbuddy/
