@@ -124,7 +124,7 @@ export function intentDot(person: Person): string {
   return `<i class="intent-dot i-${person.intent}" title="${escape(INTENT_LABEL[person.intent])}"></i>`;
 }
 
-export function personChip(person: Person, attackable = false): string {
+export function personChip(person: Person, attackable = false, carryable = false): string {
   const cls =
     person.role === 'police'
       ? 'police'
@@ -156,13 +156,14 @@ export function personChip(person: Person, attackable = false): string {
       ? `<span class="chip-watch" title="夜幕监视值 ${person.watchValue}/100">监视 ${person.watchValue}</span>`
       : '';
   const label = person.intent === 'idle' ? person.activity : INTENT_LABEL[person.intent];
+  const action = carryable ? 'carry' : 'person';
   const note =
     person.role === 'police'
       ? ' · 警察：不能攻击，他会循着现场追你'
       : attackable
         ? ' · 点击对他挥刀'
         : '';
-  return `<button type="button" class="person-chip ${cls} ${person.bloodSacrifice ? 'blood-sacrifice' : ''} ${health === 'downed' ? 'is-downed' : ''} ${attackable ? 'can-hit' : ''}" data-action="person" data-person-id="${person.id}"${attackable ? ' data-attack="1"' : ''}
+  return `<button type="button" class="person-chip ${cls} ${person.bloodSacrifice ? 'blood-sacrifice' : ''} ${health === 'downed' ? 'is-downed' : ''} ${attackable ? 'can-hit' : ''}" data-action="${action}" data-person-id="${person.id}"${attackable ? ' data-attack="1"' : ''}
     title="${escape(person.name)} · ${HEALTH_LABEL[health]} · 警觉 ${person.alert}/100 · ${escape(ARCH_LABEL[person.archetype])} · ${escape(GOAL_LABEL[person.goal])} · 正在${escape(label)}${note}">
     ${img ? `<img src="${img}" alt="" onerror="this.style.display='none'">` : ''}
     <span>${escape(person.name)}</span>${sacrificeMark}${intentDot(person)}${stateMark}${alertMark}${watchMark}${person.item ? itemBadge(person.item, person.itemUses) : ''}
