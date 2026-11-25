@@ -19,7 +19,7 @@ export interface EffectRuntime {
   resolveDest(state: GameState, dest: Dest): RoomId;
   movePersonTo(state: GameState, person: Person, room: RoomId, clearAlert?: boolean): void;
   markExplored(state: GameState, room: RoomId): void;
-  onPlayerEnter(state: GameState, chasedId: string): void;
+  onPlayerEnter(state: GameState, chasedId?: string): void;
   scoutRoom(state: GameState, room: RoomId, turns?: number): void;
   npcs(state: GameState): Person[];
   peopleInRoom(state: GameState, room: RoomId, role?: Person['role']): Person[];
@@ -113,7 +113,7 @@ export function executeOps(state: GameState, ops: Op[], runtime: EffectRuntime):
           log(state, `你移动到${roomName(dest)}。`);
           state.playerRoom = dest;
           markExplored(state, dest);
-          npcOnPlayerEnter(state);
+          onPlayerEnter(state);
         }
         break;
       }

@@ -43,6 +43,7 @@ interface SceneInstance extends SceneHandle {
 let instance: SceneInstance | null = null;
 
 const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v));
+const DARK_SCALE = 0.55;
 
 /* ------------------------------------------------------------------ */
 /* 随机数：固定种子，保证每次加载纹理一致，不会闪来闪去               */

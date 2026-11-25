@@ -848,7 +848,7 @@ export function runOps(state: GameState, ops: Op[]): void {
     selectPeople, log, damagePerson, canExecuteNow, executePerson, killPerson,
     addWanted, addAlarm, resolveDest, movePersonTo, markExplored,
     onPlayerEnter: (current, chased) => {
-      chasedId = chased;
+      chasedId = chased ?? null;
       try { npcOnPlayerEnter(current); } finally { chasedId = null; }
     },
     scoutRoom, npcs, peopleInRoom, standing, nextStepToward,
