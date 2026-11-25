@@ -1,9 +1,6 @@
 import type { MatKind } from './config';
 import type { Ctx, Rect } from './types';
 
-const TEX = 192;
-const texCache = new Map<MatKind, HTMLCanvasElement>();
-
 export function rng(seed: number): () => number {
   let a = seed >>> 0;
   return () => {
@@ -19,8 +16,6 @@ export function rng(seed: number): () => number {
 /* ------------------------------------------------------------------ */
 
 const TEX = 192;
-/** 光照层分辨率比例（半分辨率更快、边缘更柔） */
-const DARK_SCALE = 0.55;
 const texCache = new Map<MatKind, HTMLCanvasElement>();
 
 function makeTexture(kind: MatKind): HTMLCanvasElement {
