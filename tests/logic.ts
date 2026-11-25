@@ -12,6 +12,8 @@ import {
   FRENZY_AP_BONUS,
   SEARCH_COST,
   TEAM_GOAL_MAX,
+  TEAM_STAGE_COUNT,
+  conditionOf,
   GENERATOR_JAM_TURNS,
   SABOTAGE_COST,
   addAlarm,
@@ -282,13 +284,13 @@ function caseFinisher(): void {
   const s3 = newGame();
   const v3 = player(s3);
   v3.room = s3.playerRoom;
-  v3.hp = 2;
+  v3.hp = 4;
   v3.hidden = false;
   s3.energy = 3;
   s3.possessed = true;
   s3.possessTurns = 3;
   attack(s3, v3.id);
-  check('F 恶魔附身时健康者一刀倒地', v3.hp === 0, `hp=${v3.hp}`);
+  check('F 恶魔附身额外伤害使健康者进入受伤', v3.hp === 2 && conditionOf(v3) === 'injured', `hp=${v3.hp}`);
 }
 
 /** G：卡牌数据仍然挂着正确的指令，而且不再直接造成伤害 */
@@ -311,14 +313,13 @@ function caseSwingGate(): void {
   const s = newGame();
   const v = player(s);
   v.room = s.playerRoom;
-  v.hp = 2;
+  v.hp = 4;
   v.alert = 0;
   v.intent = 'idle';
 
   s.energy = 3;
   const first = attack(s);
-  const hurt = v.hp === 1;
-  check('H 挥刀把健康砍成受伤', first && hurt, `hp ${v.hp}，行动点 ${s.energy}`);
+  check('H 默认挥刀造成 1 点伤害', first && v.hp === 3 && conditionOf(v) === 'healthy', `hp ${v.hp}，行动点 ${s.energy}`);
 
   const second = attack(s);
   check('H 不能连续挥刀', !second && !s.attackReady, attackBlockReason(s));
@@ -335,12 +336,12 @@ function casePanicRun(): void {
   const s = newGame();
   const v = player(s);
   v.room = s.playerRoom;
-  v.hp = 2;
+  v.hp = 3;
   v.alert = 0;
   v.sneaky = false;
   s.energy = 3;
   const ok = attack(s);
-  check('I 挥刀命中健康的人', ok && v.hp === 1, `hp ${v.hp}`);
+  check('I 再受 1 点伤害后进入受伤状态', ok && v.hp === 2 && conditionOf(v) === 'injured', `hp ${v.hp}`);
   check(
     'I 被砍伤的人会连着跑好几间屋',
     v.movesThisTurn >= 2,
@@ -395,14 +396,14 @@ function caseTrailDecay(): void {
   const s = newGame();
   const v = player(s);
   v.room = s.playerRoom;
-  v.hp = 2;
+  v.hp = 4;
   s.energy = 3;
   // 固定随机源，避免开局道具与随机 NPC 行为影响痕迹回归。
   withRandomSource(() => 0.99, () => attack(s));
   s.people.forEach((p) => {
     p.alert = 0;
     p.intent = 'idle';
-    p.hp = 2;
+    p.hp = 4;
     p.movesThisTurn = 0;
   });
   const now = visibleTrails(s).length;
@@ -496,7 +497,7 @@ function caseDisturbance(): void {
   const s = newGame();
   const v = player(s);
   v.room = s.playerRoom;
-  v.hp = 2;
+  v.hp = 4;
   v.sneaky = false;
   s.energy = 9;
   s.disturbances = [];
@@ -507,10 +508,17 @@ function caseDisturbance(): void {
 /** S：他们的团队目标做满，玩家直接失败 */
 function caseTeamGoal(): void {
   const s = newGame();
-  s.people = [];
-  s.teamProgress = TEAM_GOAL_MAX;
+  s.teamStage = TEAM_STAGE_COUNT - 1;
+  s.teamProgress = 90;
+  const worker = s.people.find((p) => p.role !== 'police')!;
+  worker.room = openNeighbor(s.playerRoom);
+  worker.item = 'key';
+  worker.itemUses = 1;
+  worker.alert = 0;
+  worker.hidden = false;
   endTurn(s);
-  check('S 团队目标做满直接判负', s.result === 'failed' && s.resultReason.length > 0, s.resultReason);
+  check('S 第四阶段完成后出现两个逃生点', s.teamStage === 4 && s.escapeRooms.length === 2, `stage=${s.teamStage} exits=${s.escapeRooms.join(',')}`);
+  check('S 第四阶段不会立刻判负', s.result !== 'failed', s.resultReason);
 }
 
 /** T：动静和脚印一样是短线索，不会一直挂在地图上 */
@@ -529,7 +537,7 @@ function caseFrenzy(): void {
   const v = player(s);
   const next = openNeighbor(s.playerRoom);
   v.room = next;
-  v.hp = 2;
+  v.hp = 4;
   v.alert = 0;
   s.trails = [{ room: s.playerRoom, to: next, turn: s.turn, clock: s.trailClock, blood: false }];
   s.energy = 9;
@@ -550,7 +558,7 @@ function caseFrenzy(): void {
   s.energy = 5;
   s.attackReady = true;
   v.room = s.playerRoom;
-  v.hp = 2;
+  v.hp = 4;
   v.hidden = false;
   attack(s);
   check('U 砍中人杀戮清零', s.frenzy === 0, String(s.frenzy));
@@ -701,8 +709,23 @@ function caseSurvivorItems(): void {
 /** 本轮：擦刀 / 同屋目击者 / 守尸 / 袭警 / 道具次数 / 拉扯型 */
 function caseNewMechanics() {
   check('Z 行动点上限为 4', BASE_AP === 4, `BASE_AP=${BASE_AP}`);
+  const sacrifice = newGame();
+  const sacrifices = sacrifice.people.filter((p) => p.role !== 'police' && p.bloodSacrifice);
+  check('Z 每局恰好随机标记一名血祭品', sacrifices.length === 1, `count=${sacrifices.length}`);
+  if (sacrifices[0]) {
+    const beforeAlert = sacrifices[0].alert;
+    runOps(sacrifice, [{ op: 'alert', who: 'bloodSacrifice', amount: 7 }]);
+    check('Z DSL 可以单独选择血祭品', sacrifices[0].alert === beforeAlert + 7);
+  }
   check('Z 拉扯型幸存者已注册', ARCH_LABEL.kiter === '拉扯型');
   check('Z 倒地 2 回合后才能补刀', DOWNED_LOCK_TURNS === 2 && BLEEDOUT_TURNS > DOWNED_LOCK_TURNS, `lock=${DOWNED_LOCK_TURNS} bleed=${BLEEDOUT_TURNS}`);
+  const health = newGame();
+  const healthy = health.people.find((p) => p.role !== 'police')!;
+  check('Z 幸存者初始生命值为 4', healthy.hp === 4 && conditionOf(healthy) === 'healthy');
+  healthy.hp = 2;
+  check('Z 累计 2 点伤害后进入受伤', conditionOf(healthy) === 'injured');
+  healthy.hp = 0;
+  check('Z 再累计 2 点伤害后倒地', conditionOf(healthy) === 'downed');
 
   // 倒地保护期：砍倒当回合不能补刀，满 2 回合才能处决
   const e = newGame();
@@ -724,7 +747,7 @@ function caseNewMechanics() {
   b.people.forEach((p) => { p.item = null; p.itemUses = 0; p.alert = 0; });
   const victim = b.people.find((p) => p.role !== 'police')!;
   victim.room = b.playerRoom;
-  victim.hp = 2;
+  victim.hp = 4;
   b.attackReady = true;
   attack(b, victim.id);
   const afterAtk = !b.attackReady && b.energy === BASE_AP - 1;
@@ -737,7 +760,7 @@ function caseNewMechanics() {
   const pair = g.people.filter((p) => p.role !== 'police').slice(0, 2);
   pair[0].room = g.playerRoom;
   pair[1].room = g.playerRoom;
-  pair[0].hp = 2;
+  pair[0].hp = 4;
   g.attackReady = true;
   const tp = g.teamProgress;
   attack(g, pair[0].id);
@@ -823,7 +846,7 @@ function caseAidAndPressure(): void {
 
   // 同屋救援：把原型换成普通「警觉型」，验证不再只有救援型会拉人
   const a = newGame();
-  a.people.forEach((p) => { p.item = null; p.itemUses = 0; p.alert = 0; p.hidden = false; p.hp = 2; });
+  a.people.forEach((p) => { p.item = null; p.itemUses = 0; p.alert = 0; p.hidden = false; p.hp = 4; });
   const pair = a.people.filter((p) => p.role !== 'police').slice(0, 2);
   const away = ROOM_MAP[a.playerRoom].neighbors.find((r) => !OBSTACLE_ROOMS.includes(r))
     ?? ROOM_MAP[a.playerRoom].neighbors[0];
@@ -835,11 +858,11 @@ function caseAidAndPressure(): void {
   Math.random = () => 0.01;
   endTurn(a);
   Math.random = originalRandom;
-  check('AA 非救援型也会拉起同屋倒地同伴', pair[0].hp === 1, `hp=${pair[0].hp} down=${pair[0].downedTurns}`);
+  check('AA 非救援型也会拉起同屋倒地同伴', pair[0].hp === 2, `hp=${pair[0].hp} down=${pair[0].downedTurns}`);
 
   // 主动赶路：倒地的人在另一间屋，附近的人会放下手里的活往那边走
   const b = newGame();
-  b.people.forEach((p) => { p.item = null; p.itemUses = 0; p.alert = 0; p.hidden = false; p.hp = 2; });
+  b.people.forEach((p) => { p.item = null; p.itemUses = 0; p.alert = 0; p.hidden = false; p.hp = 4; });
   const folk = b.people.filter((p) => p.role !== 'police').slice(0, 2);
   const near = ROOM_MAP[b.playerRoom].neighbors.find((r) => !OBSTACLE_ROOMS.includes(r))
     ?? ROOM_MAP[b.playerRoom].neighbors[0];
@@ -864,7 +887,7 @@ function caseAidAndPressure(): void {
   for (let attempt = 0; attempt < 5 && delta < 7; attempt += 1) {
     const w = newGame();
     w.siteItems = [];
-    w.people.forEach((p) => { p.item = null; p.itemUses = 0; p.alert = 0; p.hidden = false; p.hp = 2; });
+    w.people.forEach((p) => { p.item = null; p.itemUses = 0; p.alert = 0; p.hidden = false; p.hp = 4; });
     const room = w.objectiveRooms.find((r) => r !== w.playerRoom);
     if (!room) continue;
     const worker = w.people.filter((p) => p.role !== 'police')[0];
