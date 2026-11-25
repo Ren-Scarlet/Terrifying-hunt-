@@ -176,20 +176,19 @@ export const KILLERS: KillerProfile[] = [
     powers: [
       {
         id: 'ghost_stalk',
-        name: '夜幕潜行',
-        desc: '通缉值 -1，团队警戒 -10，本回合所有目击无效。',
+        name: '夜幕',
+        desc: '拉开夜幕：接下来每回合盯住相邻房间的一名幸存者，监视值累积到 100 他就持续显形（红色小人），下一刀可直接把他击倒。有人闯进你所在房间会打断夜幕，且对方能多跑一步。',
         cooldown: 1,
         ops: [
-          { op: 'wanted', amount: -1 },
           { op: 'alarm', amount: -10 },
           { op: 'flag', key: 'noAlarm' },
-          { op: 'log', text: '你只是站在阴影里，什么都没有做。' },
+          { op: 'log', text: '你退进阴影里，开始数隔壁的脚步声。' },
         ],
       },
       {
         id: 'ghost_nightfall',
-        name: '夜袭',
-        desc: '本回合行动点 +3、目击无效，且下次攻击 +2 伤害。',
+        name: '夜袭 · 收网',
+        desc: '本回合行动点 +3、目击无效、下次攻击 +2 伤害。趁监视锁定的人还在显形时贴上去，一刀就能收网。',
         cooldown: 3,
         ultimate: true,
         ops: [
@@ -318,7 +317,7 @@ export const KILLERS: KillerProfile[] = [
       {
         id: 'cannibal_sprint',
         name: '电锯冲刺',
-        desc: '本回合行动点 +2、下次攻击 +1 伤害，但引擎声让通缉值 +1。',
+        desc: '本回合行动点 +2、下次攻击 +1 伤害，但引擎声让暴露度 +1。',
         cooldown: 1,
         ops: [
           { op: 'steps', amount: 2 },
@@ -330,7 +329,7 @@ export const KILLERS: KillerProfile[] = [
       {
         id: 'cannibal_slaughter',
         name: '狂锯',
-        desc: '对当前房间所有人造成 2 点伤害（健康直接倒地），通缉值 +3。',
+        desc: '对当前房间所有人造成 2 点伤害（健康直接倒地），暴露度 +3。',
         cooldown: 3,
         ultimate: true,
         ops: [
@@ -362,7 +361,7 @@ export const KILLERS: KillerProfile[] = [
       {
         id: 'executioner_judge',
         name: '处刑',
-        desc: '处决当前房间一名倒地的人，通缉值 +2。必须先把他打倒。',
+        desc: '处决当前房间一名倒地的人，暴露度 +2。必须先把他打倒。',
         cooldown: 3,
         ultimate: true,
         requires: [{ c: 'downedHere' }],
@@ -416,7 +415,7 @@ export const KILLERS: KillerProfile[] = [
       {
         id: 'doctor_shock',
         name: '电击治疗',
-        desc: '当前房间所有人僵住 1 回合、警觉 +10，通缉值 +1。',
+        desc: '当前房间所有人僵住 1 回合、警觉 +10，暴露度 +1。',
         cooldown: 1,
         ops: [
           { op: 'block', who: 'allHere', turns: 1 },

@@ -3,17 +3,15 @@ import type { Mission, MissionKind, RoomId } from './types';
 
 const pick = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
 
-const RITUAL_ROOMS: RoomId[] = ['basement', 'study', 'attic'];
-
 /**
- * 任务生成。maxEscaped 是「最多能有几个人活着跑出后院」，
- * 超过就判定失败——这是这一版新增的压力来源。
+ * 任务生成。玩家一律靠「杀够人 / 杀掉关键人物再撤离 / 收齐证据撤离」取胜；
+ * 没有「在房间里挂机数回合」这类白给任务。
+ * 幸存者那边的压力另算：每逃一人扣分，人全跑光或团队目标做满，玩家直接输。
  */
 export function generateMission(unlockedKinds: MissionKind[] = [
   'assassinate',
   'bodyCount',
   'evidence',
-  'ritual',
   'escape',
 ]): Mission {
   const kind = pick(unlockedKinds);
@@ -29,10 +27,9 @@ export function generateMission(unlockedKinds: MissionKind[] = [
         turns: 20 + count,
         reward: 100 + count * 20,
         targetCount: count,
-        maxEscaped: 2,
         objective: `击杀 ${count} 名标记目标，并抵达车库撤离`,
         successText: `名单 ${count}/${count} + 人在车库`,
-        failText: `超时 · 标记目标逃走 · 逃走超 2 人 · 被捕或警戒满`,
+        failText: `超时 · 标记目标逃走 · 幸存者全逃 · 暴露度满（被捕 / 被驱散）`,
       };
     }
     case 'bodyCount': {
@@ -41,15 +38,13 @@ export function generateMission(unlockedKinds: MissionKind[] = [
         id: `mission-${Date.now()}`,
         kind,
         title: `无声收割 · ${count} 人`,
-        desc: `在回合结束结算时累计击杀 ${count} 人，且通缉值 ≤ 3。最多容许 1 个人逃走——多跑一个，契约作废。`,
+        desc: `累计击杀 ${count} 人即可完成契约。每逃走一个人都会扣分，人全跑光了契约照样作废。`,
         turns: 22,
         reward: 120,
         targetCount: count,
-        maxWanted: 3,
-        maxEscaped: 1,
-        objective: `击杀 ${count} 人，且结算时通缉 ≤ 3`,
-        successText: `击杀 ${count}/${count} + 通缉 ≤ 3`,
-        failText: `超时 · 通缉 > 3 · 逃走超 1 人 · 被捕`,
+        objective: `累计击杀 ${count} 人`,
+        successText: `击杀 ${count}/${count}`,
+        failText: `超时 · 幸存者全逃 · 暴露度满（被捕 / 被驱散）`,
       };
     }
     case 'evidence': {
@@ -62,28 +57,9 @@ export function generateMission(unlockedKinds: MissionKind[] = [
         turns: 22,
         reward: 140,
         targetCount: count,
-        maxEscaped: 2,
         objective: `收集 ${count} 份证据，并抵达车库撤离`,
         successText: `证据 ${count}/${count} + 人在车库`,
-        failText: `超时 · 逃走超 2 人 · 被捕`,
-      };
-    }
-    case 'ritual': {
-      const room = pick(RITUAL_ROOMS);
-      const holds = 2 + Math.floor(Math.random() * 2);
-      return {
-        id: `mission-${Date.now()}`,
-        kind,
-        title: '秘密仪式',
-        desc: `在${roomName(room)}连续停留 ${holds} 个回合结束阶段（中途离开就清零），期间不得被警察抓捕。`,
-        turns: 22,
-        reward: 150,
-        targetRoom: room,
-        targetCount: holds,
-        maxEscaped: 2,
-        objective: `在${roomName(room)}连续停留 ${holds} 个回合结束阶段`,
-        successText: `仪式进度 ${holds}/${holds}`,
-        failText: `中途离开房间 · 被捕 · 超时 · 警戒满`,
+        failText: `超时 · 幸存者全逃 · 暴露度满（被捕 / 被驱散）`,
       };
     }
     case 'escape': {
@@ -95,10 +71,9 @@ export function generateMission(unlockedKinds: MissionKind[] = [
         turns: 20,
         reward: 160,
         targetCount: 1,
-        maxEscaped: 2,
         objective: '击杀 1 名标记目标，并抵达车库撤离',
         successText: '标记目标死亡 + 人在车库',
-        failText: '超时 · 标记目标逃走 · 被捕',
+        failText: '超时 · 标记目标逃走 · 幸存者全逃 · 暴露度满（被捕 / 被驱散）',
       };
     }
   }

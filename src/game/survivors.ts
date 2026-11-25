@@ -95,7 +95,7 @@ export const THREAT_LABEL: Record<NpcThreat, string> = {
 };
 
 export const THREAT_DESC: Record<NpcThreat, string> = {
-  alarm: '目击你时通缉值 +3，并直接把警察引到现场。',
+  alarm: '目击你时暴露度 +30，并直接把警察引到现场。',
   lead: '每回合带一名同伴逃向更远的房间。',
   team: '同房间的同伴受其保护，受到的攻击伤害 -1。',
   spiritual: '能看穿潜行与夜幕，你的无声机制对她无效。',

@@ -46,7 +46,7 @@ import type { RoomId } from './types';
  *   track      追踪一个人 N 回合，位置始终可见
  *   reveal     暴露全场所有人的位置（写进日志）
  *   lure       制造噪声，把附近的人吸引到指定房间
- *   alarm      团队警戒值增减（满 100 任务失败）
+ *   alarm      暴露度增减（满 100 被捕 / 被驱散，每回合自动回落）
  *
  * —— 移动与封锁 ——
  *   block      无法移动 N 回合        { who, turns }
@@ -72,7 +72,7 @@ import type { RoomId } from './types';
  * —— 全局开关（flag）——
  *   phoneCut       电话线被剪断，没有人能报警
  *   wiretap        窃听，回合结束会报出警察下一步去向
- *   poltergeist    灵异事件，目击导致的通缉再 -1
+ *   poltergeist    灵异事件，目击导致的暴露度再 -10
  *   policeBlocked  警察下回合无法移动
  *   noAlarm        本回合所有目击无效
  *   exitBlocked    封锁逃生点（配合 value 指定回合）
@@ -155,7 +155,7 @@ export type Op =
   | { op: 'execute'; who: Who }
   | { op: 'kill'; who: Who }
   | { op: 'wanted'; amount: number }
-  /** 通缉值减半（向下取整） */
+  /** 暴露度减半（向下取整） */
   | { op: 'wantedHalf' }
   | { op: 'alert'; who: Who; amount: number }
   | { op: 'block'; who: Who; turns: number }
@@ -179,7 +179,7 @@ export type Op =
   | { op: 'track'; who: Who; turns: number }
   /** 制造噪声：把附近的人吸到目标房间 */
   | { op: 'lure'; to: Dest; count: number }
-  /** 团队警戒值增减 */
+  /** 暴露度增减 */
   | { op: 'alarm'; amount: number }
   /** 破坏设施 */
   | { op: 'sabotage'; key: SabotageKey }

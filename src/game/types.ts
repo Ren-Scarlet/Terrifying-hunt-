@@ -229,7 +229,6 @@ export type MissionKind =
   | 'assassinate'
   | 'bodyCount'
   | 'evidence'
-  | 'ritual'
   | 'escape';
 
 export interface Mission {
@@ -240,10 +239,7 @@ export interface Mission {
   turns: number;
   reward: number;
   targetCount?: number;
-  targetRoom?: RoomId;
-  maxWanted?: number;
-  /** 允许逃走的 NPC 上限，超过即任务失败 */
-  maxEscaped?: number;
+  /** 允许逃走的 NPC 上限已删除：改成「每逃一人扣分，人全跑光才判负」 */
   /** 一句话主目标：任务条上永远看得见 */
   objective?: string;
   /** 达成条件：写清楚「做到什么就算成功」 */
@@ -283,7 +279,7 @@ export interface GameState {
   energy: number;
   maxEnergy: number;
   wanted: number;
-  /** 最后一次被追查/目击的回合号：通缉值只在这个回合里保持，之后开始降温 */
+  /** 最后一次被追查/目击的回合号：暴露度只在这个回合里保持，之后开始降温 */
   heatTurn: number;
   /** 警察已经盯上你几回合：连续两回合同屋才会真的被铐走 */
   policeLock: number;
@@ -313,7 +309,6 @@ export interface GameState {
   kills: number;
   killsThisTurn: number;
   evidence: number;
-  ritualStreak: number;
   markedKilled: number;
   decoyRoom: RoomId | null;
   /** 房间锁：房间 -> 还锁着几回合。NPC 与警察都过不去 */
@@ -378,8 +373,8 @@ export interface GameState {
   /** 本局结果说明（为什么失败），给结算面板用 */
   resultReason: string;
 
-  /* ---------- 战争迷雾与团队警戒 ---------- */
-  /** 团队警戒 0–100：不是某个人的警觉，而是整栋房子的紧张程度。满值任务失败 */
+  /* ---------- 战争迷雾与暴露度 ---------- */
+  /** 暴露度 0–100：团队警戒与通缉/逮捕合并后的唯一失败压力条，满值被捕 / 被驱散 */
   alarm: number;
   /** 已探索的房间：进过、或侦查过 */
   explored: RoomId[];

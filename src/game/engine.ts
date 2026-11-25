@@ -46,8 +46,10 @@ export const ESCAPE_ROOMS: RoomId[] = ['garden'];
 export const BLEEDOUT_TURNS = 4;
 /** 倒地后要隔这么多回合才能补刀 / 处决：这段时间是同伴真正的救援窗口 */
 export const DOWNED_LOCK_TURNS = 2;
-/** 团队警戒上限：到 100 直接判负 */
+/** 暴露度上限：到 100 直接判负（实体杀手被捕，灵异鬼怪被驱散） */
 export const ALARM_MAX = 100;
+/** 1 点旧「暴露度」折算成多少暴露度：暴露度只是暴露度的 0~10 镜像 */
+const WANTED_TO_ALARM = 10;
 /** 站在后院的人至少要有这么高的警觉，才会想到翻篱笆（否则只是路过） */
 const ESCAPE_ALERT_MIN = 35;
 
@@ -321,21 +323,34 @@ function ambushActive(state: GameState): boolean {
   return state.ambushTurn === state.turn;
 }
 
-function addWanted(state: GameState, amount: number): void {
-  if (amount > 0) state.heatTurn = state.turn;
-  state.wanted = clamp(state.wanted + amount, 0, 10);
+/**
+ * 「暴露度」是唯一的失败压力条：暴露度与暴露度/逮捕已合并成一条。
+ * wanted 只是它的 0~10 镜像，供旧卡牌 ops 继续读写，不再单独判负。
+ */
+function syncWanted(state: GameState): void {
+  state.wanted = clamp(Math.ceil(state.alarm / WANTED_TO_ALARM), 0, 10);
 }
 
-/** 团队警戒：整栋房子的紧张程度，满 100 任务失败 */
+function addWanted(state: GameState, amount: number): void {
+  if (amount > 0) state.heatTurn = state.turn;
+  addAlarm(state, amount * WANTED_TO_ALARM);
+}
+
+/** 暴露度：满 100 玩家被捕 / 被驱散。由玩家的动作推高，每回合自动回落。 */
 export function addAlarm(state: GameState, amount: number): void {
   state.alarm = clamp(state.alarm + amount, 0, ALARM_MAX);
+  syncWanted(state);
   if (state.alarm >= ALARM_MAX && !state.result) {
-    state.resultReason = '团队警戒拉满：所有幸存者都确认了你的存在，房子已经不再属于你。';
-    finish(state, 'failed');
+    // 灵异鬼怪不该「被警察抓捕」：换成被恐惧反噬、逐回黑暗，代入感才成立。
+    const supernatural = KILLER_MAP[state.killer]?.school === 'supernatural';
+    state.resultReason = supernatural
+      ? '你的形体被彻底看穿：活人的恐惧凝成符咒，把你逐回黑暗——这一夜的猎场不再容你。'
+      : '整栋房子的证词终于拼成一张完整的脸：警察破门而入，当场把你按倒。';
+    finish(state, supernatural ? 'failed' : 'caught');
   }
 }
 
-/** 布局牌对报警通缉值的削弱 */
+/** 布局牌对报警暴露度的削弱 */
 function witnessWanted(state: GameState, base: number): number {
   let gain = base;
   if (state.phoneCut) gain -= 1;
@@ -679,8 +694,8 @@ function killPerson(state: GameState, person: Person): void {
   if (person.marked) state.markedKilled += 1;
   state.lastCrimeRoom = state.playerRoom;
 
-  // 只有被看见的击杀才会推高通缉值。悄悄做掉的、屋子里没人的，
-  // 外面只知道「又少了一个人」——那是团队警戒该管的事，不是通缉。
+  // 只有被看见的击杀才会推高暴露度。悄悄做掉的、屋子里没人的，
+  // 外面只知道「又少了一个人」——那是暴露度该管的事，不是暴露度。
   const seenBy = npcs(state).filter(
     (p) => p.room === person.room && p.hp > 0 && !p.hidden && (p.alert >= 25 || p.intent !== 'idle'),
   );
@@ -958,9 +973,9 @@ export function runOps(state: GameState, ops: Op[]): void {
         addWanted(state, op.amount);
         break;
       case 'wantedHalf': {
-        const before = state.wanted;
-        state.wanted = Math.floor(state.wanted / 2);
-        if (before !== state.wanted) log(state, `通缉值从 ${before} 降至 ${state.wanted}。`);
+        const before = state.alarm;
+        addAlarm(state, -Math.floor(state.alarm / 2));
+        if (before !== state.alarm) log(state, `暴露度从 ${before} 降到 ${state.alarm}。`);
         break;
       }
       case 'alert':
@@ -1076,7 +1091,7 @@ export function runOps(state: GameState, ops: Op[]): void {
       }
       case 'alarm':
         addAlarm(state, op.amount);
-        if (op.amount < 0) log(state, `团队警戒降至 ${state.alarm}/100。`);
+        if (op.amount < 0) log(state, `暴露度降至 ${state.alarm}/100。`);
         break;
       case 'sabotage':
         if (op.key === 'phone') {
@@ -1128,8 +1143,9 @@ export function runOps(state: GameState, ops: Op[]): void {
         log(state, `下次攻击伤害 +${op.amount}。`);
         break;
       case 'arrestThreshold':
-        state.arrestThreshold += op.amount;
-        log(state, `警察的逮捕阈值提高到 ${state.arrestThreshold}。`);
+        // 警戒与逮捕合并后，这张牌改为直接压低暴露度
+        addAlarm(state, -10);
+        log(state, `你抹掉了现场的痕迹，暴露度降到 ${state.alarm}。`);
         break;
       case 'reveal': {
         const list = npcs(state)
@@ -1331,7 +1347,7 @@ function shout(state: GameState, person: Person, base = 18): void {
         learned += 1;
       });
   });
-  // 空喊不会让房子更紧张：只有真的有人被喊醒了，团队警戒才涨
+  // 空喊不会让房子更紧张：只有真的有人被喊醒了，暴露度才涨
   if (learned > 0) addAlarm(state, Math.min(3, learned));
 }
 
@@ -1617,7 +1633,7 @@ function finishCall(state: GameState, person: Person, device: string): void {
   person.intent = 'flee';
   person.alert = 100;
   person.callTurns = 0;
-  log(state, `${person.name} 用${device}联系上了外面：「他在${roomName(person.room)}！」通缉值 +3，警察正赶过去。`);
+  log(state, `${person.name} 用${device}联系上了外面：「他在${roomName(person.room)}！」暴露度大涨，警察正赶过去。`);
 }
 
 /** 按行为类型行动一步 */
@@ -2049,8 +2065,11 @@ function escapePhase(state: GameState): void {
       finish(state, 'failed');
       return;
     }
-    if (state.escaped >= (state.mission.maxEscaped ?? 2)) {
-      state.resultReason = `已经逃走了 ${state.escaped} 个人，现场彻底失控。`;
+    // 每逃一个人都在结算里扣 15 分；直到最后一个幸存者也翻出篱笆，契约才作废。
+    // 不再用「逃够 N 个就立刻输」的硬阈值——那会让幸存者的个人目标失去博弈空间。
+    const survivorsLeft = state.people.filter((p) => p.role !== 'police').length;
+    if (survivorsLeft === 0 && state.escaped > 0) {
+      state.resultReason = `最后一名幸存者也翻过了篱笆，房子里再没有活人——契约作废（逃走 ${state.escaped} 人）。`;
       finish(state, 'failed');
     }
   }
@@ -2064,7 +2083,7 @@ function policeNextStep(state: GameState): RoomId {
   const police = state.people.find((p) => p.role === 'police');
   if (!police) return POLICE_START;
   // 警察只追「新鲜的现场」：两回合内没有新的报警，他就开始挨屋搜查，
-  // 而不是永远贴着玩家跑。这样玩家可以甩掉他，而不是被一路加通缉到逮捕。
+  // 而不是永远贴着玩家跑。这样玩家可以甩掉他，而不是被一路加暴露度到逮捕。
   const fresh = state.heatTurn >= state.turn - 1;
   const destination = state.decoyRoom ?? (fresh ? state.lastCrimeRoom ?? state.playerRoom : null);
   if (!destination) {
@@ -2093,25 +2112,17 @@ function policePhase(state: GameState): void {
   if (police.room !== state.playerRoom) state.policeLock = 0;
 
   if (police.room === state.playerRoom) {
-    if (state.wanted >= state.arrestThreshold) {
-      state.policeLock += 1;
-      if (state.policeLock >= 2) {
-        log(state, '警察在现场将你逮捕。');
-        state.resultReason = `通缉值 ${state.wanted} 已经超过逮捕阈值 ${state.arrestThreshold}。`;
-        finish(state, 'caught');
-        return;
-      }
-      // 给玩家一个反应窗口：这一回合还能跑
-      log(
-        state,
-        `警察按住你的肩膀，对着通缉画像看了两秒——下回合还待在这间屋子，他就会铐上你。`,
-      );
-      addAlarm(state, 4);
-      return;
-    }
-    // 擦肩而过：这一点热度不续命，否则他会一直黏着你，直到把你抓走
-    state.wanted = clamp(state.wanted + 1, 0, 10);
-    log(state, '警察与你擦肩而过，通缉值 +1。');
+    // 警戒/逮捕合并：警察不再单独判负，而是持续把「暴露度」往上顶。
+    // 盯得越久涨得越快，满 100 才由 addAlarm 统一收束（被捕 / 被驱散）。
+    state.policeLock += 1;
+    const pressure = state.policeLock >= 2 ? 18 : 10;
+    addAlarm(state, pressure);
+    log(
+      state,
+      state.policeLock >= 2
+        ? `警察咬住你不放，你的存在彻底暴露了（暴露度 ${state.alarm}/${ALARM_MAX}）。`
+        : `警察按住你的肩膀盯了两秒——再不甩开他，暴露度会一路涨满（${state.alarm}/${ALARM_MAX}）。`,
+    );
   }
 }
 
@@ -2145,7 +2156,7 @@ function witnessPhase(state: GameState): void {
   addWanted(state, gain);
   addAlarm(state, 4);
   state.lastCrimeRoom = state.playerRoom;
-  log(state, `${witness.name} 目击了你，通缉值 +${gain}${alarmWitness ? '（报警者）' : ''}。`);
+  log(state, `${witness.name} 目击了你，暴露度 +${gain}${alarmWitness ? '（报警者）' : ''}。`);
   if (alarmWitness) log(state, `${witness.name} 直接报出了这间房，警察正在赶来。`);
 }
 
@@ -2473,13 +2484,14 @@ export function createGame(
     phase: 'playing',
     killer: killerId,
     killerRuntime: { killUsed: false, moveUsed: false, attackUsed: false, witnessUsed: false },
-    // 逮捕阈值跟着任务规模走：要杀 4 个人的活儿不可能只容忍 4 点通缉值
+    // 逮捕阈值已废弃（警戒与逮捕合并），保留字段只为兼容旧存档
     arrestThreshold: 5 + (mission.targetCount ?? 1),
     turn: 1,
     // 走路 / 砍人 / 打牌 / 搜索共用这一个池子，原来「能量 + 步数」两套资源合并
     energy: BASE_AP,
     maxEnergy: BASE_AP,
-    wanted: 0,
+    // 与初始 alarm:12 对齐：wanted 只是暴露度 /10 的镜像
+    wanted: 2,
     heatTurn: 0,
     policeLock: 0,
     ambushTurn: 0,
@@ -2498,7 +2510,6 @@ export function createGame(
     kills: 0,
     killsThisTurn: 0,
     evidence: 0,
-    ritualStreak: 0,
     markedKilled: 0,
     decoyRoom: null,
     freeMove: false,
@@ -2740,7 +2751,7 @@ export function attackBlockReason(state: GameState, targetId?: string): string {
   if (targetId) {
     const picked = state.people.find((p) => p.id === targetId);
     if (!picked) return '这个人已经不在现场了';
-    // 袭警允许，但代价写在 attack() 里：通缉 +6、警戒 +12、警察立刻锁定你
+    // 袭警允许，但代价写在 attack() 里：暴露度 +6、警戒 +12、警察立刻锁定你
     if (picked.role === 'police' && state.policeAssaulted) return '警员已经倒下，别再看了';
     if (picked.room !== state.playerRoom) return '他不在这间屋里';
     if (picked.hidden) return '他躲起来了，先搜索这间屋子';
@@ -2811,11 +2822,11 @@ export function attack(state: GameState, targetId?: string): boolean {
   state.lastAttackedId = target.id;
   if (target.role === 'police') {
     state.policeAssaulted = true;
-    state.wanted += 6;
     state.heatTurn = state.turn;
     state.policeLock = 1;
+    addWanted(state, 6);
     addAlarm(state, 12);
-    log(state, '你居然对警员动了刀——通缉 +6、团队警戒 +12，警察会立刻咬住你。');
+    log(state, '你居然对警员动了刀——暴露度暴涨 +72，警察会立刻咬住你。');
   }
   log(
     state,
@@ -3036,9 +3047,8 @@ function finish(state: GameState, result: ResultKind): void {
 
   const lines: ScoreLine[] = [{ label: `契约基础分 · ${state.mission.title}`, value: state.mission.reward }];
   lines.push({ label: `凶残 · 击杀 ${state.kills} 人`, value: state.kills * 14 });
-  if (state.wanted > 0) lines.push({ label: `通缉值 ${state.wanted} 的代价`, value: -state.wanted * 3 });
-  if (state.escaped > 0) lines.push({ label: `逃走 ${state.escaped} 人的失分`, value: -state.escaped * 15 });
-  if (state.alarm >= 60) lines.push({ label: `团队警戒 ${state.alarm} 的代价`, value: -Math.round(state.alarm / 5) });
+  if (state.escaped > 0) lines.push({ label: `逃走 ${state.escaped} 人的失分（每人 -15）`, value: -state.escaped * 15 });
+  if (state.alarm >= 60) lines.push({ label: `暴露度 ${state.alarm} 的代价`, value: -Math.round(state.alarm / 5) });
 
   if (result === 'win') {
     const bonus = (state.mission.turns - state.turn) * 5;
@@ -3063,7 +3073,6 @@ export function currentScore(state: GameState): number {
     Math.round(
       state.mission.reward +
         state.kills * 14 -
-        state.wanted * 3 -
         state.escaped * 15 -
         Math.round(state.alarm / 5),
     ),
@@ -3074,21 +3083,8 @@ export function endTurn(state: GameState): void {
   if (state.phase !== 'playing') return;
 
   const m = state.mission;
-  if (m.kind === 'ritual' && m.targetRoom) {
-    if (state.playerRoom === m.targetRoom && state.wanted < 4) {
-      state.ritualStreak += 1;
-      log(state, `仪式进度 ${state.ritualStreak}/${m.targetCount ?? 2}。`);
-    } else {
-      state.ritualStreak = 0;
-      log(state, '仪式中断。');
-    }
-  }
-
-  if (m.kind === 'bodyCount' && state.kills >= (m.targetCount ?? 3) && state.wanted <= (m.maxWanted ?? 3)) {
-    finish(state, 'win');
-    return;
-  }
-  if (m.kind === 'ritual' && state.ritualStreak >= (m.targetCount ?? 2)) {
+  // 挂机类任务（在房间里连续停留数回合）已删除：赢只能靠杀够人 / 杀掉关键人物再撤离。
+  if (m.kind === 'bodyCount' && state.kills >= (m.targetCount ?? 3)) {
     finish(state, 'win');
     return;
   }
@@ -3168,14 +3164,16 @@ export function endTurn(state: GameState): void {
   checkImmediateWin(state);
   if (state.result) return;
 
-  // 团队警戒每回合自然回落一点：玩家安静下来，房子也会安静
+  // 暴露度每回合自然回落：玩家安静下来，房子也会安静。
+  // 这是它和「团队进度」最大的区别——后者由幸存者干活推高，只涨不退。
   state.alarm = Math.max(0, state.alarm - 6);
-
-  // 通缉值降温：这一回合没有新的动静（没人报警、没人看见你、也没动手），
-  // 街上的注意力就散一点。这是「潜行 / 潜伏」玩法能成立的前提。
-  if (state.heatTurn !== state.turn && state.wanted > 0) {
-    state.wanted = Math.max(0, state.wanted - 1);
-    log(state, `这一夜没人再提起你，通缉值降到 ${state.wanted}。`);
+  syncWanted(state);
+  if (state.heatTurn !== state.turn) {
+    // 这一回合没有新的动静（没人报警、没人看见你、也没动手），注意力就散一点。
+    // 这是「潜行 / 潜伏」玩法能成立的前提。
+    state.alarm = Math.max(0, state.alarm - 4);
+    syncWanted(state);
+    log(state, `这一夜没人再提起你，暴露度降到 ${state.alarm}。`);
   }
 
   /* ---------- 回合收尾 ---------- */

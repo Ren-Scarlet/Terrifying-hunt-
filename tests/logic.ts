@@ -13,6 +13,8 @@ import {
   TEAM_GOAL_MAX,
   GENERATOR_JAM_TURNS,
   SABOTAGE_COST,
+  addAlarm,
+  currentScore,
   sabotageSiteItem,
   attack,
   attackBlockReason,
@@ -34,6 +36,7 @@ import {
 } from '../src/game/engine';
 import { OBSTACLE_ROOMS, ROOM_MAP } from '../src/game/rooms';
 import { SURVIVOR_MAP } from '../src/game/survivors';
+import { generateMission } from '../src/game/missions';
 import type { GameState, RoomId } from '../src/game/types';
 
 let pass = 0;
@@ -714,6 +717,46 @@ function caseNewMechanics() {
 caseSiteItems();
 caseSurvivorItems();
 caseNewMechanics();
+
+function caseMergeAndMissions(): void {
+  // 挂机类任务已从任务池移除：赢只能靠杀够人 / 杀关键人物撤离 / 收齐证据撤离
+  const kinds = new Set<string>();
+  for (let i = 0; i < 40; i++) kinds.add(generateMission().kind);
+  check('Z 任务池不含挂机类 ritual', !kinds.has('ritual'), [...kinds].join(','));
+
+  // 通缉与警戒合并：袭警推高的是同一条暴露度，wanted 只是它的 0~10 镜像
+  const s = newGame();
+  s.people.forEach((p) => { p.item = null; p.itemUses = 0; p.alert = 0; });
+  const cop = s.people.find((p) => p.role === 'police')!;
+  cop.room = s.playerRoom;
+  s.attackReady = true;
+  const before = s.alarm;
+  attack(s, cop.id);
+  check('Z 袭警推高同一条暴露度', s.alarm >= before + 60 && s.wanted >= 6, `alarm ${before}→${s.alarm} wanted=${s.wanted}`);
+
+  // 满值判负：实体杀手被捕，灵异鬼怪被驱散（贞子不该「被警察抓捕」）
+  const solid = newGame();
+  solid.alarm = 99;
+  addAlarm(solid, 5);
+  check('Z 暴露度满 → 实体杀手被警察抓捕', solid.result === 'caught' && solid.resultReason.includes('警察'));
+
+  const ghost = createGame(['silent_step', 'sprint'], undefined, '贞子');
+  ghost.alarm = 99;
+  addAlarm(ghost, 5);
+  check(
+    'Z 暴露度满 → 贞子被驱散不提警察',
+    ghost.result === 'failed' && !ghost.resultReason.includes('警察') && ghost.resultReason.includes('黑暗'),
+    ghost.resultReason,
+  );
+
+  // 每逃走一个幸存者扣 15 分（全逃才判负，不再有硬阈值）
+  const sc = newGame();
+  const base = currentScore(sc);
+  sc.escaped = 2;
+  check('Z 每逃一人扣 15 分', currentScore(sc) === base - 30, `${base} → ${currentScore(sc)}`);
+}
+
+caseMergeAndMissions();
 
 console.log(`\n规则回归 ${pass} 通过 / ${fail} 失败`);
 if (fail > 0) process.exitCode = 1;

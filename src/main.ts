@@ -61,7 +61,7 @@ let lastNewCard: string | null = null;
 let detailCardUid: string | null = null;
 /** 平面图下方的场景画布 */
 let scene: SceneHandle | null = null;
-/** 上一次的击杀数与通缉值：用来判断这一手是得手还是暴露了 */
+/** 上一次的击杀数与暴露度：用来判断这一手是得手还是暴露了 */
 let lastKills = 0;
 let lastWanted = 0;
 

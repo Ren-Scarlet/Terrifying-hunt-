@@ -16,7 +16,7 @@ import type { CardDef } from '../types';
  *    诱导   鬼鸦谍影 / 人肉烧烤 / 支配之力：制造噪声，把人挪到你想要的位置
  *    破坏   失效开关 / 厄咒：直面黑暗：剪电话、拉电闸
  *    封锁   死锁 / 花言巧语：锁房间、钉死后院
- *    潜行   静止隐身 / 折磨路径 / 恐惧释放：压通缉、压警戒、伏击进门
+ *    潜行   静止隐身 / 折磨路径 / 恐惧释放：压暴露度、伏击进门
  *    追击   疾速残暴：贴到逃跑的人身后；配合伏击就是「偷袭 → 补刀」的两张牌组合
  *    追猎   辣手屠夫 / 牢牢紧握 / 优胜劣汰 / 恩赐解脱：咬住伤口、按住人、磨刀、处决
  *
@@ -69,7 +69,7 @@ export const CARDS: CardDef[] = [
     name: '恩赐解脱',
     cost: 3,
     type: 'attack',
-    desc: '处决当前房间一名已经倒地的人。挥刀只能把人打倒，最后这一下得靠这张牌。通缉值 +3。',
+    desc: '处决当前房间一名已经倒地的人。挥刀只能把人打倒，最后这一下得靠这张牌。暴露度 +3。',
     flavor: '名单上的人不该开口。',
     sourceSkill: 'Coup de Grâce',
     sourceText: '消耗印记使突进攻击距离增加。',
@@ -86,7 +86,7 @@ export const CARDS: CardDef[] = [
     name: '鲜血回响',
     cost: 2,
     type: 'skill',
-    desc: '伤口连成一条线：所有受伤的人位置暴露 2 回合，团队警戒 -6。他们想躲，血先出卖他们。',
+    desc: '伤口连成一条线：所有受伤的人位置暴露 2 回合，暴露度 -6。他们想躲，血先出卖他们。',
     flavor: '第一个之后，剩下的只是惯性。',
     sourceSkill: 'Blood Echo',
     sourceText: '钩住逃生者后，所有受伤逃生者陷入疲劳与出血。',
@@ -132,14 +132,14 @@ export const CARDS: CardDef[] = [
   },
 
   /* ------------------------------------------------------------------ */
-  /* 潜行：压低通缉与团队警戒                                             */
+  /* 潜行：压低暴露度                                             */
   /* ------------------------------------------------------------------ */
   {
     id: 'silent_step',
     name: '静止隐身',
     cost: 1,
     type: 'skill',
-    desc: '伏击：本回合进门不惊动任何人，接着挥刀就是偷袭。通缉 -2，团队警戒 -8，目击无效。',
+    desc: '伏击：本回合进门不惊动任何人，接着挥刀就是偷袭。暴露度 -2，暴露度 -8，目击无效。',
     flavor: '影子不会留下脚印。',
     sourceSkill: 'Insidious',
     sourceText: '闲置后获得无法侦测状态。',
@@ -172,7 +172,7 @@ export const CARDS: CardDef[] = [
     name: '折磨路径',
     cost: 1,
     type: 'skill',
-    desc: '抹掉痕迹：通缉值 -1、团队警戒 -10，并让相邻房间的地面重新安静下来。',
+    desc: '抹掉痕迹：暴露度 -1、暴露度 -10，并让相邻房间的地面重新安静下来。',
     flavor: '地板干净得像什么都没发生。',
     sourceSkill: 'Trail of Torment',
     sourceText: '破坏发电机后获得无法侦测状态。',
@@ -203,7 +203,7 @@ export const CARDS: CardDef[] = [
     name: '厄咒：猎手摇篮曲',
     cost: 1,
     type: 'skill',
-    desc: '本回合后续卡牌费用 -1（最低为 0），团队警戒 -5。',
+    desc: '本回合后续卡牌费用 -1（最低为 0），暴露度 -5。',
     flavor: '低语比喊叫更致命。',
     sourceSkill: 'Hex: Huntress Lullaby',
     sourceText: '每层印记让检定更难，五层时没有预警。',
@@ -219,7 +219,7 @@ export const CARDS: CardDef[] = [
     name: '黑暗奉献',
     cost: 2,
     type: 'skill',
-    desc: '通缉值减半（向下取整）。',
+    desc: '暴露度减半（向下取整）。',
     flavor: '换一件外套，换一个人。',
     sourceSkill: 'Dark Devotion',
     sourceText: '血祭品受伤时把恐惧范围转移过去。',
@@ -231,7 +231,7 @@ export const CARDS: CardDef[] = [
     name: '恐惧释放',
     cost: 2,
     type: 'skill',
-    desc: '本回合无人报警，当前房间所有人警觉 -20，团队警戒 -12。',
+    desc: '本回合无人报警，当前房间所有人警觉 -20，暴露度 -12。',
     flavor: '他们听见了，却不敢说。',
     sourceSkill: 'Distressing',
     sourceText: '恐惧范围扩大，范围内逃生者修理变慢。',
@@ -300,7 +300,7 @@ export const CARDS: CardDef[] = [
     name: '血腥狱长',
     cost: 3,
     type: 'skill',
-    desc: '立即移动到车库（撤离点），通缉值 -2。',
+    desc: '立即移动到车库（撤离点），暴露度 -2。',
     flavor: '收工也是一种技术。',
     sourceSkill: 'Blood Warden',
     sourceText: '出口开启后封锁两扇大门。',
@@ -335,7 +335,7 @@ export const CARDS: CardDef[] = [
     name: '鬼鸦谍影',
     cost: 1,
     type: 'tactic',
-    desc: '惊动乌鸦：把当前房间的人引到相邻房间，并侦查那里 1 回合。制造噪声会降低团队警戒。',
+    desc: '惊动乌鸦：把当前房间的人引到相邻房间，并侦查那里 1 回合。制造噪声会降低暴露度。',
     flavor: '让他们追逐声音，而不是你。',
     sourceSkill: 'Spies from the Shadows',
     sourceText: '逃生者惊动乌鸦时获得提示。',
@@ -400,7 +400,7 @@ export const CARDS: CardDef[] = [
     name: '人肉烧烤',
     cost: 1,
     type: 'setup',
-    desc: '在远处制造动静，把两个人引过去，团队警戒 -5。',
+    desc: '在远处制造动静，把两个人引过去，暴露度 -5。',
     flavor: '一声脆响，就够了。',
     sourceSkill: 'Barbecue & Chilli',
     sourceText: '钩住逃生者后显示远处逃生者气场。',
@@ -431,7 +431,7 @@ export const CARDS: CardDef[] = [
     name: '厄咒：闹鬼之地',
     cost: 1,
     type: 'setup',
-    desc: '本局目击造成的通缉值再 -1（可与失效开关叠加），团队警戒 -8。',
+    desc: '本局目击造成的暴露度再 -1（可与失效开关叠加），暴露度 -8。',
     flavor: '家具自己移动时，没人顾得上门口。',
     sourceSkill: 'Hex: Haunted Ground',
     sourceText: '图腾被净化时让所有逃生者陷入危险状态。',
@@ -447,7 +447,7 @@ export const CARDS: CardDef[] = [
     name: '厄咒：直面黑暗',
     cost: 2,
     type: 'setup',
-    desc: '拉闸断电：本回合所有目击无效，封锁逃生点 1 回合，团队警戒 -10。',
+    desc: '拉闸断电：本回合所有目击无效，封锁逃生点 1 回合，暴露度 -10。',
     flavor: '黑暗是最好的共犯。',
     sourceSkill: 'Hex: Face the Darkness',
     sourceText: '恐惧范围外的人会尖叫并暴露气场。',
@@ -496,7 +496,7 @@ export const CARDS: CardDef[] = [
     name: '厄咒：惩戒',
     cost: 2,
     type: 'setup',
-    desc: '本局警察逮捕阈值提高 1，团队警戒 -8。',
+    desc: '抹去现场痕迹，大幅压低暴露度（原「提高逮捕阈值」，合并后改为直接降压）。',
     flavor: '给他们一份错误的档案，他们会照着查。',
     sourceSkill: 'Hex: Retribution',
     sourceText: '逃生者祝福图腾时陷入浑然不觉。',
@@ -540,6 +540,5 @@ export const UNLOCK_REWARDS: Record<string, string> = {
   assassinate: 'harvest',
   bodyCount: 'final_blow',
   evidence: 'search',
-  ritual: 'silence',
   escape: 'evacuate',
 };

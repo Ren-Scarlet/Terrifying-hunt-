@@ -274,7 +274,7 @@ export function personDetailHtml(state: GameState, personId: string): string {
     if (threat) paras.push(`威胁：这名角色会主动对抗你，别把他当普通平民。`);
     if (profile.role === 'police') {
       paras.push(
-        '警察不能攻击：他循着「新鲜现场」追你。同屋连续两回合、且通缉值达到逮捕阈值，就会直接逮捕。压低通缉、制造假现场、或者离开这条街，才能甩掉他。',
+        '警察可以攻击，但代价极高。他循着「新鲜现场」追你，同屋越久你的暴露度涨得越快——满 100 就会被捕（灵异鬼怪则是被驱散）。剪电话、制造假现场、或者干脆离开这条街，才能甩掉他。',
       );
     }
   } else {
@@ -376,7 +376,7 @@ export function renderGuide(): string {
         <div class="subtitle">FIELD MANUAL</div>
         <h1>玩法<span>指引</span></h1>
         <div class="guide-grid">
-          <div class="guide-card">${icon('mission')}<b>1 · 接取契约</b><p>每局随机获得任务。主目标旁会显示${icon('missionTarget', 'ui-icon tiny')}标记，告诉你要击杀谁、需要多少证据或仪式进度。</p></div>
+          <div class="guide-card">${icon('mission')}<b>1 · 接取契约</b><p>每局随机获得任务。主目标旁会显示${icon('missionTarget', 'ui-icon tiny')}标记，告诉你要击杀谁、要杀几个人，或需要收齐多少证据再撤离。</p></div>
           <div class="guide-card">${icon('darkCell')}<b>2 · 现场布局</b><p>布局牌（绿色）在行动阶段打出：剪断电话线、封死逃生点、装窃听。布局打早了才有用。</p></div>
           <div class="guide-card">${icon('escape')}<b>3 · 相邻只看轮廓，推门才是照面</b><p>隔壁房间<b>看得见名字、看不见人</b>——找人得自己走过去，或者靠侦查 / 感知牌。只要没打伏击，屋里的人<b>门一开就转身跑</b>；想拿先手先打<b>静止隐身</b>。跑掉的人留下<b>鞋印</b>；更远的地方会传来<b>乌鸦叫、地板响</b>，房间上亮起「动静」角标，那是有人刚经过。</p></div>
           <div class="guide-card">${icon('bloodPoint')}<b>4 · 行动点、脚印与杀戮</b><p>每回合 <b>${BASE_AP} 点行动点</b>：走路、挥刀、出牌、<b>搜索柜子</b>全从这一个池子里扣；砍完想立刻再砍，就花 1 点<b>擦刀</b>——但擦刀时幸存者也会跟着动。伤害只从「挥刀」来（1 点），同屋多人<b>点谁砍谁</b>；有人钻进柜子就点<b>搜索</b>翻出来。<b>鞋印</b>只看得见当前房间（留最近两次行动），严格踩着它连续追才攒<b>杀戮</b>，随便走不涨；满 50 后每回合多 2 点行动点，<b>路你自己走，不会瞬移</b>。砍中人或被击晕清零。</p></div>
@@ -555,7 +555,7 @@ function threatRowsHtml(state: GameState): string {
       hint: state.phoneCut
         ? '电话线已经剪断，他们只能去地下室碰无线电'
         : calling.length
-          ? '有人正在摸电话，报警会让通缉 +3'
+          ? '有人正在摸电话，报警会让暴露度暴涨'
           : '书房和大厅有电话，先剪线最省事',
       level: calling.length ? (state.phoneCut ? 'warn' : 'hot') : 'calm',
     },
@@ -637,7 +637,6 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
   const here = state.people.filter((p) => p.room === state.playerRoom && p.role !== 'police');
   const policeHere = state.people.some((p) => p.room === state.playerRoom && p.role === 'police');
   const isMyers = killer.owner === '迈克尔·迈尔斯';
-  const maxEscaped = m.maxEscaped ?? 2;
 
   // 任务条：目标 / 达成条件 / 失败条件 / 实时进度 / 倒计时，一眼看清这一局要做什么
   const need = m.targetCount ?? 2;
@@ -652,16 +651,12 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
       objectiveDone = state.markedKilled >= need && atExit;
       break;
     case 'bodyCount':
-      progress = `击杀 ${state.kills}/${need} · 通缉 ${state.wanted}/${m.maxWanted ?? 3}`;
-      objectiveDone = state.kills >= need && state.wanted <= (m.maxWanted ?? 3);
+      progress = `击杀 ${state.kills}/${need}`;
+      objectiveDone = state.kills >= need;
       break;
     case 'evidence':
       progress = `证据 ${state.evidence}/${need} · 撤离 ${atExit ? '✓' : '✗'}`;
       objectiveDone = state.evidence >= need && atExit;
-      break;
-    case 'ritual':
-      progress = `仪式 ${state.ritualStreak}/${need}`;
-      objectiveDone = state.ritualStreak >= need;
       break;
     case 'escape':
       progress = `标记 ${state.markedKilled}/1 · 撤离 ${atExit ? '✓' : '✗'}`;
@@ -917,9 +912,13 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
           <div class="stats">
             <div class="stat"><b>${state.turn}<i>/${m.turns}</i></b><small>回合</small></div>
             <div class="stat energy" title="走路、挥刀、出牌、搜索柜子，全都从这一个池子里扣"><b>${state.energy}<i>/${state.maxEnergy}</i></b><small>行动点</small></div>
-            <div class="stat wanted"><b>${state.wanted}<i>/${state.arrestThreshold}</i></b><small>通缉/逮捕</small></div>
+            <div class="stat alarm-stat ${state.alarm >= 70 ? 'hot' : state.alarm >= 40 ? 'warm' : ''}" title="暴露度：你的动作（挥刀、破坏、被目击、袭警、报警）会推高它，每回合自动回落；满 ${ALARM_MAX} 就会被捕，灵异鬼怪则是被符咒驱散。它和「他们的进度」是两回事。">
+              <b>${state.alarm}<i>/${ALARM_MAX}</i></b>
+              <div class="alarm-track"><span style="width:${state.alarm}%"></span></div>
+              <small>暴露度</small>
+            </div>
             <div class="stat"><b>${state.kills}</b><small>击杀</small></div>
-            <div class="stat ${state.escaped > 0 ? 'escaped' : ''}"><b>${state.escaped}<i>/${maxEscaped}</i></b><small>逃走</small></div>
+            <div class="stat ${state.escaped > 0 ? 'escaped' : ''}" title="每逃走一人结算扣 15 分；幸存者全跑光契约作废"><b>${state.escaped}</b><small>逃走</small></div>
             <div class="stat frenzy ${state.frenzy >= FRENZY_THRESHOLD ? 'active' : ''}" title="杀戮：严格踩着脚印连续追才涨；满 ${FRENZY_THRESHOLD} 后每回合多 ${FRENZY_AP_BONUS} 点行动点，路自己走。砍中人或被击晕清零。">
               <b>${state.frenzy}<i>/${FRENZY_MAX}</i></b>
               <div class="alarm-track"><span style="width:${state.frenzy}%"></span></div>
@@ -929,11 +928,6 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
               <b>${state.teamProgress}<i>/${TEAM_GOAL_MAX}</i></b>
               <div class="alarm-track"><span style="width:${state.teamProgress}%"></span></div>
               <small>他们的进度</small>
-            </div>
-            <div class="stat alarm-stat ${state.alarm >= 70 ? 'hot' : state.alarm >= 40 ? 'warm' : ''}" title="团队警戒：满 ${ALARM_MAX} 任务失败。剪电话、断电、制造噪声、锁门都能压低它。">
-              <b>${state.alarm}<i>/${ALARM_MAX}</i></b>
-              <div class="alarm-track"><span style="width:${state.alarm}%"></span></div>
-              <small>团队警戒</small>
             </div>
             <div class="stat score"><b>${currentScore(state)}</b><small>预计得分</small></div>
           </div>
@@ -1026,7 +1020,7 @@ export function renderResult(state: GameState, newCard: string | null): string {
           <div><small>最终评分</small><b>${state.score}</b></div>
           <div><small>击杀人数</small><b>${state.kills}</b></div>
           <div><small>逃走人数</small><b>${state.escaped}</b></div>
-          <div><small>最终通缉值</small><b>${state.wanted}/10</b></div>
+          <div><small>最终暴露度</small><b>${state.alarm}/${ALARM_MAX}</b></div>
         </div>
         <div class="score-breakdown">${breakdown}</div>
         ${newCard ? `<p style="color:var(--gold)">新卡牌解锁：<b>${escape(CARD_MAP[newCard]?.name ?? newCard)}</b></p>` : ''}
