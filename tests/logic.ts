@@ -1308,6 +1308,11 @@ function caseNewPerkSystem(): void {
   const food = createGame(['myers_plaything'], undefined, '迈克尔·迈尔斯');
   const sacrifice = food.people.find((person) => person.bloodSacrifice)!;
   sacrifice.room = food.playerRoom;
+  // 固定清除开局随机的追踪状态，避免把「已被追踪」误判为仍处于玩家直接视野。
+  sacrifice.trackedTurns = 0;
+  sacrifice.revealedActions = 0;
+  sacrifice.hidden = false;
+  sacrifice.lastSeenTurn = 0;
   // 阻止卡牌结算后的 NPC 自主行动干扰「立即离开视线」的断言；
   // 卡牌自身仍会直接把血祭品移动到迷雾房间。
   sacrifice.blockedTurns = 2;
