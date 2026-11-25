@@ -661,8 +661,9 @@ function killPerson(state: GameState, person: Person): void {
   // 尸体迟早会被发现：整栋房子的警觉跟着抬起来，恐慌会传染。
   let stirred = 0;
   npcs(state).forEach((other) => {
-    if (other.alert < 36) {
-      other.alert = clamp(other.alert + 10, 0, 100);
+    // 尸体不会让整栋房子瞬间获知消息；只有同屋或相邻房间的人先察觉。
+    if (other.alert < 36 && roomDistance(other.room, person.room) <= 1) {
+      other.alert = clamp(other.alert + (other.room === person.room ? 18 : 8), 0, 100);
       stirred += 1;
     }
   });
@@ -1245,9 +1246,9 @@ function witnessInRoom(state: GameState, person: Person): boolean {
   }
   person.alert = clamp(person.alert + 45, 0, 100);
   npcs(state)
-    .filter((p) => p.id !== person.id && p.hp > 0 && p.alert < 70)
+    .filter((p) => p.id !== person.id && p.hp > 0 && p.alert < 70 && roomDistance(p.room, person.room) <= 1)
     .forEach((p) => {
-      p.alert = clamp(p.alert + 20, 0, 100);
+      p.alert = clamp(p.alert + (p.room === person.room ? 20 : 8), 0, 100);
     });
   addDisturbance(state, person.room);
   if (random() < 0.55 && person.movesThisTurn < REACT_MOVE_CAP) {
@@ -1538,6 +1539,9 @@ function npcTurn(state: GameState): void {
     if (state.result) return;
     if (!state.people.some((p) => p.id === person.id)) continue;
 
+    // 警觉值只代表情绪强度；认知阶段决定 NPC 是否真的知道危险存在。
+    person.awareness = Math.max(person.awareness, person.alert >= 75 ? 3 : person.alert >= 40 ? 2 : person.alert >= 12 ? 1 : 0);
+
     // 被抱起的人不会参与救援或移动，但仍然会继续流血倒计时。
     if (person.id === state.carryPersonId) {
       person.downedTurns += 1;
@@ -1565,10 +1569,10 @@ function npcTurn(state: GameState): void {
       continue;
     }
 
-    // 供电区域：灯光让幸存者更警觉；正在执行团队工作的人效率更高。
-    if (isRoomLit(state, person.room)) {
+    // 日常生活阶段不会因为房间亮着灯就逐渐怀疑异常。
+    if (isRoomLit(state, person.room) && person.awareness > 0) {
       person.alert = clamp(person.alert + 4, 0, 100);
-      if (person.goal === 'objective' || person.goal === 'generator' || person.goal === 'key' || person.intent === 'work') {
+      if (person.awareness >= 2 && (person.goal === 'objective' || person.goal === 'generator' || person.goal === 'key' || person.intent === 'work')) {
         addTeamProgress(state, 2);
         log(state, `${roomName(person.room)}仍有照明，${person.name}借着灯光加快了行动（团队进度 +2）。`);
       }
@@ -1612,6 +1616,40 @@ function npcTurn(state: GameState): void {
       continue;
     }
     if (person.hidden && state.teamStage >= TEAM_STAGE_COUNT) person.hidden = false;
+
+    // 发现同屋或相邻房间的倒地/重伤者属于明确异常，会立刻触发救援意识。
+    const nearbyVictim = npcs(state).some(
+      (other) => other.id !== person.id && (other.hp <= 0 || (other.hp > 0 && other.hp <= SURVIVOR_INJURED_HP)) && roomDistance(other.room, person.room) <= 1,
+    );
+    if (nearbyVictim && person.awareness < 2) {
+      person.alert = Math.max(person.alert, 45);
+      person.awareness = 2;
+    }
+
+    // 没有任何异常线索时，幸存者继续自己的日常，不修逃生设施、不报警、不集体行动。
+    if (person.awareness === 0) {
+      person.intent = 'idle';
+      if (random() < 0.18) {
+        const options = ROOM_MAP[person.room].neighbors.filter((room) => room !== state.playerRoom && !isLocked(state, room));
+        const next = options.length ? randomOf(options) : null;
+        if (next) {
+          person.room = next;
+          person.activity = randomOf(ACTIVITIES);
+        } else {
+          person.activity = randomOf(ACTIVITIES);
+        }
+      } else {
+        person.activity = randomOf(ACTIVITIES);
+      }
+      continue;
+    }
+
+    // 只有察觉到异常但尚未确认危险的人会停下来倾听、查看，不会立刻逃生。
+    if (person.awareness === 1 && person.alert < 40 && person.room !== state.playerRoom) {
+      person.intent = 'wary';
+      person.activity = randomOf(['停下手里的事，侧耳听着', '四处看了看，像是在找声音来源', '有些疑惑地检查周围']);
+      continue;
+    }
 
     // 第四阶段开启后，所有幸存者都以两个动态逃生点为目标，不再执行原本的个人工作。
     if (state.teamStage >= TEAM_STAGE_COUNT && state.escapeRooms.length === 2) {
@@ -1790,7 +1828,34 @@ function npcTurn(state: GameState): void {
       }
     }
   }
+  updateNpcDialogue(state);
   recordTrails(state, before);
+}
+
+/** 根据 NPC 真正掌握的信息与当前行为生成头顶短对白。 */
+function updateNpcDialogue(state: GameState): void {
+  const daily = ['今晚吃什么？', '这里还挺安静的。', '等会儿要不要看电影？', '我有点饿了。', '你听说最近的新消息了吗？', '忙完就去休息吧。'];
+  const suspicious = ['嗯？刚才是什么动静？', '你听见了吗？', '是不是有什么东西掉了？', '奇怪……我去看看。'];
+  const alarmed = ['这里好像不太对劲。', '我们最好待在一起。', '刚才那声音是从哪边来的？', '快去看看其他人怎么样了。'];
+  const fleeing = ['救命！他在追我！', '快跑！别回头！', '该死！离我远点！', '有人吗？救救我！', '他就在后面！'];
+  const injured = ['好痛……谁来帮帮我。', '我流血了……', '别把我一个人留在这里。'];
+  for (const person of npcs(state)) {
+    if (person.hp <= 0) {
+      person.dialogue = randomOf(['……', '救……命……', '我动不了了……']);
+    } else if (person.intent === 'flee' || person.intent === 'escape') {
+      person.dialogue = person.hp <= SURVIVOR_INJURED_HP ? randomOf(injured) : randomOf(fleeing);
+    } else if (person.intent === 'call') {
+      person.dialogue = randomOf(['喂？听得到吗？这里出事了！', '快接电话！求求你们快接！', '我需要帮助！']);
+    } else if (person.intent === 'hide' || person.hidden) {
+      person.dialogue = randomOf(['别出声……', '他应该没发现我。', '拜托，快点离开……']);
+    } else if (person.awareness >= 2) {
+      person.dialogue = randomOf(person.awareness >= 3 ? ['他就在附近！', '别分开，快找个安全的地方！', '我们得想办法离开这里！'] : alarmed);
+    } else if (person.awareness === 1) {
+      person.dialogue = randomOf(suspicious);
+    } else {
+      person.dialogue = randomOf(daily);
+    }
+  }
 }
 
 /** 打电话的人真的把消息送出去了吗 */
