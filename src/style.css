@@ -2071,3 +2071,50 @@ button, .room-hit, .hand-row { touch-action: manipulation; }
 .btn.execution{border:1px solid #8b574a;color:#e5b2a4;background:#241512;}
 
 .room-feature.light{font-size:10px;padding:1px 3px;border-radius:3px;}.room-feature.light.off{opacity:.4;filter:grayscale(1);}.room.dark-room{background-color:#090a0d;}
+
+
+/* NPC 头顶对白：短暂出现，带轻微上浮与淡出，不遮挡人物操作 */
+.person-chip { position: relative; overflow: visible; }
+.person-dialogue {
+  position: absolute;
+  z-index: 20;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: min(190px, 52vw);
+  padding: 5px 8px;
+  border: 1px solid #82745f;
+  border-radius: 5px;
+  background: linear-gradient(180deg, #20201deF, #101110f5);
+  color: #eee6d7;
+  box-shadow: 0 4px 14px #000c, inset 0 0 12px #b3945f12;
+  font-size: 10px;
+  line-height: 1.45;
+  font-weight: 600;
+  letter-spacing: .15px;
+  white-space: normal;
+  text-align: center;
+  pointer-events: none;
+  animation: survivor-dialogue 5.2s ease both;
+}
+.person-dialogue::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  width: 7px;
+  height: 7px;
+  background: #101110;
+  border-right: 1px solid #82745f;
+  border-bottom: 1px solid #82745f;
+  transform: translate(-50%, -4px) rotate(45deg);
+}
+@keyframes survivor-dialogue {
+  0% { opacity: 0; translate: 0 5px; }
+  10%, 72% { opacity: 1; translate: 0 0; }
+  100% { opacity: 0; translate: 0 -3px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .person-dialogue { animation: none; }
+}
