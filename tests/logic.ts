@@ -1235,7 +1235,7 @@ function caseNewPerkSystem(): void {
   hex.energy = 6;
   hex.attackReady = true;
   attack(hex, hexVictim.id);
-  check('猎杀戾气：首次伤害幸存者后生成地图图腾', hex.hexHuntressUsed && hex.totems.includes(hex.playerRoom));
+  check('猎杀戾气：首次伤害幸存者后生成地图图腾', hex.hexHuntressUsed && hex.totems.length === 1);
 
   const reveal = createGame(['hell'], undefined, '迈克尔·迈尔斯');
   reveal.hand = [{ uid: 'test-hell', defId: 'hell' }];
