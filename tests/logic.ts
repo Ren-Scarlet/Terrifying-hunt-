@@ -1226,6 +1226,30 @@ caseNpcAwarenessAndDialogue();
 
 /** 新版通用卡池、限时情报与迈尔斯专属印记。 */
 function caseNewPerkSystem(): void {
+  const freeWipe = createGame(['unbreakable', 'clean'], undefined, '迈克尔·迈尔斯');
+  const freeWipeVictim = freeWipe.people.find((person) => person.role !== 'police')!;
+  freeWipeVictim.room = freeWipe.playerRoom;
+  freeWipeVictim.hp = 4;
+  freeWipeVictim.bloodSacrifice = false;
+  freeWipe.hand = [{ uid: 'test-unbreakable', defId: 'unbreakable' }];
+  freeWipe.energy = 1;
+  freeWipe.myersLastBestActive = true;
+  freeWipe.myersLastBestMarks = 2;
+  const firstHit = withRandomSource(() => 0.99, () => attack(freeWipe, freeWipeVictim.id));
+  const energyAfterHit = freeWipe.energy;
+  const freeWipePlayed = playCard(freeWipe, 'test-unbreakable');
+  check(
+    '不屈不挠：0行动点时仍能抽牌并免费擦刀',
+    firstHit && energyAfterHit === 0 && freeWipePlayed && freeWipe.energy === 0 && freeWipe.attackReady,
+    `攻击后行动点=${energyAfterHit}，结算后=${freeWipe.energy}，attackReady=${freeWipe.attackReady}`,
+  );
+  check('不屈不挠：免费擦刀同样移除至多两枚终局印记', freeWipe.myersLastBestMarks === 0, `剩余印记=${freeWipe.myersLastBestMarks}`);
+
+  check('天灾：鬼魔神龛使用钩子图案而非恩赐解脱图案', cardImage('scourge_shrine')?.endsWith('/lure.png') ?? false, cardImage('scourge_shrine') ?? '无图标');
+  check('猎杀戾气使用血腥/利爪图案', cardImage('hex_huntress')?.endsWith('/harvest.png') ?? false);
+  check('粉碎希望使用诅咒/灵异图案', cardImage('hex_ruin')?.endsWith('/poltergeist.png') ?? false);
+  check('苦涩低语使用聆听/耳语图案', cardImage('bitter_murmur')?.endsWith('/wiretap.png') ?? false);
+
   const pool = deckCardsForKiller('迈克尔·迈尔斯');
   check('新版通用初始卡池恰好 12 张', pool.filter((card) => card.pool === 'initial').length === 12);
   check('迈尔斯专属卡恰好 3 张', pool.filter((card) => card.killerOnly === '迈克尔·迈尔斯').length === 3);
