@@ -314,7 +314,12 @@ export function executeOps(state: GameState, ops: Op[], runtime: EffectRuntime):
             break;
           case 'hexNoed':
             state.hexNoedActive = true;
-            log(state, '难逃一死已启用：第四阶段仍有图腾时，诅咒将生效。');
+            if (state.teamStage >= 4 && state.totems.length > 0 && !state.hexNoedBonusGranted) {
+              state.energy += 2;
+              state.hexNoedBonusGranted = true;
+              log(state, '难逃一死立即生效：图腾仍然存留，你获得 2 点额外行动点。');
+            }
+            log(state, '难逃一死已启用：第四阶段仍有图腾时，攻击可直接击倒站立的幸存者。');
             break;
           case 'scourgeShrine':
             state.scourgeShrineReady = true;
