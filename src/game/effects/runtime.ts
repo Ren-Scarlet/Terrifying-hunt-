@@ -308,6 +308,57 @@ export function executeOps(state: GameState, ops: Op[], runtime: EffectRuntime):
         break;
       case 'flag':
         switch (op.key) {
+          case 'hexHuntress':
+            state.hexHuntressActive = true;
+            log(state, '猎杀戾气已启用：首次伤害幸存者时会在地图生成图腾。');
+            break;
+          case 'hexNoed':
+            state.hexNoedActive = true;
+            log(state, '难逃一死已启用：第四阶段仍有图腾时，诅咒将生效。');
+            break;
+          case 'scourgeShrine':
+            state.scourgeShrineReady = true;
+            log(state, '鬼魔神龛已准备：下一次在特殊处决地点命中的攻击会倒退团队进度。');
+            break;
+          case 'distressing':
+            state.distressingActive = true;
+            log(state, '恐惧释放已启用：恐惧范围内的幸存者推进团队目标变慢。');
+            break;
+          case 'hexRuin':
+            state.hexRuinActive = true;
+            log(state, '粉碎希望已启用：首次破坏设施会额外倒退团队进度。');
+            break;
+          case 'stealthNext':
+            state.stealthActions = Math.max(state.stealthActions, Number(op.value ?? 2));
+            break;
+          case 'revealAura':
+            state.revealAuraActions = Math.max(state.revealAuraActions, Number(op.value ?? 1) + 1);
+            log(state, '恶灵地狱：周围房间浮现红色人影。');
+            break;
+          case 'revealNearestTrail': {
+            const nearest = [...state.trails].sort((a, b) => roomDistance(a.to, state.playerRoom) - roomDistance(b.to, state.playerRoom))[0];
+            if (nearest) {
+              state.highlightedTrail = { ...nearest };
+              state.trailRevealActions = Math.max(state.trailRevealActions, Number(op.value ?? 1) + 1);
+              log(state, `猎鹿者：最近的脚印路线显现，指向${roomName(nearest.to)}。`);
+            } else {
+              log(state, '猎鹿者：附近没有可追踪的脚印。');
+            }
+            break;
+          }
+          case 'revealWorkers': {
+            const duration = Number(op.value ?? 2) + 1;
+            const targets = state.teamStage >= 4
+              ? npcs(state).filter((person) => person.hp > 0 && !person.hidden)
+              : npcs(state).filter((person) => person.hp > 0 && !person.hidden && (person.intent === 'work' || ['objective', 'generator', 'key'].includes(person.goal)));
+            targets.forEach((person) => { person.revealedActions = Math.max(person.revealedActions ?? 0, duration); });
+            log(state, targets.length ? `苦涩低语：${state.teamStage >= 4 ? '所有幸存者' : '正在推进任务的幸存者'}显形。` : '苦涩低语：暂时没有正在推进任务的幸存者。');
+            break;
+          }
+          case 'myersLastBest':
+            state.myersLastBestActive = true;
+            log(state, '把最好的留在最后已启用：攻击非血祭品时会积累专属印记。');
+            break;
           case 'phoneCut':
             state.phoneCut = true;
             break;
