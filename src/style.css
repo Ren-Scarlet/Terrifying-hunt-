@@ -309,7 +309,7 @@ button { font-family: inherit; cursor: pointer; }
 .floorplan {
   position: relative;
   /* 宽度跟着视口高度走：地图不会高到把手牌挤出屏幕，比例也不会被压扁 */
-  width: min(100%, calc(40vh * 16 / 9.4));
+  width: min(100%, calc(43vh * 16 / 9.4));
   margin-inline: auto;
   aspect-ratio: 16 / 9.4;
   border: 1px solid #1c2023;
@@ -491,20 +491,22 @@ button { font-family: inherit; cursor: pointer; }
 }
 
 /* ---------- 地板上的脚印（血丝划痕素材） ---------- */
+/* 脚印要压在地板与房间底色之上：房间是 z-index 2，且未探索房间有 alpha .92 的
+   斜纹底，脚印留在 1 就会被整块盖掉——这也是「红色脚印看不见」的直接原因。 */
 .trail-layer {
-  position: absolute; inset: 0; z-index: 1;
+  position: absolute; inset: 0; z-index: 4;
   pointer-events: none;
   overflow: hidden;
 }
 .footprint {
   position: absolute;
-  width: 24px; height: 24px;
+  width: 28px; height: 28px;
   transform: translate(-50%, -50%) rotate(var(--rot, 0deg));
-  background: #8a2a1c;
+  background: #9c3323;
   -webkit-mask: url('/assets/ui/trail.webp') center / contain no-repeat;
   mask: url('/assets/ui/trail.webp') center / contain no-repeat;
-  opacity: .42;
-  filter: drop-shadow(0 0 3px #b03420) drop-shadow(0 0 8px #8d1c0e88);
+  opacity: .58;
+  filter: drop-shadow(0 0 4px #b03420) drop-shadow(0 0 10px #8d1c0e88);
   transition: opacity .2s ease;
 }
 .footprint.fresh { opacity: .95; background: #d0402c; animation: trailGlow 2.4s ease-in-out infinite; }
@@ -1754,15 +1756,17 @@ button { font-family: inherit; cursor: pointer; }
   font-style: normal; font-size: 9px; letter-spacing: 0; color: #5f5a53;
 }
 
-/* 地图撑满主栏：房子是 5×4 的网格，按 5:4 排版再用视口高度封顶，
-   房间能从 124×85 长到 200×110，名字和人物标签才看得清。 */
+/* 地图撑满主栏：房子是 w×h 的网格，必须让宽高由同一个比例算出来。
+   旧写法是 width:100% + max-height 截断高度，等于先撑宽再压扁，
+   木纹/墙线/手电筒光圈会一起横向变形——别再用 max-height 压它。 */
 .floorplan {
-  width: 100%;
-  aspect-ratio: 5 / 4;
-  /* 顶部任务条 + 底部吸附的资源条与手牌都要留在屏幕里，地图只吃剩下的高度。
-     60vh 是上限，再按「视口减去固定占位」封一次顶，房间就不会被手牌盖住。 */
-  max-height: max(230px, calc(100vh - 585px));
-  min-height: 230px;
+  /* 先定高度（视口扣掉任务条、资源条、手牌后剩下的），
+     再用本局真实户型比例反推宽度，比例永远不破。 */
+  --map-h: min(60vh, max(240px, calc(100vh - 570px)));
+  height: var(--map-h);
+  width: min(100%, calc(var(--map-h) * var(--ar, 1.45)));
+  max-height: var(--map-h);
+  min-height: 0;
 }
 
 /* 威胁面板 */
@@ -1791,10 +1795,17 @@ button { font-family: inherit; cursor: pointer; }
    可读性 / 场地物品 / 手机适配（统一放在最后，覆盖前面的旧值）
    ========================================================================== */
 
-/* 桌面大屏：整体放大一档，不必眯着眼找 8px 的小字 */
+/*
+ * 桌面大屏只放宽容器宽度。
+ * 千万不要在这里用 zoom —— Canvas 地图用 getBoundingClientRect() 量宿主尺寸，
+ * 而 zoom 会让「量到的值」和「样式里写的 px」差一个倍率，
+ * 结果是木纹/墙线比 DOM 房间大一圈、手电筒光圈偏移、脚印被挤出房间。
+ * 同理也不要用 max-height 压 .floorplan：宽度由 aspect-ratio 反推，
+ * 高度被强行截短就会把整栋房子压扁，背景纹理跟着变形。
+ * 放大请走字号（下方已有覆盖层）与地图基准高度。
+ */
 @media (min-width: 1280px) {
-  #app { zoom: 1.1; max-width: 1500px; }
-  .floorplan { max-height: max(260px, calc(100dvh - 610px)); }
+  #app { max-width: 1500px; }
 }
 
 /* 最暗的两级文字提亮，长文也不刺眼 */

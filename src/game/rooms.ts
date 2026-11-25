@@ -138,6 +138,11 @@ export function layoutAspect(): string {
   return `${spanRef.w} / ${spanRef.h}`;
 }
 
+/** 同一比例的数值形式，给 CSS 反推宽度用（如 1.75） */
+export function layoutAspectNum(): number {
+  return spanRef.w / spanRef.h;
+}
+
 /**
  * 重排整栋房子。每次开局调用一次，之后所有邻居/坐标都从 ROOM_MAP 现取。
  * @returns 本局的户型摘要，方便调试台打印。

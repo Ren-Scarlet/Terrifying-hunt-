@@ -53,6 +53,7 @@ import {
   ROOMS,
   TOTEM_ROOMS,
   layoutAspect,
+  layoutAspectNum,
 } from '../game/rooms';
 import { getPersonProfile, type PersonProfile } from '../game/people';
 import { SURVIVOR_MAP } from '../game/survivors';
@@ -837,7 +838,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
           <div class="panel-heading"><h2>房屋平面</h2><span>绿边=能走（标行动点） · 黄=障碍多1点 · 蓝框=他们的目标点 · ！动静=有人刚经过 · ？？？=没进去过</span>
             <button class="btn ghost mini" data-action="guide">玩法指引</button>
           </div>
-          <div class="floorplan" style="aspect-ratio:${layoutAspect()}">
+          <div class="floorplan" style="--ar:${layoutAspectNum().toFixed(4)};aspect-ratio:${layoutAspect()}">
             ${rooms}
             ${trailOverlay(state)}
             ${playerMarker}
