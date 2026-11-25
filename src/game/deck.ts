@@ -1,3 +1,11 @@
+import { shuffle } from './random';
+import type { GameState } from './types';
+
+function log(state: GameState, message: string): void {
+  state.log.unshift(`[第 ${state.turn} 回合] ${message}`);
+  if (state.log.length > 60) state.log.length = 60;
+}
+
 export function drawCards(state: GameState, count: number): void {
   for (let i = 0; i < count; i++) {
     if (state.drawPile.length === 0) {
