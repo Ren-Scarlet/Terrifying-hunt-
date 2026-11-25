@@ -142,7 +142,8 @@ export function createGame(
 
   // 场地物品：道具箱固定 2 个，发电机随机 1~2 台，撒在能走的房间里。
   // 杀手用不了它们，但能砸——去哪边、什么时候砸，多了一层取舍。
-  const sitePool = shuffle(objPool.filter((id) => !state.objectiveRooms.includes(id)));
+  const breakerRooms = state.powerCircuits.map((circuit) => circuit.breakerRoom);
+  const sitePool = shuffle(objPool.filter((id) => !state.objectiveRooms.includes(id) && !breakerRooms.includes(id)));
   const genCount = GENERATOR_MIN + Math.floor(random() * (GENERATOR_MAX - GENERATOR_MIN + 1));
   const items: SiteItem[] = [];
   for (let i = 0; i < ITEM_BOX_COUNT; i++) {
