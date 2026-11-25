@@ -71,6 +71,7 @@ const WHO_OPTIONS = [
   ['markedAny', '全场标记目标'],
   ['allAny', '全场所有人'],
   ['fleeing', '正在逃跑的人'],
+  ['downedHere', '当前房间倒地的人'],
   ['downedAny', '全场倒地的人'],
   ['injuredAny', '全场受伤的人'],
   ['randomAny', '全场随机一人'],
