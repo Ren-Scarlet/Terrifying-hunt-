@@ -1243,7 +1243,7 @@ function caseNewPerkSystem(): void {
     firstHit && energyAfterHit === 0 && freeWipePlayed && freeWipe.energy === 0 && freeWipe.attackReady,
     `攻击后行动点=${energyAfterHit}，结算后=${freeWipe.energy}，attackReady=${freeWipe.attackReady}`,
   );
-  check('不屈不挠：免费擦刀同样移除至多两枚终局印记', freeWipe.myersLastBestMarks === 0, `剩余印记=${freeWipe.myersLastBestMarks}`);
+  check('不屈不挠：免费擦刀同样移除至多两枚终局印记', freeWipe.myersLastBestMarks === 1, `攻击获得 1 枚后移除 2 枚，剩余=${freeWipe.myersLastBestMarks}`);
 
   check('天灾：鬼魔神龛使用钩子图案而非恩赐解脱图案', cardImage('scourge_shrine')?.endsWith('/lure.png') ?? false, cardImage('scourge_shrine') ?? '无图标');
   check('猎杀戾气使用血腥/利爪图案', cardImage('hex_huntress')?.endsWith('/harvest.png') ?? false);
@@ -1288,7 +1288,8 @@ function caseNewPerkSystem(): void {
   sacrifice.room = food.playerRoom;
   food.energy = 6;
   food.hand = [{ uid: 'test-food-1', defId: 'myers_plaything' }];
-  check('戏耍食物要求视野内有血祭品、获得印记并将其送出视线', playCard(food, 'test-food-1') && food.myersFoodMarks === 1 && !isPersonVisible(food, sacrifice));
+  const firstFoodPlayed = withRandomSource(() => 0.99, () => playCard(food, 'test-food-1'));
+  check('戏耍食物要求视野内有血祭品、获得印记并将其送出视线', firstFoodPlayed && food.myersFoodMarks === 1 && !isPersonVisible(food, sacrifice));
   sacrifice.room = food.playerRoom;
   food.hand = [{ uid: 'test-food-2', defId: 'myers_plaything' }];
   const energyBeforeSecondFood = food.energy;
