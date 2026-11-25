@@ -483,4 +483,4 @@ export const KILLER_MAP: Record<string, KillerProfile> = KILLERS.reduce(
 export const ACTIVE_KILLER_NAMES = ['设陷者', '护士', '迈克尔·迈尔斯'] as const;
 export const ACTIVE_KILLERS = ACTIVE_KILLER_NAMES.map((name) => KILLER_MAP[name]);
 /** 初始解锁名单与当前开放名单保持一致。 */
-export const STARTER_KILLERS = [...ACTIVE_KILLER_NAMES];
+export const STARTER_KILLERS: string[] = [...ACTIVE_KILLER_NAMES];
