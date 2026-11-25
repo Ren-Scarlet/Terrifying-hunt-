@@ -397,7 +397,8 @@ function caseTrailDecay(): void {
   v.room = s.playerRoom;
   v.hp = 2;
   s.energy = 3;
-  attack(s);
+  // 固定随机源，避免开局道具与随机 NPC 行为影响痕迹回归。
+  withRandomSource(() => 0.99, () => attack(s));
   s.people.forEach((p) => {
     p.alert = 0;
     p.intent = 'idle';
