@@ -50,14 +50,14 @@ function load(): TuningData {
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return { cards: {}, powers: {} };
-    const parsed = JSON.parse(raw) as Partial<TuningData>;
-    return { cards: parsed.cards ?? {}, powers: parsed.powers ?? {} };
+    const parsed: unknown = JSON.parse(raw);
+    return validateTuning(parsed) ? clone(parsed) : { cards: {}, powers: {} };
   } catch {
     return { cards: {}, powers: {} };
   }
 }
 
-let data: TuningData = load();
+let data: TuningData;
 
 function persist(): void {
   try {
@@ -296,6 +296,8 @@ function validateTuning(value: unknown): value is TuningData {
   }
   return true;
 }
+
+data = load();
 
 export function importTuning(raw: string): boolean {
   let parsed: unknown;
