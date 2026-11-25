@@ -93,7 +93,7 @@ function caseDrawAndDiscardRules(): void {
   const selected = discard.hand[0].uid;
   const dropped = discardCard(discard, selected);
   check('抽牌规则：手牌超过 6 张必须先弃牌', denied && dropped && discard.hand.length === HAND_LIMIT && discard.discardPile.some((c) => c.uid === selected));
-  check('抽牌规则：超限期间不能继续主动抽牌', !drawCardAction(discard) && discard.hand.length === HAND_LIMIT);
+  check('抽牌规则：弃牌后恢复正常操作', discard.hand.length === HAND_LIMIT && drawCardAction(discard) && discard.hand.length === HAND_LIMIT + 1);
 
   const shuffle = newGame();
   shuffle.drawPile = [];
