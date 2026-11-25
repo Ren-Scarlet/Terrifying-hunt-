@@ -1324,7 +1324,7 @@ function survivorsActOnce(state: GameState, actorId: string): void {
       fleeAway(state, p);
       p.movesThisTurn += 1;
     } else if (state.teamProgress < TEAM_GOAL_MAX) {
-      addTeamProgress(state, 2);
+      addTeamProgress(state, scaleSurvivorProgress(state, p, 2));
     }
   }
   void actorId;
@@ -1936,7 +1936,7 @@ function npcTurn(state: GameState): void {
       if (gen) {
         const hasToolbox = person.item === 'toolbox' && person.itemUses > 0;
         // 危急时刻发电机也修得更快：同伴的死亡和倒地都在催他们
-        const gain = Math.round(GENERATOR_GAIN * (1 + workPressure(state))) * (hasToolbox ? 2 : 1);
+        const gain = scaleSurvivorProgress(state, person, Math.round(GENERATOR_GAIN * (1 + workPressure(state)))) * (hasToolbox ? 2 : 1);
         gen.progress = Math.min(100, gen.progress + gain);
         if (hasToolbox) consumeItem(state, person);
         person.intent = 'work';
