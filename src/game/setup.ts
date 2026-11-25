@@ -67,6 +67,8 @@ export function createGame(
     kills: 0,
     killsThisTurn: 0,
     executions: 0,
+    survivorKills: 0,
+    specialExecutionBonus: 0,
     npcAlarmed: false,
     carryPersonId: null,
     carryDistance: 0,
@@ -127,6 +129,7 @@ export function createGame(
       { id: 'main-floor', name: '主楼照明', breakerRoom: 'basement', affectedRooms: ['hall', 'kitchen', 'dining', 'study'], broken: false },
       { id: 'upper-floor', name: '二层照明', breakerRoom: 'workshop', affectedRooms: ['bedroom', 'nursery', 'guestroom', 'attic'], broken: false },
       { id: 'east-wing', name: '东翼照明', breakerRoom: 'conservatory', affectedRooms: ['garden', 'balcony', 'foyer'], broken: false },
+      { id: 'service-wing', name: '服务区照明', breakerRoom: 'laundry', affectedRooms: ['corridor', 'storage', 'wine', 'chapel', 'stairwell', 'bathroom', 'library'], broken: false },
     ],
   };
   // 团队目标：随机挑 3 间房作为「电闸 / 钥匙柜」，再给每个人派一个个人目的。
