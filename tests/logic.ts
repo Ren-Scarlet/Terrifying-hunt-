@@ -38,6 +38,7 @@ import { OBSTACLE_ROOMS, ROOM_MAP } from '../src/game/rooms';
 import { SURVIVOR_MAP } from '../src/game/survivors';
 import { generateMission } from '../src/game/missions';
 import type { GameState, RoomId } from '../src/game/types';
+import { createSeededRandom, random, withRandomSource } from '../src/game/random';
 
 let pass = 0;
 let fail = 0;
@@ -47,6 +48,14 @@ function check(name: string, ok: boolean, detail = ''): void {
   else fail += 1;
   console.log(`${ok ? '  ok  ' : ' FAIL '} ${name}${detail ? ' — ' + detail : ''}`);
 }
+
+const seededA = createSeededRandom(20261125);
+const seededB = createSeededRandom(20261125);
+const sequenceA = Array.from({ length: 8 }, () => seededA());
+const sequenceB = Array.from({ length: 8 }, () => seededB());
+check('随机源：相同种子产生相同序列', sequenceA.every((value, index) => value === sequenceB[index]));
+const injected = withRandomSource(() => 0.25, () => random());
+check('随机源：可在作用域内注入确定值', injected === 0.25);
 
 function newGame(): GameState {
   const deck = ['silent_step', 'sprint', 'choke', 'shuriken', 'execute', 'clean', 'night_cover', 'aim'];
