@@ -1617,6 +1617,15 @@ function npcTurn(state: GameState): void {
     }
     if (person.hidden && state.teamStage >= TEAM_STAGE_COUNT) person.hidden = false;
 
+    // 发现同屋或相邻房间的倒地/重伤者属于明确异常，会立刻触发救援意识。
+    const nearbyVictim = npcs(state).some(
+      (other) => other.id !== person.id && (other.hp <= 0 || (other.hp > 0 && other.hp <= SURVIVOR_INJURED_HP)) && roomDistance(other.room, person.room) <= 1,
+    );
+    if (nearbyVictim && person.awareness < 2) {
+      person.alert = Math.max(person.alert, 45);
+      person.awareness = 2;
+    }
+
     // 没有任何异常线索时，幸存者继续自己的日常，不修逃生设施、不报警、不集体行动。
     if (person.awareness === 0) {
       person.intent = 'idle';
@@ -1833,14 +1842,14 @@ function updateNpcDialogue(state: GameState): void {
   for (const person of npcs(state)) {
     if (person.hp <= 0) {
       person.dialogue = randomOf(['……', '救……命……', '我动不了了……']);
-    } else if (person.intent === 'flee' || person.intent === 'escape' || person.awareness >= 3) {
+    } else if (person.intent === 'flee' || person.intent === 'escape') {
       person.dialogue = person.hp <= SURVIVOR_INJURED_HP ? randomOf(injured) : randomOf(fleeing);
     } else if (person.intent === 'call') {
       person.dialogue = randomOf(['喂？听得到吗？这里出事了！', '快接电话！求求你们快接！', '我需要帮助！']);
     } else if (person.intent === 'hide' || person.hidden) {
       person.dialogue = randomOf(['别出声……', '他应该没发现我。', '拜托，快点离开……']);
     } else if (person.awareness >= 2) {
-      person.dialogue = randomOf(alarmed);
+      person.dialogue = randomOf(person.awareness >= 3 ? ['他就在附近！', '别分开，快找个安全的地方！', '我们得想办法离开这里！'] : alarmed);
     } else if (person.awareness === 1) {
       person.dialogue = randomOf(suspicious);
     } else {
