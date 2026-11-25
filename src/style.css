@@ -2046,3 +2046,12 @@ button, .room-hit, .hand-row { touch-action: manipulation; }
   opacity: .45;
   cursor: not-allowed;
 }
+
+
+.hand-count {
+  margin: 4px 0 7px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .04em;
+}
