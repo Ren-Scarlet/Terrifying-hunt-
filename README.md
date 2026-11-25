@@ -191,13 +191,21 @@ src/
     types.ts             所有数据结构
     effect.ts            效果指令（DSL）的类型定义与说明书
     effectCatalog.ts     DSL 编辑器元数据（指令名称、字段和目标选项）
-    random.ts            可注入随机源与种子随机数生成器
+    random.ts            可注入随机源、种子随机数、洗牌与随机抽取
+    constants.ts         全局行动点、设施与附身等规则常量
+    navigation.ts        房间图最短路径与最近房间查询
+    deck.ts              抽牌、弃牌堆洗回
+    setup.ts             新局初始化、场地目标与设施生成
+    effects/runtime.ts   DSL 效果解释器（由 engine.runOps 兼容入口调用）
+    npc/
+      catalog.ts         NPC 原型、意图、目标与状态文案
+      factory.ts         NPC 原型选择、人物创建、阵容与出生点生成
     data/
       cards.ts           ★ 29 张卡牌 + 每张的效果程序（改卡牌改这里）
       killers.ts         ★ 13 个杀手 + 两个能力的效果程序（改能力改这里）
     cards.ts             转发 data/cards.ts
     killers.ts           转发 data/killers.ts
-    engine.ts            规则结算 + 效果解释器 + NPC 行为（纯逻辑，可单测）
+    engine.ts            核心规则、战斗、NPC 回合与玩家行动；保留公共 API 兼容入口
     tuning.ts            ★ 平衡数值的本地存档：改写卡牌/能力，校验导入、导出与重置
     rooms.ts             房间、邻接关系、平面图矩形、特殊房间
     missions.ts          任务生成
@@ -205,9 +213,19 @@ src/
     people.ts            人物档案
     save.ts              存档校验与降级
     assetMap.ts          素材路径映射
-  ui/render.ts           纯字符串模板渲染
-  ui/admin.ts            「平衡调整」工作台（29 张卡 + 13 个杀手的能力逐条可编辑）
-  ui/scene.ts            平面图的程序化场景层（Canvas：材质 / 墙体 / 家具 / 光照）
+  ui/
+    render.ts            兼容导出入口
+    render/
+      shared.ts          HTML 安全转义、人物/卡牌详情与渲染辅助
+      menus.ts           主菜单、玩法指引、商店、牌组编辑
+      game.ts            游戏 HUD 与结算页面
+    admin.ts             「平衡调整」工作台（29 张卡 + 13 个杀手的能力逐条可编辑）
+    scene.ts             Canvas 场景生命周期、墙体/门窗/光照与逐帧渲染
+    scene/
+      config.ts          房间材质、色调、灯光、窗户与家具静态配置
+      materials.ts       程序化材质纹理生成与缓存
+      props.ts            家具、物体投影与程序化绘制
+      types.ts            Canvas 与几何类型
 scripts/
   import_dbd_assets.py   从图鉴站裁切技能图标 / 力量图标
 ```
@@ -227,7 +245,7 @@ scripts/
 
 **卡牌效果全部写在 `src/game/data/cards.ts` 里**，每张卡的 `ops` 是一串指令，引擎逐条执行。
 杀手能力在 `src/game/data/killers.ts`，指令清单与字段说明在 `src/game/effect.ts` 开头，
-解释器是 `src/game/engine.ts` 里的 `runOps()`。
+效果解释器位于 `src/game/effects/runtime.ts`；`src/game/engine.ts` 的 `runOps()` 保留为兼容入口，并负责注入游戏运行时依赖。
 
 改数字、加效果、加条件都只动数据文件，存盘刷新就生效。
 **只想调数值不想写代码**：主菜单 →「平衡调整」，可改费用、改每条指令的数字、改杀手冷却，
@@ -346,7 +364,7 @@ python scripts/import_dbd_assets.py    # 需要 Pillow
 
 ## 视觉与场景渲染
 
-平面图不是一张背景图，而是叠在 DOM 房间下面的 Canvas 场景层（`src/ui/scene.ts`）。DOM 只保留房间名、人物头像和点击热区，`rooms.ts` 里的百分比矩形一个都没动，所以交互位置、碰撞和存档完全不受影响。
+平面图不是一张背景图，而是叠在 DOM 房间下面的 Canvas 场景层（`src/ui/scene.ts`）。静态材质、家具配置与家具绘制分别维护在 `src/ui/scene/materials.ts`、`config.ts` 和 `props.ts`。DOM 只保留房间名、人物头像和点击热区，`rooms.ts` 里的百分比矩形一个都没动，所以交互位置、碰撞和存档完全不受影响。
 
 三层画布：
 
