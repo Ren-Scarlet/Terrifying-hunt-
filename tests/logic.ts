@@ -969,7 +969,8 @@ function caseAidAndPressure(): void {
     worker.goal = 'objective';
     worker.room = room;
     worker.intent = 'idle';
-    worker.alert = 100;
+    worker.alert = 0;
+    worker.awareness = 2;
     worker.movesThisTurn = 0;
     w.kills = 3;
     const before = w.teamProgress;
