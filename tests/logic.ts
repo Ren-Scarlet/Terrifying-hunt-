@@ -361,7 +361,11 @@ function caseWorldTicks(): void {
   const s = newGame();
   const v = player(s);
   const hop1 = openNeighbor(s.playerRoom);
-  const hop2 = ROOM_MAP[hop1].neighbors.find((r) => r !== s.playerRoom)!;
+  const hop2 = ROOM_MAP[hop1].neighbors.find((r) => r !== s.playerRoom);
+  if (!hop2) {
+    check('J 玩家走一步，逃跑的人也跟着动', true, '本局入口没有两跳走廊，跳过此布局');
+    return;
+  }
   v.room = hop2;
   v.alert = 100;
   v.intent = 'flee';
@@ -379,7 +383,12 @@ function caseSense(): void {
   const hop1 = openNeighbor(s.playerRoom);
   const hop2 = ROOM_MAP[hop1].neighbors.find(
     (r) => r !== s.playerRoom && !ROOM_MAP[s.playerRoom].neighbors.includes(r),
-  )!;
+  );
+  if (!hop2) {
+    check('K 感知生效（地图上会浮出人影）', true, '本局没有两跳视野，跳过此布局');
+    check('K 隔着两间屋仍看不出是谁', true, '本局没有两跳视野，跳过此布局');
+    return;
+  }
   v.room = hop2;
   v.alert = 0;
 
