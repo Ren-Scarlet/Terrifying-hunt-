@@ -1,4 +1,5 @@
 import { random } from './random';
+import { nearestOf, roomDistance } from './navigation';
 import { CARD_MAP, UNLOCK_REWARDS } from './cards';
 import type { Cond, Dest, Op, Who } from './effect';
 import { KILLER_MAP } from './killers';
@@ -620,23 +621,7 @@ function afterPlayerAction(state: GameState): void {
 /*  寻路                                                                */
 /* ==================================================================== */
 
-function roomDistance(from: RoomId, to: RoomId): number {
-  if (from === to) return 0;
-  const queue: Array<[RoomId, number]> = [[from, 0]];
-  const seen = new Set<RoomId>([from]);
-  while (queue.length) {
-    const [cur, d] = queue.shift()!;
-    for (const next of ROOM_MAP[cur].neighbors) {
-      if (seen.has(next)) continue;
-      if (next === to) return d + 1;
-      seen.add(next);
-      queue.push([next, d + 1]);
-    }
-  }
-  return 99;
-}
 
-/** BFS 求从 from 到 to 的下一步；无法到达返回 null。 */
 function nextStepToward(
   state: GameState,
   from: RoomId,
@@ -694,18 +679,6 @@ function resolveDest(state: GameState, dest: Dest): RoomId {
   }
 }
 
-function nearestOf(from: RoomId, candidates: RoomId[]): RoomId {
-  let best = candidates[0];
-  let bestLen = Infinity;
-  for (const c of candidates) {
-    const len = roomDistance(from, c);
-    if (len < bestLen) {
-      bestLen = len;
-      best = c;
-    }
-  }
-  return best;
-}
 
 /* ==================================================================== */
 /*  生死：健康 → 受伤 → 倒地 → 死亡                                     */

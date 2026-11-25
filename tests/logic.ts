@@ -41,6 +41,7 @@ import { SURVIVOR_MAP } from '../src/game/survivors';
 import { generateMission } from '../src/game/missions';
 import type { GameState, RoomId } from '../src/game/types';
 import { createSeededRandom, random, withRandomSource } from '../src/game/random';
+import { nearestOf, roomDistance } from '../src/game/navigation';
 
 let pass = 0;
 let fail = 0;
@@ -62,6 +63,17 @@ check('随机源：可在作用域内注入确定值', injected === 0.25);
 function newGame(): GameState {
   const deck = ['silent_step', 'sprint', 'choke', 'shuriken', 'execute', 'clean', 'night_cover', 'aim'];
   return createGame(deck, undefined, '迈克尔·迈尔斯');
+}
+
+/** 房间导航模块：验证随机生成的房屋图最短路与候选点选择。 */
+function caseNavigationUtilities(): void {
+  const state = newGame();
+  const start = state.playerRoom;
+  const neighbor = ROOM_MAP[start].neighbors[0];
+  check('导航：同一房间距离为 0', roomDistance(start, start) === 0);
+  check('导航：相邻房间距离为 1', roomDistance(start, neighbor) === 1);
+  check('导航：最短距离具有对称性', roomDistance(start, neighbor) === roomDistance(neighbor, start));
+  check('导航：候选列表优先选择起点本身', nearestOf(start, [neighbor, start]) === start);
 }
 
 function handOf(state: GameState, defId: string): string | null {
@@ -385,7 +397,8 @@ function caseTrailDecay(): void {
   v.room = s.playerRoom;
   v.hp = 2;
   s.energy = 3;
-  attack(s);
+  // 固定随机源，避免开局道具与随机 NPC 行为影响痕迹回归。
+  withRandomSource(() => 0.99, () => attack(s));
   s.people.forEach((p) => {
     p.alert = 0;
     p.intent = 'idle';
@@ -801,6 +814,7 @@ function caseMergeAndMissions(): void {
   check('Z 每逃一人扣 15 分', currentScore(sc) === base - 30, `${base} → ${currentScore(sc)}`);
 }
 
+caseNavigationUtilities();
 caseMergeAndMissions();
 
 /** 本轮：人人可救援 / 主动赶去救 / 连杀之后团队进度被催快 */
