@@ -423,7 +423,7 @@ function leavesTrail(person: Person): boolean {
     person.intent === 'escape' ||
     person.intent === 'call' ||
     person.alert >= 45 ||
-    person.hp < 2
+    person.hp <= SURVIVOR_INJURED_HP
   );
 }
 
@@ -534,7 +534,7 @@ function npcReact(state: GameState): void {
     }
     if (person.movesThisTurn >= REACT_MOVE_CAP) continue;
     // 后院翻篱笆是回合结束的结算，不在这中间偷偷逃出去
-    if (wantsToLeave(person)) continue;
+    if (wantsToLeave(state, person)) continue;
 
     const fleeing = person.intent === 'flee' || person.intent === 'escape';
     const busy =
@@ -943,7 +943,7 @@ function fleeAway(state: GameState, person: Person, quiet = false): boolean {
   // 后院是出口：只有本来就打算离开、或者已经吓破胆的人才会往外跑。
   // 否则「被追」等于「自动逃生」，玩家把人逼到院子里反而在帮对手。
   const mayExit =
-    person.goal === 'exit' || person.goal === 'panic' || person.alert >= 70 || person.hp < 2;
+    person.goal === 'exit' || person.goal === 'panic' || person.alert >= 70 || person.hp <= SURVIVOR_INJURED_HP;
   const options = ROOM_MAP[person.room].neighbors.filter(
     (r) =>
       r !== state.playerRoom &&
@@ -965,7 +965,7 @@ function fleeAway(state: GameState, person: Person, quiet = false): boolean {
   person.activity = '夺路而逃';
   // 老练的人踮着脚走：这一步连脚印都不留，也不惊动乌鸦
   if (!isQuietMove(state, person)) {
-    pushTrail(state, fromId, person.room, person.hp < 2);
+    pushTrail(state, fromId, person.room, person.hp <= SURVIVOR_INJURED_HP);
     addDisturbance(state, person.room);
   }
   if (quiet) return true;
@@ -1541,12 +1541,12 @@ function npcTurn(state: GameState): void {
         continue;
       }
       const exitTarget = nearestOf(person.room, state.escapeRooms);
-      const exitStep = nextStepToward(state, person.room, exitTarget, [state.playerRoom]) ?? nextStepToward(state, person.room, exitTarget);
+      const exitStep = person.room === state.playerRoom ? null : nextStepToward(state, person.room, exitTarget, [state.playerRoom]);
       if (exitStep) {
         const from = person.room; person.room = exitStep;
         person.activity = `正赶往${roomName(exitTarget)}`;
         pushTrail(state, from, exitStep, person.hp <= SURVIVOR_INJURED_HP);
-      } else fleeAway(state, person);
+      } else if (person.room === state.playerRoom) fleeAway(state, person);
       continue;
     }
 
@@ -1749,17 +1749,10 @@ function escapePhase(state: GameState): void {
       p.alert = clamp(p.alert + 12, 0, 100);
     });
 
-    const remainingMarked = npcs(state).filter((p) => p.marked).length;
-    const need = state.mission.kind === 'assassinate' ? state.mission.targetCount ?? 2 : 1;
-    if (remainingMarked === 0 && state.markedKilled < need) {
-      state.resultReason = '名单上的目标全部脱逃，契约作废。';
-      finish(state, 'failed');
-      return;
-    }
     // 每逃一个人都在结算里扣 15 分；直到最后一个幸存者也翻出篱笆，契约才作废。
     // 不再用「逃够 N 个就立刻输」的硬阈值——那会让幸存者的个人目标失去博弈空间。
     const survivorsLeft = state.people.filter((p) => p.role !== 'police').length;
-    if (survivorsLeft === 0 && state.escaped > 0) {
+    if (state.escaped >= state.survivorTotal && state.survivorTotal > 0) {
       state.resultReason = `最后一名幸存者也成功逃离，房子里再没有活人——契约作废（逃走 ${state.escaped} 人）。`;
       finish(state, 'failed');
     }

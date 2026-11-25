@@ -7,7 +7,6 @@ import {
   BASE_AP,
   BLEEDOUT_TURNS,
   DOWNED_LOCK_TURNS,
-  ESCAPE_ROOMS,
   FRENZY_AP_BONUS,
   FRENZY_MAX,
   FRENZY_THRESHOLD,
@@ -84,7 +83,7 @@ function roomFeatures(state: GameState, roomId: RoomId): string {
       );
     });
   if (roomId === EXIT_ROOM) parts.push(`<span class="room-feature escape" title="撤离点：任务完成的撤离位置">${icon('escape', 'ui-icon tiny')}</span>`);
-  if (ESCAPE_ROOMS.includes(roomId)) parts.push(`<span class="room-feature escape-npc" title="逃生点：NPC 在这里待满一回合就会逃出去">${icon('escape', 'ui-icon tiny')}</span>`);
+  if (state.escapeRooms.includes(roomId)) parts.push(`<span class="room-feature escape-npc" title="团队第4阶段开启的逃生点">${icon('escape', 'ui-icon tiny')}</span>`);
   if (TOTEM_ROOMS.includes(roomId)) parts.push(`<span class="room-feature totem" title="图腾：在此结束回合，下回合 +1 行动点">${icon('totem', 'ui-icon tiny')}</span>`);
   if (CABINET_ROOMS.includes(roomId)) parts.push(`<span class="room-feature cabinet" title="柜子：藏身者不会被引诱类卡牌锁定">${icon('cabinet', 'ui-icon tiny')}</span>`);
   if (OBSTACLE_ROOMS.includes(roomId) && !cleared) parts.push(`<span class="room-feature obstacle" title="障碍：进入多花 1 点行动点；破门能力可以直接清掉">${icon('obstacle', 'ui-icon tiny')}</span>`);
@@ -123,7 +122,7 @@ function powerButtonHtml(state: GameState, killer: KillerProfile): string {
 function threatRowsHtml(state: GameState): string {
   const alive = state.people.filter((p) => p.role !== 'police' && p.hp > 0);
   const downed = state.people.filter((p) => p.role !== 'police' && p.hp <= 0);
-  const atExit = alive.filter((p) => ESCAPE_ROOMS.includes(p.room));
+  const atExit = alive.filter((p) => state.escapeRooms.includes(p.room));
   const leaving = alive.filter((p) => p.intent === 'escape');
   const calling = alive.filter((p) => p.intent === 'call');
   const caring = alive.filter((p) => p.intent === 'rescue' || p.intent === 'heal');
@@ -373,12 +372,13 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
       const alertLabel = `<em class="alert-tag ${p.alert >= 70 ? 'high' : p.alert >= 35 ? 'mid' : ''}">警觉 ${p.alert}</em>`;
       const intentLabel = p.intent === 'idle' ? GOAL_LABEL[p.goal] : INTENT_LABEL[p.intent];
       const where = vis ? roomName(p.room) : `最后在${roomName(p.lastSeenRoom)}`;
-      return `<button class="roster-person ${p.room === state.playerRoom ? 'here' : ''} ${p.marked ? 'marked' : ''} ${p.intent === 'escape' ? 'escaping' : ''} ${vis ? '' : 'unknown'} ${health === 'downed' ? 'downed' : ''}"
+      return `<button class="roster-person ${p.room === state.playerRoom ? 'here' : ''} ${p.marked ? 'marked' : ''} ${p.bloodSacrifice ? 'blood-sacrifice' : ''} ${p.intent === 'escape' ? 'escaping' : ''} ${vis ? '' : 'unknown'} ${health === 'downed' ? 'downed' : ''}"
         data-action="person" data-person-id="${p.id}"
         title="${escape(p.name)}：${escape(ARCH_LABEL[p.archetype])}，${escape(GOAL_LABEL[p.goal])}，${escape(HEALTH_LABEL[health])}${vis ? '' : '，位置待确认'}">
         ${img ? `<img src="${img}" alt="" onerror="this.style.display='none'">` : ''}
         <span><b>${escape(p.name)} ${alertLabel}</b>
           <small class="goal-line">${escape(ARCH_LABEL[p.archetype])} · ${escape(GOAL_LABEL[p.goal])}</small>
+          ${p.bloodSacrifice ? '<small class="blood-sacrifice-tag">🩸 血祭品</small>' : ''}
           <small>${where} · ${HEALTH_LABEL[health]} · ${escape(intentLabel)}</small>
           ${health === 'downed' ? `<small class="roster-bleed">倒地 · ${p.downedTurns >= DOWNED_LOCK_TURNS ? `可以补刀处决，${Math.max(0, BLEEDOUT_TURNS - p.downedTurns)} 回合后自己流干` : `还要等 ${DOWNED_LOCK_TURNS - p.downedTurns} 回合才能补刀`} · 可能被救起</small>` : ''}
           ${p.item ? `<small class="roster-item">携带 ${itemIconHtml(p.item)}${escape(SURVIVOR_ITEM_LABEL[p.item])} ×${p.itemUses}</small>` : ''}
@@ -468,7 +468,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
         <div class="mission-meta">
           <span class="mission-progress ${objectiveDone ? 'done' : ''}">${progress}</span>
           <span class="mission-clock ${urgent ? 'hot' : ''}">剩余 <b>${left}</b> 回合</span>
-          <span class="mission-team ${state.teamProgress >= TEAM_GOAL_MAX * 0.7 ? 'hot' : ''}" title="他们在${escape(state.teamGoalLabel)}；进度做满他们就集体逃走，你直接失败">他们在赶工 <b>${state.teamProgress}%</b></span>
+          <span class="mission-team ${state.teamStage >= 3 ? 'hot' : ''}" title="${escape(state.teamGoalLabel)}：四阶段团队进度。第四阶段完成后出现两个逃生点。">团队阶段 <b>${state.teamStage}/4</b></span>
         </div>
       </div>
     </div>
@@ -487,7 +487,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
             ${playerMarker}
           </div>
           <div class="map-legend">
-            <span>${icon('escape', 'ui-icon tiny')} 撤离点/后院</span>
+            <span>${icon('escape', 'ui-icon tiny')} 逃生点（第4阶段开启）</span>
             <span>${icon('totem', 'ui-icon tiny')} 图腾</span>
             <span>${icon('cabinet', 'ui-icon tiny')} 柜子</span>
             <span>${icon('obstacle', 'ui-icon tiny')} 障碍物</span>
@@ -517,10 +517,10 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
               <div class="alarm-track"><span style="width:${state.frenzy}%"></span></div>
               <small>杀戮</small>
             </div>
-            <div class="stat team ${state.teamProgress >= TEAM_GOAL_MAX * 0.7 ? 'hot' : ''}" title="幸存者的团队目标：${escape(state.teamGoalLabel)}。进度做满他们集体逃走，你直接失败。">
-              <b>${state.teamProgress}<i>/${TEAM_GOAL_MAX}</i></b>
-              <div class="alarm-track"><span style="width:${state.teamProgress}%"></span></div>
-              <small>他们的进度</small>
+            <div class="stat team ${state.teamStage >= 3 ? 'hot' : ''}" title="幸存者团队目标：${escape(state.teamGoalLabel)}。每完成 25% 解锁一个阶段；第四阶段开启双逃生点。">
+              <b>${state.teamStage}<i>/4</i></b>
+              <div class="team-stage-track">${Array.from({ length: 4 }, (_, i) => `<span class="team-stage-segment ${state.teamStage > i ? 'done' : ''}"></span>`).join('')}</div>
+              <small>${state.teamStage >= 4 ? '逃生点已开启' : '逃生阶段'}</small>
             </div>
             <div class="stat score"><b>${currentScore(state)}</b><small>预计得分</small></div>
           </div>
