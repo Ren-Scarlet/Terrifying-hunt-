@@ -2118,3 +2118,11 @@ button, .room-hit, .hand-row { touch-action: manipulation; }
 @media (prefers-reduced-motion: reduce) {
   .person-dialogue { animation: none; }
 }
+
+
+/* 新版卡牌：迈尔斯三种独立印记与诅咒图腾 */
+.myers-mark-strip{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px;font-size:11px;color:var(--muted)}
+.myers-mark-strip span{padding:3px 7px;border:1px solid rgba(180,70,70,.28);border-radius:5px;background:rgba(45,15,18,.42)}
+.myers-mark-strip b{color:#e6b0a9;font-variant-numeric:tabular-nums}
+.room-feature.totem.cursed{filter:drop-shadow(0 0 5px rgba(220,35,45,.75))}
+.room-feature.trail-highlight{color:#ff6666;text-shadow:0 0 7px rgba(255,45,45,.8);font-size:16px}

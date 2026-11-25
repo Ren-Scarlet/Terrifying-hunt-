@@ -93,6 +93,8 @@ function roomFeatures(state: GameState, roomId: RoomId): string {
   if (roomId === EXIT_ROOM) parts.push(`<span class="room-feature escape" title="撤离点：任务完成的撤离位置">${icon('escape', 'ui-icon tiny')}</span>`);
   if (state.escapeRooms.includes(roomId)) parts.push(`<span class="room-feature escape-npc" title="团队第4阶段开启的逃生点">${icon('escape', 'ui-icon tiny')}</span>`);
   if (TOTEM_ROOMS.includes(roomId)) parts.push(`<span class="room-feature totem" title="图腾：在此结束回合，下回合 +1 行动点">${icon('totem', 'ui-icon tiny')}</span>`);
+  if (state.totems.includes(roomId)) parts.push(`<span class="room-feature totem cursed" title="厄咒图腾：支撑难逃一死；幸存者可能发现并破坏">${icon('totem', 'ui-icon tiny')}</span>`);
+  if (state.trailRevealActions > 0 && state.highlightedTrail && (state.highlightedTrail.room === roomId || state.highlightedTrail.to === roomId)) parts.push('<span class="room-feature trail-highlight" title="猎鹿者显现的最近脚印路线">👣</span>');
   if (CABINET_ROOMS.includes(roomId)) parts.push(`<span class="room-feature cabinet" title="柜子：藏身者不会被引诱类卡牌锁定">${icon('cabinet', 'ui-icon tiny')}</span>`);
   if (OBSTACLE_ROOMS.includes(roomId) && !cleared) parts.push(`<span class="room-feature obstacle" title="障碍：进入多花 1 点行动点；破门能力可以直接清掉">${icon('obstacle', 'ui-icon tiny')}</span>`);
   return parts.join('');
@@ -281,11 +283,10 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
     const darkRoom = !isRoomLit(state, room.id);
     const noise = visibleDisturbances(state).find((d) => d.room === room.id);
     // 感知：看不见的房间也会浮出红色人影——只有影子，没有名字
-    const sensed =
-      !visible && isSensing(state)
-        ? state.people.filter((p) => p.room === room.id && p.role !== 'police' && p.hp > 0 && !p.hidden)
-            .length
-        : 0;
+    const auraReveal = state.revealAuraActions > 0 && (room.id === state.playerRoom || ROOM_MAP[state.playerRoom].neighbors.includes(room.id));
+    const sensed = !visible
+      ? state.people.filter((p) => p.room === room.id && p.role !== 'police' && p.hp > 0 && !p.hidden && (isSensing(state) || auraReveal || (p.revealedActions ?? 0) > 0)).length
+      : 0;
     const r = room.rect;
     const style = `left:${r.left}%;top:${r.top}%;width:${r.width}%;height:${r.height}%`;
     return `
@@ -390,6 +391,13 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
         <div class="stalk-track"><div class="stalk-fill" style="width:${state.stalkMeter}%"></div></div>
       </div>`
     : '';
+  const myersMarks = isMyers
+    ? `<div class="myers-mark-strip" title="三种专属印记独立计数">
+        <span>湮灭 <b>${state.myersEclipseMarks}/5</b></span>
+        <span>终局 <b>${state.myersLastBestMarks}/8</b></span>
+        <span>食物 <b>${state.myersFoodMarks}/8</b></span>
+      </div>`
+    : '';
 
   // 一次性把「现在到底发生了什么」摆出来：倒地倒计时、守尸、死追、夜幕、致盲
   const statusBits: string[] = [];
@@ -457,6 +465,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
           <span>${escape(killer.owner)} · ${escape(killer.title)}</span>
         </div>
         ${meter}
+        ${myersMarks}
       </div>
       <div class="mission-strip ${urgent ? 'urgent' : ''}">
         <div class="mission-icon">${icon('missionTarget', 'ui-icon')}</div>

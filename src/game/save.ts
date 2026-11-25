@@ -1,12 +1,12 @@
-import { CARDS, CARD_MAP, STARTING_DECK } from './cards';
+import { CARDS, CARD_MAP, STARTING_DECK, deckCardsForKiller } from './cards';
 import { KILLER_MAP, STARTER_KILLERS } from './killers';
 import type { SaveData } from './types';
 
 const KEY = 'night-hunt-dossier-save-v1';
-/** 存档结构版本：v3 起伤害全部来自「挥刀」按钮，旧牌组里的伤害牌已经不存在了 */
-const SAVE_VERSION = 3;
+/** v4：切换到新的通用初始卡池与杀手专属构筑池。 */
+const SAVE_VERSION = 4;
 
-const STARTER_CARDS: string[] = CARDS.filter((c) => c.unlocked).map((c) => c.id);
+const STARTER_CARDS: string[] = CARDS.filter((c) => c.unlocked && (c.pool === 'initial' || c.pool === 'killer')).map((c) => c.id);
 
 const DEFAULT_SAVE: SaveData = {
   deck: [...STARTING_DECK],
@@ -24,12 +24,13 @@ const DEFAULT_SAVE: SaveData = {
  * 校验牌组：只保留存在的卡牌 id，单卡最多 3 张、总数最多 15 张。
  * 长度不足 10 张时直接回退到初始牌组，避免开局抽不到牌或出现不存在的卡导致白屏。
  */
-function sanitizeDeck(raw: unknown): string[] {
+function sanitizeDeck(raw: unknown, killer: string): string[] {
   if (!Array.isArray(raw)) return [...STARTING_DECK];
   const counts = new Map<string, number>();
   const out: string[] = [];
+  const allowed = new Set(deckCardsForKiller(killer).map((card) => card.id));
   for (const id of raw) {
-    if (typeof id !== 'string' || !CARD_MAP[id]) continue;
+    if (typeof id !== 'string' || !CARD_MAP[id] || !allowed.has(id)) continue;
     const used = counts.get(id) ?? 0;
     if (used >= 3 || out.length >= 15) continue;
     counts.set(id, used + 1);
@@ -64,7 +65,7 @@ export function loadSave(): SaveData {
     // 旧版本的牌组里塞满了「攻击牌」。伤害改由挥刀按钮承担之后，
     // 这些牌已经换成了功能性效果，牌组也整体换了套路，所以老档直接换新起始牌组。
     const version = toInt(parsed.version, 1);
-    const deck = version < SAVE_VERSION ? [...STARTING_DECK] : sanitizeDeck(parsed.deck);
+    const deck = version < SAVE_VERSION ? [...STARTING_DECK] : sanitizeDeck(parsed.deck, killer ?? '迈克尔·迈尔斯');
 
     return {
       deck,

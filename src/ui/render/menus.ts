@@ -1,4 +1,4 @@
-import { CARDS } from '../../game/cards';
+import { CARDS, deckCardsForKiller } from '../../game/cards';
 import { BASE_AP } from '../../game/engine';
 import { KILLERS } from '../../game/killers';
 import type { SaveData } from '../../game/types';
@@ -69,7 +69,7 @@ export function renderMenu(save: SaveData): string {
           <div><small>历史最高分</small><b>${save.bestScore}</b></div>
           <div><small>完成任务数</small><b>${save.wins}</b></div>
           <div><small>当前牌组</small><b>${save.deck.length} 张</b></div>
-          <div><small>已解锁卡牌</small><b>${save.unlockedCards.length} / ${CARDS.length}</b></div>
+          <div><small>已解锁卡牌</small><b>${save.unlockedCards.filter((id) => deckCardsForKiller(killer.owner).some((card) => card.id === id)).length} / ${deckCardsForKiller(killer.owner).length}</b></div>
         </div>
         <div class="actions">
           <button class="btn primary" data-action="start">开始任务</button>
@@ -113,7 +113,7 @@ export function shopPrice(cardCost: number): number {
 }
 
 export function renderShop(save: SaveData): string {
-  const rows = CARDS.filter((card) => !save.unlockedCards.includes(card.id))
+  const rows = deckCardsForKiller(save.killer ?? '').filter((card) => !save.unlockedCards.includes(card.id))
     .map((card) => {
       const price = shopPrice(card.cost);
       return `
@@ -142,11 +142,11 @@ export function renderShop(save: SaveData): string {
   `;
 }
 
-export function renderDeckEditor(deck: string[], unlocked: string[]): string {
+export function renderDeckEditor(deck: string[], unlocked: string[], killer = '迈克尔·迈尔斯'): string {
   const counts: Record<string, number> = {};
   deck.forEach((id) => (counts[id] = (counts[id] ?? 0) + 1));
 
-  const rows = CARDS.map((card) => {
+  const rows = deckCardsForKiller(killer).map((card) => {
     const count = counts[card.id] ?? 0;
     const isUnlocked = unlocked.includes(card.id);
     return `
@@ -171,7 +171,7 @@ export function renderDeckEditor(deck: string[], unlocked: string[]): string {
       <div class="modal deck-modal">
         <button class="btn back-top" data-action="deck-cancel">← 返回主菜单</button>
         <h1>牌组<span>构筑</span></h1>
-        <p>牌组需要 10–15 张牌，同一种卡牌最多 3 张。点击加减号调整，保存后才会生效。</p>
+        <p>当前角色：${escape(killer)}。只能从通用初始卡与该角色专属卡中构筑；牌组需要 10–15 张，同一种卡牌最多 3 张。</p>
         <div class="deck-list">${rows}</div>
         <div class="actions">
           <button class="btn primary" data-action="deck-save" ${deck.length < 10 || deck.length > 15 ? 'disabled' : ''}>保存并返回（${deck.length} 张）</button>
