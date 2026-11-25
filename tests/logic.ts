@@ -481,7 +481,9 @@ function caseTrailDecay(): void {
   const now = visibleTrails(s).length;
   for (let i = 0; i < 4; i++) s.trailClock += 1;
   const later = visibleTrails(s).length;
-  check('L 痕迹只留最近两次行动', now > 0 && later === 0, `${now} → ${later}`);
+  s.trailClock += 1;
+  const expired = visibleTrails(s).length;
+  check('L 痕迹在 5 次行动内保留，之后自然过期', now > 0 && later > 0 && expired === 0, `${now} → ${later} → ${expired}`);
 }
 
 /** M：同屋多人时，点谁打谁 */
