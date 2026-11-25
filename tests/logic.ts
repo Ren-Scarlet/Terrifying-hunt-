@@ -1261,10 +1261,13 @@ function caseNewPerkSystem(): void {
   worker.room = fogRoom;
   worker.intent = 'work';
   worker.goal = 'objective';
+  worker.hidden = false;
+  worker.trackedTurns = 0;
+  worker.lastSeenTurn = 0;
   bitter.hand = [{ uid: 'test-bitter', defId: 'bitter_murmur' }];
   bitter.energy = 6;
   playCard(bitter, 'test-bitter');
-  check('苦涩低语显示工作者两次行动但不泄露身份', (worker.revealedActions ?? 0) > 0 && !isPersonVisible(bitter, worker));
+  check('苦涩低语显示工作者两次行动但不泄露身份', (worker.revealedActions ?? 0) > 0 && !isPersonVisible(bitter, worker), `revealed=${worker.revealedActions ?? 0} visible=${isPersonVisible(bitter, worker)} room=${worker.room} player=${bitter.playerRoom}`);
 
   const reveal = createGame(['hell'], undefined, '迈克尔·迈尔斯');
   reveal.hand = [{ uid: 'test-hell', defId: 'hell' }];
