@@ -1292,7 +1292,7 @@ function caseNewPerkSystem(): void {
   food.energy = 6;
   food.hand = [{ uid: 'test-food-1', defId: 'myers_plaything' }];
   const firstFoodPlayed = withRandomSource(() => 0.99, () => playCard(food, 'test-food-1'));
-  check('戏耍食物要求视野内有血祭品、获得印记并将其送出视线', firstFoodPlayed && food.myersFoodMarks === 1 && !isPersonVisible(food, sacrifice));
+  check('戏耍食物要求视野内有血祭品、获得印记并将其送出视线', firstFoodPlayed && food.myersFoodMarks === 1 && !isPersonVisible(food, sacrifice), `played=${firstFoodPlayed} marks=${food.myersFoodMarks} room=${sacrifice.room} player=${food.playerRoom} visible=${isPersonVisible(food, sacrifice)} blocked=${sacrifice.blockedTurns}`);
   sacrifice.room = food.playerRoom;
   food.hand = [{ uid: 'test-food-2', defId: 'myers_plaything' }];
   const energyBeforeSecondFood = food.energy;
