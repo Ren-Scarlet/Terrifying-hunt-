@@ -553,7 +553,7 @@ function caseSneaky(): void {
   check('W 有老练的幸存者', s.people.some((p) => p.role !== 'police' && p.sneaky), '至少两名知名角色带此技巧');
 }
 
-check('开局行动点为 7', newGame().energy === BASE_AP, String(newGame().energy));
+check('开局行动点为 4', newGame().energy === BASE_AP, String(newGame().energy));
 caseBoltOnEnter();
 caseAmbush();
 casePursue();
