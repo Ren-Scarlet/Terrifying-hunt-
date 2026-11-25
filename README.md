@@ -16,7 +16,7 @@ npm run preview    # 预览构建产物
 ### 改完东西怎么验（不要开浏览器）
 
 ```bash
-npm run check      # 约 3 秒：类型检查 + 11 条规则回归 + 39 局胜率抽样
+npm run check      # 类型检查 + 规则回归 + 39 局胜率抽样
 npm run check:full # 13 杀手 × 8 局，只用于最终平衡
 ```
 
