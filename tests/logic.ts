@@ -9,6 +9,9 @@ import {
   BASE_AP,
   BLEEDOUT_TURNS,
   DOWNED_LOCK_TURNS,
+  HAND_LIMIT,
+  drawCardAction,
+  discardCard,
   FRENZY_AP_BONUS,
   SEARCH_COST,
   TEAM_STAGE_COUNT,
@@ -67,6 +70,60 @@ function newGame(): GameState {
 }
 
 /** 房间导航模块：验证随机生成的房屋图最短路与候选点选择。 */
+
+/** 新抽牌规则：每回合补 1 张、主动抽牌、六张上限、洗牌推进团队进度。 */
+function caseDrawAndDiscardRules(): void {
+  const s = newGame();
+  check('抽牌规则：开局仍有 5 张手牌', s.hand.length === 5, `hand=${s.hand.length}`);
+  const initialDeck = s.drawPile.length;
+  s.people.forEach((p) => { p.alert = 0; p.item = null; p.itemUses = 0; });
+  endTurn(s);
+  check('抽牌规则：新回合只补 1 张且保留原手牌', s.hand.length === 6 && s.drawPile.length === initialDeck - 1, `hand=${s.hand.length} deck=${s.drawPile.length}`);
+
+  const draw = newGame();
+  draw.energy = 2;
+  const before = draw.hand.length;
+  const ok = drawCardAction(draw);
+  check('抽牌规则：主动抽 1 张消耗 1 AP', ok && draw.hand.length === before + 1 && draw.energy === 1, `hand=${draw.hand.length} AP=${draw.energy}`);
+
+  const discard = newGame();
+  discard.hand = [...discard.hand, ...discard.hand.slice(0, 2).map((card, index) => ({ ...card, uid: `${card.uid}-extra-${index}` }))];
+  const denied = !drawCardAction(discard);
+  const selected = discard.hand[0].uid;
+  const dropped = discardCard(discard, selected);
+  check('抽牌规则：手牌超过 6 张必须先弃牌', denied && dropped && discard.hand.length === HAND_LIMIT && discard.discardPile.some((c) => c.uid === selected));
+  check('抽牌规则：弃牌后恢复正常操作', discard.hand.length === HAND_LIMIT && drawCardAction(discard) && discard.hand.length === HAND_LIMIT + 1);
+
+  const shuffle = newGame();
+  shuffle.drawPile = [];
+  shuffle.discardPile = [{ uid: 'reshuffle-test', defId: 'silent_step' }];
+  const progress = shuffle.teamProgress;
+  drawCardAction(shuffle);
+  check('抽牌规则：牌库耗尽洗回弃牌堆并推进团队进度', shuffle.teamProgress >= progress + 5 && shuffle.hand.some((c) => c.uid === 'reshuffle-test'), `team=${progress}→${shuffle.teamProgress}`);
+
+  const flee = newGame();
+  const victim = player(flee);
+  const escapeSetup = Object.values(ROOM_MAP).find((room) =>
+    room.neighbors.filter((r) => !OBSTACLE_ROOMS.includes(r)).length >= 2,
+  );
+  if (escapeSetup) {
+    const playerNeighbor = escapeSetup.neighbors.find((r) => !OBSTACLE_ROOMS.includes(r))!;
+    flee.playerRoom = playerNeighbor;
+    victim.room = escapeSetup.id;
+    victim.hp = 2;
+    victim.alert = 100;
+    victim.intent = 'flee';
+    victim.hidden = false;
+    victim.blockedTurns = 0;
+    victim.movesThisTurn = 3;
+    const beforeRoom = victim.room;
+    endTurn(flee);
+    check('回合结束：同屋幸存者即使移动次数用尽也会尝试逃跑', victim.room !== beforeRoom || !flee.people.some((p) => p.id === victim.id), `room=${victim.room}`);
+  } else {
+    check('回合结束：同屋幸存者即使移动次数用尽也会尝试逃跑', false, '随机户型没有两条可走出口');
+  }
+}
+
 function caseNavigationUtilities(): void {
   const state = newGame();
   const start = state.playerRoom;
@@ -847,6 +904,7 @@ function caseMergeAndMissions(): void {
 
 caseNavigationUtilities();
 caseMergeAndMissions();
+caseDrawAndDiscardRules();
 
 /** 本轮：人人可救援 / 主动赶去救 / 连杀之后团队进度被催快 */
 function caseAidAndPressure(): void {

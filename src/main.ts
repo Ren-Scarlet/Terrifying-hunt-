@@ -3,6 +3,8 @@ import { CARD_MAP } from './game/cards';
 import {
   attack,
   createGame,
+  discardCard,
+  drawCardAction,
   endTurn,
   giveUp,
   movePlayer,
@@ -286,6 +288,14 @@ app.addEventListener('click', (event) => {
     return;
   }
 
+  if (action === 'discard') {
+    if (!game || screen !== 'game') return;
+    const cardUid = target.dataset.uid;
+    if (cardUid) discardCard(game, cardUid);
+    afterAction();
+    return;
+  }
+
   if (action === 'guide') {
     guideOpen = true;
     render();
@@ -387,6 +397,11 @@ app.addEventListener('click', (event) => {
     return;
   }
 
+  // 超过手牌上限时，必须先逐张选择弃牌；禁止用结束回合或其他动作绕过。
+  if (game && screen === 'game' && game.hand.length > 6 && action !== 'discard' && action !== 'mute') {
+    return;
+  }
+
   if (action === 'person') {
     const personId = target.dataset.personId;
     if (personId && game && screen === 'game') {
@@ -414,6 +429,12 @@ app.addEventListener('click', (event) => {
   }
 
   if (!game || screen !== 'game') return;
+
+  if (action === 'draw') {
+    drawCardAction(game);
+    afterAction();
+    return;
+  }
 
   if (action === 'move') {
     const room = target.dataset.room as RoomId | undefined;
