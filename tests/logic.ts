@@ -231,6 +231,23 @@ function caseFinisher(): void {
   const ok2 = play(s2, 'execute');
   check('F 处决牌也能结束倒地者', ok2 && s2.people.length < before2, ok2 ? (s2.people.length < before2 ? '已处决' : 'hp=' + v2.hp) : '牌被拒绝');
 
+  // 处决范围必须限制在玩家当前房间，不能波及其他房间的倒地者
+  const scoped = newGame();
+  const localDowned = scoped.people.find((p) => p.role !== 'police')!;
+  const remoteDowned = scoped.people.find((p) => p.role !== 'police' && p.id !== localDowned.id)!;
+  localDowned.room = scoped.playerRoom;
+  localDowned.hp = 0;
+  localDowned.downedTurns = DOWNED_LOCK_TURNS;
+  remoteDowned.room = openNeighbor(scoped.playerRoom);
+  remoteDowned.hp = 0;
+  remoteDowned.downedTurns = DOWNED_LOCK_TURNS;
+  const scopedPlayed = play(scoped, 'execute');
+  check(
+    'F 处决牌只处决当前房间目标',
+    scopedPlayed && !scoped.people.some((p) => p.id === localDowned.id) && scoped.people.some((p) => p.id === remoteDowned.id),
+    `local=${scoped.people.some((p) => p.id === localDowned.id)} remote=${scoped.people.some((p) => p.id === remoteDowned.id)}`,
+  );
+
   const s3 = newGame();
   const v3 = player(s3);
   v3.room = s3.playerRoom;
