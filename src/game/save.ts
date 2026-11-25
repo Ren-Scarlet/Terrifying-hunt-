@@ -65,7 +65,7 @@ export function loadSave(): SaveData {
     // 旧版本的牌组里塞满了「攻击牌」。伤害改由挥刀按钮承担之后，
     // 这些牌已经换成了功能性效果，牌组也整体换了套路，所以老档直接换新起始牌组。
     const version = toInt(parsed.version, 1);
-    const deck = version < SAVE_VERSION ? [...STARTING_DECK] : sanitizeDeck(parsed.deck, killer);
+    const deck = version < SAVE_VERSION ? [...STARTING_DECK] : sanitizeDeck(parsed.deck, killer ?? '迈克尔·迈尔斯');
 
     return {
       deck,
