@@ -45,6 +45,7 @@ import type {
   Trail,
   SiteItem,
   SiteItemKind,
+  MissionTask,
   SurvivorItem,
 } from './types';
 
@@ -2428,9 +2429,9 @@ export function sabotageSiteItem(state: GameState): boolean {
     circuit.broken = true;
     log(state, `你砸毁了${circuit.name}控制箱！${circuit.affectedRooms.map(roomName).join('、')}立即断电，灯光熄灭。`);
   } else if (item!.kind === 'itemBox') {
-    item.broken = true;
-    item.charges = 0;
-    log(state, `你砸烂了${roomName(item.room)}的道具箱——从今往后，没人能从这里翻到道具了。`);
+    item!.broken = true;
+    item!.charges = 0;
+    log(state, `你砸烂了${roomName(item!.room)}的道具箱——从今往后，没人能从这里翻到道具了。`);
   } else {
     const before = item!.progress;
     item!.progress = Math.max(0, item!.progress - SABOTAGE_GEN_LOSS);
