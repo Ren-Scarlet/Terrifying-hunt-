@@ -143,6 +143,16 @@ function caseMyersStalkingAndFearRadius(): void {
   runOps(s, [{ op: 'flag', key: 'myersStalk' }]);
   check('迈尔斯：尾随者技能切换开启潜行模式', s.myersStalking);
   check('迈尔斯：尾随模式移动额外消耗 1 点行动点', moveCost(s, next) === beforeCost + 1);
+
+  const stealth = newGame();
+  const hiddenTarget = player(stealth);
+  const stealthRoom = openNeighbor(stealth.playerRoom);
+  hiddenTarget.room = stealthRoom;
+  runOps(stealth, [{ op: 'flag', key: 'myersStalk' }]);
+  stealth.energy = 9;
+  movePlayer(stealth, stealthRoom);
+  check('迈尔斯：尾随者模式进入幸存者所在房间也不会被察觉', hiddenTarget.alert === 0 && hiddenTarget.awareness === 0, `alert=${hiddenTarget.alert} awareness=${hiddenTarget.awareness}`);
+
   victim.room = s.playerRoom;
   const beforeStalk = s.stalkMeter;
   endTurn(s);
