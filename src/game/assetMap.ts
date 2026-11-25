@@ -22,7 +22,7 @@ export const ASSET_PATHS: AssetPaths = {
   characters: {
     /** 警员借用「大卫·塔普」警探的肖像 */
     'police-0': 'assets/characters/portraits/S12_DavidTapp_Portrait.webp',
-    player: 'assets/characters/michael-myers.webp',
+    player: 'assets/characters/killers/迈尔斯.webp',
   },
   ui: {
     mission: 'assets/ui/mission.png',

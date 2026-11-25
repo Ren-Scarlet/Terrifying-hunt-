@@ -7,12 +7,18 @@ import {
   uiIcon,
 } from '../game/assetMap';
 import {
-  canEnterPossession,
+  ESCAPE_ROOMS,
+  GOAL_LABEL,
+  INTENT_LABEL,
   canMoveTo,
-  canUseKillerAbility,
+  canUsePower,
   currentScore,
   effectiveCost,
   getStars,
+  isLocked,
+  moveCost,
+  powerBlockReason,
+  powerCooldown,
 } from '../game/engine';
 import { KILLERS, type KillerProfile } from '../game/killers';
 import { roomName } from '../game/missions';
@@ -25,6 +31,7 @@ import {
   TOTEM_ROOMS,
 } from '../game/rooms';
 import { getPersonProfile, type PersonProfile } from '../game/people';
+import { SURVIVOR_MAP } from '../game/survivors';
 import type { GameState, Person, RoomId, SaveData } from '../game/types';
 
 const escape = (s: string) =>
@@ -70,6 +77,17 @@ function perkIconHtml(defId: string, size = ''): string {
   `;
 }
 
+/** 杀手头像：有立绘用立绘，没有就退回力量图标，统一装进同一个框里 */
+export function killerFaceHtml(killer: KillerProfile, cls = ''): string {
+  if (killer.portrait) {
+    return `<span class="killer-face art ${cls}"><img src="${killer.portrait}" alt="" onerror="this.style.display='none'"></span>`;
+  }
+  return `<span class="killer-face glyph ${cls}">
+      <img class="face-bg" src="${POWER_RARITY_BG}" alt="" onerror="this.style.display='none'">
+      <img class="face-icon" src="${killer.icon}" alt="" onerror="this.style.display='none'">
+    </span>`;
+}
+
 function powerIconHtml(killer: KillerProfile): string {
   return `
     <div class="dbd-power">
@@ -79,21 +97,16 @@ function powerIconHtml(killer: KillerProfile): string {
   `;
 }
 
-function killerPortraitHtml(killer: KillerProfile): string {
-  if (!killer.portrait) return '';
-  return `<img class="killer-portrait" src="${killer.portrait}" alt="${escape(killer.owner)}立绘" onerror="this.style.display='none'">`;
-}
-
 export function getKiller(owner?: string): KillerProfile {
   return KILLERS.find((k) => k.owner === owner) ?? KILLERS[0];
 }
 
 export function defaultDetailHtml(): string {
   return detailCardHtml('信息面板', '悬停或选中卡牌、点击人物查看资料', '档案', [
-    '点击手牌查看完整效果；点击房间中的人物头像查看档案与立绘。',
-    '攻击只能依靠卡牌。人物会警觉、躲避和逃跑，先布局再下手。',
-    '每回合可使用一次杀手能力；移动、出牌都受能量和步数限制。',
-    '结束回合会弃掉手牌并重新抽 5 张，别把牌囤在手里。',
+    '点击手牌查看完整效果；点击房间中的人物头像查看档案、目的和警觉。',
+    '每个人都有目的：想打电话的会摸向书房，想逃的会往后院跑。先看目的，再决定杀谁。',
+    '堵门的房间要多花 1 步才能进；「所向无敌」可以直接撞开。',
+    '两个杀手能力分开冷却：主力技每回合可用，大招要等 3 回合。',
   ]);
 }
 
@@ -103,14 +116,21 @@ export function cardDetailHtml(state: GameState, cardUid: string): string {
   const def = CARD_MAP[card.defId];
   if (!def) return defaultDetailHtml();
   const cost = effectiveCost(card.defId, state);
+  const paras = [def.desc, def.flavor];
+  if (def.sourceText) paras.push(`图鉴原效果：${def.sourceText}`);
   return detailCardHtml(
     def.name,
-    `费用 ${cost} / ${TYPE_NAMES[def.type] ?? def.type} / 原创机制${def.sourceSkill ? ` · 图标原型 ${def.sourceSkill}` : ''}`,
+    `费用 ${cost} / ${TYPE_NAMES[def.type] ?? def.type} / 图标取自 ${def.sourceSkill}`,
     TYPE_NAMES[def.type] ?? def.type,
-    [def.desc, def.flavor, '注：卡牌名称、描述与效果均为本项目原创，技能名仅作图标来源标注。'],
+    paras,
     TYPE_RARITY[def.type] ?? 'rare',
     perkIconHtml(def.id),
   );
+}
+
+function intentDot(person: Person): string {
+  if (person.intent === 'idle') return '';
+  return `<i class="intent-dot i-${person.intent}" title="${escape(INTENT_LABEL[person.intent])}"></i>`;
 }
 
 function personChip(person: Person): string {
@@ -123,11 +143,14 @@ function personChip(person: Person): string {
           : 'target'
         : 'civilian';
   const img = characterImage(person.id);
-  const alertMark = person.alert >= 70 ? '<span class="chip-alert high">!</span>' : person.alert >= 35 ? '<span class="chip-alert">?</span>' : '';
+  const alertMark =
+    person.alert >= 70 ? '<span class="chip-alert high">!</span>'
+      : person.alert >= 35 ? '<span class="chip-alert">?</span>' : '';
+  const label = person.intent === 'idle' ? person.activity : INTENT_LABEL[person.intent];
   return `<button type="button" class="person-chip ${cls}" data-action="person" data-person-id="${person.id}"
-    title="${escape(person.name)} · 生命 ${person.hp} · 警觉 ${person.alert}/100 · 正在${escape(person.activity)} · 点击查看档案">
+    title="${escape(person.name)} · 生命 ${person.hp} · 警觉 ${person.alert}/100 · ${escape(GOAL_LABEL[person.goal])} · 正在${escape(label)}">
     ${img ? `<img src="${img}" alt="" onerror="this.style.display='none'">` : ''}
-    <span>${escape(person.name)}</span>${alertMark}
+    <span>${escape(person.name)}</span>${intentDot(person)}${alertMark}
   </button>`;
 }
 
@@ -155,14 +178,19 @@ export function personDetailHtml(state: GameState, personId: string): string {
   const roleName = profile.role === 'police' ? '警察' : profile.role === 'target' ? '目标' : '平民';
   const rarityKey = profile.role === 'police' ? 'rare' : profile.role === 'target' ? 'visceral' : 'common';
   const rarityLabel = person?.marked ? '标记目标' : roleName;
-  const status = person
-    ? `当前位置：${roomName(person.room)} · 生命 ${person.hp} · 警觉 ${person.alert}/100 · 正在${person.activity}${person.marked ? ' · 已被标记' : ''}`
-    : '档案状态：已从现场消失。';
+  const threat = SURVIVOR_MAP[personId]?.threat;
+  const paras = [...profile.bio, `习惯：${profile.habit}`, `秘密：${profile.secret}`];
+  if (person) {
+    paras.push(`目的：${GOAL_LABEL[person.goal]}。警觉 ${person.alert}/100，当前${INTENT_LABEL[person.intent]}。`);
+    if (threat) paras.push(`威胁：这名角色会主动对抗你，别把他当普通平民。`);
+  } else {
+    paras.push('档案状态：已从现场消失。');
+  }
   return detailCardHtml(
     profile.name,
     `${roleName} / ${profile.occupation} / ${profile.age} 岁 · ${profile.tags.join(' · ')}`,
     rarityLabel,
-    [...profile.bio, `习惯：${profile.habit}`, `秘密：${profile.secret}`, status],
+    paras,
     rarityKey,
     `<div class="person-detail-lead">${personPortraitHtml(profile)}</div>`,
   );
@@ -178,11 +206,15 @@ export function renderMenu(save: SaveData): string {
       data-action="${unlocked ? 'killer' : 'unlock-killer'}" data-owner="${escape(k.owner)}"
       ${disabled ? 'disabled' : ''}
       title="${escape(k.owner)}${unlocked ? '' : ` · 需要 2 暗金细胞解锁`}">
-      ${k.portrait ? `<img src="${k.portrait}" alt="">` : `<img src="${k.icon}" alt="">`}
+      ${killerFaceHtml(k)}
       <span>${escape(k.owner)}</span>
       ${unlocked ? '' : `<em>${icon('darkCell', 'ui-icon tiny')} 2</em>`}
     </button>`;
   }).join('');
+
+  const powerLines = killer.powers.map(
+    (p) => `${p.name}（${p.ultimate ? `大招 · CD ${p.cooldown}` : `CD ${p.cooldown}`}）：${p.desc}`,
+  );
 
   return `
     <div class="overlay menu-overlay">
@@ -202,19 +234,27 @@ export function renderMenu(save: SaveData): string {
           <div class="menu-mission">
             ${icon('mission', 'ui-icon large')}
             <div><small>本局流程</small><b>接取契约 → 潜入布局 → 猎杀撤离</b></div>
-            <p>布局牌在行动阶段打出。完成任务获得血点与暗金细胞。</p>
+            <p>房子里的人各有目的：报警、躲柜子、翻后院。跑掉太多人就输了。</p>
           </div>
         </div>
 
         <div class="section-title">选择你的怪物 <small>力量图标取自图鉴 · 全部游戏机制原创</small></div>
         <div class="killer-picker">${picker}</div>
         <div class="detail-wrap">${detailCardHtml(
-          killer.mechanic.name,
-          `${killer.owner} · ${killer.title} / ${killer.school === 'supernatural' ? '灵异系' : '现实系'}`,
+          killer.owner,
+          `${killer.title} / ${killer.school === 'supernatural' ? '灵异系' : '现实系'} · 两个能力分开冷却`,
           '力量',
-          [killer.mechanic.short, ...killer.mechanic.detail, killer.sourceNote],
+          [
+            ...(killer.passive ? [`被动 · ${killer.passive.name}：${killer.passive.short}`] : []),
+            ...powerLines,
+            killer.sourceNote,
+          ],
           'common',
-          `<div class="killer-detail-lead">${killerPortraitHtml(killer)}${powerIconHtml(killer)}</div>`,
+          `<div class="killer-detail-lead">${
+            killer.portrait
+              ? `<img class="killer-portrait" src="${killer.portrait}" alt="${escape(killer.owner)}立绘" onerror="this.style.display='none'">`
+              : ''
+          }${powerIconHtml(killer)}</div>`,
         )}</div>
 
         <div class="menu-stats">
@@ -242,11 +282,16 @@ export function renderGuide(): string {
         <h1>玩法<span>指引</span></h1>
         <div class="guide-grid">
           <div class="guide-card">${icon('mission')}<b>1 · 接取契约</b><p>每局随机获得任务。主目标旁会显示${icon('missionTarget', 'ui-icon tiny')}标记，告诉你要击杀谁、需要多少证据或仪式进度。</p></div>
-          <div class="guide-card">${icon('darkCell')}<b>2 · 现场布局</b><p>布局牌（绿色）和别的卡牌一样在行动阶段打出：剪断电话线、引开注意、安装窃听、拉闸断电。布局也能成为牌组的一部分。</p></div>
-          <div class="guide-card">${icon('escape')}<b>3 · 追踪与猎杀</b><p>点击亮起的相邻房间移动（发光的门就是通道）。点击人物查看${icon('missionTarget', 'ui-icon tiny')}档案。NPC 会警觉、躲避、逃跑，先用潜行或布局降低警觉，再用攻击卡下手。</p></div>
-          <div class="guide-card">${icon('bloodPoint')}<b>4 · 卡牌与评分</b><p>手牌每张都有费用，每回合恢复 3 能量与 2 步数，结束回合会弃掉手牌并重抽 5 张。悬停或选中卡牌查看完整效果，胜利按评分发放血点。</p></div>
+          <div class="guide-card">${icon('darkCell')}<b>2 · 现场布局</b><p>布局牌（绿色）在行动阶段打出：剪断电话线、封死逃生点、装窃听。布局打早了才有用。</p></div>
+          <div class="guide-card">${icon('escape')}<b>3 · 他们想跑</b><p>点人物头像能看到他的<b>目的</b>：想打电话的会往书房摸，想逃的会往${icon('escape', 'ui-icon tiny')}后院跑。跑到后院的人只要再撑一回合就翻出去了。</p></div>
+          <div class="guide-card">${icon('bloodPoint')}<b>4 · 卡牌与评分</b><p>每回合恢复 3 能量与 2 步数，结束回合弃掉手牌重抽 5 张。跑掉的人会扣分，标记目标跑掉直接判负。</p></div>
         </div>
-        <div class="guide-note">${icon('totem', 'ui-icon tiny')} 图腾房间：在此结束回合，下回合 +1 能量。 ${icon('cabinet', 'ui-icon tiny')} 柜子房间：藏身者不会被引诱类卡牌锁定。 ${icon('obstacle', 'ui-icon tiny')} 障碍房间：需要「破窗而入」或恶魔附身才能进入，人也不会主动逃进去。</div>
+        <div class="guide-note">
+          ${icon('totem', 'ui-icon tiny')} 图腾：在此结束回合，下回合 +1 能量。
+          ${icon('cabinet', 'ui-icon tiny')} 柜子：躲进去的人不会被引诱类卡牌锁定。
+          ${icon('obstacle', 'ui-icon tiny')} 障碍：需要「所向无敌」或杀手能力破开。
+          堵门的房间进入要多花 1 步。
+        </div>
         <div class="actions"><button class="btn primary" data-action="guide-close">知道了</button></div>
       </div>
     </div>
@@ -266,7 +311,7 @@ export function renderShop(save: SaveData): string {
           ${perkIconHtml(card.id, 'compact')}
           <div class="shop-info">
             <b>${escape(card.name)} <span style="color:var(--accent)">${card.cost}</span></b>
-            <small>${escape(card.desc)}${card.sourceSkill ? ` · 图标原型 ${escape(card.sourceSkill)}` : ''}</small>
+            <small>${escape(card.desc)} · 图标取自 ${escape(card.sourceSkill)}</small>
           </div>
           <button class="btn primary" data-action="buy" data-id="${card.id}" ${save.credits < price ? 'disabled' : ''}>${icon('bloodPoint', 'ui-icon tiny')} ${price}</button>
         </div>
@@ -299,7 +344,7 @@ export function renderDeckEditor(deck: string[], unlocked: string[]): string {
         ${perkIconHtml(card.id, 'compact')}
         <div class="deck-row-info">
           <b>${escape(card.name)} <span style="color:var(--accent)">${card.cost}</span></b>
-          <small>${isUnlocked ? escape(card.desc) : '未解锁 · 可在商店购买'}${card.sourceSkill ? `<br><span class="source-skill">图标原型：${escape(card.sourceSkill)} · 效果原创</span>` : ''}</small>
+          <small>${isUnlocked ? escape(card.desc) : '未解锁 · 可在商店购买'}<br><span class="source-skill">图标原型：${escape(card.sourceSkill)} · 效果为本作原创</span></small>
         </div>
         <div class="counter">
           <button data-action="deck-remove" data-id="${card.id}" ${count === 0 ? 'disabled' : ''}>−</button>
@@ -329,36 +374,63 @@ export function renderDeckEditor(deck: string[], unlocked: string[]): string {
 function roomFeatures(roomId: RoomId): string {
   const parts: string[] = [];
   if (roomId === EXIT_ROOM) parts.push(`<span class="room-feature escape" title="撤离点：任务完成的撤离位置">${icon('escape', 'ui-icon tiny')}</span>`);
+  if (ESCAPE_ROOMS.includes(roomId)) parts.push(`<span class="room-feature escape-npc" title="逃生点：NPC 在这里待满一回合就会逃出去">${icon('escape', 'ui-icon tiny')}</span>`);
   if (TOTEM_ROOMS.includes(roomId)) parts.push(`<span class="room-feature totem" title="图腾：在此结束回合，下回合 +1 能量">${icon('totem', 'ui-icon tiny')}</span>`);
   if (CABINET_ROOMS.includes(roomId)) parts.push(`<span class="room-feature cabinet" title="柜子：藏身者不会被引诱类卡牌锁定">${icon('cabinet', 'ui-icon tiny')}</span>`);
-  if (OBSTACLE_ROOMS.includes(roomId)) parts.push(`<span class="room-feature obstacle" title="障碍物：需破门或恶魔附身才能进入">${icon('obstacle', 'ui-icon tiny')}</span>`);
+  if (OBSTACLE_ROOMS.includes(roomId)) parts.push(`<span class="room-feature obstacle" title="障碍物：需所向无敌或杀手能力破开">${icon('obstacle', 'ui-icon tiny')}</span>`);
   return parts.join('');
+}
+
+function powerButtonHtml(state: GameState, killer: KillerProfile): string {
+  return killer.powers
+    .map((p) => {
+      const cd = powerCooldown(state, p.id);
+      const ok = canUsePower(state, p.id);
+      const reason = powerBlockReason(state, p.id);
+      const total = Math.max(1, p.cooldown);
+      const pips = Array.from({ length: total }, (_, i) => {
+        const filled = i < cd;
+        return `<i class="${filled ? 'on' : ''}"></i>`;
+      }).join('');
+      return `<button class="btn power ${p.ultimate ? 'ultimate' : 'main'} ${ok ? '' : 'cooling'}"
+        data-action="power" data-power="${p.id}" ${ok ? '' : 'disabled'}
+        title="${escape(p.desc)}${reason ? ` · ${escape(reason)}` : ''}">
+        <span class="power-art"><img class="power-glyph" src="${killer.icon}" alt="" onerror="this.style.display='none'"></span>
+        <span class="power-body">
+          <b>${escape(p.name)}${p.ultimate ? '<em>大招</em>' : ''}</b>
+          <small>${cd > 0 ? `冷却 ${cd} 回合` : reason || (p.ultimate ? '可以发动' : '可以使用')}</small>
+        </span>
+        <span class="power-pips">${pips}</span>
+      </button>`;
+    })
+    .join('');
 }
 
 export function renderGame(state: GameState, killer: KillerProfile): string {
   const m = state.mission;
   const here = state.people.filter((p) => p.room === state.playerRoom && p.role !== 'police');
   const policeHere = state.people.some((p) => p.room === state.playerRoom && p.role === 'police');
-  const isStalker = killer.mechanic.id === 'stalker';
-  const abilityDisabled = !canUseKillerAbility(state);
-  const abilityLabel = state.possessed ? '恶魔附身 · 处决' : `杀手能力 · ${killer.mechanic.name}`;
+  const isMyers = killer.owner === '迈克尔·迈尔斯';
+  const maxEscaped = m.maxEscaped ?? 2;
 
   const rooms = ROOMS.map((room) => {
     const people = state.people.filter((p) => p.room === room.id && p.role !== 'police');
     const police = state.people.find((p) => p.room === room.id && p.role === 'police');
     const isPlayer = state.playerRoom === room.id;
     const reachable = canMoveTo(state, room.id);
-    const locked = state.lockedRooms.includes(room.id);
+    const locked = isLocked(state, room.id);
+    const barricaded = state.barricades.includes(room.id);
+    const cost = moveCost(state, room.id);
     const r = room.rect;
     const style = `left:${r.left}%;top:${r.top}%;width:${r.width}%;height:${r.height}%`;
     return `
-      <div class="room ${isPlayer ? 'current' : ''} ${reachable ? 'reachable' : 'disabled'} ${room.id === 'garden' ? 'outdoor' : ''}"
+      <div class="room ${isPlayer ? 'current' : ''} ${reachable ? 'reachable' : 'disabled'} ${room.id === 'garden' ? 'outdoor' : ''} ${locked ? 'locked' : ''} ${barricaded ? 'barricaded' : ''}"
         style="${style}" data-room="${room.id}" title="${escape(room.name)}：${escape(room.desc)}">
         ${reachable ? `<button type="button" class="room-hit" data-action="move" data-room="${room.id}"
-          aria-label="移动到${escape(room.name)}"></button>` : ''}
+          aria-label="移动到${escape(room.name)}${cost > 1 ? `（堵门，需 ${cost} 步）` : ''}"></button>` : ''}
         <div class="room-head">
           <span class="room-name">${escape(room.name)}</span>
-          ${isPlayer ? '<span class="room-tag">你在</span>' : locked ? '<span class="room-tag">封锁</span>' : ''}
+          ${isPlayer ? '<span class="room-tag">你在</span>' : locked ? '<span class="room-tag lock">封锁</span>' : barricaded ? `<span class="room-tag bar">堵门 ${cost}步</span>` : ''}
         </div>
         <div class="room-desc">${escape(room.desc)}</div>
         <div class="room-features">${roomFeatures(room.id)}</div>
@@ -374,7 +446,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
   const markerStyle = `left:${currentRect.left + currentRect.width / 2}%;top:${currentRect.top + currentRect.height / 2}%`;
   const playerMarker = `
     <div class="player-marker" style="${markerStyle}" title="你在这里：${escape(killer.owner)}">
-      ${killer.portrait ? `<img src="${killer.portrait}" alt="">` : `<img src="${killer.icon}" alt="">`}
+      ${killerFaceHtml(killer, 'marker')}
       <span>你</span>
     </div>
   `;
@@ -406,19 +478,21 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
       const alertLabel = p.alert >= 70
         ? '<em class="alert-tag high">警觉</em>'
         : p.alert >= 35 ? '<em class="alert-tag">留意</em>' : '';
-      return `<button class="roster-person ${p.room === state.playerRoom ? 'here' : ''} ${p.marked ? 'marked' : ''}"
-        data-action="person" data-person-id="${p.id}" title="点击查看档案">
+      const intentLabel = p.intent === 'idle' ? GOAL_LABEL[p.goal] : INTENT_LABEL[p.intent];
+      return `<button class="roster-person ${p.room === state.playerRoom ? 'here' : ''} ${p.marked ? 'marked' : ''} ${p.intent === 'escape' ? 'escaping' : ''}"
+        data-action="person" data-person-id="${p.id}" title="${escape(p.name)}：${escape(GOAL_LABEL[p.goal])}，当前${escape(INTENT_LABEL[p.intent])}">
         ${img ? `<img src="${img}" alt="" onerror="this.style.display='none'">` : ''}
-        <span><b>${escape(p.name)} ${alertLabel}</b><small>${roomName(p.room)} · ${p.hp} HP · ${escape(p.activity)}</small></span>
+        <span><b>${escape(p.name)} ${alertLabel}</b>
+          <small class="goal-line">${escape(GOAL_LABEL[p.goal])}</small>
+          <small>${roomName(p.room)} · ${p.hp} HP · ${escape(intentLabel)}</small></span>
       </button>`;
     })
     .join('');
 
-  const meter = isStalker
-    ? `<div class="stalk-meter ${state.possessed ? 'active' : ''}">
-        <div class="stalk-label"><span>${state.possessed ? '恶魔附身中' : '尾随值'}</span><b>${state.stalkMeter}/100</b></div>
+  const meter = isMyers
+    ? `<div class="stalk-meter ${state.stalkMeter >= 100 ? 'active' : ''}">
+        <div class="stalk-label"><span>尾随值</span><b>${state.stalkMeter}/100</b></div>
         <div class="stalk-track"><div class="stalk-fill" style="width:${state.stalkMeter}%"></div></div>
-        ${canEnterPossession(state) ? '<button class="btn primary possess" data-action="possess">进入恶魔附身</button>' : ''}
       </div>`
     : '';
 
@@ -427,7 +501,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
       <div class="topbar-identity">
         <div class="brand">夜猎<span>档案</span> <small>${icon('mission', 'ui-icon tiny')} ${escape(m.title)}</small></div>
         <div class="killer-chip">
-          ${killer.portrait ? `<img src="${killer.portrait}" alt="">` : `<img src="${killer.icon}" alt="">`}
+          ${killerFaceHtml(killer, 'chip')}
           <span>${escape(killer.owner)} · ${escape(killer.title)}</span>
         </div>
         ${meter}
@@ -436,8 +510,9 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
         <div class="stat"><b>${state.turn}/${m.turns}</b><small>回合</small></div>
         <div class="stat energy"><b>${state.energy}/${state.maxEnergy}</b><small>能量</small></div>
         <div class="stat"><b>${state.steps}</b><small>步数</small></div>
-        <div class="stat wanted"><b>${state.wanted}/10</b><small>通缉值</small></div>
+        <div class="stat wanted"><b>${state.wanted}/${state.arrestThreshold}</b><small>通缉/逮捕</small></div>
         <div class="stat"><b>${state.kills}</b><small>击杀</small></div>
+        <div class="stat ${state.escaped > 0 ? 'escaped' : ''}"><b>${state.escaped}/${maxEscaped}</b><small>逃走</small></div>
         <div class="stat score"><b>${currentScore(state)}</b><small>预计得分</small></div>
       </div>
     </div>
@@ -450,14 +525,15 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
             <div class="mission-title">${escape(m.title)}</div>
             <div class="mission-desc">${escape(m.desc)}</div>
             <div class="mission-meta">
-              <span>奖励 ${m.reward}</span><span>标记击杀 ${state.markedKilled}</span><span>证据 ${state.evidence}</span>
+              <span>奖励 ${m.reward}</span><span>标记击杀 ${state.markedKilled}/${m.kind === 'assassinate' ? (m.targetCount ?? 2) : 1}</span><span>证据 ${state.evidence}</span>
               ${m.kind === 'ritual' ? `<span>仪式 ${state.ritualStreak}/${m.targetCount ?? 2}</span>` : ''}
+              <span class="escape-quota">允许逃走 ${state.escaped}/${maxEscaped}</span>
             </div>
           </div>
         </div>
 
         <div class="panel map-panel">
-          <div class="panel-heading"><h2>房屋平面</h2><span>点击亮起的房间移动 · 发光的长条是门 · 人物会警觉和逃跑</span>
+          <div class="panel-heading"><h2>房屋平面</h2><span>点击亮起的房间移动 · 注意每个人的意图 · 后院是他们的逃生点</span>
             <button class="btn ghost mini" data-action="guide">玩法指引</button>
           </div>
           <div class="floorplan">
@@ -465,20 +541,19 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
             ${playerMarker}
           </div>
           <div class="map-legend">
-            <span>${icon('escape', 'ui-icon tiny')} 逃生点</span>
+            <span>${icon('escape', 'ui-icon tiny')} 撤离点</span>
             <span>${icon('totem', 'ui-icon tiny')} 图腾</span>
             <span>${icon('cabinet', 'ui-icon tiny')} 柜子</span>
             <span>${icon('obstacle', 'ui-icon tiny')} 障碍物</span>
+            <span class="legend-intent"><i class="intent-dot i-flee"></i> 逃跑中 <i class="intent-dot i-call"></i> 打电话 <i class="intent-dot i-escape"></i> 翻篱笆</span>
           </div>
         </div>
 
         <div class="panel hand">
           <div class="panel-heading"><h2>手牌</h2><span>悬停或选中查看完整效果 · 点击打出 · 结束回合重抽</span></div>
           <div class="hand-actions">
-            <button class="btn ability" data-action="ability" ${abilityDisabled ? 'disabled' : ''}
-              title="${escape(killer.mechanic.short)}">${escape(abilityLabel)}</button>
-            <small class="ability-hint">${escape(killer.mechanic.short)}</small>
-            <button class="btn primary" data-action="end-turn">结束回合</button>
+            <div class="power-row">${powerButtonHtml(state, killer)}</div>
+            <button class="btn primary end-turn" data-action="end-turn">结束回合</button>
             <button class="btn ghost" data-action="give-up">放弃任务</button>
           </div>
           <div class="hand-row">${hand || '<div style="color:var(--muted);font-size:13px">手牌已空，结束回合重新抽牌。</div>'}</div>
@@ -521,11 +596,12 @@ export function renderResult(state: GameState, newCard: string | null): string {
       <div class="modal result-modal">
         <div class="subtitle">CONTRACT REPORT</div>
         <h1>${labels[state.result ?? 'failed']}</h1>
+        ${state.resultReason ? `<p class="result-reason">${escape(state.resultReason)}</p>` : ''}
         <div class="result-stars">${'★'.repeat(stars)}${'☆'.repeat(3 - stars)}</div>
         <div class="result-grid">
           <div><small>最终评分</small><b>${state.score}</b></div>
           <div><small>击杀人数</small><b>${state.kills}</b></div>
-          <div><small>剩余回合</small><b>${Math.max(0, state.mission.turns - state.turn)}</b></div>
+          <div><small>逃走人数</small><b>${state.escaped}</b></div>
           <div><small>最终通缉值</small><b>${state.wanted}/10</b></div>
         </div>
         <div class="score-breakdown">${breakdown}</div>

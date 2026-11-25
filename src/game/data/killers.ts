@@ -1,0 +1,485 @@
+import type { KillerPower } from '../effect';
+
+/**
+ * ============================================================================
+ *  杀手数据库
+ * ============================================================================
+ *
+ *  每位杀手有两个主动能力：
+ *    · powers[0]  主力技：冷却 1 回合，每回合都能用，负责建立节奏
+ *    · powers[1]  大招：冷却 3 回合，效果强烈，个别还带开启条件
+ *
+ *  能力效果同样由 effect.ts 的指令描述，改 ops 就能改效果。
+ *  图标取自 public/assets/dbd/powers（选人界面那一批），立绘取自
+ *  public/assets/characters/killers；没有立绘的杀手会退回用力量图标。
+ *
+ *  被动（passive）目前只有迈尔斯的尾随值在引擎里实现，其余杀手的强度
+ *  全部集中在两个主动能力上，避免出现「被动和主动效果重复」的混乱。
+ */
+
+export type KillerSchool = 'supernatural' | 'grounded';
+
+export interface KillerProfile {
+  owner: string;
+  title: string;
+  /** 力量图标 */
+  icon: string;
+  /** 立绘；没有就用 icon 兜底 */
+  portrait?: string;
+  school: KillerSchool;
+  sourceNote: string;
+  /** 被动说明。引擎里真正实现被动的是迈尔斯（尾随值）。 */
+  passive?: { name: string; short: string };
+  powers: KillerPower[];
+}
+
+const NOTE = '力量名称与图标取自图鉴站；能力机制为本作原创。';
+
+export const KILLERS: KillerProfile[] = [
+  {
+    owner: '设陷者',
+    title: '捕兽夹',
+    icon: 'assets/dbd/powers/设陷者.png',
+    school: 'grounded',
+    sourceNote: NOTE,
+    powers: [
+      {
+        id: 'trap_set',
+        name: '布设捕兽夹',
+        desc: '在当前房间和相邻一个房间布下夹子：逃亡者无法穿过这两个房间 2 回合。',
+        cooldown: 1,
+        ops: [
+          { op: 'lockRoom', room: 'here', turns: 2 },
+          { op: 'lockRoom', room: 'adjacent', turns: 2 },
+          { op: 'log', text: '你把夹子按下，弹簧的响声被地毯吞掉了。' },
+        ],
+      },
+      {
+        id: 'trap_lockdown',
+        name: '整层封锁',
+        desc: '所有人的腿都被夹住：全场 NPC 2 回合无法移动。',
+        cooldown: 3,
+        ultimate: true,
+        ops: [
+          { op: 'block', who: 'allAny', turns: 2 },
+          { op: 'log', text: '地板下传来一连串金属咬合的声音，再没有人敢迈步。' },
+        ],
+      },
+    ],
+  },
+  {
+    owner: '幽灵',
+    title: '骷髅丧钟',
+    icon: 'assets/dbd/powers/幽灵.png',
+    school: 'supernatural',
+    sourceNote: NOTE,
+    powers: [
+      {
+        id: 'wraith_bell',
+        name: '丧钟',
+        desc: '本回合隐身：移动无视相邻限制、不计步数，也不会惊动目击者。',
+        cooldown: 1,
+        ops: [
+          { op: 'flag', key: 'freeMove' },
+          { op: 'flag', key: 'noAlarm' },
+          { op: 'steps', amount: 1 },
+          { op: 'log', text: '钟声只响了一下，你已经不在原来的位置。' },
+        ],
+      },
+      {
+        id: 'wraith_rush',
+        name: '穿墙突袭',
+        desc: '本回合步数 +3、无视相邻限制、目击无效，且下次攻击 +2 伤害。',
+        cooldown: 3,
+        ultimate: true,
+        ops: [
+          { op: 'steps', amount: 3 },
+          { op: 'flag', key: 'freeMove' },
+          { op: 'flag', key: 'noAlarm' },
+          { op: 'bonusDamage', amount: 2 },
+          { op: 'log', text: '墙对你来说只是一层薄雾。' },
+        ],
+      },
+    ],
+  },
+  {
+    owner: '护士',
+    title: '斯宾塞的濒死之息',
+    icon: 'assets/dbd/powers/护士.png',
+    school: 'supernatural',
+    sourceNote: NOTE,
+    powers: [
+      {
+        id: 'nurse_blink',
+        name: '瞬步',
+        desc: '本回合步数 +2，移动时不会惊动目击者。',
+        cooldown: 1,
+        ops: [
+          { op: 'steps', amount: 2 },
+          { op: 'flag', key: 'noAlarm' },
+          { op: 'log', text: '地板在你脚下缩短了一截。' },
+        ],
+      },
+      {
+        id: 'nurse_breath',
+        name: '窒息之息',
+        desc: '当前房间所有人受到 3 点伤害，并被压在原地 1 回合。',
+        cooldown: 3,
+        ultimate: true,
+        ops: [
+          { op: 'damage', who: 'allHere', amount: 3 },
+          { op: 'block', who: 'allHere', turns: 1 },
+          { op: 'log', text: '空气突然变得很重，他们连喊都喊不出来。' },
+        ],
+      },
+    ],
+  },
+  {
+    owner: '女猎手',
+    title: '狩猎飞斧',
+    icon: 'assets/dbd/powers/女猎手.png',
+    school: 'grounded',
+    sourceNote: NOTE,
+    powers: [
+      {
+        id: 'huntress_axe',
+        name: '投斧',
+        desc: '对全场警觉最高的人造成 2 点伤害，不论他躲在哪个房间。',
+        cooldown: 1,
+        ops: [
+          { op: 'damage', who: 'highestAlert', amount: 2 },
+          { op: 'log', text: '斧头穿过走廊，钉在了某扇门框上——后面有人在喘气。' },
+        ],
+      },
+      {
+        id: 'huntress_volley',
+        name: '连投',
+        desc: '对全场警觉最高的人造成 3 点伤害，再对另一人造成 2 点。',
+        cooldown: 3,
+        ultimate: true,
+        ops: [
+          { op: 'damage', who: 'highestAlert', amount: 3 },
+          { op: 'damage', who: 'randomAny', amount: 2 },
+          { op: 'log', text: '一把接一把，房子里的每一道门都成了靶子。' },
+        ],
+      },
+    ],
+  },
+  {
+    owner: '鬼面',
+    title: '夜幕',
+    icon: 'assets/dbd/powers/鬼面.png',
+    portrait: 'assets/characters/killers/鬼面.webp',
+    school: 'grounded',
+    sourceNote: NOTE,
+    powers: [
+      {
+        id: 'ghost_stalk',
+        name: '夜幕潜行',
+        desc: '通缉值 -1，本回合所有目击无效。',
+        cooldown: 1,
+        ops: [
+          { op: 'wanted', amount: -1 },
+          { op: 'flag', key: 'noAlarm' },
+          { op: 'log', text: '你只是站在阴影里，什么都没有做。' },
+        ],
+      },
+      {
+        id: 'ghost_nightfall',
+        name: '夜袭',
+        desc: '本回合步数 +3、目击无效，且下次攻击 +3 伤害。',
+        cooldown: 3,
+        ultimate: true,
+        ops: [
+          { op: 'steps', amount: 3 },
+          { op: 'flag', key: 'noAlarm' },
+          { op: 'bonusDamage', amount: 3 },
+          { op: 'log', text: '灯灭了，房子开始按你的节奏呼吸。' },
+        ],
+      },
+    ],
+  },
+  {
+    owner: '迈克尔·迈尔斯',
+    title: '恶魔附身',
+    icon: 'assets/dbd/powers/迈克尔·迈尔斯.png',
+    portrait: 'assets/characters/killers/迈尔斯.webp',
+    school: 'grounded',
+    passive: {
+      name: '尾随',
+      short: '每次进入有人的房间都会积累尾随值（会随时间衰减）。',
+    },
+    sourceNote: NOTE,
+    powers: [
+      {
+        id: 'myers_gaze',
+        name: '凝视',
+        desc: '尾随值 +30，并让当前房间所有人的警觉 -15。',
+        cooldown: 1,
+        ops: [
+          { op: 'stalk', amount: 30 },
+          { op: 'alert', who: 'allHere', amount: -15 },
+          { op: 'log', text: '你站在门口，一动不动地看着他。' },
+        ],
+      },
+      {
+        id: 'myers_possess',
+        name: '恶魔附身',
+        desc: '尾随值满 100 才能发动：处决当前房间的一名目标，之后尾随值清零。',
+        cooldown: 3,
+        ultimate: true,
+        requires: [{ c: 'stalk', gte: 100 }],
+        ops: [
+          { op: 'kill', who: 'victim' },
+          { op: 'wanted', amount: 1 },
+          { op: 'stalk', amount: -100 },
+          { op: 'log', text: '面具合上了。那一刻不需要刀，也不需要理由。' },
+        ],
+      },
+    ],
+  },
+  {
+    owner: '贞子',
+    title: '怨灵',
+    icon: 'assets/dbd/powers/贞子.png',
+    portrait: 'assets/characters/killers/贞子.webp',
+    school: 'supernatural',
+    sourceNote: NOTE,
+    powers: [
+      {
+        id: 'sadako_deluge',
+        name: '恐惧洪流',
+        desc: '全场所有人警觉 +12，并僵住 1 回合。',
+        cooldown: 1,
+        ops: [
+          { op: 'alert', who: 'allAny', amount: 12 },
+          { op: 'block', who: 'allAny', turns: 1 },
+          { op: 'log', text: '屏幕雪花一闪，每个房间里都多了一道湿脚印。' },
+        ],
+      },
+      {
+        id: 'sadako_tape',
+        name: '录像带',
+        desc: '全场所有人受到 2 点伤害，并暴露位置。',
+        cooldown: 3,
+        ultimate: true,
+        ops: [
+          { op: 'damage', who: 'allAny', amount: 2 },
+          { op: 'reveal' },
+          { op: 'log', text: '七天，从这一秒开始算。' },
+        ],
+      },
+    ],
+  },
+  {
+    owner: '梦魇',
+    title: '梦魇之爪',
+    icon: 'assets/dbd/powers/梦魇.png',
+    school: 'supernatural',
+    sourceNote: NOTE,
+    powers: [
+      {
+        id: 'freddy_sleep',
+        name: '入梦',
+        desc: '让全场警觉最高的人陷入梦境：2 回合无法移动，并暴露位置。',
+        cooldown: 1,
+        ops: [
+          { op: 'block', who: 'highestAlert', turns: 2 },
+          { op: 'reveal' },
+          { op: 'log', text: '他在走廊里坐了下来，像是突然很困。' },
+        ],
+      },
+      {
+        id: 'freddy_nightmare',
+        name: '梦魇降临',
+        desc: '全场陷入噩梦：所有人警觉 +25、受到 1 点伤害，并僵住 1 回合。',
+        cooldown: 3,
+        ultimate: true,
+        ops: [
+          { op: 'alert', who: 'allAny', amount: 25 },
+          { op: 'damage', who: 'allAny', amount: 1 },
+          { op: 'block', who: 'allAny', turns: 1 },
+          { op: 'log', text: '这栋房子开始按梦的规则运转。' },
+        ],
+      },
+    ],
+  },
+  {
+    owner: '食人魔',
+    title: '电锯',
+    icon: 'assets/dbd/powers/食人魔.png',
+    portrait: 'assets/characters/killers/食人魔.webp',
+    school: 'grounded',
+    sourceNote: NOTE,
+    powers: [
+      {
+        id: 'cannibal_sprint',
+        name: '电锯冲刺',
+        desc: '本回合步数 +2、下次攻击 +2 伤害，但引擎声让通缉值 +1。',
+        cooldown: 1,
+        ops: [
+          { op: 'steps', amount: 2 },
+          { op: 'bonusDamage', amount: 2 },
+          { op: 'wanted', amount: 1 },
+          { op: 'log', text: '引擎拉响，走廊尽头的人开始跑。' },
+        ],
+      },
+      {
+        id: 'cannibal_slaughter',
+        name: '狂锯',
+        desc: '对当前房间所有人造成 4 点伤害，通缉值 +3。',
+        cooldown: 3,
+        ultimate: true,
+        ops: [
+          { op: 'damage', who: 'allHere', amount: 4 },
+          { op: 'wanted', amount: 3 },
+          { op: 'log', text: '他不再挑选目标了。' },
+        ],
+      },
+    ],
+  },
+  {
+    owner: '处刑者',
+    title: '送葬者',
+    icon: 'assets/dbd/powers/处刑者.png',
+    school: 'supernatural',
+    sourceNote: NOTE,
+    powers: [
+      {
+        id: 'executioner_chain',
+        name: '审判之链',
+        desc: '当前房间所有人被钉住，本回合无法逃离。',
+        cooldown: 1,
+        ops: [
+          { op: 'pin', who: 'allHere' },
+          { op: 'block', who: 'allHere', turns: 1 },
+          { op: 'log', text: '锁链穿过墙壁，另一端握在你手里。' },
+        ],
+      },
+      {
+        id: 'executioner_judge',
+        name: '处刑',
+        desc: '击杀当前房间生命值最低的一人，通缉值 +2。',
+        cooldown: 3,
+        ultimate: true,
+        requires: [{ c: 'peopleHere', gte: 1 }],
+        ops: [
+          { op: 'kill', who: 'lowestHpHere' },
+          { op: 'wanted', amount: 2 },
+          { op: 'log', text: '他跪了下来，因为知道自己该跪。' },
+        ],
+      },
+    ],
+  },
+  {
+    owner: '魔王',
+    title: '撕裂边界',
+    icon: 'assets/dbd/powers/魔王.png',
+    school: 'supernatural',
+    sourceNote: NOTE,
+    powers: [
+      {
+        id: 'demogorgon_portal',
+        name: '裂隙穿行',
+        desc: '移动到任意相邻房间且不计步数，不会惊动目击者。',
+        cooldown: 1,
+        ops: [
+          { op: 'teleportPlayer', to: 'adjacent' },
+          { op: 'flag', key: 'noAlarm' },
+          { op: 'log', text: '墙面上裂开一道只属于你的门。' },
+        ],
+      },
+      {
+        id: 'demogorgon_maul',
+        name: '群体撕裂',
+        desc: '当前房间所有人受到 3 点伤害，并被按在原地 1 回合。',
+        cooldown: 3,
+        ultimate: true,
+        ops: [
+          { op: 'damage', who: 'allHere', amount: 3 },
+          { op: 'block', who: 'allHere', turns: 1 },
+          { op: 'log', text: '花瓣一样的口器张开，房间里的空气被抽走了一半。' },
+        ],
+      },
+    ],
+  },
+  {
+    owner: '医生',
+    title: '电击治疗',
+    icon: 'assets/dbd/powers/医生.png',
+    school: 'grounded',
+    sourceNote: NOTE,
+    powers: [
+      {
+        id: 'doctor_shock',
+        name: '电击治疗',
+        desc: '当前房间所有人僵住 1 回合、警觉 +10，通缉值 +1。',
+        cooldown: 1,
+        ops: [
+          { op: 'block', who: 'allHere', turns: 1 },
+          { op: 'alert', who: 'allHere', amount: 10 },
+          { op: 'wanted', amount: 1 },
+          { op: 'log', text: '他们突然安静下来，服从得不像自己。' },
+        ],
+      },
+      {
+        id: 'doctor_madness',
+        name: '疯狂',
+        desc: '3 回合内没有人能报警，且全场警觉 +20。',
+        cooldown: 3,
+        ultimate: true,
+        ops: [
+          { op: 'silenceAlarm', turns: 3 },
+          { op: 'alert', who: 'allAny', amount: 20 },
+          { op: 'log', text: '电流声盖过了所有呼救。' },
+        ],
+      },
+    ],
+  },
+  {
+    owner: '门徒',
+    title: '竖锯的洗礼',
+    icon: 'assets/dbd/powers/门徒.png',
+    portrait: 'assets/characters/killers/门徒.webp',
+    school: 'grounded',
+    sourceNote: NOTE,
+    powers: [
+      {
+        id: 'pig_ambush',
+        name: '伏击',
+        desc: '本回合目击无效、步数 +1，且下次攻击 +2 伤害。',
+        cooldown: 1,
+        ops: [
+          { op: 'flag', key: 'noAlarm' },
+          { op: 'steps', amount: 1 },
+          { op: 'bonusDamage', amount: 2 },
+          { op: 'log', text: '你蹲下去，等到脚步声刚好经过。' },
+        ],
+      },
+      {
+        id: 'pig_baptism',
+        name: '竖锯的洗礼',
+        desc: '全场所有人被套上捕兽夹 2 回合无法移动，并受到 1 点伤害；期间无人能报警。',
+        cooldown: 3,
+        ultimate: true,
+        ops: [
+          { op: 'block', who: 'allAny', turns: 2 },
+          { op: 'damage', who: 'allAny', amount: 1 },
+          { op: 'silenceAlarm', turns: 2 },
+          { op: 'log', text: '「我想玩个游戏。」这句话在每个人耳边响起。' },
+        ],
+      },
+    ],
+  },
+];
+
+export const KILLER_MAP: Record<string, KillerProfile> = KILLERS.reduce(
+  (acc, killer) => {
+    acc[killer.owner] = killer;
+    return acc;
+  },
+  {} as Record<string, KillerProfile>,
+);
+
+/** 初始解锁的杀手 */
+export const STARTER_KILLERS = ['设陷者', '幽灵', '护士', '女猎手', '鬼面', '迈克尔·迈尔斯'];

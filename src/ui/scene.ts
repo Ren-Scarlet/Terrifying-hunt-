@@ -1,3 +1,4 @@
+import { isLocked } from '../game/engine';
 import { ROOMS, ROOM_MAP } from '../game/rooms';
 import type { GameState, RoomId } from '../game/types';
 
@@ -1534,7 +1535,7 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
   function paintDoors(c: Ctx): void {
     for (const hole of doorHoles(view)) {
       const verticalWall = hole.side === 'left' || hole.side === 'right';
-      const locked = state.lockedRooms.includes(hole.room) || state.lockedRooms.includes(hole.other);
+      const locked = isLocked(state, hole.room) || isLocked(state, hole.other);
       const from = Math.min(hole.from, hole.to);
       const to = Math.max(hole.from, hole.to);
       c.save();
@@ -2028,7 +2029,7 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
       if (Math.abs(dx) + Math.abs(dy) > 1) facing = Math.atan2(dy, dx);
       lastRoom = next.playerRoom;
     }
-    const key = `${next.kills}|${next.people.filter((p) => p.hp <= 0).length}|${next.lockedRooms.join(',')}`;
+    const key = `${next.kills}|${next.people.filter((p) => p.hp <= 0).length}|${Object.keys(next.roomLocks).sort().join(',')}`;
     if (key !== worldKey) {
       worldKey = key;
       staticDirty = true;
@@ -2043,7 +2044,7 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
   const ro = new ResizeObserver(() => resize());
   ro.observe(anchor);
   resize();
-  worldKey = `${state.kills}|${state.people.filter((p) => p.hp <= 0).length}|${state.lockedRooms.join(',')}`;
+  worldKey = `${state.kills}|${state.people.filter((p) => p.hp <= 0).length}|${Object.keys(state.roomLocks).sort().join(',')}`;
   if (reduced) drawFrame(performance.now());
   else raf = requestAnimationFrame(loop);
 

@@ -1,3 +1,5 @@
+import type { Op, Precheck } from './effect';
+
 export type RoomId =
   | 'hall'
   | 'corridor'
@@ -32,14 +34,21 @@ export interface Room {
 
 export interface CardDef {
   id: string;
+  /** 卡面主标题：采用图鉴技能的官方中文名，与图标严格一一对应 */
   name: string;
   cost: number;
   type: CardType;
   desc: string;
   flavor: string;
-  /** 图标对应的图鉴技能原名；卡牌效果与机制为本项目原创。 */
+  /** 图标对应的图鉴技能英文原名 */
   sourceSkill: string;
+  /** 该技能在图鉴里的原始效果，只作考据说明，不参与结算 */
+  sourceText?: string;
   unlocked: boolean;
+  /** 效果程序：由 effect.ts 的解释器执行，改这里就能改卡牌效果 */
+  ops: Op[];
+  /** 出牌前的条件检查：不满足时不消耗能量、不弃牌 */
+  precheck?: Precheck;
 }
 
 export interface CardInstance {
@@ -48,6 +57,20 @@ export interface CardInstance {
 }
 
 export type PersonRole = 'target' | 'civilian' | 'police';
+
+/** NPC 这一回合的打算，会显示在平面图上供玩家预判 */
+export type NpcIntent =
+  | 'idle'
+  | 'wary'
+  | 'flee'
+  | 'barricade'
+  | 'call'
+  | 'hide'
+  | 'escape'
+  | 'stunned';
+
+/** 个人目的：决定他慌乱时往哪跑，是这一局 NPC 的行为主轴 */
+export type NpcGoal = 'phone' | 'exit' | 'hide' | 'gather' | 'weapon' | 'panic';
 
 export interface Person {
   id: string;
@@ -60,6 +83,16 @@ export interface Person {
   alert: number;
   /** 当前行为，用于档案与人物名单 */
   activity: string;
+  /** 这一回合的意图 */
+  intent: NpcIntent;
+  /** 个人目的 */
+  goal: NpcGoal;
+  /** 被限制移动的剩余回合（支配、钉住、恐惧、夹子） */
+  blockedTurns: number;
+  /** 流血：每回合结束掉血，被「辣手屠夫」类卡牌造成 */
+  bleed: number;
+  /** 已经跑到逃生点的人，再待一回合就会真的逃出去（0 未开始，1 正在翻篱笆） */
+  escapeProgress: number;
 }
 
 export type MissionKind =
@@ -79,16 +112,16 @@ export interface Mission {
   targetCount?: number;
   targetRoom?: RoomId;
   maxWanted?: number;
+  /** 允许逃走的 NPC 上限，超过即任务失败 */
+  maxEscaped?: number;
 }
 
-/** 每回合重置，用于结算原创杀手机制的一次性效果 */
+/** 每回合重置，用于结算杀手被动的一次性效果 */
 export interface KillerRuntime {
   killUsed: boolean;
   moveUsed: boolean;
   attackUsed: boolean;
   witnessUsed: boolean;
-  /** 主动杀手能力每回合只能使用一次 */
-  abilityUsed: boolean;
 }
 
 /** 结算面板上的一行明细 */
@@ -125,11 +158,16 @@ export interface GameState {
   ritualStreak: number;
   markedKilled: number;
   decoyRoom: RoomId | null;
-  lockedRooms: RoomId[];
+  /** 房间锁：房间 -> 还锁着几回合。NPC 与警察都过不去 */
+  roomLocks: Partial<Record<RoomId, number>>;
+  /** 本回合是否已经暴露过全场位置 */
+  revealedThisTurn: boolean;
   freeMove: boolean;
   discount: number;
   bonusDamage: number;
   noAlarmTurn: boolean;
+  /** 报警被压制到第几回合（医生「疯狂」这类多回合沉默） */
+  alarmSilencedUntilTurn: number;
   lastCrimeRoom: RoomId | null;
   result: ResultKind | null;
   score: number;
@@ -152,6 +190,20 @@ export interface GameState {
   bonusEnergyNextTurn: number;
   /** 已被破坏的障碍物房间 */
   clearedObstacles: RoomId[];
+
+  /* ---------- NPC 逃跑系统 ---------- */
+  /** 已经逃出这栋房子的人数 */
+  escaped: number;
+  /** 堵门的房间：玩家进入要多花 1 步，需「所向无敌」清除 */
+  barricades: RoomId[];
+  /** 逃生点被封锁的剩余回合 */
+  exitBlockedTurns: number;
+  /** 玩家被 NPC 反击造成的眩晕：下回合步数减少 */
+  stunTurns: number;
+  /** 杀手能力冷却：powerId -> 剩余回合 */
+  cooldowns: Record<string, number>;
+  /** 本局结果说明（为什么失败），给结算面板用 */
+  resultReason: string;
 }
 
 export interface SaveData {
@@ -165,4 +217,6 @@ export interface SaveData {
   /** 暗金细胞：用于解锁额外杀手 */
   darkCells: number;
   unlockedKillers: string[];
+  /** 存档里记一下版本，方便以后迁移 */
+  version?: number;
 }

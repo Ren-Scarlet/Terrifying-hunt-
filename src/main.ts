@@ -3,11 +3,10 @@ import { CARD_MAP } from './game/cards';
 import {
   createGame,
   endTurn,
-  enterPossession,
   giveUp,
   movePlayer,
   playCard,
-  useKillerAbility,
+  usePower,
 } from './game/engine';
 import { loadSave, writeSave } from './game/save';
 import { ROOM_MAP } from './game/rooms';
@@ -291,10 +290,10 @@ app.addEventListener('click', (event) => {
     return;
   }
 
-  if (action === 'ability' || action === 'possess') {
+  if (action === 'power') {
     if (!game || screen !== 'game') return;
-    if (action === 'possess') enterPossession(game);
-    else useKillerAbility(game);
+    const powerId = target.dataset.power;
+    if (powerId) usePower(game, powerId);
     afterAction();
     return;
   }

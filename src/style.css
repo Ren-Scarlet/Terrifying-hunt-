@@ -303,8 +303,10 @@ button { font-family: inherit; cursor: pointer; }
 
 .floorplan {
   position: relative;
-  width: 100%;
-  aspect-ratio: 16 / 10.5;
+  /* 宽度跟着视口高度走：地图不会高到把手牌挤出屏幕，比例也不会被压扁 */
+  width: min(100%, calc(40vh * 16 / 9.4));
+  margin-inline: auto;
+  aspect-ratio: 16 / 9.4;
   border: 1px solid #1c2023;
   border-radius: 3px;
   overflow: hidden;
@@ -503,7 +505,7 @@ button { font-family: inherit; cursor: pointer; }
 .card {
   position: relative;
   flex: 0 0 152px;
-  min-height: 226px;
+  min-height: 212px;
   padding: 11px 11px 12px;
   border-radius: 2px;
   border: 1px solid #37332c;
@@ -1122,4 +1124,200 @@ button { font-family: inherit; cursor: pointer; }
     transition-duration: .001ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* ==========================================================================
+   杀手头像框：有立绘用立绘，没有就用力量图标，统一装进同一个框
+   ========================================================================== */
+
+.killer-face {
+  position: relative;
+  display: inline-grid; place-items: center;
+  flex: 0 0 auto;
+  width: 30px; height: 30px;
+  border-radius: 2px;
+  border: 1px solid #37322c;
+  background: #07080a;
+  overflow: hidden;
+}
+.killer-face img { display: block; }
+.killer-face.art img {
+  width: 100%; height: 100%;
+  object-fit: cover; object-position: top center;
+  filter: grayscale(.18) contrast(1.06) brightness(.96);
+}
+.killer-face.glyph .face-bg {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover; opacity: .5; filter: brightness(1.15);
+}
+.killer-face.glyph .face-icon {
+  position: relative;
+  width: 76%; height: 76%;
+  object-fit: contain;
+  filter: grayscale(.15) contrast(1.18) brightness(1.3) drop-shadow(0 2px 5px #000);
+}
+
+/* 各处的尺寸变体 */
+.killer-chip .killer-face { width: 32px; height: 32px; }
+.killer-chip .killer-face.art img { filter: grayscale(.12) contrast(1.06); }
+
+.killer-choice .killer-face {
+  width: 56px; height: 64px;
+  border-color: #2b2f33;
+  background: radial-gradient(70% 70% at 50% 20%, #14171a, #060708);
+  transition: border-color .2s, filter .2s, transform .2s;
+}
+.killer-choice .killer-face.art img {
+  filter: grayscale(.42) brightness(.96) contrast(1.06);
+}
+.killer-choice:hover .killer-face { border-color: #4d4437; transform: translateY(-1px); }
+.killer-choice:hover .killer-face.art img { filter: grayscale(.08) brightness(1.04) contrast(1.05); }
+.killer-choice.selected .killer-face { border-color: #8d4c34; box-shadow: inset 0 0 18px rgba(141, 58, 44, .22); }
+.killer-choice.selected .killer-face.art img { filter: grayscale(0) brightness(1) contrast(1.05); }
+
+/* 平面图上的玩家标记 */
+.player-marker .killer-face.marker {
+  width: 46px; height: 46px;
+  border-radius: 50%;
+  border-color: rgba(196, 128, 96, .28);
+  box-shadow: 0 6px 14px #000a, 0 0 14px rgba(141, 58, 44, .2);
+}
+.player-marker .killer-face.marker img {
+  width: 100%; height: 100%;
+  object-fit: cover; object-position: top center;
+  filter: contrast(1.06) saturate(.72) brightness(.94);
+}
+
+/* ==========================================================================
+   杀手能力按钮：短 CD 主力 + 长 CD 大招
+   ========================================================================== */
+
+.power-row { display: flex; gap: 7px; flex: 1 1 320px; flex-wrap: wrap; min-width: 0; }
+
+.btn.power {
+  position: relative;
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 10px 5px 5px;
+  min-width: 158px;
+  border: 1px solid #33302a;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #17140f, #0a0b0c);
+  color: #cec7ba;
+  text-align: left;
+  transition: border-color .15s, background .15s, transform .15s;
+}
+.btn.power:hover:not(:disabled) { border-color: #8d4c34; background: linear-gradient(180deg, #241811, #0c0d0e); transform: translateY(-1px); }
+.btn.power.main { border-left: 2px solid #6e5c3c; }
+.btn.power.ultimate { border-left: 2px solid #8d3a2c; }
+.btn.power.ultimate .power-body b { color: #e4cdb4; }
+.btn.power:disabled { opacity: .55; cursor: not-allowed; transform: none; }
+.btn.power.cooling { filter: saturate(.4); }
+
+.power-art {
+  position: relative;
+  display: grid; place-items: center;
+  width: 34px; height: 34px; flex: 0 0 auto;
+  border: 1px solid #33302a;
+  border-radius: 2px;
+  background: radial-gradient(circle at 50% 35%, #171a1d, #060708);
+  overflow: hidden;
+}
+.power-glyph { width: 26px; height: 26px; object-fit: contain; filter: grayscale(.2) contrast(1.08) drop-shadow(0 2px 4px #000); }
+
+.power-body { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.power-body b {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 11.5px; font-weight: 600; letter-spacing: .4px; color: #d8d2c7;
+  white-space: nowrap;
+}
+.power-body b em {
+  font-style: normal; font-size: 8px; letter-spacing: 1.2px;
+  padding: 0 4px; border-radius: 1px;
+  background: #46201a; color: #e0a894; border: 1px solid #6d3025;
+}
+.power-body small { font-size: 9px; color: var(--faint); letter-spacing: .3px; white-space: nowrap; }
+
+.power-pips { display: flex; gap: 2px; margin-left: auto; align-self: flex-start; padding-top: 2px; }
+.power-pips i {
+  width: 4px; height: 4px; border-radius: 50%;
+  background: #2a2d30;
+  box-shadow: inset 0 0 0 1px #3a3d40;
+}
+.power-pips i.on { background: #8d5a3c; box-shadow: 0 0 5px #b3713f88, inset 0 0 0 1px #a4694a; }
+
+.btn.end-turn { margin-left: auto; }
+
+/* ==========================================================================
+   NPC 意图：地图与名单上的小圆点
+   ========================================================================== */
+
+.intent-dot {
+  display: inline-block;
+  width: 6px; height: 6px; flex: 0 0 auto;
+  border-radius: 50%;
+  background: #5a5348;
+}
+.intent-dot.i-wary { background: #b3945f; box-shadow: 0 0 6px #b3945f66; }
+.intent-dot.i-flee { background: #c07a4a; box-shadow: 0 0 7px #c07a4a77; }
+.intent-dot.i-call { background: #6e8ba3; box-shadow: 0 0 8px #6e8ba3aa; animation: intentPulse 1.4s ease-in-out infinite; }
+.intent-dot.i-escape { background: #9c3f2b; box-shadow: 0 0 9px #9c3f2baa; animation: intentPulse 1s ease-in-out infinite; }
+.intent-dot.i-barricade { background: #8a7a5e; }
+.intent-dot.i-hide { background: #4a5a4a; }
+.intent-dot.i-stunned { background: #3a3d40; }
+
+@keyframes intentPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: .45; transform: scale(.7); }
+}
+
+.legend-intent { display: inline-flex; align-items: center; gap: 5px; }
+.legend-intent .intent-dot { margin-left: 6px; }
+
+/* 名单里显示目的 */
+.roster-person .goal-line {
+  display: block;
+  font-size: 9.5px; color: #b09a76; letter-spacing: .3px;
+}
+.roster-person.escaping { border-color: #6d3025; background: #150d0b; }
+.roster-person.escaping .goal-line { color: #d99a86; }
+
+/* 房间状态 */
+.room.locked { box-shadow: inset 0 0 0 1px rgba(110, 139, 163, .28); }
+.room.barricaded { box-shadow: inset 0 0 0 1px rgba(150, 122, 78, .3); }
+.room-tag.lock { background: #121d24cc; color: #9db8cc; border-color: #33485a; }
+.room-tag.bar { background: #221a0fcc; color: #d0b184; border-color: #5a4a2a; }
+
+/* 顶栏「逃走」计数 */
+.stat.escaped b { color: #d99a86; }
+.escape-quota { color: #b09a76; }
+
+.result-reason {
+  margin: -4px 0 12px;
+  font-size: 11.5px; color: #b09a76; letter-spacing: .3px;
+  line-height: 1.7;
+}
+
+/* ==========================================================================
+   手牌吸附：地图很高时，手牌始终贴在视口底部，出牌不用来回滚动
+   ========================================================================== */
+
+.panel.hand {
+  position: sticky;
+  bottom: 10px;
+  z-index: 30;
+  background: linear-gradient(180deg, #121517 0%, #0a0c0e 100%);
+  box-shadow:
+    0 -18px 34px -10px #000e,
+    0 14px 30px #000b,
+    inset 0 1px #ffffff09;
+}
+
+@media (max-width: 1080px) {
+  .panel.hand { bottom: 6px; }
+}
+
+/* 窄屏下屏幕本来就短，手牌不再吸附，恢复正常滚动 */
+@media (max-width: 720px) {
+  .panel.hand { position: static; box-shadow: 0 10px 26px #0008, inset 0 1px #ffffff07; }
 }

@@ -1,11 +1,10 @@
 import { CARDS, CARD_MAP, STARTING_DECK } from './cards';
-import { KILLER_MAP } from './killers';
+import { KILLER_MAP, STARTER_KILLERS } from './killers';
 import type { SaveData } from './types';
 
 const KEY = 'night-hunt-dossier-save-v1';
 
 const STARTER_CARDS: string[] = CARDS.filter((c) => c.unlocked).map((c) => c.id);
-const STARTER_KILLERS = ['设陷者', '幽灵', '护士', '女猎手', '鬼面', '迈克尔·迈尔斯'];
 
 const DEFAULT_SAVE: SaveData = {
   deck: [...STARTING_DECK],
@@ -16,6 +15,7 @@ const DEFAULT_SAVE: SaveData = {
   credits: 60,
   darkCells: 3,
   unlockedKillers: [...STARTER_KILLERS],
+  version: 2,
 };
 
 /**
