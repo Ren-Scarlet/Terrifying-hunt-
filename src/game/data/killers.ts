@@ -77,9 +77,10 @@ export const KILLERS: KillerProfile[] = [
       {
         id: 'wraith_bell',
         name: '丧钟',
-        desc: '本回合隐身：移动无视相邻限制、不计步数，也不会惊动目击者。',
+        desc: '本回合隐身：移动无视相邻限制、不计步数，进门不会惊动任何人（伏击），也不会惊动目击者。',
         cooldown: 1,
         ops: [
+          { op: 'ambush' },
           { op: 'flag', key: 'freeMove' },
           { op: 'flag', key: 'noAlarm' },
           { op: 'steps', amount: 1 },

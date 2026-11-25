@@ -183,6 +183,11 @@ function playerIsHidden(state: GameState): boolean {
   return alarmSuppressed(state);
 }
 
+/** 本回合是否处于「伏击」状态：推门进去也不会惊动任何人 */
+function ambushActive(state: GameState): boolean {
+  return state.ambushTurn === state.turn;
+}
+
 function addWanted(state: GameState, amount: number): void {
   if (amount > 0) state.heatTurn = state.turn;
   state.wanted = clamp(state.wanted + amount, 0, 10);
@@ -793,6 +798,30 @@ export function runOps(state: GameState, ops: Op[]): void {
         state.stalkMeter = clamp(state.stalkMeter + op.amount, 0, 100);
         log(state, `尾随值 ${state.stalkMeter}/100。`);
         break;
+      case 'ambush': {
+        state.ambushTurn = state.turn;
+        log(state, '你收住了呼吸——这一回合推门进去，不会有任何人察觉。');
+        break;
+      }
+      case 'pursue': {
+        const maxD = op.distance ?? 2;
+        const pool = selectPeople(state, op.who)
+          .filter((p) => p.hp > 0 && p.room !== state.playerRoom)
+          .filter((p) => roomDistance(p.room, state.playerRoom) <= maxD)
+          .sort((a, b) => roomDistance(a.room, state.playerRoom) - roomDistance(b.room, state.playerRoom));
+        const target = pool[0];
+        if (!target) {
+          log(state, '身边没有可以追的人。');
+          break;
+        }
+        const from = roomName(state.playerRoom);
+        state.playerRoom = target.room;
+        markExplored(state, target.room);
+        log(state, `你贴着他的脚步声从${from}追进了${roomName(target.room)}。`);
+        target.alert = clamp(target.alert + 12, 0, 100);
+        npcOnPlayerEnter(state);
+        break;
+      }
       case 'silenceAlarm':
         state.alarmSilencedUntilTurn = Math.max(state.alarmSilencedUntilTurn, state.turn + op.turns);
         log(state, `接下来 ${op.turns} 回合没有人能报警。`);
@@ -933,12 +962,29 @@ function shout(state: GameState, person: Person, base = 18): void {
 /** 玩家踏进房间的瞬间 */
 function npcOnPlayerEnter(state: GameState): void {
   const hidden = playerIsHidden(state);
+  const ambush = ambushActive(state);
   const here = peopleInRoom(state, state.playerRoom).filter(
     (p) => p.role !== 'police' && p.hp > 0,
   );
 
   here.forEach((person) => {
     const threat = SURVIVOR_MAP[person.id]?.threat;
+
+    // 伏击：屋里的人根本没发现你进来——不加警觉、不喊人，
+    // 回合结束时也不会夺门而逃。这是「偷袭」这张牌买来的一个回合。
+    if (ambush && threat !== 'spiritual') {
+      person.activity = '背对着门，没有察觉';
+      return;
+    }
+    if (ambush) {
+      // 灵异感知者是你唯一骗不过的人：她能直接感觉到你在屋里
+      log(state, `${person.name} 忽然抬头，看向你藏身的方向——她感觉到了。`);
+      person.alert = 100;
+    }
+
+    // 用「进门之前」的警觉判断他是不是早就确认了你在房子里：
+    // 刚看见你和已经在追杀你是两回事，不该混成一个阈值。
+    const wasAlert = person.alert;
     let gain = 30;
     if (threat === 'spiritual') gain = 65;
     else if (threat === 'alarm') gain = 55;
@@ -952,6 +998,19 @@ function npcOnPlayerEnter(state: GameState): void {
       person.intent = 'wary';
       person.activity = '背对着门，没有察觉';
       return;
+    }
+
+    // 已经完全确认「杀手就在这栋房子里」的人，看到门开就直接冲出去。
+    // 想在他们身上拿先手，就得先用伏击类卡牌（静止隐身）。
+    if (wasAlert >= 85) {
+      if (person.archetype === 'defiant' && person.armed && person.room === state.playerRoom) {
+        counterAttack(state, person);
+        return;
+      }
+      if (fleeAway(state, person)) {
+        log(state, `${person.name} 根本没等你站稳，已经冲出了门口。`);
+        return;
+      }
     }
 
     // 高警觉：丢下手上的事，准备夺门而逃。
@@ -1669,6 +1728,7 @@ export function createGame(
     wanted: 0,
     heatTurn: 0,
     policeLock: 0,
+    ambushTurn: 0,
     playerRoom: ENTRY_ROOM,
     people: createPeople(mission),
     hand: [],

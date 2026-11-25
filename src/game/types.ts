@@ -183,6 +183,8 @@ export interface GameState {
   heatTurn: number;
   /** 警察已经盯上你几回合：连续两回合同屋才会真的被铐走 */
   policeLock: number;
+  /** 伏击生效的回合号：等于当前回合时，进门不会惊动任何人 */
+  ambushTurn: number;
   playerRoom: RoomId;
   people: Person[];
   hand: CardInstance[];

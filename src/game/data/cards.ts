@@ -16,7 +16,8 @@ import type { CardDef } from '../types';
  *    诱导   鬼鸦谍影 / 人肉烧烤 / 支配之力：制造噪声，把人挪到你想要的位置
  *    破坏   失效开关 / 厄咒：直面黑暗：剪电话、拉电闸
  *    封锁   死锁 / 花言巧语：锁房间、钉死后院
- *    潜行   静止隐身 / 折磨路径 / 恐惧释放：压通缉、压警戒
+ *    潜行   静止隐身 / 折磨路径 / 恐惧释放：压通缉、压警戒、伏击进门
+ *    追击   疾速残暴：贴到逃跑的人身后；配合伏击就是「偷袭 → 补刀」的两张牌组合
  *    追猎   辣手屠夫 / 牢牢紧握 / 优胜劣汰 / 恩赐解脱：受伤 → 倒地 → 处决
  *
  *  —— 生死规则 ——
@@ -131,12 +132,13 @@ export const CARDS: CardDef[] = [
     name: '静止隐身',
     cost: 1,
     type: 'skill',
-    desc: '通缉值 -2，团队警戒 -8，本回合不会惊动任何目击者。',
+    desc: '伏击：本回合进门不惊动任何人，接着打攻击牌就是偷袭。通缉 -2，团队警戒 -8，目击无效。',
     flavor: '影子不会留下脚印。',
     sourceSkill: 'Insidious',
     sourceText: '闲置后获得无法侦测状态。',
     unlocked: true,
     ops: [
+      { op: 'ambush' },
       { op: 'wanted', amount: -2 },
       { op: 'alarm', amount: -8 },
       { op: 'flag', key: 'noAlarm' },
@@ -147,12 +149,13 @@ export const CARDS: CardDef[] = [
     name: '疾速残暴',
     cost: 1,
     type: 'skill',
-    desc: '本回合移动步数 +2。',
+    desc: '追击：立刻贴到逃跑的人身后（不计步数，最远两间屋），接攻击牌补刀。步数 +2。',
     flavor: '脚步声追不上你。',
     sourceSkill: 'Rapid Brutality',
     sourceText: '普通攻击命中后获得急速。',
     unlocked: true,
     ops: [
+      { op: 'pursue', who: 'fleeing', distance: 2 },
       { op: 'steps', amount: 2 },
       { op: 'log', text: '本回合步数 +2。' },
     ],
@@ -277,7 +280,8 @@ export const CARDS: CardDef[] = [
     flavor: '每一张纸都可能是一把钥匙。',
     sourceSkill: 'Hoarder',
     sourceText: '额外生成箱子，并提示有人开箱。',
-    unlocked: false,
+    // 这是「证据销毁」唯一稳定的证据来源，必须起始就有
+    unlocked: true,
     ops: [
       { op: 'search' },
       { op: 'evidence', amount: 1 },

@@ -51,6 +51,10 @@ import type { RoomId } from './types';
  *   sabotage   破坏设施              { key: 'phone' | 'exit' | 'radio' | 'lights' }
  *   flag       设置一个全局开关        { key, value? }
  *
+ * —— 潜行与追击（把「进门就惊动」「跑了追不上」交给卡牌）——
+ *   ambush     伏击：本回合进门不惊动任何人（不加警觉、不喊人、不会夺门而逃）
+ *   pursue     追击：立刻贴到目标所在房间，不计步数
+ *
  * —— 资源 ——
  *   draw / energy / steps / evidence / discount / bonusDamage / arrestThreshold
  *   wanted / wantedHalf / stalk / silenceAlarm / stun
@@ -188,6 +192,18 @@ export type Op =
   | { op: 'stalk'; amount: number }
   /** 让全场在 N 回合内无法报警 */
   | { op: 'silenceAlarm'; turns: number }
+  /**
+   * 伏击：本回合推门进去不会惊动任何人——不加警觉、不喊人、
+   * 也不会在回合结束时夺门而逃。给「偷袭」留出一个白打的回合。
+   * 灵异感知者（threat: spiritual）例外，她能直接看见你。
+   */
+  | { op: 'ambush' }
+  /**
+   * 追击：立刻贴到一个目标所在的位置（默认追正在逃跑的人），不计步数。
+   * 后面再接 damage / pin 就是「追上去补一刀」。
+   * distance 是允许的最大房间距离，默认 2。
+   */
+  | { op: 'pursue'; who: Who; distance?: number }
   | { op: 'flag'; key: FlagKey; value?: number | boolean }
   | { op: 'log'; text: string }
   | { op: 'if'; cond: Cond; then: Op[]; else?: Op[] };
