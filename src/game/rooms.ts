@@ -286,6 +286,10 @@ export function buildLayout(): string {
     regionArea(regions[b]) - regionArea(regions[a]),
   )[0];
   const garageIndex = treeAdj[gardenIndex][0];
+  const hallIndex = centerIndex === garageIndex
+    ? regions.map((_, index) => index).filter((index) => index !== gardenIndex && index !== garageIndex)
+      .sort((a, b) => Math.max(...depthFrom(a).values()) - Math.max(...depthFrom(b).values()))[0]
+    : centerIndex;
 
   // 剩余房间按空间定位：公共区域优先分配大块，储藏/设备类优先分配小块。
   const sizeOrder: RoomId[] = [
@@ -296,7 +300,7 @@ export function buildLayout(): string {
   ];
   const roomById = new Map<RoomId, Room>(ROOMS.map((room) => [room.id, room]));
   const regionRooms = new Map<number, Room>();
-  regionRooms.set(centerIndex, roomById.get(ENTRY_ROOM)!);
+  regionRooms.set(hallIndex, roomById.get(ENTRY_ROOM)!);
   regionRooms.set(gardenIndex, roomById.get('garden')!);
   regionRooms.set(garageIndex, roomById.get(EXIT_ROOM)!);
 
@@ -307,8 +311,6 @@ export function buildLayout(): string {
   const freeRooms = sizeOrder.map((id) => roomById.get(id)!);
   freeRegions.forEach((index, order) => regionRooms.set(index, freeRooms[order]));
 
-  const span = { col: 0, row: 0, w: GRID_COLS, h: GRID_ROWS };
-  void span;
   ROOMS.forEach((room) => {
     room.neighbors = [];
   });
