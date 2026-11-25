@@ -34,6 +34,9 @@ export function createGame(
     defId,
   }));
   const killerId = KILLER_MAP[killer] ? killer : '迈克尔·迈尔斯';
+  const people = createPeople(mission);
+  const sacrifice = randomOf(people.filter((person) => person.role !== 'police'));
+  if (sacrifice) sacrifice.bloodSacrifice = true;
   const state: GameState = {
     phase: 'playing',
     killer: killerId,
@@ -55,7 +58,7 @@ export function createGame(
     frenzy: 0,
     trails: [],
     playerRoom: ENTRY_ROOM,
-    people: createPeople(mission),
+    people,
     hand: [],
     drawPile: pile,
     discardPile: [],
@@ -111,6 +114,9 @@ export function createGame(
     disturbances: [],
     objectiveRooms: [],
     teamProgress: 0,
+    teamStage: 0,
+    escapeRooms: [],
+    survivorTotal: people.filter((person) => person.role !== 'police').length,
     teamGoalLabel: '',
     siteItems: [],
   };
@@ -152,6 +158,7 @@ export function createGame(
     });
   drawCards(state, 5);
   log(state, `契约已接取：${mission.title}`);
+  if (sacrifice) log(state, `血祭品已标记：${sacrifice.name}。此标记本身没有额外效果。`);
   log(state, `你以「${killerId}」的身份行动。每回合 ${BASE_AP} 点行动点：走路、挥刀、出牌、搜索柜子都从这里扣。`);
   log(state, `他们也在忙自己的事：${state.teamGoalLabel}就会集体从后门逃走。留意乌鸦叫和地板响，那是有人刚经过。`);
   log(state, `屋里有 ${items.filter((i) => i.kind === 'itemBox').length} 个道具箱、${genCount} 台发电机：他们会靠这些翻盘，你只能砸掉它们（${SABOTAGE_COST} 点行动点）。`);

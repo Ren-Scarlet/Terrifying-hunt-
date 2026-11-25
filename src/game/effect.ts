@@ -99,6 +99,7 @@ export type Who =
   | 'downedHere'
   | 'downedAny'
   | 'injuredAny'
+  | 'bloodSacrifice'
   | 'randomAny'
   /** 相邻房间里还没察觉到你的人（藏起来的除外） */
   | 'unawareNearby';

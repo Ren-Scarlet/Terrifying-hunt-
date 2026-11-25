@@ -48,12 +48,12 @@ export function executeOps(state: GameState, ops: Op[], runtime: EffectRuntime):
         break;
       }
       case 'down': {
-        const list = selectPeople(state, op.who).filter((p) => p.hp === 1);
+        const list = selectPeople(state, op.who).filter((p) => p.hp > 0 && p.hp <= 2);
         if (!list.length) {
           log(state, '没有受伤的人可以被击倒。');
           break;
         }
-        list.forEach((p) => damagePerson(state, p, 1));
+        list.forEach((p) => damagePerson(state, p, 2));
         break;
       }
       case 'execute': {
