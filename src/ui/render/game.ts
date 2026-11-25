@@ -59,8 +59,6 @@ import {
 import { isCardTuned } from '../../game/tuning';
 import { isMuted } from '../audio';
 import { escape, icon, itemBadge, itemIconHtml, personChip, intentDot, shadowFigures, perkIconHtml, TYPE_NAMES, killerFaceHtml, defaultDetailHtml } from './shared';
-export { killerFaceHtml, getKiller, defaultDetailHtml, cardDetailHtml, personDetailHtml } from './render/shared';
-export { renderMenu, renderGuide, shopPrice, renderShop, renderDeckEditor } from './render/menus';
 import type { GameState, Person, RoomId, SaveData } from '../../game/types';
 
 function roomFeatures(state: GameState, roomId: RoomId): string {
