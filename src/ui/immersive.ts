@@ -93,6 +93,12 @@ export function syncImmersiveCamera(nextRoot: HTMLElement): void {
   if (intel) intel.open = intelDrawerOpen;
   root.classList.toggle('hud-hidden', hudHidden);
   root.classList.toggle('hand-collapsed', !handOpen);
+  const handToggle = root.querySelector<HTMLButtonElement>('[data-action="toggle-hand"]');
+  if (handToggle) {
+    handToggle.textContent = handOpen ? '⌄' : '⌃';
+    handToggle.setAttribute('aria-expanded', String(handOpen));
+    handToggle.setAttribute('aria-label', handOpen ? '收起手牌' : '展开手牌');
+  }
   if (!frame) frame = window.requestAnimationFrame(loop);
   applyTransform();
 }
