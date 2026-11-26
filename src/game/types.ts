@@ -261,7 +261,7 @@ export type MissionKind =
   | 'evidence'
   | 'escape';
 
-export type MissionTaskKind = 'kill_count' | 'marked_kill' | 'execute' | 'no_alarm' | 'break_circuit';
+export type MissionTaskKind = 'kill_count' | 'marked_kill' | 'execute' | 'special_execute' | 'no_alarm' | 'break_circuit';
 
 export interface MissionTask {
   id: string;
@@ -272,6 +272,8 @@ export interface MissionTask {
 
 export interface Mission {
   id: string;
+  /** contract = 契约模式；free = 玩家自主选择猎物与结束时机。 */
+  mode?: 'contract' | 'free';
   kind: MissionKind;
   title: string;
   desc: string;
