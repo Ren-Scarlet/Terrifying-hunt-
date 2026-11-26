@@ -164,6 +164,7 @@ export function createPeople(mission: Mission): Person[] {
     bloodSacrifice: false,
     archetype: 'alert',
     alert: 0,
+    fear: 0,
     awareness: 0,
     dialogue: '',
     activity: '在辖区巡逻',
