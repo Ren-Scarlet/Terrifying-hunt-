@@ -258,11 +258,13 @@ function createCanvases(): SceneRefs {
 }
 
 export function mountFloorplanScene(initialHost: HTMLElement, initialState: GameState): SceneHandle {
-  // 整块 DOM 每次操作都会重建，所以场景画布做成单例：
-  // 重挂载时只是把已有 canvas 挪进新的宿主节点，粒子、朝向、时间轴都不断。
-  if (instance) return instance.attach(initialHost, initialState);
+  // 场景画布必须和房间 DOM 共用同一个世界坐标系：镜头缩放/平移时，
+  // 地板、墙体、家具、手电光和房间热区必须一起移动，不能把 Canvas 留在视口上。
+  const resolveSceneAnchor = (host: HTMLElement): HTMLElement =>
+    host.matches('.floorplan') ? host : host.querySelector<HTMLElement>('.floorplan') ?? host;
+  if (instance) return instance.attach(resolveSceneAnchor(initialHost), initialState);
 
-  let anchor = initialHost;
+  let anchor = resolveSceneAnchor(initialHost);
   const refs = createCanvases();
   const { canvas, ctx } = refs;
   anchor.prepend(canvas);
@@ -1077,8 +1079,9 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
   const handle: SceneInstance = {
     update,
     attach(nextHost: HTMLElement, nextState: GameState): SceneHandle {
-      if (nextHost !== anchor) {
-        anchor = nextHost;
+      const nextAnchor = resolveSceneAnchor(nextHost);
+      if (nextAnchor !== anchor) {
+        anchor = nextAnchor;
         ro.disconnect();
         anchor.prepend(canvas);
         ro.observe(anchor);
