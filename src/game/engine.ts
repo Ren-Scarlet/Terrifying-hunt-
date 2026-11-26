@@ -1900,6 +1900,8 @@ function npcTurn(state: GameState): void {
     }
 
     person.statusEffects ??= {};
+    const effectsNow = person.statusEffects;
+    const cannotSenseKiller = (effectsNow.undetectable ?? 0) > 0 || (effectsNow.oblivious ?? 0) > 0 || (effectsNow.blind ?? 0) > 0 || !isRoomLit(state, person.room);
     if ((person.statusEffects.cursed ?? 0) > 0) {
       if (state.totems.length === 0) {
         person.statusEffects.cursed = 0;
@@ -2040,7 +2042,7 @@ function npcTurn(state: GameState): void {
     }
 
     // 玩家就在这一间：先跑，跑不掉再对抗
-    if (person.room === state.playerRoom) {
+    if (person.room === state.playerRoom && !cannotSenseKiller) {
       // 同屋幸存者在回合结算时必须获得一次最终逃跑机会。
       // 本回合行动期间的反应移动次数不能让玩家把受伤目标留在原地反复攻击。
       if (
