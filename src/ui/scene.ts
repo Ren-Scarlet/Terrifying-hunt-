@@ -293,10 +293,14 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
   const doorGap = (): number => clamp(view.w * 0.032, 26, 54);
 
   function resize(): void {
-    const box = anchor.getBoundingClientRect();
-    if (box.width < 10 || box.height < 10) return;
+    // clientWidth/clientHeight are layout-space dimensions. getBoundingClientRect()
+    // includes the camera's CSS scale/translation and would resize the world itself
+    // every time the camera zooms, desynchronizing Canvas from DOM hit areas.
+    const width = anchor.clientWidth;
+    const height = anchor.clientHeight;
+    if (width < 10 || height < 10) return;
     const dpr = Math.min(2, window.devicePixelRatio || 1);
-    view = { w: box.width, h: box.height, dpr };
+    view = { w: width, h: height, dpr };
     for (const cv of [refs.canvas, refs.staticCv, refs.structCv]) {
       cv.width = Math.round(box.width * dpr);
       cv.height = Math.round(box.height * dpr);
@@ -305,8 +309,8 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
     refs.darkCv.height = Math.round(box.height * dpr * DARK_SCALE);
     refs.coneCv.width = refs.darkCv.width;
     refs.coneCv.height = refs.darkCv.height;
-    canvas.style.width = `${box.width}px`;
-    canvas.style.height = `${box.height}px`;
+    canvas.style.width = '100%';
+    canvas.style.height = '100%';
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     refs.staticCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
     refs.structCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -1032,8 +1036,16 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
     ctx.globalCompositeOperation = 'source-over';
   }
 
+  // The camera can animate at the browser's refresh rate; the atmospheric
+  // lighting layer is intentionally capped at 30fps to leave headroom for input,
+  // DOM updates and smooth camera transforms on mid-range devices.
+  let lastDrawTime = 0;
+  const frameInterval = 1000 / 30;
   function loop(now: number): void {
-    drawFrame(now);
+    if (now - lastDrawTime >= frameInterval) {
+      drawFrame(now);
+      lastDrawTime = now;
+    }
     raf = requestAnimationFrame(loop);
   }
 
