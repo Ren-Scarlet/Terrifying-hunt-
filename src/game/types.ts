@@ -219,6 +219,12 @@ export interface Person {
   trackedTurns: number;
   /** 通过情报卡显形的剩余玩家行动次数 */
   revealedActions?: number;
+  /** 最近一次亲眼目击袭击、死亡或搬运事件的玩家行动时钟，防止同一动作重复行动。 */
+  lastWitnessedEventClock?: number;
+  /** 最近一次听到谁呼喊；用于后续区分亲眼所见与他人告知。 */
+  lastHeardFrom?: string;
+  lastHeardRoom?: RoomId;
+  lastHeardTurn?: number;
   /** 玩家最后一次看到他的房间与回合，用于地图上的"最后已知位置" */
   lastSeenRoom: RoomId;
   lastSeenTurn: number;
