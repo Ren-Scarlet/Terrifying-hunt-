@@ -552,3 +552,168 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
     animation-duration: .01ms;
   }
 }
+
+
+/* ------------------------------------------------------------------
+   Larger in-world markers: room props, NPCs, status icons and doors all
+   remain readable at the same camera zoom as the floorplan.
+------------------------------------------------------------------- */
+#app.immersive-game .floorplan .room-features {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  overflow: visible;
+}
+#app.immersive-game .floorplan .room-features .room-feature {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  padding: 2px;
+  border-radius: 5px;
+  font-size: 11px;
+  gap: 1px;
+  box-shadow: 0 3px 10px rgba(0,0,0,.72), inset 0 1px rgba(255,255,255,.08);
+}
+#app.immersive-game .floorplan .room-features .room-feature .ui-icon {
+  width: 24px;
+  height: 24px;
+}
+#app.immersive-game .floorplan .room-features .room-feature b {
+  font-size: 8px;
+  line-height: 1;
+  letter-spacing: 0;
+}
+#app.immersive-game .floorplan .map-door-marker {
+  width: 27px;
+  height: 34px;
+  filter: drop-shadow(0 2px 4px #000) drop-shadow(0 0 3px rgba(0,0,0,.9));
+}
+#app.immersive-game .floorplan .map-door-marker i {
+  left: 7px;
+  width: 12px;
+  height: 23px;
+}
+#app.immersive-game .floorplan .map-door-marker i::after {
+  width: 3px;
+  height: 3px;
+  top: 10px;
+}
+
+/* NPC portraits no longer shrink inside small rooms. */
+#app.immersive-game .floorplan .room-people {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  width: max-content;
+  max-width: none;
+  max-height: none;
+  overflow: visible;
+}
+#app.immersive-game .floorplan .room-people .person-chip,
+#app.immersive-game .floorplan .room.room-size-small .room-people .person-chip {
+  flex: 0 0 auto !important;
+  min-width: 64px;
+  min-height: 70px;
+  max-width: none !important;
+  gap: 6px;
+  padding: 3px 8px;
+  overflow: visible;
+  font-size: 12px;
+}
+#app.immersive-game .floorplan .room-people .person-chip .person-avatar-wrap,
+#app.immersive-game .floorplan .room.room-size-small .room-people .person-chip .person-avatar-wrap {
+  flex: 0 0 62px !important;
+  width: 62px !important;
+  height: 62px !important;
+}
+#app.immersive-game .floorplan .room-people .person-chip .person-avatar-wrap .person-avatar,
+#app.immersive-game .floorplan .room.room-size-small .room-people .person-chip .person-avatar-wrap .person-avatar,
+#app.immersive-game .floorplan .room-people .person-chip > img {
+  flex: 0 0 62px !important;
+  width: 62px !important;
+  height: 62px !important;
+  object-fit: cover;
+}
+#app.immersive-game .floorplan .room-people .person-chip .person-status-row {
+  top: -33px;
+  gap: 4px;
+}
+#app.immersive-game .floorplan .room-people .person-chip .person-status-icon {
+  flex-basis: 26px;
+  width: 26px;
+  height: 26px;
+}
+#app.immersive-game .floorplan .room-people .person-chip .chip-alert {
+  min-width: 27px;
+  height: 25px;
+  font-size: 13px;
+}
+#app.immersive-game .floorplan .room-people .person-chip .person-avatar-wrap .chip-sacrifice-frame {
+  inset: -6px;
+  width: calc(100% + 12px) !important;
+  height: calc(100% + 12px) !important;
+}
+
+/* The player is a clean portrait, not a glowing badge with decorative dots. */
+#app.immersive-game .floorplan .player-marker {
+  width: 82px;
+  height: 82px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  filter: drop-shadow(0 8px 12px rgba(0,0,0,.8));
+}
+#app.immersive-game .floorplan .player-marker::after {
+  content: none;
+  display: none;
+}
+#app.immersive-game .floorplan .player-marker .killer-face.marker {
+  width: 72px;
+  height: 72px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  box-shadow: none;
+  overflow: hidden;
+}
+#app.immersive-game .floorplan .player-marker .killer-face.marker .face-icon {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 3px 6px rgba(0,0,0,.9));
+}
+#app.immersive-game .floorplan .player-marker > span:not(.killer-face) {
+  bottom: -17px;
+  font-size: 12px;
+  letter-spacing: 2px;
+  color: #e5d7c2;
+  text-shadow: 0 2px 6px #000, 0 0 10px #000;
+}
+
+@media (max-width: 700px) {
+  #app.immersive-game .floorplan .room-people .person-chip,
+  #app.immersive-game .floorplan .room.room-size-small .room-people .person-chip {
+    min-width: 54px;
+    min-height: 60px;
+  }
+  #app.immersive-game .floorplan .room-people .person-chip .person-avatar-wrap,
+  #app.immersive-game .floorplan .room.room-size-small .room-people .person-chip .person-avatar-wrap,
+  #app.immersive-game .floorplan .room-people .person-chip .person-avatar-wrap .person-avatar,
+  #app.immersive-game .floorplan .room.room-size-small .room-people .person-chip .person-avatar-wrap .person-avatar,
+  #app.immersive-game .floorplan .room-people .person-chip > img {
+    flex-basis: 54px !important;
+    width: 54px !important;
+    height: 54px !important;
+  }
+  #app.immersive-game .floorplan .player-marker {
+    width: 70px;
+    height: 70px;
+  }
+  #app.immersive-game .floorplan .player-marker .killer-face.marker {
+    width: 62px;
+    height: 62px;
+  }
+}
