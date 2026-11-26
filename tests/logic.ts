@@ -8,6 +8,11 @@ import {
   ARCH_LABEL,
   BASE_AP,
   BLEEDOUT_TURNS,
+  blinkPlayer,
+  collectTrapCache,
+  nurseGrabPerson,
+  refillHuntressHatchets,
+  throwHuntressHatchet,
   HAND_LIMIT,
   LOOK_COST,
   drawCardAction,
@@ -31,6 +36,7 @@ import {
   canCoordinateRescue,
   executeCarriedPerson,
   isRoomLit,
+  recoverBearTrap,
   getHuntOpportunities,
   recordRoutineObservation,
   missionTaskProgress,
@@ -60,7 +66,7 @@ import {
   nextStepToward,
   updateNpcDialogue,
 } from '../src/game/engine';
-import { OBSTACLE_ROOMS, ROOM_MAP, ROOMS, buildLayout, doorMarkerPosition } from '../src/game/rooms';
+import { CABINET_ROOMS, OBSTACLE_ROOMS, ROOM_MAP, ROOMS, buildLayout, doorMarkerPosition } from '../src/game/rooms';
 import { cardImage } from '../src/game/assetMap';
 import { personChip, personDetailHtml } from '../src/ui/render/shared';
 import { SURVIVOR_MAP } from '../src/game/survivors';
@@ -74,9 +80,9 @@ import { ROUTINE_PROFILE } from '../src/game/npc/catalog';
 let pass = 0;
 let fail = 0;
 
-check('初期可选杀手严格限定为设陷者、护士、迈尔斯',
-  ACTIVE_KILLERS.map((killer) => killer.owner).join('|') === '设陷者|护士|迈克尔·迈尔斯' &&
-  STARTER_KILLERS.join('|') === '设陷者|护士|迈克尔·迈尔斯',
+check('初期可选杀手包含设陷者、护士、女猎手与迈尔斯',
+  ACTIVE_KILLERS.map((killer) => killer.owner).join('|') === '设陷者|护士|女猎手|迈克尔·迈尔斯' &&
+  STARTER_KILLERS.join('|') === '设陷者|护士|女猎手|迈克尔·迈尔斯',
   ACTIVE_KILLERS.map((killer) => killer.owner).join('、'),
 );
 check('未开放杀手资料仍保留在内部数据库，便于后续实装',
@@ -310,7 +316,7 @@ function caseMyersStalkingAndFearRadius(): void {
   movePlayer(stealth, stealthRoom);
   check('迈尔斯：尾随者模式进入幸存者所在房间也不会被察觉', hiddenTarget.alert === 0 && hiddenTarget.awareness === 0, `alert=${hiddenTarget.alert} awareness=${hiddenTarget.awareness}`);
 
-  const stalking = newGame();
+  const stalking = createGame(STARTING_DECK, undefined, '迈克尔·迈尔斯');
   const prey = player(stalking);
   const farRoom = (Object.keys(ROOM_MAP) as RoomId[]).find((room) =>
     room !== stalking.playerRoom && !ROOM_MAP[stalking.playerRoom].neighbors.includes(room),
@@ -318,30 +324,34 @@ function caseMyersStalkingAndFearRadius(): void {
   stalking.people.forEach((person) => {
     if (person.role !== 'police') {
       person.room = farRoom;
-      person.hidden = false;
+      person.hidden = true;
       person.intent = 'idle';
       person.alert = 0;
       person.awareness = 0;
     }
   });
   prey.room = stalking.playerRoom;
+  prey.hidden = false;
   prey.intent = 'idle';
   prey.hp = 4;
   stalking.energy = 5;
   stalking.fearRadius = 0;
   const stalkStart = stalking.stalkMeter;
-  check('迈尔斯：未发觉目标首次尾随增加 15 点尾随值',
-    usePower(stalking, 'myers_gaze') && !stalking.myersStalking && stalking.stalkMeter === stalkStart + 15 && stalking.energy === 4 && stalking.stalkPressure === 0 && prey.alert === 0 && prey.intent === 'idle',
+  check('迈尔斯：落单目标提供基础尾随值与额外收益',
+    usePower(stalking, 'myers_gaze') && stalking.stalkMeter === stalkStart + 20 && stalking.energy === 4 &&
+    stalking.stalkPressure === 0 && prey.alert === 0 && prey.intent === 'idle',
     `stalk=${stalking.stalkMeter} AP=${stalking.energy}`);
-  check('迈尔斯：重复观察只增加尾随值，不累积压力或惊动目标',
-    usePower(stalking, 'myers_gaze') && stalking.stalkMeter === stalkStart + 30 && stalking.energy === 3 && stalking.stalkPressure === 0 && !stalking.myersStalking && prey.alert === 0 && prey.intent === 'idle' && prey.awareness === 0,
-    `stalk=${stalking.stalkMeter} pressure=${stalking.stalkPressure} intent=${prey.intent}`);
-  const thirdStalk = usePower(stalking, 'myers_gaze');
-  check('迈尔斯：第三次观察仍然保持被动，不进入尾随姿态',
-    thirdStalk && stalking.stalkMeter === stalkStart + 45 && stalking.stalkPressure === 0 && !stalking.myersStalking && prey.intent === 'idle',
-    `stalk=${stalking.stalkMeter} intent=${prey.intent}`);
 
-  const fleeingVisible = newGame();
+  const groupStalk = createGame(STARTING_DECK, undefined, '迈克尔·迈尔斯');
+  const visibleGroup = groupStalk.people.filter((person) => person.role !== 'police');
+  visibleGroup.forEach((person) => { person.room = groupStalk.playerRoom; person.hidden = false; person.alert = 0; });
+  groupStalk.energy = 5;
+  const expectedGroupGain = visibleGroup.length * 15;
+  check('迈尔斯：视野内每名幸存者都会贡献尾随值',
+    usePower(groupStalk, 'myers_gaze') && groupStalk.stalkMeter === Math.min(100, expectedGroupGain),
+    `visible=${visibleGroup.length} stalk=${groupStalk.stalkMeter}`);
+
+  const fleeingVisible = createGame(STARTING_DECK, undefined, '迈克尔·迈尔斯');
   const fleeingTarget = player(fleeingVisible);
   const fleeingFarRoom = (Object.keys(ROOM_MAP) as RoomId[]).find((room) =>
     room !== fleeingVisible.playerRoom && !ROOM_MAP[fleeingVisible.playerRoom].neighbors.includes(room),
@@ -359,9 +369,9 @@ function caseMyersStalkingAndFearRadius(): void {
   fleeingVisible.fearRadius = 0;
   fleeingVisible.energy = 2;
   check('迈尔斯：视野内正在逃跑的 NPC 仍可被观察',
-    usePower(fleeingVisible, 'myers_gaze') && fleeingVisible.stalkMeter > 0 && fleeingVisible.energy === 1);
+    usePower(fleeingVisible, 'myers_gaze') && fleeingVisible.stalkMeter === 20 && fleeingVisible.energy === 1);
 
-  const noPrey = newGame();
+  const noPrey = createGame(STARTING_DECK, undefined, '迈克尔·迈尔斯');
   const hiddenRoom = (Object.keys(ROOM_MAP) as RoomId[]).find((room) =>
     room !== noPrey.playerRoom && !ROOM_MAP[noPrey.playerRoom].neighbors.includes(room),
   ) ?? openNeighbor(noPrey.playerRoom);
@@ -370,13 +380,70 @@ function caseMyersStalkingAndFearRadius(): void {
   check('迈尔斯：视野内没有幸存者时尾随不能使用也不扣 AP',
     !usePower(noPrey, 'myers_gaze') && noPrey.energy === 4 && noPrey.stalkMeter === 0 && !noPrey.myersStalking);
 
-  const exitStalk = newGame();
-  const exitPrey = player(exitStalk);
-  exitPrey.room = exitStalk.playerRoom;
-  runOps(exitStalk, [{ op: 'flag', key: 'myersStalk' }]);
-  check('迈尔斯：可以主动退出尾随姿态并恢复正常移动',
-    usePower(exitStalk, 'myers_gaze_exit') && !exitStalk.myersStalking);
+  const myersBurst = createGame(STARTING_DECK, undefined, '迈克尔·迈尔斯');
+  const burstTarget = player(myersBurst);
+  myersBurst.people.forEach((person) => {
+    if (person.role !== 'police' && person.id !== burstTarget.id) { person.room = openNeighbor(myersBurst.playerRoom); person.hidden = true; }
+  });
+  burstTarget.room = myersBurst.playerRoom;
+  burstTarget.hidden = false;
+  myersBurst.stalkMeter = 100;
+  myersBurst.energy = 4;
+  check('迈尔斯：尾随值满后同一按钮发动恶魔附身，发动后保留 80 点爆发能量',
+    usePower(myersBurst, 'myers_gaze') && myersBurst.possessed && myersBurst.stalkMeter === 80);
+  check('迈尔斯：恶魔附身挥刀可直接击倒健康目标',
+    attack(myersBurst, burstTarget.id) && burstTarget.hp === 0 && myersBurst.possessed,
+    `hp=${burstTarget.hp} stalk=${myersBurst.stalkMeter}`);
 
+  const trapper = createGame(STARTING_DECK, undefined, '设陷者');
+  const trapRoom = ROOMS.find((room) =>
+    room.id !== trapper.playerRoom && room.id !== 'garden' && room.id !== 'garage' &&
+    !trapper.objectiveRooms.includes(room.id) && room.neighbors.length >= 2,
+  )?.id ?? openNeighbor(trapper.playerRoom);
+  trapper.playerRoom = trapRoom;
+  trapper.energy = 4;
+  check('设陷者：开局携带 2 个捕兽夹并可在合适房间布设',
+    trapper.trapInventory === 2 && usePower(trapper, 'trap_set') && trapper.trapInventory === 1 &&
+    trapper.bearTraps.some((trap) => trap.room === trapRoom && trap.armed));
+  check('设陷者：地图随机生成额外捕兽夹补给点',
+    trapper.trapCaches.length === 2, `caches=${trapper.trapCaches.length}`);
+  if (trapper.trapCaches.length) {
+    trapper.playerRoom = trapper.trapCaches[0];
+    trapper.energy = 4;
+    const beforeCache = trapper.trapInventory;
+    check('设陷者：可以在地图补给点收集额外捕兽夹',
+      collectTrapCache(trapper) && trapper.trapInventory === beforeCache + 1);
+  }
+
+  const nurse = createGame(STARTING_DECK, undefined, '护士');
+  const nurseTarget = player(nurse);
+  const blinkRoom = ROOM_MAP[nurse.playerRoom].neighbors[0];
+  nurseTarget.room = blinkRoom;
+  nurseTarget.hidden = false;
+  nurse.energy = 4;
+  check('护士：闪现能力先进入选点状态，不立即消耗行动点',
+    usePower(nurse, 'nurse_blink') && nurse.nurseBlinkTargeting && nurse.energy === 4);
+  check('护士：可以穿过房门闪现到 1 格外房间并开启抓取窗口',
+    blinkPlayer(nurse, blinkRoom) && nurse.playerRoom === blinkRoom && nurse.nurseFollowUp && nurse.nurseFatiguePending && nurse.energy === 3);
+  check('护士：闪现后抓取会打断目标并施加疲惫',
+    nurseGrabPerson(nurse, nurseTarget.id) && nurseTarget.hp === 3 && nurseTarget.blockedTurns === 1 &&
+    nurse.stunTurns === 1 && !nurse.nurseFollowUp && !nurse.nurseFatiguePending);
+
+  const huntress = createGame(STARTING_DECK, undefined, '女猎手');
+  const hatchetTarget = player(huntress);
+  hatchetTarget.room = huntress.playerRoom;
+  hatchetTarget.hidden = false;
+  huntress.energy = 4;
+  check('女猎手：开局携带 3 把飞斧并可进入瞄准状态',
+    huntress.hatchets === 3 && usePower(huntress, 'huntress_axe') && huntress.huntressAiming);
+  check('女猎手：投掷飞斧消耗 1 把并对选中目标造成 1 点伤害',
+    throwHuntressHatchet(huntress, hatchetTarget.id) && huntress.hatchets === 2 && hatchetTarget.hp === 3);
+  huntress.playerRoom = CABINET_ROOMS[0];
+  huntress.hatchets = 1;
+  huntress.energy = 4;
+  check('女猎手：在柜子处可以将飞斧补充至 3 把',
+    refillHuntressHatchets(huntress) && huntress.hatchets === 3);
+  
   check('卡牌图标：新版初始卡和迈尔斯专属卡都有可用白色图案资源',
     ['unbreakable','hex_huntress','hex_noed','scourge_shrine','distressing','hell','iron_grasp','deerstalker','hex_ruin','bitter_murmur','sloppy_butcher','insidious','myers_eclipse_light','myers_last_best','myers_plaything'].every((id) => !!cardImage(id) && cardImage(id)!.includes('assets/dbd/perks/')));
   const normal = createGame(['silent_step'], undefined, '设陷者');
