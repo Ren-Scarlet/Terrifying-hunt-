@@ -47,6 +47,7 @@ import {
   BREAKER_SWITCH_COST,
   missionTaskProgress,
   isRoomLit,
+  getHuntOpportunities,
 } from '../../game/engine';
 import { KILLERS, type KillerProfile } from '../../game/killers';
 import { roomName } from '../../game/missions';
@@ -186,6 +187,16 @@ function powerButtonHtml(state: GameState, killer: KillerProfile): string {
  * 威胁面板：把「他们正在做什么」直接摊开，每一行都给出一个具体的反制办法。
  * 数值全部从真实状态算，不做占位。
  */
+function huntOpportunityHtml(state: GameState): string {
+  const opportunities = getHuntOpportunities(state);
+  if (!opportunities.length) {
+    return '<div class="opportunity-empty">暂未发现可利用的窗口。观察目标的日常路线，留意落单、黑暗和设施操作时机。</div>';
+  }
+  return '<div class="opportunity-list">' + opportunities.map((item) =>
+    '<div class="opportunity-row"><div class="opportunity-heading"><b>' + escape(item.title) + '</b><span>' + escape(item.targetName) + ' · ' + escape(roomName(item.room)) + '</span></div><p>' + escape(item.detail) + '</p></div>',
+  ).join('') + '</div>';
+}
+
 function threatRowsHtml(state: GameState): string {
   const alive = state.people.filter((p) => p.role !== 'police' && p.hp > 0);
   const downed = state.people.filter((p) => p.role !== 'police' && p.hp <= 0);
@@ -578,6 +589,10 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
               }).join('')}
               ${(['study', 'hall'] as RoomId[]).map((room) => '<div class="facility-row telephone ' + (state.phoneCut ? 'broken' : '') + '"><span class="facility-symbol">☎</span><div class="facility-info"><b>' + escape(roomName(room)) + ' · 电话线路</b><small>' + (state.phoneCut ? '电话已中断 · 跨区域救援协调受限' + (state.sabotage.includes('radio') ? ' · 无线电也已破坏' : ' · 无线电仍可有限协调') : '线路正常 · 可对外求救与远程协调') + '</small></div><span class="facility-state">' + (state.phoneCut ? '中断' : '正常') + '</span></div>').join('')}
             </div>
+          </div>
+          <div class="panel hunt-opportunities-panel">
+            <div class="panel-heading"><h2>猎杀机会</h2><span>只显示当前视野中可利用的窗口</span></div>
+            ${huntOpportunityHtml(state)}
           </div>
           <div class="panel threat-panel">
             <div class="panel-heading"><h2>现场威胁动态</h2><span>只显示当前正在发生的风险</span></div>
