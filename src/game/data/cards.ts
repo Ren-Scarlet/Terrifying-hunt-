@@ -635,7 +635,7 @@ export const CARDS: CardDef[] = [
     sourceSkill: 'Sloppy Butcher',
     unlocked: true,
     pool: 'initial',
-    ops: [],
+    ops: [{ op: 'attack', who: 'victim', bleedTurns: 2, status: 'deepWound', statusTurns: 0 }],
   },
   {
     id: 'insidious',
