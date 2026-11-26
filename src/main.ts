@@ -80,6 +80,43 @@ let lastWanted = 0;
 
 const app = document.getElementById('app')!;
 
+type DisplayScale = 'standard' | 'large' | 'xlarge';
+type DisplaySettings = { interfaceScale: DisplayScale; fontScale: DisplayScale; mapScale: DisplayScale };
+const DISPLAY_SETTINGS_KEY = 'nightfall-display-settings';
+const DEFAULT_DISPLAY_SETTINGS: DisplaySettings = { interfaceScale: 'standard', fontScale: 'standard', mapScale: 'standard' };
+function loadDisplaySettings(): DisplaySettings {
+  try {
+    const raw = localStorage.getItem(DISPLAY_SETTINGS_KEY);
+    if (!raw) return { ...DEFAULT_DISPLAY_SETTINGS };
+    const value = JSON.parse(raw) as Partial<DisplaySettings>;
+    const valid = (v: unknown): v is DisplayScale => v === 'standard' || v === 'large' || v === 'xlarge';
+    return {
+      interfaceScale: valid(value.interfaceScale) ? value.interfaceScale : 'standard',
+      fontScale: valid(value.fontScale) ? value.fontScale : 'standard',
+      mapScale: valid(value.mapScale) ? value.mapScale : 'standard',
+    };
+  } catch {
+    return { ...DEFAULT_DISPLAY_SETTINGS };
+  }
+}
+let displaySettings = loadDisplaySettings();
+function applyDisplaySettings(): void {
+  app.dataset.interfaceScale = displaySettings.interfaceScale;
+  app.dataset.fontScale = displaySettings.fontScale;
+  app.dataset.mapScale = displaySettings.mapScale;
+}
+function cycleDisplaySetting(key: keyof DisplaySettings): void {
+  const levels: DisplayScale[] = ['standard', 'large', 'xlarge'];
+  const index = levels.indexOf(displaySettings[key]);
+  displaySettings = { ...displaySettings, [key]: levels[(index + 1) % levels.length] };
+  try {
+    localStorage.setItem(DISPLAY_SETTINGS_KEY, JSON.stringify(displaySettings));
+  } catch {
+    // 私密浏览模式或存储空间受限时，仍保留本次页面会话的设置。
+  }
+  render();
+}
+
 function render(): void {
   // 菜单（含商店/牌组/平衡面板）放角色选择曲，进入对局换背景曲；同一首不会重播
   setMusic(screen === 'menu' || !game ? 'menu' : 'bgm');
@@ -98,6 +135,7 @@ function render(): void {
   }
   if (guideOpen) html += renderGuide();
   app.innerHTML = html;
+  applyDisplaySettings();
   detailCardUid = null;
   if (game && screen === 'game' && selectedPersonId) {
     const panel = document.getElementById('cardDetail');
@@ -232,6 +270,12 @@ app.addEventListener('click', (event) => {
   if (screen === 'menu' && !game && action && action !== 'mute') {
     if (action === 'killer' || action === 'unlock-killer') playSfx('killerPick');
     else if (action !== 'start' && action !== 'again') playSfx('menuButton');
+  }
+
+  if (action === 'display-setting') {
+    const key = target.dataset.setting as keyof DisplaySettings | undefined;
+    if (key === 'interfaceScale' || key === 'fontScale' || key === 'mapScale') cycleDisplaySetting(key);
+    return;
   }
 
   if (action === 'mute') {
