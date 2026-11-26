@@ -409,6 +409,10 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
     // 墙顶：比地面亮一点点的暖灰。墙体如果跟背景一样黑，就只剩"缝隙"没有"墙"
     c.fillStyle = '#342e26';
     c.fill(mass);
+    // 墙体上沿的微弱冷灰高光与下沿阴影，强化墙厚而不改变房间边界。
+    c.strokeStyle = 'rgba(190,174,148,.22)';
+    c.lineWidth = 1.5;
+    c.stroke(mass);
 
     // 墙面材质（只铺在墙体上）
     c.save();
@@ -459,6 +463,67 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
       c.lineWidth = 1;
       c.strokeRect(r.x - 1.5, r.y - 1.5, r.w + 3, r.h + 3);
     }
+  }
+
+  /** 地面使用痕迹：污渍、拖擦和门口积灰，全部固定种子，重绘时不会闪烁。 */
+  function paintSurfaceWear(c: Ctx): void {
+    ROOMS.forEach((room, i) => {
+      const r = rectOf(room.id, view);
+      const rand = rng(9107 + i * 173);
+      c.save();
+      c.beginPath();
+      c.rect(r.x + 1, r.y + 1, r.w - 2, r.h - 2);
+      c.clip();
+
+      // 房间角落的潮气与积灰：边缘有痕迹，中心仍保留地板材质。
+      for (let n = 0; n < 5; n++) {
+        const corner = n % 4;
+        const x = r.x + (corner === 0 || corner === 3 ? 0.06 : 0.94) * r.w;
+        const y = r.y + (corner < 2 ? 0.07 : 0.93) * r.h;
+        const rx = r.w * (0.08 + rand() * 0.1);
+        const ry = r.h * (0.07 + rand() * 0.09);
+        const stain = c.createRadialGradient(x, y, 1, x, y, Math.max(rx, ry));
+        stain.addColorStop(0, `rgba(5,6,6,${0.11 + rand() * 0.08})`);
+        stain.addColorStop(0.62, 'rgba(8,8,7,.055)');
+        stain.addColorStop(1, 'rgba(0,0,0,0)');
+        c.fillStyle = stain;
+        c.beginPath();
+        c.ellipse(x, y, rx, ry, rand() * 0.5, 0, Math.PI * 2);
+        c.fill();
+      }
+
+      // 不规则的细划痕和鞋底拖痕，避免地面像一张干净的重复贴图。
+      for (let n = 0; n < 13; n++) {
+        const x = r.x + (0.12 + rand() * 0.76) * r.w;
+        const y = r.y + (0.12 + rand() * 0.76) * r.h;
+        const len = Math.min(r.w, r.h) * (0.018 + rand() * 0.045);
+        c.strokeStyle = `rgba(4,4,4,${0.12 + rand() * 0.14})`;
+        c.lineWidth = 0.45 + rand() * 0.65;
+        c.beginPath();
+        c.moveTo(x, y);
+        c.quadraticCurveTo(x + len * 0.35, y + (rand() - 0.5) * 3, x + len, y + (rand() - 0.5) * 4);
+        c.stroke();
+      }
+
+      // 门口附近的磨损带，给房间之间的通行路径一点生活痕迹。
+      const doors = doorHoles(view).filter((hole) => hole.room === room.id || hole.other === room.id);
+      for (const hole of doors) {
+        const cx = hole.side === 'left' ? r.x : hole.side === 'right' ? r.x + r.w :
+          hole.side === 'top' ? hole.center : hole.center;
+        const cy = hole.side === 'top' ? r.y : hole.side === 'bottom' ? r.y + r.h : hole.center;
+        const horizontal = hole.side === 'top' || hole.side === 'bottom';
+        const wear = c.createRadialGradient(cx, cy, 1, cx, cy, hole.gap * 1.35);
+        wear.addColorStop(0, 'rgba(0,0,0,.16)');
+        wear.addColorStop(0.55, 'rgba(0,0,0,.055)');
+        wear.addColorStop(1, 'rgba(0,0,0,0)');
+        c.fillStyle = wear;
+        c.beginPath();
+        c.ellipse(cx, cy, horizontal ? hole.gap * 1.25 : hole.gap * 0.72,
+          horizontal ? hole.gap * 0.72 : hole.gap * 1.25, 0, 0, Math.PI * 2);
+        c.fill();
+      }
+      c.restore();
+    });
   }
 
   /** 灯具本体：画在地面上的一个亮点 + 金属罩 */
@@ -671,6 +736,7 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
       c.restore();
     });
 
+    paintSurfaceWear(c);
     paintFixtures(c);
 
     // 墙体
