@@ -71,7 +71,7 @@ import {
 
 import { isCardTuned } from '../../game/tuning';
 import { isMuted, playHeartbeat, playTrapScream } from '../audio';
-import { escape, icon, itemBadge, itemIconHtml, personChip, intentDot, shadowFigures, perkIconHtml, TYPE_NAMES, killerFaceHtml, defaultDetailHtml, cardTextHtml } from './shared';
+import { escape, icon, itemBadge, itemIconHtml, personChip, shadowFigures, perkIconHtml, TYPE_NAMES, killerFaceHtml, defaultDetailHtml, cardTextHtml } from './shared';
 import type { GameState, Person, RoomId, SaveData } from '../../game/types';
 
 let lastRenderedTrapTriggerCount: number | null = null;
@@ -778,7 +778,6 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
           <div class="resource-bar">
             <div class="stats">
               <div class="stat"><b>${state.turn}<i>/${m.turns}</i></b><small>回合</small></div>
-              <div class="stat energy" title="当前行动点"><b>${state.energy}<i>/${state.maxEnergy}</i></b><small>行动点</small></div>
               <div class="stat alarm-stat ${state.alarm >= 70 ? 'hot' : state.alarm >= 40 ? 'warm' : ''}" title="全局警报值">
                 <b>${state.alarm}<i>/${ALARM_MAX}</i></b><div class="alarm-track"><span style="width:${state.alarm}%"></span></div><small>警报</small>
               </div>
@@ -815,6 +814,10 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
             <div class="hand-row">${hand || '<div class="empty-hand">手牌已空，可花行动点主动抽牌。</div>'}</div>
           </div>
           <button class="hand-toggle" data-action="toggle-hand" title="收起 / 展开手牌" aria-label="收起或展开手牌" aria-expanded="true">⌄</button>
+          <div class="ap-display" aria-label="当前行动力">
+            <b>${state.energy}<i>/${state.maxEnergy}</i></b>
+            <small>行动力</small>
+          </div>
         </div>
       </div>
       <aside class="hunt-sidebar hunt-sidebar-right">
