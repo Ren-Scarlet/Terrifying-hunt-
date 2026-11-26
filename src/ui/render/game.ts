@@ -449,13 +449,20 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
           : `<div class="room-unknown">未探索</div>
              <div class="room-features">${roomFeatures(state, room.id)}</div>`}
         <div class="room-people">
-          ${people.map((p) => personChip(
-            p,
-            false,
-            false,
-            state.huntressAiming ? 'hatchet' : state.nurseFollowUp && p.hp > 0 && p.room === state.playerRoom ? 'nurse-grab' : undefined,
-            !isRoomLit(state, p.room),
-          )).join('')}
+          ${people.map((p) => p.hp <= 0 && p.room === state.playerRoom && !state.carryPersonId
+            ? `<div class="map-person-wrap">${personChip(p, false, false, undefined, !isRoomLit(state, p.room))}
+                <div class="person-world-actions">
+                  <button class="btn" data-action="carry" data-person-id="${p.id}" ${state.energy < 1 ? 'disabled' : ''}>抱起</button>
+                  <button class="btn execute" data-action="execute-target" data-person-id="${p.id}" ${executeBlockReason(state) ? 'disabled' : ''}>处决</button>
+                </div>
+              </div>`
+            : personChip(
+                p,
+                false,
+                false,
+                state.huntressAiming ? 'hatchet' : state.nurseFollowUp && p.hp > 0 && p.room === state.playerRoom ? 'nurse-grab' : undefined,
+                !isRoomLit(state, p.room),
+              )).join('')}
           ${police ? personChip(police) : ''}
           ${ghosts.map(() => '<span class="ghost-chip" title="最后确认位置：人可能已经走了">?</span>').join('')}
         </div>
@@ -665,7 +672,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
       ).join('')
     : '';
   const mapWorldActions = carried
-    ? `<div class="map-world-actions" aria-label="携带目标操作">
+    ? `<div class="map-world-actions" style="${markerStyle}" aria-label="携带目标操作">
         <button class="btn" data-action="drop-carried" ${state.energy < 1 ? 'disabled' : ''}>放下目标 · 1 AP</button>
         ${executionMethodsAtRoom(state.playerRoom).map((method) => `<button class="btn" data-action="execute-special" data-method="${method.id}" title="${escape(method.description)}">特殊处决 · ${escape(method.name)}</button>`).join('')}
       </div>`
