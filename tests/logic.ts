@@ -1197,6 +1197,8 @@ function caseWitnessFearAndUnifiedSabotage(): void {
   const phone = newGame();
   phone.playerRoom = PHONE_ROOMS[0];
   phone.phoneCut = false;
+  phone.powerCircuits = phone.powerCircuits.filter((circuit) => circuit.breakerRoom !== phone.playerRoom);
+  phone.siteItems = phone.siteItems.filter((item) => item.room !== phone.playerRoom);
   phone.energy = 4;
   const phoneBroken = sabotageSiteItem(phone);
   check('统一破坏：电话房可直接剪断电话线', phoneBroken && phone.phoneCut);
