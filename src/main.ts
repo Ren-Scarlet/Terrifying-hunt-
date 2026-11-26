@@ -122,6 +122,7 @@ let pendingMapAttackTarget: string | null = null;
 let pendingMapAttackGhost: { roomId: string; element: HTMLElement; left: number; top: number; width: number; height: number } | null = null;
 let heldMoveKey: string | null = null;
 let heldMoveTimer = 0;
+let pendingMapWalk = false;
 
 const app = document.getElementById('app')!;
 
@@ -185,6 +186,7 @@ function performHeldMovement(key: string): boolean {
   if (game.hand.length > 6) return false;
   const nextRoom = nextRoomInDirection(key);
   if (!nextRoom || !movePlayer(game, nextRoom)) return false;
+  pendingMapWalk = true;
   playSfx('step');
   afterAction();
   return true;
@@ -319,6 +321,13 @@ function render(): void {
   }
   if (guideOpen) html += renderGuide();
   renderMarkupPreservingMap(html);
+  if (pendingMapWalk) {
+    pendingMapWalk = false;
+    app.classList.remove('map-walk');
+    void app.offsetWidth;
+    app.classList.add('map-walk');
+    window.setTimeout(() => app.classList.remove('map-walk'), 520);
+  }
   if (pendingMapAttackTarget !== null) {
     const targetId = pendingMapAttackTarget;
     pendingMapAttackTarget = null;
@@ -498,6 +507,7 @@ function showCardDetail(uid: string | null): void {
 app.addEventListener('click', (event) => {
   const target = (event.target as HTMLElement).closest<HTMLElement>('[data-action]');
   if (!target) return;
+  clearHeldMovement();
   const action = target.dataset.action;
   if (handleImmersiveAction(action)) return;
   // 浏览器要求先有用户交互才允许出声
