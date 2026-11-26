@@ -80,6 +80,7 @@ export function renderMenu(save: SaveData): string {
           <div><small>完成任务数</small><b>${save.wins}</b></div>
           <div><small>当前牌组</small><b>${save.deck.length} 张</b></div>
           <div><small>已解锁卡牌</small><b>${save.unlockedCards.filter((id) => deckCardsForKiller(killer.owner).some((card) => card.id === id)).length} / ${deckCardsForKiller(killer.owner).length}</b></div>
+          <div><small>处决图鉴</small><b>${(save.executionRecords ?? []).length} / 6</b></div>
         </div>
         <div class="actions">
           <button class="btn primary" data-action="start">开始任务</button>
