@@ -1,17 +1,31 @@
-// Prototype-aligned HUD controls: camera, drawers, hand collapse and keyboard shortcuts.
+// Camera controller for the immersive hunt map.
+// The map is re-created with the game HUD, so camera state lives outside the DOM.
+// Animation is event-driven: no permanent RAF loop and no layout reads per frame.
 type CameraMode = 'center' | 'smooth';
 
 let root: HTMLElement | null = null;
+let mapElement: HTMLElement | null = null;
+let viewportElement: HTMLElement | null = null;
 let zoom = 1.18;
 let mode: CameraMode = 'smooth';
 let globalView = false;
 let following = true;
 let panX = 0;
 let panY = 0;
-let focusX = 0;
-let focusY = 0;
+let cameraX = 0;
+let cameraY = 0;
+let cameraZoom = 1.18;
+let mapWidth = 0;
+let mapHeight = 0;
+let viewportWidth = 0;
+let viewportHeight = 0;
+let playerX = 0;
+let playerY = 0;
 let frame = 0;
-let previousFrameTime = 0;
+let animationStart = 0;
+let animationFrom = { x: 0, y: 0, zoom: 1.18 };
+let animationTo = { x: 0, y: 0, zoom: 1.18 };
+let hasCamera = false;
 let taskDrawerOpen = false;
 let intelDrawerOpen = false;
 let hudHidden = false;
@@ -21,74 +35,105 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
-function elements(): { viewport: HTMLElement; map: HTMLElement; marker: HTMLElement } | null {
-  if (!root) return null;
-  const viewport = root.querySelector<HTMLElement>('.map-viewport');
-  const map = root.querySelector<HTMLElement>('.floorplan');
-  const marker = root.querySelector<HTMLElement>('.player-marker');
-  return viewport && map && marker ? { viewport, map, marker } : null;
-}
-
 function readPlayerPoint(map: HTMLElement, marker: HTMLElement): { x: number; y: number } {
   const left = Number.parseFloat(marker.style.left) || 50;
   const top = Number.parseFloat(marker.style.top) || 50;
-  return { x: map.offsetWidth * left / 100, y: map.offsetHeight * top / 100 };
+  return { x: mapWidth * left / 100, y: mapHeight * top / 100 };
 }
 
-function applyTransform(deltaSeconds = 1 / 60): void {
-  const found = elements();
-  if (!found) return;
-  const { viewport, map, marker } = found;
-  const width = map.offsetWidth;
-  const height = map.offsetHeight;
-  const viewWidth = viewport.clientWidth;
-  const viewHeight = viewport.clientHeight;
-  const point = readPlayerPoint(map, marker);
-  let x: number;
-  let y: number;
-
-  if (globalView) {
-    const fit = Math.min(viewWidth / width, viewHeight / height) * 0.94;
-    zoom = fit;
-    x = (viewWidth - width * zoom) / 2;
-    y = (viewHeight - height * zoom) / 2;
-  } else {
-    if (following) {
-      const desiredX = viewWidth / 2 - point.x * zoom;
-      const desiredY = viewHeight / 2 - point.y * zoom;
-      if (mode === 'center') {
-        focusX = desiredX;
-        focusY = desiredY;
-      } else {
-        const alpha = 1 - Math.exp(-clamp(deltaSeconds, 0.001, 0.05) * 9);
-        focusX += (desiredX - focusX) * clamp(alpha, 0.08, 0.24);
-        focusY += (desiredY - focusY) * clamp(alpha, 0.08, 0.24);
-      }
-    }
-    x = focusX + panX;
-    y = focusY + panY;
+function setCameraTransform(x: number, y: number, scale: number): void {
+  cameraX = x;
+  cameraY = y;
+  cameraZoom = scale;
+  if (mapElement) {
+    mapElement.style.transform = `translate3d(${x.toFixed(2)}px,${y.toFixed(2)}px,0) scale(${scale.toFixed(4)})`;
   }
-  map.style.transform = `translate3d(${x}px,${y}px,0) scale(${zoom})`;
-  const readout = root?.querySelector<HTMLElement>('[data-camera-zoom]');
+}
+
+function stopCameraAnimation(): void {
+  if (frame) window.cancelAnimationFrame(frame);
+  frame = 0;
+}
+
+function animateCamera(x: number, y: number, scale: number, duration = 360): void {
+  stopCameraAnimation();
+  if (!mapElement) return;
+  animationFrom = { x: cameraX, y: cameraY, zoom: cameraZoom };
+  animationTo = { x, y, zoom: scale };
+  if (!hasCamera || duration <= 0) {
+    setCameraTransform(x, y, scale);
+    hasCamera = true;
+    return;
+  }
+  animationStart = performance.now();
+  const tick = (now: number): void => {
+    const raw = clamp((now - animationStart) / duration, 0, 1);
+    // Ease-out cubic: quick response at the start, soft landing at the target.
+    const eased = 1 - Math.pow(1 - raw, 3);
+    setCameraTransform(
+      animationFrom.x + (animationTo.x - animationFrom.x) * eased,
+      animationFrom.y + (animationTo.y - animationFrom.y) * eased,
+      animationFrom.zoom + (animationTo.zoom - animationFrom.zoom) * eased,
+    );
+    if (raw < 1) frame = window.requestAnimationFrame(tick);
+    else frame = 0;
+  };
+  frame = window.requestAnimationFrame(tick);
+}
+
+function cameraTarget(): { x: number; y: number; zoom: number } {
+  if (globalView) {
+    const fit = Math.min(viewportWidth / mapWidth, viewportHeight / mapHeight) * 0.94;
+    zoom = fit;
+    return {
+      x: (viewportWidth - mapWidth * zoom) / 2,
+      y: (viewportHeight - mapHeight * zoom) / 2,
+      zoom,
+    };
+  }
+  if (following) {
+    return {
+      x: viewportWidth / 2 - playerX * zoom,
+      y: viewportHeight / 2 - playerY * zoom,
+      zoom,
+    };
+  }
+  return { x: panX, y: panY, zoom };
+}
+
+function updateCamera(animate = true): void {
+  if (!mapElement || mapWidth < 1 || mapHeight < 1 || viewportWidth < 1 || viewportHeight < 1) return;
+  const target = cameraTarget();
+  animateCamera(target.x, target.y, target.zoom, animate && mode === 'smooth' && !globalView ? 360 : animate ? 260 : 0);
+  updateCameraControls();
+}
+
+function updateCameraControls(): void {
+  if (!root) return;
+  const readout = root.querySelector<HTMLElement>('[data-camera-zoom]');
   if (readout) readout.textContent = globalView ? '全局' : `${Math.round(zoom * 100)}%`;
-  root?.querySelectorAll<HTMLElement>('[data-camera-mode]').forEach((button) => {
+  root.querySelectorAll<HTMLElement>('[data-camera-mode]').forEach((button) => {
     button.classList.toggle('active', button.dataset.cameraMode === mode);
   });
-  root?.querySelector<HTMLElement>('[data-camera-follow]')?.classList.toggle('active', following && !globalView);
-}
-
-function loop(time: number): void {
-  if (!root) { frame = 0; return; }
-  const delta = previousFrameTime ? (time - previousFrameTime) / 1000 : 1 / 60;
-  previousFrameTime = time;
-  if (!globalView) applyTransform(delta);
-  frame = window.requestAnimationFrame(loop);
+  root.querySelector<HTMLElement>('[data-camera-follow]')?.classList.toggle('active', following && !globalView);
 }
 
 export function syncImmersiveCamera(nextRoot: HTMLElement): void {
   root = nextRoot;
-  const map = root.querySelector<HTMLElement>('.floorplan');
-  if (!map) return;
+  viewportElement = root.querySelector<HTMLElement>('.map-viewport');
+  mapElement = root.querySelector<HTMLElement>('.floorplan');
+  const marker = root.querySelector<HTMLElement>('.player-marker');
+  if (!viewportElement || !mapElement || !marker) return;
+
+  // Measure once per render/resize, never inside the animation frame.
+  mapWidth = mapElement.offsetWidth;
+  mapHeight = mapElement.offsetHeight;
+  viewportWidth = viewportElement.clientWidth;
+  viewportHeight = viewportElement.clientHeight;
+  const point = readPlayerPoint(mapElement, marker);
+  playerX = point.x;
+  playerY = point.y;
+
   root.querySelector<HTMLElement>('.task-detail-drawer')?.classList.toggle('open', taskDrawerOpen);
   const intel = root.querySelector<HTMLDetailsElement>('.intel-drawer');
   if (intel) intel.open = intelDrawerOpen;
@@ -100,22 +145,40 @@ export function syncImmersiveCamera(nextRoot: HTMLElement): void {
     handToggle.setAttribute('aria-expanded', String(handOpen));
     handToggle.setAttribute('aria-label', handOpen ? '收起手牌' : '展开手牌');
   }
-  if (!frame) frame = window.requestAnimationFrame(loop);
-  applyTransform();
+
+  // A newly rendered map element has no transform, but cameraX/Y retain the
+  // previous view. Seed it with that view before animating toward the new target.
+  if (hasCamera) {
+    mapElement.style.transform = `translate3d(${cameraX}px,${cameraY}px,0) scale(${cameraZoom})`;
+  }
+  updateCameraControls();
+  updateCamera(hasCamera);
 }
 
 function pan(dx: number, dy: number): void {
   globalView = false;
   following = false;
-  panX += dx;
-  panY += dy;
-  applyTransform();
+  panX = cameraX + dx;
+  panY = cameraY + dy;
+  updateCamera(true);
 }
 
 function setZoom(next: number): void {
-  globalView = false;
-  zoom = clamp(next, 0.55, 2.15);
-  applyTransform();
+  const oldZoom = zoom;
+  const nextZoom = clamp(next, 0.55, 2.15);
+  if (following) {
+    zoom = nextZoom;
+  } else {
+    const centerWorldX = (viewportWidth / 2 - cameraX) / Math.max(0.01, cameraZoom);
+    const centerWorldY = (viewportHeight / 2 - cameraY) / Math.max(0.01, cameraZoom);
+    zoom = nextZoom;
+    panX = viewportWidth / 2 - centerWorldX * zoom;
+    panY = viewportHeight / 2 - centerWorldY * zoom;
+  }
+  if (oldZoom !== zoom) {
+    globalView = false;
+    updateCamera(true);
+  }
 }
 
 export function handleImmersiveAction(action: string | undefined): boolean {
@@ -125,7 +188,7 @@ export function handleImmersiveAction(action: string | undefined): boolean {
   if (action === 'camera-global') {
     globalView = true;
     following = false;
-    applyTransform();
+    updateCamera(false);
     return true;
   }
   if (action === 'camera-follow') {
@@ -134,14 +197,14 @@ export function handleImmersiveAction(action: string | undefined): boolean {
     zoom = 1.18;
     panX = 0;
     panY = 0;
-    applyTransform();
+    updateCamera(true);
     return true;
   }
   if (action === 'camera-mode-center' || action === 'camera-mode-smooth') {
     mode = action === 'camera-mode-center' ? 'center' : 'smooth';
     following = true;
     globalView = false;
-    applyTransform();
+    updateCamera(mode === 'smooth');
     return true;
   }
   if (action === 'toggle-task-drawer') {
@@ -207,5 +270,21 @@ export function installImmersiveKeys(): void {
       pan(key === 'arrowleft' ? amount : key === 'arrowright' ? -amount : 0, key === 'arrowup' ? amount : key === 'arrowdown' ? -amount : 0);
     }
   });
-  window.addEventListener('resize', () => applyTransform());
+  window.addEventListener('resize', () => {
+    if (!root) return;
+    const viewport = root.querySelector<HTMLElement>('.map-viewport');
+    const map = root.querySelector<HTMLElement>('.floorplan');
+    const marker = root.querySelector<HTMLElement>('.player-marker');
+    if (!viewport || !map || !marker) return;
+    viewportElement = viewport;
+    mapElement = map;
+    mapWidth = map.offsetWidth;
+    mapHeight = map.offsetHeight;
+    viewportWidth = viewport.clientWidth;
+    viewportHeight = viewport.clientHeight;
+    const point = readPlayerPoint(map, marker);
+    playerX = point.x;
+    playerY = point.y;
+    updateCamera(false);
+  });
 }
