@@ -598,7 +598,7 @@ export const CARDS: CardDef[] = [
     sourceSkill: 'Deerstalker',
     unlocked: true,
     pool: 'initial',
-    ops: [{ op: 'flag', key: 'revealNearestTrail', value: 1 }],
+    ops: [{ op: 'flag', key: 'revealNearestTrail', value: 2 }],
   },
   {
     id: 'hex_ruin',
