@@ -2779,9 +2779,12 @@ export function searchRoom(state: GameState): boolean {
 
 /** 为什么现在砸不了：用于按钮禁用与日志 */
 export function isRoomLit(state: GameState, room: RoomId): boolean {
-  return state.powerCircuits.some((c) =>
-    !c.broken && (c.flickerTurns ?? 0) <= 0 && c.affectedRooms.includes(room),
-  );
+  return state.powerCircuits.some((c) => {
+    const source = c.generatorId ? state.siteItems.find((item) => item.id === c.generatorId) : undefined;
+    const generatorOnline = !source || (!source.broken && source.jammedTurns <= 0);
+    return !c.broken && c.enabled !== false && generatorOnline &&
+      (c.flickerTurns ?? 0) <= 0 && c.affectedRooms.includes(room);
+  });
 }
 
 /**
@@ -2851,6 +2854,48 @@ function triggerEnvironmentalEvent(state: GameState): void {
   log(state, `【环境事件】${room.name}突然传来玻璃碎裂声${startled.length ? `，${startled.map((person) => person.name).join('、')}被惊动了` : '，声音在空房间里回荡'}。`);
 }
 
+export const BREAKER_SWITCH_COST = 1;
+
+/** 电闸只能在所在房间操作；合闸需要对应发电机正常供电。 */
+export function breakerBlockReason(state: GameState, circuitId?: string): string | null {
+  if (state.phase !== 'playing') return '这一局已经结束了。';
+  const circuit = state.powerCircuits.find((item) =>
+    circuitId ? item.id === circuitId : item.breakerRoom === state.playerRoom,
+  );
+  if (!circuit) return '这间屋子没有电闸。';
+  if (circuit.breakerRoom !== state.playerRoom) return '必须走到电闸所在房间才能操作。';
+  if (circuit.broken) return '电闸控制箱已经损坏，无法操作。';
+  if (state.energy < BREAKER_SWITCH_COST) return '行动点不足：操作电闸需要 1 点。';
+  if (circuit.enabled === false) {
+    const source = circuit.generatorId ? state.siteItems.find((item) => item.id === circuit.generatorId) : undefined;
+    if (source && (source.broken || source.jammedTurns > 0)) return '供电发电机尚未恢复，暂时无法合闸。';
+  }
+  return null;
+}
+
+export function togglePowerCircuit(state: GameState, circuitId?: string): boolean {
+  const reason = breakerBlockReason(state, circuitId);
+  if (reason) {
+    log(state, reason);
+    return false;
+  }
+  const circuit = state.powerCircuits.find((item) =>
+    circuitId ? item.id === circuitId : item.breakerRoom === state.playerRoom,
+  );
+  if (!circuit) return false;
+  state.energy -= BREAKER_SWITCH_COST;
+  circuit.enabled = circuit.enabled === false;
+  addDisturbance(state, state.playerRoom);
+  addAlarm(state, 1);
+  log(state, circuit.enabled
+    ? `你合上了${circuit.name}电闸，供电恢复。`
+    : `你拉下了${circuit.name}电闸，${circuit.affectedRooms.map(roomName).join('、')}陷入黑暗。`);
+  state.attackReady = true;
+  afterPlayerAction(state);
+  checkImmediateWin(state);
+  return true;
+}
+
 export function sabotageBlockReason(state: GameState): string | null {
   if (state.phase !== 'playing') return '这一局已经结束了。';
   if (state.energy < SABOTAGE_COST) return `行动点不足：破坏需要 ${SABOTAGE_COST} 点。`;
@@ -2888,6 +2933,7 @@ export function sabotageSiteItem(state: GameState): boolean {
 
   if (circuit) {
     circuit.broken = true;
+    circuit.enabled = false;
     log(state, `你砸毁了${circuit.name}控制箱！${circuit.affectedRooms.map(roomName).join('、')}立即断电，灯光熄灭。`);
   } else if (item!.kind === 'itemBox') {
     item!.broken = true;
@@ -2904,7 +2950,8 @@ export function sabotageSiteItem(state: GameState): boolean {
     item!.jammedTurns = GENERATOR_JAM_TURNS;
     // 停机而不是永久报废：他们还能修回来，破坏是「拖时间」而非一劳永逸
     item!.broken = false;
-    log(state, `你砸了${roomName(item!.room)}的发电机，修复进度 ${before}% → ${item!.progress}%，停机 ${GENERATOR_JAM_TURNS} 回合。`);
+    const affected = state.powerCircuits.filter((circuit) => circuit.generatorId === item!.id).map((circuit) => circuit.name);
+    log(state, `你砸了${roomName(item!.room)}的发电机，修复进度 ${before}% → ${item!.progress}%，停机 ${GENERATOR_JAM_TURNS} 回合。${affected.length ? '受其供电的 ' + affected.join('、') + ' 也随之熄灭。' : ''}`);
   }
 
   addDisturbance(state, state.playerRoom);

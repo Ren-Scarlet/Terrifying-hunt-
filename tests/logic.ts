@@ -21,6 +21,9 @@ import {
   addAlarm,
   currentScore,
   sabotageSiteItem,
+  togglePowerCircuit,
+  breakerBlockReason,
+  BREAKER_SWITCH_COST,
   attack,
   executeDownedPerson,
   executeBlockReason,
@@ -96,6 +99,35 @@ function newGame(): GameState {
   const deck = ['silent_step', 'sprint', 'choke', 'shuriken', 'execute', 'clean', 'night_cover', 'aim'];
   return createGame(deck, undefined, '迈克尔·迈尔斯');
 }
+function caseGeneratorBreakerNetwork(): void {
+  const s = newGame();
+  const circuit = s.powerCircuits[0];
+  const source = s.siteItems.find((item) => item.id === circuit.generatorId);
+  const room = circuit.affectedRooms[0];
+  check('供电网络：每组电闸都绑定到实际发电机',
+    s.powerCircuits.every((item) => !!item.generatorId && s.siteItems.some((site) => site.id === item.generatorId && site.kind === 'generator')));
+  check('供电网络：发电机正常时区域照明开启', isRoomLit(s, room));
+  s.playerRoom = circuit.breakerRoom;
+  const before = s.energy;
+  const pulled = togglePowerCircuit(s, circuit.id);
+  check('电闸：拉闸消耗 1 AP 并关闭所属区域照明',
+    pulled && s.energy === before - BREAKER_SWITCH_COST && !isRoomLit(s, room));
+  const closed = togglePowerCircuit(s, circuit.id);
+  check('电闸：合闸恢复照明', closed && isRoomLit(s, room));
+  if (source) {
+    source.jammedTurns = 1;
+    check('发电机：停机时其供电区域自动熄灭', !isRoomLit(s, room));
+    circuit.enabled = false;
+    const blockReason = breakerBlockReason(s, circuit.id);
+    check('发电机：供电源停机时禁止合闸', !!blockReason && blockReason.includes('发电机'));
+    source.jammedTurns = 0;
+    const restored = togglePowerCircuit(s, circuit.id);
+    check('发电机：恢复后允许合闸并重新供电', restored && isRoomLit(s, room));
+  }
+  circuit.broken = true;
+  check('电闸：控制箱损坏后所属区域保持断电', !isRoomLit(s, room));
+}
+
 function casePhoneLineCoordination(): void {
   const s = newGame();
   const farRoom = ROOMS.map((room) => room.id)
@@ -123,6 +155,7 @@ function casePhoneLineCoordination(): void {
 
 /** 新抽牌规则：每回合补 1 张、主动抽牌、六张上限、洗牌推进团队进度。 */
 /** 环境事件：每三回合改变一次现场局势，并正确区分临时闪断与永久断电。 */
+caseGeneratorBreakerNetwork();
 casePhoneLineCoordination();
 
 function caseEnvironmentalEvents(): void {

@@ -43,6 +43,8 @@ import {
   SITE_ITEM_LABEL,
   SURVIVOR_ITEM_LABEL,
   sabotageBlockReason,
+  breakerBlockReason,
+  BREAKER_SWITCH_COST,
   missionTaskProgress,
   isRoomLit,
 } from '../../game/engine';
@@ -90,12 +92,22 @@ function roomFeatures(state: GameState, roomId: RoomId): string {
     });
   const lighting = state.powerCircuits.find((c) => c.affectedRooms.includes(roomId));
   if (lighting) {
-    const flickering = !lighting.broken && (lighting.flickerTurns ?? 0) > 0;
-    const lightStatus = lighting.broken ? '断电' : flickering ? '临时闪断' : '供电中';
-    parts.push(`<span class="room-feature light ${lighting.broken ? 'off' : flickering ? 'flickering' : 'on'}" title="${escape(lighting.name)}：${lightStatus}">${lighting.broken ? '☾' : flickering ? '⚡' : '💡'}<b>照明</b></span>`);
+    const source = lighting.generatorId ? state.siteItems.find((item) => item.id === lighting.generatorId) : undefined;
+    const sourceOffline = !!source && (source.broken || source.jammedTurns > 0);
+    const sourcePowered = !lighting.broken && lighting.enabled !== false && !sourceOffline;
+    const flickering = sourcePowered && (lighting.flickerTurns ?? 0) > 0;
+    const lightOn = isRoomLit(state, roomId);
+    const lightStatus = lighting.broken ? '电闸损坏' : lighting.enabled === false ? '电闸已拉下' : sourceOffline ? '发电机停机' : flickering ? '临时闪断' : lightOn ? '供电中' : '断电';
+    const lightClass = flickering ? 'flickering' : lightOn ? 'on' : 'off';
+    parts.push(`<span class="room-feature light ${lightClass}" title="${escape(lighting.name)}：${lightStatus}">${flickering ? '⚡' : lightOn ? '💡' : '☾'}<b>照明</b></span>`);
   }
   const circuitAt = state.powerCircuits.find((c) => c.breakerRoom === roomId);
-  if (circuitAt) parts.push(`<span class="room-feature breaker ${circuitAt.broken ? 'broken' : ''}" title="${escape(circuitAt.name)}：${circuitAt.broken ? '已破坏' : '可破坏；影响 ' + circuitAt.affectedRooms.map(roomName).join('、')}">⚡<b>电闸</b></span>`);
+  if (circuitAt) {
+    const source = circuitAt.generatorId ? state.siteItems.find((item) => item.id === circuitAt.generatorId) : undefined;
+    const sourceOffline = !!source && (source.broken || source.jammedTurns > 0);
+    const status = circuitAt.broken ? '控制箱损坏' : circuitAt.enabled === false ? '已拉闸' : sourceOffline ? '发电机停机' : '供电正常';
+    parts.push(`<span class="room-feature breaker ${circuitAt.broken || circuitAt.enabled === false || sourceOffline ? 'broken' : ''}" title="${escape(circuitAt.name)}：${status}，影响 ${circuitAt.affectedRooms.map(roomName).join('、')}">⚡<b>电闸</b></span>`);
+  }
   if (roomId === 'kitchen') parts.push('<span class="room-feature execution-site" title="特殊处决地点：冰箱 / 微波炉">☠<b>处决点</b></span>');
   if (roomId === EXIT_ROOM) parts.push(`<span class="room-feature escape" title="撤离点：任务完成的撤离位置">${icon('escape', 'ui-icon tiny')}</span>`);
   if (state.escapeRooms.includes(roomId)) parts.push(`<span class="room-feature escape-npc" title="团队第4阶段开启的逃生点">${icon('escape', 'ui-icon tiny')}</span>`);
@@ -556,7 +568,14 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
                   ${canSmash ? `<button class="btn mini" data-action="sabotage" title="花 ${SABOTAGE_COST} 点行动点砸掉">砸掉</button>` : ''}
                 </div>`;
               }).join('')}
-              ${state.powerCircuits.map((c) => '<div class="facility-row breaker ' + (c.broken ? 'broken' : '') + '"><span class="facility-symbol">⚡</span><div class="facility-info"><b>' + escape(c.name) + ' · 电闸</b><small>' + escape(roomName(c.breakerRoom)) + ' · ' + (c.broken ? '已断电' : '供电中') + ' · 影响 ' + c.affectedRooms.length + ' 个房间</small></div><span class="facility-state">' + (c.broken ? '断电' : '正常') + '</span></div>').join('')}
+              ${state.powerCircuits.map((c) => {
+                const source = c.generatorId ? state.siteItems.find((item) => item.id === c.generatorId) : undefined;
+                const sourceOnline = !source || (!source.broken && source.jammedTurns <= 0);
+                const status = c.broken ? '控制箱损坏' : c.enabled === false ? '已拉闸' : !sourceOnline ? '发电机停机' : '供电中';
+                const reason = breakerBlockReason(state, c.id);
+                const canToggle = c.breakerRoom === state.playerRoom && !c.broken && !reason;
+                return '<div class="facility-row breaker ' + (c.broken || c.enabled === false || !sourceOnline ? 'broken' : '') + '"><span class="facility-symbol">⚡</span><div class="facility-info"><b>' + escape(c.name) + ' · 电闸</b><small>' + escape(roomName(c.breakerRoom)) + ' · ' + status + ' · 供电源：' + (source ? escape(roomName(source.room)) + '发电机' : '独立电源') + ' · 影响 ' + c.affectedRooms.length + ' 个房间</small></div><span class="facility-state">' + status + '</span>' + (c.breakerRoom === state.playerRoom ? '<button class="btn mini" data-action="toggle-breaker" data-circuit-id="' + c.id + '" ' + (canToggle ? '' : 'disabled title="' + escape(reason ?? '电闸不可操作') + '"') + '>' + (c.enabled === false ? '合闸' : '拉闸') + '（' + BREAKER_SWITCH_COST + ' AP）</button>' : '') + '</div>';
+              }).join('')}
               ${(['study', 'hall'] as RoomId[]).map((room) => '<div class="facility-row telephone ' + (state.phoneCut ? 'broken' : '') + '"><span class="facility-symbol">☎</span><div class="facility-info"><b>' + escape(roomName(room)) + ' · 电话线路</b><small>' + (state.phoneCut ? '电话已中断 · 跨区域救援协调受限' + (state.sabotage.includes('radio') ? ' · 无线电也已破坏' : ' · 无线电仍可有限协调') : '线路正常 · 可对外求救与远程协调') + '</small></div><span class="facility-state">' + (state.phoneCut ? '中断' : '正常') + '</span></div>').join('')}
             </div>
           </div>

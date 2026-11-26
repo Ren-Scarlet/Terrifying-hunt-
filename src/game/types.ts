@@ -296,6 +296,10 @@ export interface PowerCircuit {
   breakerRoom: RoomId;
   affectedRooms: RoomId[];
   broken: boolean;
+  /** 控制箱的开关状态；未定义的旧状态按开启处理。 */
+  enabled?: boolean;
+  /** 为这组照明供电的发电机；未绑定时按旧版独立电路处理。 */
+  generatorId?: string;
   /** 环境事件造成的临时熄灯回合数，不等于电闸被破坏。 */
   flickerTurns?: number;
 }

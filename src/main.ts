@@ -17,6 +17,7 @@ import {
   playCard,
   searchRoom,
   sabotageSiteItem,
+  togglePowerCircuit,
   usePower,
   wipeBlade,
 } from './game/engine';
@@ -582,6 +583,14 @@ app.addEventListener('click', (event) => {
   if (action === 'wipe') {
     wipeBlade(game);
     playSfx('wipe');
+    afterAction();
+    return;
+  }
+
+  if (action === 'toggle-breaker') {
+    const circuitId = target.dataset.circuitId;
+    togglePowerCircuit(game, circuitId);
+    playSfx('breaker');
     afterAction();
     return;
   }
