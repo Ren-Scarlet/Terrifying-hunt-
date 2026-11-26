@@ -575,14 +575,14 @@ function npcReact(state: GameState): void {
       person.activity = '察觉到杀手逼近，立刻逃跑';
       if (person.movesThisTurn < REACT_MOVE_CAP && fleeAway(state, person, true)) person.movesThisTurn += 1;
       continue;
-    } else if (fearRadius >= 1 && distanceToPlayer === 1 && person.awareness === 0 && person.alert < 40) {
+    } else if (fearRadius >= 1 && distanceToPlayer === 1 && awarenessStage(person.alert) === 0 && person.alert < 50) {
       person.alert = Math.max(person.alert, 25);
       person.awareness = awarenessStage(person.alert);
       person.intent = 'wary';
       person.activity = '听见附近有动静，停下来观察';
     } else if (fearRadius >= 2 && distanceToPlayer === 2 && person.awareness === 0 && person.alert < 40) {
-      person.awareness = 1;
-      person.alert = Math.max(person.alert, 12);
+      person.alert = Math.max(person.alert, 25);
+      person.awareness = awarenessStage(person.alert);
       person.intent = 'wary';
       person.activity = '远处传来令人不安的动静';
     }
@@ -1087,7 +1087,7 @@ function fleeAway(state: GameState, person: Person, quiet = false): boolean {
   // 后院是出口：只有本来就打算离开、或者已经吓破胆的人才会往外跑。
   // 否则「被追」等于「自动逃生」，玩家把人逼到院子里反而在帮对手。
   const mayExit =
-    person.goal === 'exit' || person.goal === 'panic' || person.alert >= 70 || person.hp <= SURVIVOR_INJURED_HP;
+    person.goal === 'exit' || person.goal === 'panic' || person.alert >= 75 || person.hp <= SURVIVOR_INJURED_HP;
   const options = ROOM_MAP[person.room].neighbors.filter(
     (r) =>
       r !== state.playerRoom &&
@@ -1844,11 +1844,11 @@ function npcTurn(state: GameState): void {
       actByArchetype(state, person);
       continue;
     }
-    if (person.alert >= 42) {
+    if (awarenessStage(person.alert) >= 2) {
       actByArchetype(state, person);
       continue;
     }
-    if (person.alert >= 22) {
+    if (awarenessStage(person.alert) >= 1) {
       person.intent = 'wary';
       if (random() < 0.5) actByArchetype(state, person);
       else person.activity = '紧张地四处张望';
