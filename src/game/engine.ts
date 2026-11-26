@@ -580,7 +580,7 @@ function npcReact(state: GameState): void {
       person.awareness = awarenessStage(person.alert);
       person.intent = 'wary';
       person.activity = '听见附近有动静，停下来观察';
-    } else if (fearRadius >= 2 && distanceToPlayer === 2 && person.awareness === 0 && person.alert < 40) {
+    } else if (fearRadius >= 2 && distanceToPlayer === 2 && awarenessStage(person.alert) === 0 && person.alert < 50) {
       person.alert = Math.max(person.alert, 25);
       person.awareness = awarenessStage(person.alert);
       person.intent = 'wary';
