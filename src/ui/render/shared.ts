@@ -226,7 +226,7 @@ export function personDetailHtml(state: GameState, personId: string): string {
     paras.push(
       `状态：${HEALTH_LABEL[health]}（${person.hp}/4）。行为类型：${ARCH_LABEL[person.archetype]}。`,
       `目的：${GOAL_LABEL[person.goal]}。当前状态：${INTENT_LABEL[person.intent]}。`,
-      `即时警觉：${awarenessLabel(person.alert)}（${person.alert}/100）。行为：${person.activity || '暂无明显动作'}。`,
+      `警戒值：${awarenessLabel(person.alert)}（${person.alert}/100）。恐惧值：${person.fear}/100${person.fear >= 100 ? '（精神崩溃）' : person.fear >= 70 ? '（濒临崩溃）' : ''}。行为：${person.activity || '暂无明显动作'}。`,
     );
     if (person.dialogue) paras.push(`听见他说：“${person.dialogue}”`);
     if (person.item) paras.push(`携带物品：${SURVIVOR_ITEM_LABEL[person.item]}（剩余 ${person.itemUses} 次）。`);
@@ -239,7 +239,6 @@ export function personDetailHtml(state: GameState, personId: string): string {
     }
     if (person.hidden) paras.push('他躲起来了：点左下角的「搜索」翻柜子（1 点行动点），不然打不到他。');
     if (person.sneaky) paras.push('老练：有时会踮着脚走路，不留鞋印、也不惊动乌鸦——但不会一直这样。');
-    if (person.goal === 'objective' || person.goal === 'key') paras.push('他正为团队目标忙：进度做满，幸存者会集体从后门逃走，你直接失败。');
     if (person.armed) paras.push('他手里有武器：进门时可能反击，让你下回合少走一步。');
     if (health === 'downed') paras.push(`倒地：现在即可处决；如果暂时放过他，同伴仍可能赶来救援，${Math.max(0, BLEEDOUT_TURNS - person.downedTurns)} 回合后会因失血死亡。`);
     if (threat) paras.push(`威胁：这名角色会主动对抗你，别把他当普通平民。`);
