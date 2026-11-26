@@ -2514,6 +2514,10 @@ export function attack(state: GameState, targetId?: string): boolean {
   }
   const target = findVictim(state, state.playerRoom, Infinity, true, targetId)!;
   const heavy = state.possessed;
+  const alone = npcs(state).every((person) =>
+    person.id === target.id || person.room !== state.playerRoom || person.hp <= 0,
+  );
+  const ambushStrike = ambushActive(state) && target.role !== 'police' && target.alert < 100 && alone;
   const noedActive = state.hexNoedActive && state.teamStage >= 4 && state.totems.length > 0;
   // 带手电筒的人可能从隔壁冲进来照你：这一刀落空，两个人都趁机跑掉
   const flasher = npcs(state).find(
@@ -2568,7 +2572,13 @@ export function attack(state: GameState, targetId?: string): boolean {
     log(state, `夜幕锁定 ${target.name}：这一刀直接把他放倒。`);
   }
   const hpBeforeHit = target.hp;
-  damagePerson(state, target, noedActive || (heavy && state.killer === '迈克尔·迈尔斯') ? SURVIVOR_MAX_HP : heavy || nightfallKill ? 2 : 1);
+  damagePerson(state, target, noedActive || (heavy && state.killer === '迈克尔·迈尔斯')
+    ? SURVIVOR_MAX_HP
+    : heavy || nightfallKill || ambushStrike ? 2 : 1);
+  if (ambushStrike) {
+    state.ambushTurn = 0;
+    log(state, `致命窗口：${target.name} 独自一人且尚未察觉，你的伏击造成重创（2 点伤害）。`);
+  }
   if (target.role !== 'police' && target.hp < hpBeforeHit) {
     if (state.hexHuntressActive && !state.hexHuntressUsed) {
       state.hexHuntressUsed = true;

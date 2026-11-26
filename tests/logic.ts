@@ -337,10 +337,33 @@ function caseAmbush(): void {
   const delta = v.alert - before;
   check('B 伏击牌压住进门惊动', stayed && delta <= 0, `留在原地=${stayed}，警觉 ${delta >= 0 ? '+' : ''}${delta}`);
 
+  // 把其他幸存者移出现场，明确构造「目标独处」的致命窗口。
+  s.people.filter((person) => person.role !== 'police' && person.id !== v.id).forEach((person) => {
+    person.hp = 0;
+    person.hidden = true;
+  });
+  v.hp = 4;
   const hp = v.hp;
   // 固定随机源，避免随机手电筒干扰把伏击命中回归变成偶发测试。
-  const hit = withRandomSource(() => 0.99, () => attack(s));
+  const hit = withRandomSource(() => 0.99, () => attack(s, v.id));
   check('B 伏击后第一刀能砍中', hit && v.hp < hp, `hp ${hp} → ${v.hp}`);
+  check('B 独处且未察觉的伏击触发致命窗口', hit && v.hp === hp - 2 && s.ambushTurn === 0,
+    `hp ${hp} → ${v.hp}，伏击标记已消耗=${s.ambushTurn === 0}`);
+  const crowded = newGame();
+  const first = player(crowded);
+  const second = crowded.people.find((person) => person.role !== 'police' && person.id !== first.id)!;
+  first.room = crowded.playerRoom;
+  second.room = crowded.playerRoom;
+  first.hp = 4;
+  second.hp = 4;
+  first.alert = 50;
+  second.alert = 50;
+  crowded.ambushTurn = crowded.turn;
+  const crowdedHp = first.hp;
+  const crowdedHit = withRandomSource(() => 0.99, () => attack(crowded, first.id));
+  check('B 伏击时有其他幸存者在场，不触发独处致命窗口',
+    crowdedHit && first.hp === crowdedHp - 1 && crowded.ambushTurn === crowded.turn,
+    `hp ${crowdedHp} → ${first.hp}`);
 }
 
 /** C：「疾速残暴」把两间房的距离抹平，追上去还能补刀 */

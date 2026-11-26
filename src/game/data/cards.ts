@@ -137,7 +137,7 @@ export const CARDS: CardDef[] = [
     name: '静止隐身',
     cost: 1,
     type: 'skill',
-    desc: '伏击：本回合进门不惊动任何人，接着挥刀就是偷袭。暴露度 -2，暴露度 -8，目击无效。',
+    desc: '伏击：本回合进门不惊动任何人。目标独处且尚未察觉时，第一刀造成 2 点伤害，打开致命窗口。暴露度 -2，目击无效。',
     flavor: '影子不会留下脚印。',
     sourceSkill: 'Insidious',
     sourceText: '闲置后获得无法侦测状态。',
