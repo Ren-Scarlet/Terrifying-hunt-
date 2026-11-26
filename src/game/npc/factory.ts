@@ -4,6 +4,7 @@ import { ESCAPE_ROOMS } from '../constants';
 import { ENTRY_ROOM, OBSTACLE_ROOMS, POLICE_START, ROOMS } from '../rooms';
 import { SPECIAL_SURVIVORS, SURVIVOR_MAP, SURVIVORS } from '../survivors';
 import type { Archetype, Mission, NpcGoal, Person, PersonRole, RoomId, SurvivorItem } from '../types';
+import { ROUTINE_PROFILE } from './catalog';
 
 const STARTER_ITEM_RATE = 0.32;
 const STARTER_ITEMS: SurvivorItem[] = ['medkit', 'toolbox', 'flashlight', 'smoke', 'flare'];
@@ -86,6 +87,10 @@ function makePerson(
     activity: randomOf(ACTIVITIES),
     intent: 'idle',
     goal: goalForArchetype(archetype),
+    routineIndex: 0,
+    routineSightings: 0,
+    routineObserved: false,
+    routineLastObservedTurn: -1,
     blockedTurns: 0,
     bleed: 0,
     downedTurns: 0,
