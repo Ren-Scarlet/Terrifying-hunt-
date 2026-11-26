@@ -688,40 +688,6 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
 
 
     <div class="layout hunt-layout">
-      <aside class="hunt-sidebar hunt-sidebar-left">
-        <div class="panel roster-panel">
-        <div class="panel-heading"><h2>幸存者档案</h2><span>${here.length} 人在你的房间${policeHere ? ' · 警察也在' : ''}</span></div>
-        <div class="roster">${roster || '<div class="roster-empty">还没有确认任何人的位置。走进房间，或者用侦查卡。</div>'}</div>
-        ${unknownCount > 0 ? `<div class="roster-unknown">还有 ${unknownCount} 个人没有被确认</div>` : ''}
-        </div>
-        <div class="panel facility-panel">
-        <div class="panel-heading"><h2>现场设施</h2><span>通讯 / 照明 / 补给</span></div>
-        <div class="facility-list">
-        ${state.siteItems.map((i) => {
-        const status = i.kind === 'itemBox'
-        ? i.broken ? '已被砸烂 · 不再发道具' : `还能翻 ${i.charges} 件道具`
-        : i.jammedTurns > 0 ? `停机 ${i.jammedTurns} 回合` : i.charged ? '已通电 · 进度已计入' : `修复 ${i.progress}%`;
-        const cls = i.broken ? 'broken' : i.jammedTurns > 0 ? 'jammed' : '';
-        const canSmash = i.room === state.playerRoom && !i.broken && (i.kind === 'itemBox' ? i.charges > 0 : true) && !sabotageReason;
-        return `<div class="facility-row ${i.kind} ${cls}">
-        <img class="facility-icon" src="${uiIcon(i.kind === 'itemBox' ? 'itemBox' : 'generator')}" alt="" onerror="this.style.display='none'">
-        <div class="facility-info"><b>${SITE_ITEM_LABEL[i.kind]}</b><small>${escape(roomName(i.room))} · ${status}</small></div>
-        ${canSmash ? `<button class="btn mini" data-action="sabotage" title="花 ${SABOTAGE_COST} 点行动点砸掉">砸掉</button>` : ''}
-        </div>`;
-        }).join('')}
-        ${state.powerCircuits.map((c) => {
-        const source = c.generatorId ? state.siteItems.find((item) => item.id === c.generatorId) : undefined;
-        const sourceOnline = !source || (!source.broken && source.jammedTurns <= 0);
-        const status = c.broken ? '控制箱损坏' : c.enabled === false ? '已拉闸' : !sourceOnline ? '发电机停机' : '供电中';
-        const reason = breakerBlockReason(state, c.id);
-        const canToggle = c.breakerRoom === state.playerRoom && !c.broken && !reason;
-        return '<div class="facility-row breaker ' + (c.broken || c.enabled === false || !sourceOnline ? 'broken' : '') + '"><span class="facility-symbol">⚡</span><div class="facility-info"><b>' + escape(c.name) + ' · 电闸</b><small>' + escape(roomName(c.breakerRoom)) + ' · ' + status + ' · 供电源：' + (source ? escape(roomName(source.room)) + '发电机' : '独立电源') + ' · 影响 ' + c.affectedRooms.length + ' 个房间</small></div><span class="facility-state">' + status + '</span>' + (c.breakerRoom === state.playerRoom ? '<button class="btn mini" data-action="toggle-breaker" data-circuit-id="' + c.id + '" ' + (canToggle ? '' : 'disabled title="' + escape(reason ?? '电闸不可操作') + '"') + '>' + (c.enabled === false ? '合闸' : '拉闸') + '（' + BREAKER_SWITCH_COST + ' AP）</button>' : '') + '</div>';
-        }).join('')}
-        ${(['study', 'hall'] as RoomId[]).map((room) => '<div class="facility-row telephone ' + (state.phoneCut ? 'broken' : '') + '"><span class="facility-symbol">☎</span><div class="facility-info"><b>' + escape(roomName(room)) + ' · 电话线路</b><small>' + (state.phoneCut ? '电话已中断 · 跨区域救援协调受限' + (state.sabotage.includes('radio') ? ' · 无线电也已破坏' : ' · 无线电仍可有限协调') : '线路正常 · 可对外求救与远程协调') + '</small></div><span class="facility-state">' + (state.phoneCut ? '中断' : '正常') + '</span></div>').join('')}
-        </div>
-        </div>
-
-      </aside>
       <div class="main-column">
         <div class="panel map-panel">
           <div class="panel-heading"><h2>房屋平面</h2><span>门形=通道 · 绿门=当前可走 · 红叉=封锁 · 黄门=堵门/行动点不足 · 蓝框=目标点</span>
