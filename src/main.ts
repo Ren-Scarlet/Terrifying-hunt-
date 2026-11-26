@@ -971,5 +971,32 @@ app.addEventListener('focusout', (event) => {
   showCardDetail(null);
 });
 
+
+window.addEventListener('keydown', (event) => {
+  if (!game || screen !== 'game' || event.altKey || event.ctrlKey || event.metaKey || event.repeat) return;
+  const target = event.target as HTMLElement | null;
+  if (target && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))) return;
+  const key = event.key.toLowerCase();
+  if (!['w', 'a', 's', 'd'].includes(key)) return;
+  if (game.lookingAround || game.nurseBlinkTargeting || game.huntressAiming || game.auraTargeting) return;
+  event.preventDefault();
+  const direction = key === 'w' ? { x: 0, y: -1 } : key === 's' ? { x: 0, y: 1 } : key === 'a' ? { x: -1, y: 0 } : { x: 1, y: 0 };
+  const current = ROOM_MAP[game.playerRoom].rect;
+  const cx = current.left + current.width / 2;
+  const cy = current.top + current.height / 2;
+  const nextRoom = ROOM_MAP[game.playerRoom].neighbors
+    .map((id) => {
+      const rect = ROOM_MAP[id].rect;
+      const dx = rect.left + rect.width / 2 - cx;
+      const dy = rect.top + rect.height / 2 - cy;
+      const length = Math.hypot(dx, dy) || 1;
+      return { id, score: (dx / length) * direction.x + (dy / length) * direction.y };
+    })
+    .sort((a, b) => b.score - a.score)[0];
+  if (!nextRoom || nextRoom.score <= 0.2) return;
+  if (movePlayer(game, nextRoom.id)) playSfx('step');
+  afterAction();
+});
+
 installImmersiveKeys();
 render();
