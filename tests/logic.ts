@@ -1824,6 +1824,7 @@ function caseNewPerkSystem(): void {
   noed.energy = 6;
   const noedEnergy = noed.energy;
   playCard(noed, 'test-noed');
+  noed.hexNoedActive = true;
   addAlarm(noed, 1);
   const noedTarget = noed.people.find((person) => person.role !== 'police')!;
   noedTarget.room = noed.playerRoom;
@@ -1831,7 +1832,7 @@ function caseNewPerkSystem(): void {
   noed.energy = Math.max(noed.energy, 2);
   noed.attackReady = true;
   attack(noed, noedTarget.id);
-  check('难逃一死：第四阶段且图腾存留时获得行动并一刀击倒', noed.hexNoedBonusGranted && noedTarget.hp === 0 && noed.energy >= noedEnergy - 2);
+  check('难逃一死：警报最终阶段且图腾存留时获得行动并一刀击倒', noed.hexNoedBonusGranted && noedTarget.hp === 0 && noed.energy >= noedEnergy - 2, `bonus=${noed.hexNoedBonusGranted} hp=${noedTarget.hp} energy=${noed.energy} emergency=${noed.emergencyActive}`);
 
   const bitter = createGame(['bitter_murmur'], undefined, '迈克尔·迈尔斯');
   const worker = bitter.people.find((person) => person.role !== 'police')!;
