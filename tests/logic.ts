@@ -161,7 +161,7 @@ function caseMyersStalkingAndFearRadius(): void {
   s.energy = 9;
   const beforeCost = moveCost(s, next);
   runOps(s, [{ op: 'flag', key: 'myersStalk' }]);
-  check('迈尔斯：尾随者技能切换开启潜行模式', s.myersStalking);
+  check('迈尔斯：配件效果仍可开启旧尾随姿态', s.myersStalking);
   check('迈尔斯：尾随模式移动额外消耗 1 点行动点', moveCost(s, next) === beforeCost + 1);
 
   const stealth = newGame();
@@ -206,7 +206,17 @@ function caseMyersStalkingAndFearRadius(): void {
 
   const fleeingVisible = newGame();
   const fleeingTarget = player(fleeingVisible);
+  const fleeingFarRoom = (Object.keys(ROOM_MAP) as RoomId[]).find((room) =>
+    room !== fleeingVisible.playerRoom && !ROOM_MAP[fleeingVisible.playerRoom].neighbors.includes(room),
+  ) ?? openNeighbor(fleeingVisible.playerRoom);
+  fleeingVisible.people.forEach((person) => {
+    if (person.role !== 'police' && person.id !== fleeingTarget.id) {
+      person.room = fleeingFarRoom;
+      person.hidden = true;
+    }
+  });
   fleeingTarget.room = fleeingVisible.playerRoom;
+  fleeingTarget.hidden = false;
   fleeingTarget.intent = 'flee';
   fleeingTarget.movesThisTurn = 2;
   fleeingVisible.fearRadius = 0;
