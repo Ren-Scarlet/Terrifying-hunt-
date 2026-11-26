@@ -99,17 +99,7 @@ function roomFeatures(state: GameState, roomId: RoomId): string {
         `<span class="room-feature site ${i.kind} ${down ? 'broken' : ''}" title="${label}：${status}。你用不了它，但可以花 ${SABOTAGE_COST} 点行动点砸掉">${icon(i.kind === 'itemBox' ? 'itemBox' : 'generator', 'ui-icon tiny')}<b>${i.kind === 'itemBox' ? '道具箱' : '发电机'}</b></span>`,
       );
     });
-  const lighting = state.powerCircuits.find((c) => c.affectedRooms.includes(roomId));
-  if (lighting) {
-    const source = lighting.generatorId ? state.siteItems.find((item) => item.id === lighting.generatorId) : undefined;
-    const sourceOffline = !!source && (source.broken || source.jammedTurns > 0);
-    const sourcePowered = !lighting.broken && lighting.enabled !== false && !sourceOffline;
-    const flickering = sourcePowered && (lighting.flickerTurns ?? 0) > 0;
-    const lightOn = isRoomLit(state, roomId);
-    const lightStatus = lighting.broken ? '电闸损坏' : lighting.enabled === false ? '电闸已拉下' : sourceOffline ? '发电机停机' : flickering ? '临时闪断' : lightOn ? '供电中' : '断电';
-    const lightClass = flickering ? 'flickering' : lightOn ? 'on' : 'off';
-    parts.push(`<span class="room-feature light ${lightClass}" title="${escape(lighting.name)}：${lightStatus}">${flickering ? '⚡' : lightOn ? '💡' : '☾'}<b>照明</b></span>`);
-  }
+  // 房间照明由 Canvas 光照系统直接表现，不再用文字或 emoji 标记灯光状态。
   const circuitAt = state.powerCircuits.find((c) => c.breakerRoom === roomId);
   if (circuitAt) {
     const source = circuitAt.generatorId ? state.siteItems.find((item) => item.id === circuitAt.generatorId) : undefined;
