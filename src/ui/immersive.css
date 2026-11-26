@@ -1115,3 +1115,80 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
   65% { opacity: .72; transform: scale(1.35); }
   100% { opacity: 0; transform: scale(1.55); }
 }
+
+
+/* Final size correction: state and facility pictograms match the killer portrait scale. */
+#app.immersive-game .floorplan .room-features .room-feature {
+  flex-basis: 96px;
+  width: 96px;
+  min-width: 96px;
+  height: 96px;
+  min-height: 96px;
+}
+#app.immersive-game .floorplan .room-features .room-feature .ui-icon {
+  width: 72px !important;
+  height: 72px !important;
+  max-width: 72px;
+  max-height: 72px;
+}
+#app.immersive-game .floorplan .room-people .person-chip .person-status-row {
+  top: -80px;
+  gap: 7px;
+}
+#app.immersive-game .floorplan .room-people .person-chip .person-status-icon {
+  flex-basis: 72px;
+  width: 72px;
+  height: 72px;
+  padding: 6px;
+}
+#app.immersive-game .floorplan .map-door-marker {
+  width: 82px;
+  height: 94px;
+}
+#app.immersive-game .floorplan .map-door-marker i {
+  left: 21px;
+  width: 40px;
+  height: 64px;
+}
+@media (max-width: 700px) {
+  #app.immersive-game .floorplan .room-features .room-feature {
+    flex-basis: 72px;
+    width: 72px;
+    min-width: 72px;
+    height: 72px;
+    min-height: 72px;
+  }
+  #app.immersive-game .floorplan .room-features .room-feature .ui-icon {
+    width: 54px !important;
+    height: 54px !important;
+  }
+  #app.immersive-game .floorplan .room-people .person-chip .person-status-row {
+    top: -66px;
+  }
+  #app.immersive-game .floorplan .room-people .person-chip .person-status-icon {
+    flex-basis: 58px;
+    width: 58px;
+    height: 58px;
+  }
+  #app.immersive-game .floorplan .map-door-marker {
+    width: 62px;
+    height: 72px;
+  }
+  #app.immersive-game .floorplan .map-door-marker i {
+    left: 15px;
+    width: 32px;
+    height: 50px;
+  }
+}
+
+/* The camera carries the world; the marker itself performs a short walk cycle. */
+#app.immersive-game.map-walk .floorplan .player-marker .killer-face {
+  animation: killerWalkCycle .52s ease-in-out;
+}
+@keyframes killerWalkCycle {
+  0%, 100% { transform: translateY(0) rotate(0); }
+  18% { transform: translateY(-4px) rotate(-2deg); }
+  38% { transform: translateY(1px) rotate(2deg); }
+  58% { transform: translateY(-4px) rotate(-2deg); }
+  78% { transform: translateY(1px) rotate(2deg); }
+}
