@@ -13,6 +13,7 @@ import {
 import type { CardInstance, GameState, Mission, SiteItem } from './types';
 import { drawCards } from './deck';
 import { roomDistance } from './navigation';
+import { applyHuntingGround, getHuntingGround, type HuntingGroundId } from './maps';
 
 let cardUidCounter = 0;
 const uid = (prefix: string) => `${prefix}-${Date.now()}-${cardUidCounter++}`;
@@ -26,9 +27,12 @@ export function createGame(
   deckIds: string[],
   mission = generateMission(),
   killer = '迈克尔·迈尔斯',
+  mapId: HuntingGroundId = 'lampkin',
 ): GameState {
-  // 先重新排一遍户型：每一局的房子都不一样，之后所有人都在新户型上出生
+  // 先生成空间布局，再应用本局场地主题；菜单插画与实际地图使用同一个 mapId。
   buildLayout();
+  const ground = getHuntingGround(mapId);
+  applyHuntingGround(ground.id);
 
   const pile = shuffle(deckIds.filter((id) => CARD_MAP[id])).map<CardInstance>((defId) => ({
     uid: uid('card'),
@@ -40,6 +44,7 @@ export function createGame(
   if (sacrifice) sacrifice.bloodSacrifice = true;
   const state: GameState = {
     phase: 'playing',
+    mapId: ground.id,
     killer: killerId,
     killerRuntime: { killUsed: false, moveUsed: false, attackUsed: false, witnessUsed: false },
     // 逮捕阈值已废弃（警戒与逮捕合并），保留字段只为兼容旧存档
@@ -235,6 +240,7 @@ export function createGame(
       else if (roll < 0.80) p.goal = 'routine';
     });
   drawCards(state, 5);
+  log(state, `猎场：${ground.name} · ${ground.ruleName}：${ground.ruleDescription}`);
   log(state, `契约已接取：${mission.title}`);
   if (sacrifice) log(state, `血祭品已标记：${sacrifice.name}。此标记本身没有额外效果。`);
   log(state, `你以「${killerId}」的身份行动。每回合 ${BASE_AP} 点行动点：走路、挥刀、出牌、搜索柜子都从这里扣。`);
