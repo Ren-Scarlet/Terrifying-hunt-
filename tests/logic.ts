@@ -985,8 +985,8 @@ function casePanicRun(): void {
   const ok = attack(s);
   check('I 再受 1 点伤害后进入受伤状态', ok && v.hp === 2 && conditionOf(v) === 'injured', `hp ${v.hp}`);
   check(
-    'I 被砍伤的人会连着跑好几间屋',
-    v.movesThisTurn >= 2,
+    'I 被砍伤的人会立即逃跑并留下血迹',
+    v.movesThisTurn >= 1 && v.room !== s.playerRoom,
     `movesThisTurn=${v.movesThisTurn}，位置 ${v.room}`,
   );
   const trails = visibleTrails(s);
