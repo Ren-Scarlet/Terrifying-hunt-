@@ -644,7 +644,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
   const trapRecoverBtn = state.killer === '设陷者' && state.bearTraps.some((trap) => trap.room === state.playerRoom && !trap.armed)
     ? `<button class="btn search" data-action="recover-trap" ${state.energy < 1 || state.trapInventory >= 4 ? 'disabled' : ''}>回收已触发捕兽夹</button>`
     : '';
-  const hatchetRefillBtn = state.killer === '女猎手' && CABINET_ROOMS.includes(state.playerRoom)
+  const hatchetRefillBtn = state.killer === '女猎手' && (CABINET_ROOMS.includes(state.playerRoom) || (state.mapId === 'badham' && ['nursery', 'storage', 'guestroom'].includes(state.playerRoom)))
     ? `<button class="btn search" data-action="refill-hatchets" ${state.energy < 1 || state.hatchets >= 3 ? 'disabled' : ''}>柜子补充飞斧 · ${state.hatchets}/3</button>`
     : '';
   const searchBtn = `<button class="btn search" data-action="search" ${searchOk ? '' : 'disabled'}
