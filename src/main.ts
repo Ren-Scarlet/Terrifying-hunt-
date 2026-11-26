@@ -84,6 +84,7 @@ void initCloudAuth().then(async () => {
       if (tuningModule.importTuning(JSON.stringify(cloud))) render();
     }
   } catch (error) { console.warn('云端配置暂不可用：', error); }
+  if (adminOpen) render();
 });
 
 let save: SaveData = loadSave();
