@@ -119,6 +119,9 @@ let lastKills = 0;
 let lastWanted = 0;
 /** 成功攻击后由下一次 render 消费，纯表现层，不进入存档或战斗状态。 */
 let pendingMapAttackTarget: string | null = null;
+let pendingMapAttackGhost: { roomId: string; element: HTMLElement; left: number; top: number; width: number; height: number } | null = null;
+let heldMoveKey: string | null = null;
+let heldMoveTimer = 0;
 
 const app = document.getElementById('app')!;
 
@@ -127,6 +130,80 @@ const app = document.getElementById('app')!;
  * 保留原有 viewport / floorplan / Canvas，只替换房间交互层和人物标记，
  * 这样房间切换时旧场景持续显示，镜头可以从旧位置平滑过渡到新位置。
  */
+function captureAttackGhosts(): Map<string, { roomId: string; element: HTMLElement; left: number; top: number; width: number; height: number }> {
+  const captured = new Map<string, { roomId: string; element: HTMLElement; left: number; top: number; width: number; height: number }>();
+  app.querySelectorAll<HTMLElement>('.room[data-room] .person-chip[data-person-id]').forEach((chip) => {
+    const id = chip.dataset.personId;
+    const room = chip.closest<HTMLElement>('.room[data-room]');
+    if (!id || !room) return;
+    const clone = chip.cloneNode(true) as HTMLElement;
+    clone.classList.add('attack-ghost');
+    clone.removeAttribute('data-action');
+    clone.removeAttribute('data-person-id');
+    clone.removeAttribute('data-attack');
+    clone.setAttribute('aria-hidden', 'true');
+    clone.style.position = 'absolute';
+    clone.style.pointerEvents = 'none';
+    clone.style.margin = '0';
+    captured.set(id, {
+      roomId: room.dataset.room ?? '',
+      element: clone,
+      left: chip.offsetLeft,
+      top: chip.offsetTop,
+      width: chip.offsetWidth,
+      height: chip.offsetHeight,
+    });
+  });
+  return captured;
+}
+
+function clearHeldMovement(): void {
+  heldMoveKey = null;
+  if (heldMoveTimer) window.clearTimeout(heldMoveTimer);
+  heldMoveTimer = 0;
+}
+
+function nextRoomInDirection(key: string): RoomId | null {
+  if (!game) return null;
+  const direction = key === 'w' ? { x: 0, y: -1 } : key === 's' ? { x: 0, y: 1 } : key === 'a' ? { x: -1, y: 0 } : { x: 1, y: 0 };
+  const current = ROOM_MAP[game.playerRoom].rect;
+  const cx = current.left + current.width / 2;
+  const cy = current.top + current.height / 2;
+  const candidates = ROOM_MAP[game.playerRoom].neighbors.map((id) => {
+    const rect = ROOM_MAP[id].rect;
+    const dx = rect.left + rect.width / 2 - cx;
+    const dy = rect.top + rect.height / 2 - cy;
+    const length = Math.hypot(dx, dy) || 1;
+    return { id, score: (dx / length) * direction.x + (dy / length) * direction.y };
+  }).sort((a, b) => b.score - a.score);
+  return candidates[0] && candidates[0].score > 0.25 ? candidates[0].id : null;
+}
+
+function performHeldMovement(key: string): boolean {
+  if (!game || screen !== 'game' || game.phase !== 'playing') return false;
+  if (game.lookingAround || game.nurseBlinkTargeting || game.huntressAiming || game.auraTargeting) return false;
+  if (game.hand.length > 6) return false;
+  const nextRoom = nextRoomInDirection(key);
+  if (!nextRoom || !movePlayer(game, nextRoom)) return false;
+  playSfx('step');
+  afterAction();
+  return true;
+}
+
+function scheduleHeldMovement(key: string): void {
+  if (heldMoveKey !== key) return;
+  heldMoveTimer = window.setTimeout(() => {
+    heldMoveTimer = 0;
+    if (heldMoveKey !== key) return;
+    if (!performHeldMovement(key)) {
+      clearHeldMovement();
+      return;
+    }
+    // 一次按键对应一次跨门行动；按住时持续重复，每一步仍单独结算行动点与幸存者反应。
+    scheduleHeldMovement(key);
+  }, 520);
+}
+
 function renderMarkupPreservingMap(html: string): void {
   const previousViewport = app.querySelector<HTMLElement>('.map-viewport');
   const previousFloorplan = previousViewport?.querySelector<HTMLElement>('.floorplan') ?? null;
@@ -148,6 +225,24 @@ function renderMarkupPreservingMap(html: string): void {
   const freshViewportNodes = Array.from(nextViewport.childNodes).filter((node) => node !== nextFloorplan);
   previousFloorplan.replaceChildren(previousCanvas, ...freshWorldNodes);
   nextFloorplan.replaceWith(previousFloorplan);
+
+  // 命中动画使用受击前的位置快照；即使幸存者在攻击结算中逃跑，也能在原地看到受击。
+  if (pendingMapAttackGhost?.roomId) {
+    const room = Array.from(previousFloorplan.querySelectorAll<HTMLElement>('.room[data-room]'))
+      .find((node) => node.dataset.room === pendingMapAttackGhost?.roomId);
+    const people = room?.querySelector<HTMLElement>('.room-people');
+    if (people) {
+      const ghost = pendingMapAttackGhost.element;
+      ghost.style.left = `${pendingMapAttackGhost.left}px`;
+      ghost.style.top = `${pendingMapAttackGhost.top}px`;
+      ghost.style.width = `${pendingMapAttackGhost.width}px`;
+      ghost.style.height = `${pendingMapAttackGhost.height}px`;
+      ghost.classList.add('blood-hit');
+      people.appendChild(ghost);
+      window.setTimeout(() => ghost.remove(), 760);
+    }
+    pendingMapAttackGhost = null;
+  }
 
   // 保留 viewport 本身和地图图例等兄弟层，避免地图卸载/重挂期间露出黑色底板。
   previousViewport.className = nextViewport.className;
@@ -720,9 +815,13 @@ app.addEventListener('click', (event) => {
     if (!game || screen !== 'game') return;
     const personId = target.dataset.personId;
     if (personId) {
+      const ghosts = captureAttackGhosts();
       const killsBefore = game.kills;
       const hit = attack(game, personId);
-      if (hit) pendingMapAttackTarget = personId;
+      if (hit) {
+        pendingMapAttackTarget = personId;
+        pendingMapAttackGhost = ghosts.get(personId) ?? null;
+      }
       playSfx('attack');
       if (game.kills > killsBefore) playSfx('kill');
       lastLogHead = game.log[0] ?? '';
@@ -847,9 +946,13 @@ app.addEventListener('click', (event) => {
   }
 
   if (action === 'attack') {
+    const ghosts = captureAttackGhosts();
     const kills = game.kills;
     const hit = attack(game);
-    if (hit) pendingMapAttackTarget = game.lastAttackedId ?? null;
+    if (hit) {
+      pendingMapAttackTarget = game.lastAttackedId ?? null;
+      pendingMapAttackGhost = pendingMapAttackTarget ? ghosts.get(pendingMapAttackTarget) ?? null : null;
+    }
     playSfx('attack');
     if (game.kills > kills) playSfx('kill');
     lastLogHead = game.log[0] ?? '';
@@ -1029,30 +1132,27 @@ app.addEventListener('focusout', (event) => {
 
 
 window.addEventListener('keydown', (event) => {
-  if (!game || screen !== 'game' || event.altKey || event.ctrlKey || event.metaKey || event.repeat) return;
+  if (!game || screen !== 'game' || event.altKey || event.ctrlKey || event.metaKey) return;
   const target = event.target as HTMLElement | null;
   if (target && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))) return;
   const key = event.key.toLowerCase();
   if (!['w', 'a', 's', 'd'].includes(key)) return;
   if (game.lookingAround || game.nurseBlinkTargeting || game.huntressAiming || game.auraTargeting) return;
   event.preventDefault();
-  const direction = key === 'w' ? { x: 0, y: -1 } : key === 's' ? { x: 0, y: 1 } : key === 'a' ? { x: -1, y: 0 } : { x: 1, y: 0 };
-  const current = ROOM_MAP[game.playerRoom].rect;
-  const cx = current.left + current.width / 2;
-  const cy = current.top + current.height / 2;
-  const nextRoom = ROOM_MAP[game.playerRoom].neighbors
-    .map((id) => {
-      const rect = ROOM_MAP[id].rect;
-      const dx = rect.left + rect.width / 2 - cx;
-      const dy = rect.top + rect.height / 2 - cy;
-      const length = Math.hypot(dx, dy) || 1;
-      return { id, score: (dx / length) * direction.x + (dy / length) * direction.y };
-    })
-    .sort((a, b) => b.score - a.score)[0];
-  if (!nextRoom || nextRoom.score <= 0.2) return;
-  if (movePlayer(game, nextRoom.id)) playSfx('step');
-  afterAction();
+  if (heldMoveKey === key) return;
+  clearHeldMovement();
+  heldMoveKey = key;
+  if (!performHeldMovement(key)) {
+    clearHeldMovement();
+    return;
+  }
+  scheduleHeldMovement(key);
 });
+
+window.addEventListener('keyup', (event) => {
+  if (event.key.toLowerCase() === heldMoveKey) clearHeldMovement();
+});
+window.addEventListener('blur', clearHeldMovement);
 
 installImmersiveKeys();
 render();
