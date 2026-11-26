@@ -25,7 +25,7 @@ export const HUNTING_GROUNDS: HuntingGround[] = [
     layoutStyle: 'tall',
     description: '封闭的教学楼、漫长走廊与地下区域。铃声会让整栋学校重新活过来。',
     ruleName: '课间铃声',
-    ruleDescription: '学校广播每隔数回合响起，走廊附近的幸存者会改变路线并向公共区域移动。',
+    ruleDescription: '每三回合教学区响起课间铃声，附近幸存者警觉上升，并留下声音线索。',
     rooms: {
       attic: { name: '屋顶储藏间', desc: '屋顶斜梁下堆着旧课桌，脚步声会沿木板传到楼下。' },
       nursery: { name: '幼儿教室', desc: '小桌椅整齐得反常，柜子与课桌之间藏着狭窄的阴影。' },
@@ -59,7 +59,7 @@ export const HUNTING_GROUNDS: HuntingGround[] = [
     layoutStyle: 'wide',
     description: '暴风雪包围山间木屋，室内温暖与室外严寒形成鲜明对比。',
     ruleName: '暴风雪',
-    ruleDescription: '室外活动留下的踪迹更明显；暴风雪会短暂压低远距离视野。',
+    ruleDescription: '雪地让整张地图上的脚印保留更久，追踪逃跑路线比其他场地更容易。',
     rooms: {
       attic: { name: '阁楼客房', desc: '斜顶下堆着滑雪装备，积雪从屋檐缝隙渗进来。' },
       nursery: { name: '儿童游戏室', desc: '玩具散落在地毯上，窗外是被雪覆盖的树林。' },
@@ -93,7 +93,7 @@ export const HUNTING_GROUNDS: HuntingGround[] = [
     layoutStyle: 'branching',
     description: '幼儿园与相邻住宅连成一片，地上活动区和地下通道交错。',
     ruleName: '地下通道',
-    ruleDescription: '地下区域适合躲藏与绕行，但入口位置会成为争夺的关键。',
+    ruleDescription: '幼儿教室、玩具仓库和值班室都能藏人，搜索范围比其他场地更广。',
     rooms: {
       attic: { name: '阁楼储物间', desc: '旧玩具和纸箱堆在屋顶下，木板会暴露脚步。' },
       nursery: { name: '幼儿活动室', desc: '彩色地垫和小床散落各处，矮柜后能藏住一个人。' },
@@ -127,7 +127,7 @@ export const HUNTING_GROUNDS: HuntingGround[] = [
     layoutStyle: 'compact',
     description: '封闭病区、治疗设施和地下设备层构成复杂的医疗建筑。',
     ruleName: '病区警报',
-    ruleDescription: '异常声响会触发病区警报，使附近幸存者警觉并重新选择行动路线。',
+    ruleDescription: '每三回合病区电路更容易闪断，黑暗区域会成为接近猎物的机会。',
     rooms: {
       attic: { name: '设备夹层', desc: '通风管道和旧床垫堆在一起，声音会沿管道传递。' },
       nursery: { name: '儿童病房', desc: '空病床排列整齐，床帘后方有狭窄藏身处。' },
@@ -161,7 +161,7 @@ export const HUNTING_GROUNDS: HuntingGround[] = [
     layoutStyle: 'wide',
     description: '万圣节夜晚的住宅街区，独栋住宅、车库与庭院组成猎场。',
     ruleName: '邻里警觉',
-    ruleDescription: '住宅之间的异常会相互传播；街区幸存者可能向邻居求助或转移。',
+    ruleDescription: '尸体与异常动静会传播得更远，最多两间房外的邻居也可能察觉。',
     rooms: {
       attic: { name: '阁楼', desc: '旧家具和节日装饰挤在屋顶下，地板会放大脚步声。' },
       nursery: { name: '儿童卧室', desc: '床边摆着南瓜灯，窗帘没有完全拉上。' },
