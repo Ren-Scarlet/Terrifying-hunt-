@@ -211,7 +211,7 @@ export function personChip(person: Person, attackable = false, carryable = false
   return `<button type="button" class="person-chip ${cls} ${person.bloodSacrifice ? 'blood-sacrifice' : ''} ${person.trapTriggered ? 'trap-triggered' : ''} ${health === 'downed' ? 'is-downed' : ''} ${attackable ? 'can-hit' : ''} ${targetMode ? 'targeting-' + targetMode : ''}" data-action="${action}" data-person-id="${person.id}"${attackable ? ' data-attack="1"' : ''}
     title="${escape(person.name)} · ${HEALTH_LABEL[health]} · ${awarenessLabel(person.alert)} ${person.alert}/100 · ${escape(ARCH_LABEL[person.archetype])} · ${escape(GOAL_LABEL[person.goal])} · 正在${escape(label)}${note}">
     ${avatarHtml}${trapHitMark}
-    ${dialogue}<span>${escape(person.name)}</span>${contractTargetMark}${intentDot(person)}${stateMark}<span class="person-status-row">${statusIcons}</span>${alertMark}${watchMark}${person.item ? itemBadge(person.item, person.itemUses) : ''}
+    ${dialogue}<span>${escape(person.name)}</span>${contractTargetMark}${stateMark}<span class="person-status-row">${statusIcons}</span>${alertMark}${watchMark}${person.item ? itemBadge(person.item, person.itemUses) : ''}
   </button>`;
 }
 
