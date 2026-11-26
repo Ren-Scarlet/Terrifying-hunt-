@@ -51,6 +51,7 @@ import {
 } from '../../game/engine';
 import { roomDistance } from '../../game/navigation';
 import { executionMethodsAtRoom } from '../../game/executions';
+import { getHuntingGround } from '../../game/maps';
 import { KILLERS, type KillerProfile } from '../../game/killers';
 import { roomName } from '../../game/missions';
 import {
@@ -323,6 +324,7 @@ function trailOverlay(state: GameState): string {
 
 export function renderGame(state: GameState, killer: KillerProfile): string {
   const m = state.mission;
+  const ground = getHuntingGround(state.mapId);
   const here = state.people.filter((p) => p.room === state.playerRoom && p.role !== 'police');
   const policeHere = state.people.some((p) => p.room === state.playerRoom && p.role === 'police');
   const isMyers = killer.owner === '迈克尔·迈尔斯';
@@ -673,9 +675,10 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
       <div class="mission-strip ${urgent ? 'urgent' : ''}">
         <div class="mission-icon">${icon('missionTarget', 'ui-icon')}</div>
         <div class="mission-content">
-          <div class="mission-title">${escape(m.title)}<em>奖励 ${m.reward}</em></div>
+          <div class="mission-title">${escape(m.title)}<em>${escape(ground.name)}</em><em>奖励 ${m.reward}</em></div>
           <div class="mission-objective"><b>全部完成</b><div class="mission-task-list">${progress}</div></div>
           <div class="mission-rules">
+            <span class="mission-ok">猎场规则：${escape(ground.ruleName)} · ${escape(ground.ruleDescription)}</span>
             <span class="mission-ok">✓ 成功：${escape(m.successText ?? '达成主目标')}</span>
             <span class="mission-fail">✕ 失败：${escape(m.failText ?? '超时或被捕')}</span>
           </div>
