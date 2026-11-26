@@ -3205,11 +3205,17 @@ button, .room-hit, .hand-row { touch-action: manipulation; }
 }
 
 
-/* 猎杀界面第二轮：情报分区重排，行动记录叠放地图，不占地图尺寸。 */
+/* 猎杀界面情报分区：严格保留三栏结构，中央地图始终占据主栏。 */
 @media (min-width: 1201px) {
-  #app .hunt-sidebar-left { grid-column: 1; grid-row: 2; }
-  #app .hunt-sidebar-right { grid-column: 3; grid-row: 2; }
-  #app .hunt-sidebar-left .intel-grid { display: grid; grid-template-columns: minmax(0,1fr); gap: 8px; padding: 0; }
+  #app .layout.hunt-layout {
+    display: grid;
+    grid-template-columns: minmax(220px, 250px) minmax(0, 1fr) minmax(270px, 310px);
+    align-items: start;
+    gap: 12px;
+  }
+  #app .hunt-sidebar-left { grid-column: 1; grid-row: 1; }
+  #app .hunt-layout > .main-column { grid-column: 2; grid-row: 1; min-width: 0; width: 100%; }
+  #app .hunt-sidebar-right { grid-column: 3; grid-row: 1; }
   #app .hunt-sidebar-left .roster { grid-template-columns: minmax(0,1fr); max-height: 300px; overflow-y: auto; }
   #app .hunt-sidebar-left .panel { padding: 9px; }
   #app .hunt-sidebar-left .panel-heading { gap: 5px; flex-wrap: wrap; }
@@ -3218,14 +3224,22 @@ button, .room-hit, .hand-row { touch-action: manipulation; }
   #app .hunt-sidebar-left .facility-row > .btn,
   #app .hunt-sidebar-left .facility-state { grid-column: 2; justify-self: start; }
   #app .hunt-sidebar-right .person-dossier-panel { min-height: 0; }
-  #app .hunt-sidebar-right .person-dossier-panel .person-detail-view .detail-body { max-height: 250px; min-height: 110px; overflow-y: auto; }
+  #app .hunt-sidebar-right .person-dossier-panel .person-detail-view .detail-body { max-height: min(56vh, 560px); min-height: 110px; overflow-y: auto; }
   #app .hunt-sidebar-right .intel-grid { display: grid; grid-template-columns: minmax(0,1fr); padding: 0; gap: 8px; }
+  #app .map-viewport { width: 100%; min-width: 0; }
+  #app .map-viewport .floorplan { width: min(100%, calc(72vh * var(--ar, 1.45))); max-width: 100%; margin-inline: auto; }
+}
+@media (max-width: 1200px) {
+  #app .layout.hunt-layout { display: flex; flex-direction: column; }
+  #app .hunt-layout > .main-column { order: 0; width: 100%; }
+  #app .hunt-sidebar-left { order: 2; width: 100%; }
+  #app .hunt-sidebar-right { order: 3; width: 100%; }
 }
 #app .floorplan .intel-log-panel {
   position: absolute; z-index: 12; left: 10px; bottom: 10px;
   width: min(340px, 42%); max-height: 34%; overflow: hidden;
   padding: 8px 10px; border: 1px solid #8a75604d; border-radius: 4px;
-  background: linear-gradient(180deg, #0b0d0eeF, #08090bdF);
+  background: linear-gradient(180deg, #0b0d0eef, #08090bdf);
   box-shadow: 0 4px 18px #000b; backdrop-filter: blur(5px);
   pointer-events: auto;
 }
@@ -3233,14 +3247,7 @@ button, .room-hit, .hand-row { touch-action: manipulation; }
 #app .floorplan .intel-log-panel .panel-heading h2 { font-size: 10px; letter-spacing: 1.8px; }
 #app .floorplan .intel-log-panel .panel-heading span { font-size: 9px; }
 #app .floorplan .intel-log-panel .log { max-height: 150px; overflow-y: auto; font-size: 10px; line-height: 1.45; }
-@media (max-width: 1200px) {
-  #app .hunt-sidebar-left .intel-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
-  #app .hunt-sidebar-left .roster { grid-template-columns: repeat(2,minmax(0,1fr)); }
-  #app .hunt-sidebar-right .intel-grid { grid-template-columns: minmax(0,1fr); }
-}
 @media (max-width: 700px) {
   #app .floorplan .intel-log-panel { left: 5px; bottom: 5px; width: min(260px, 62%); max-height: 28%; padding: 6px; }
   #app .floorplan .intel-log-panel .log { max-height: 90px; font-size: 9px; }
-  #app .hunt-sidebar-left .intel-grid { grid-template-columns: minmax(0,1fr); }
-  #app .hunt-sidebar-left .roster { grid-template-columns: minmax(0,1fr); }
 }
