@@ -1268,12 +1268,24 @@ function caseNpcAwarenessAndDialogue(): void {
 
   const suspicious = newGame();
   const target = player(suspicious);
+  const suspiciousFarRoom = (Object.keys(ROOM_MAP) as RoomId[]).find((room) =>
+    room !== suspicious.playerRoom && !ROOM_MAP[suspicious.playerRoom].neighbors.includes(room),
+  ) ?? openNeighbor(suspicious.playerRoom);
+  target.room = suspiciousFarRoom;
+  target.movesThisTurn = 0;
+  target.intent = 'idle';
+  target.awareness = 0;
   target.alert = 20;
   endTurn(suspicious);
   check('AC 低强度异常只让 NPC 起疑，不直接进入求生', target.awareness === 1 && target.intent === 'wary' && target.dialogue.length > 0);
 
   const panic = newGame();
   const witness = player(panic);
+  witness.room = panic.playerRoom;
+  witness.movesThisTurn = 0;
+  witness.intent = 'idle';
+  witness.hidden = false;
+  witness.awareness = 0;
   witness.alert = 100;
   endTurn(panic);
   check('AC 高危信息让 NPC 进入求生并显示逃跑对白', witness.awareness === 3 && witness.dialogue.length > 0);
@@ -1514,6 +1526,7 @@ dialoguePerson.intent = 'flee';
 updateNpcDialogue(dialogueGuard);
 check('NPC 对白：未发觉且没有危险认知时，不会声称正在被追',
   !/追我|他就在后面|快跑|离我远点/.test(dialoguePerson.dialogue), dialoguePerson.dialogue);
+check('NPC 对白刷新：不会清除已确认的危险记忆', dialoguePerson.awareness === 3);
 const pathGuard = newGame();
 const pathStart = ROOM_MAP[pathGuard.playerRoom].neighbors[0];
 check('NPC 寻路：避让列表中的玩家房间不能成为路径终点',
