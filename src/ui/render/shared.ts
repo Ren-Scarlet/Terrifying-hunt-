@@ -1,8 +1,9 @@
 import { CARDS, CARD_MAP } from '../../game/cards';
 import { PERK_RARITY_BG, POWER_RARITY_BG, cardImage, characterImage, uiIcon } from '../../game/assetMap';
 import {
-  ARCH_LABEL, BASE_AP, BLEEDOUT_TURNS, DOWNED_LOCK_TURNS, GOAL_LABEL, HEALTH_LABEL,
+  ARCH_LABEL, BASE_AP, BLEEDOUT_TURNS, GOAL_LABEL, HEALTH_LABEL,
   INTENT_LABEL, SURVIVOR_ITEM_LABEL, conditionOf, effectiveCost, isPersonVisible,
+  attackBlockReason, executeBlockReason,
 } from '../../game/engine';
 import { KILLERS, type KillerProfile } from '../../game/killers';
 import { roomName } from '../../game/missions';
@@ -147,10 +148,9 @@ export function personChip(person: Person, attackable = false, carryable = false
       ? ''
       : `<span class="chip-alert ${alertLevel}" title="${awarenessLabel(person.alert)} ${person.alert}/100：越高越可能立刻逃跑">${person.alert}</span>`;
   const bleedLeft = Math.max(0, BLEEDOUT_TURNS - person.downedTurns);
-  const lockLeft = Math.max(0, DOWNED_LOCK_TURNS - person.downedTurns);
   const stateMark =
     health === 'downed'
-      ? `<span class="chip-state downed" title="${lockLeft > 0 ? '刚倒下：还要等 ' + lockLeft + ' 回合才能补刀，同伴可能把他救走' : '可以补刀处决了；再过 ' + bleedLeft + ' 回合会自己流干'}">${lockLeft > 0 ? `锁 ${lockLeft}` : `倒 ${bleedLeft}`}</span>`
+      ? `<span class="chip-state downed" title="倒地：可以立即处决；若暂时放过，同伴仍可能救起，${bleedLeft} 回合后流血死亡">倒 ${bleedLeft}</span>`
       : health === 'injured'
         ? '<span class="chip-state injured" title="受伤：再挨一下就会倒地">伤</span>'
         : '';
@@ -209,7 +209,7 @@ export function personDetailHtml(state: GameState, personId: string): string {
   if (person) {
     const health = conditionOf(person);
     paras.push(
-      `状态：${HEALTH_LABEL[health]}（${person.hp}/2）。行为类型：${ARCH_LABEL[person.archetype]}。`,
+      `状态：${HEALTH_LABEL[health]}（${person.hp}/4）。行为类型：${ARCH_LABEL[person.archetype]}。`,
       `目的：${GOAL_LABEL[person.goal]}。警觉 ${person.alert}/100，当前${INTENT_LABEL[person.intent]}。`,
     );
     if (isPersonVisible(state, person)) {
@@ -221,7 +221,7 @@ export function personDetailHtml(state: GameState, personId: string): string {
     if (person.sneaky) paras.push('老练：有时会踮着脚走路，不留鞋印、也不惊动乌鸦——但不会一直这样。');
     if (person.goal === 'objective' || person.goal === 'key') paras.push('他正为团队目标忙：进度做满，幸存者会集体从后门逃走，你直接失败。');
     if (person.armed) paras.push('他手里有武器：进门时可能反击，让你下回合少走一步。');
-    if (health === 'downed') paras.push(person.downedTurns >= DOWNED_LOCK_TURNS ? '倒地：已经可以补刀处决，但同伴仍可能把他救起。' : `倒地：还要等 ${DOWNED_LOCK_TURNS - person.downedTurns} 回合才能补刀，这是同伴的救援窗口。`);
+    if (health === 'downed') paras.push(`倒地：现在即可处决；如果暂时放过他，同伴仍可能赶来救援，${Math.max(0, BLEEDOUT_TURNS - person.downedTurns)} 回合后会因失血死亡。`);
     if (threat) paras.push(`威胁：这名角色会主动对抗你，别把他当普通平民。`);
     if (profile.role === 'police') {
       paras.push(
@@ -231,13 +231,34 @@ export function personDetailHtml(state: GameState, personId: string): string {
   } else {
     paras.push('档案状态：已从现场消失。');
   }
-  return detailCardHtml(
+  const localAction = person && person.room === state.playerRoom && person.role !== 'police'
+    ? person.hp <= 0
+      ? (() => {
+          const reason = executeBlockReason(state, person.id);
+          const carry = !state.carryPersonId
+            ? `<button class="btn ghost" data-action="carry" data-person-id="${escape(person.id)}">抱起搬运</button>`
+            : '';
+          return `<div class="person-detail-actions">
+            <button class="btn execute-action" data-action="execute-target" data-person-id="${escape(person.id)}" ${reason ? 'disabled' : ''}>处决 · 1 AP</button>
+            ${carry}
+            <small>${reason ? escape(reason) : '现在可以处决；若放过他，同伴仍可能赶来救援。'}</small>
+          </div>`;
+        })()
+      : (() => {
+          const reason = attackBlockReason(state, person.id);
+          return `<div class="person-detail-actions">
+            <button class="btn attack" data-action="attack-target" data-person-id="${escape(person.id)}" ${reason ? 'disabled' : ''}>攻击 · 1 AP</button>
+            <small>${reason ? escape(reason) : '对这名幸存者发动攻击。'}</small>
+          </div>`;
+        })()
+    : '';
+  return `<div class="person-detail-view">${detailCardHtml(
     profile.name,
     `${roleName} / ${profile.occupation} / ${profile.age} 岁 · ${profile.tags.join(' · ')}`,
     rarityLabel,
     paras,
     rarityKey,
     `<div class="person-detail-lead">${personPortraitHtml(profile)}</div>`,
-  );
+  )}${localAction}</div>`;
 }
 
