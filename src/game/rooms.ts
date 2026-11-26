@@ -372,7 +372,7 @@ export function buildLayout(style: LayoutStyle = 'wide'): string {
     .map((_, index) => index)
     .filter((index) => !regionRooms.has(index))
     .sort((a, b) => regionArea(regions[b]) - regionArea(regions[a]));
-  const freeRooms = sizeOrder.map((id) => roomById.get(id)!);
+  const freeRooms = sizeOrder.map((id) => roomById.get(id)).filter((room): room is Room => Boolean(room));
   freeRegions.forEach((index, order) => regionRooms.set(index, freeRooms[order]));
 
   ROOMS.forEach((room) => {
