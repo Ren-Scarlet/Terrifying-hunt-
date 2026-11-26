@@ -2380,3 +2380,146 @@ button, .room-hit, .hand-row { touch-action: manipulation; }
   .room.room-size-small .room-name { font-size: 11px; }
   .room.room-size-large, .room.room-size-open { padding: 9px 10px; }
 }
+
+
+/* ==========================================================================
+   暗夜杀机：以地图为中心的单焦点猎杀 HUD
+   ========================================================================== */
+.layout { grid-template-columns: minmax(0, 1fr); }
+.side-column { display: none; }
+.topbar { align-items: flex-start; }
+.topbar-identity { flex: 0 0 auto; }
+.brand { letter-spacing: 3px; }
+.brand small { font-size: 8px; letter-spacing: 1.6px; }
+.mission-strip .mission-rules,
+.mission-strip .mission-meta .mission-progress { display: none; }
+.mission-strip .mission-objective { align-items: flex-start; }
+.mission-strip .mission-task-list { display: flex; flex-wrap: wrap; gap: 4px 9px; }
+
+.hunt-plan {
+  display: grid;
+  grid-template-columns: minmax(120px, .55fr) minmax(180px, 1fr) minmax(220px, 1.5fr);
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 10px;
+  padding: 9px 12px;
+  border: 1px solid #29251f;
+  border-left: 2px solid #75503b;
+  background: linear-gradient(90deg, #171310, #0c0e10 72%);
+}
+.hunt-plan-heading { display: flex; align-items: center; gap: 10px; }
+.hunt-plan-heading b { color: #d4c7b4; font-size: 11px; letter-spacing: 2px; }
+.hunt-plan-heading span {
+  padding: 3px 7px; border: 1px solid #40352b; border-radius: 2px;
+  color: #b8a17e; font-size: 10px; white-space: nowrap;
+}
+.hunt-plan-focus, .hunt-plan-prep { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.hunt-plan-focus small, .hunt-plan-prep small {
+  color: #777166; font-size: 9px; letter-spacing: 1.5px;
+}
+.hunt-plan-focus strong { color: #ded6c8; font-size: 11px; font-weight: 600; }
+.hunt-plan-prep span { color: #a99d89; font-size: 10px; line-height: 1.4; }
+.hunt-plan.lethal-ready { border-color: #71382e; background: linear-gradient(90deg, #29130f, #0c0e10 76%); }
+.hunt-plan.lethal-ready .hunt-plan-heading span {
+  border-color: #8d4436; color: #f0aa8d; background: #401a15;
+  box-shadow: 0 0 14px #a33b2a33;
+}
+
+.map-event-feed {
+  position: absolute; z-index: 8; left: 10px; bottom: 10px;
+  display: flex; flex-direction: column; gap: 5px;
+  width: min(390px, 58%); max-height: 42%; overflow: hidden;
+  pointer-events: none;
+}
+.map-event-feed-title {
+  align-self: flex-start; padding: 2px 7px;
+  color: #d2b59a; background: #100c0be8; border-left: 2px solid #98513b;
+  font-size: 9px; letter-spacing: 2px;
+}
+.map-event {
+  padding: 6px 9px;
+  color: #bdb5a8; background: linear-gradient(90deg, #100e0dec, #100e0dc9);
+  border-left: 2px solid #66513e;
+  box-shadow: 0 2px 9px #0008;
+  font-size: 10px; line-height: 1.4;
+  text-shadow: 0 1px 2px #000;
+  animation: mapEventIn .25s ease-out both;
+}
+.map-event.latest { color: #f0d4bd; border-left-color: #b65a43; }
+@keyframes mapEventIn {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.card-detail-inline {
+  display: grid; grid-template-columns: 130px minmax(0, 1fr);
+  align-items: center; gap: 10px;
+  margin: 0 0 9px; padding: 7px 9px;
+  border: 1px solid #24272a; background: #0a0c0e;
+}
+.card-detail-label { color: #8e887d; font-size: 9px; letter-spacing: 1.4px; }
+.card-detail-inline .detail-card { display: flex; align-items: center; min-height: 0; box-shadow: none; }
+.card-detail-inline .detail-header { min-height: 0; padding: 5px 9px; border: 0; background: transparent; }
+.card-detail-inline .detail-header::after,
+.card-detail-inline .detail-art,
+.card-detail-inline .detail-body p,
+.card-detail-inline .detail-body .detail-flavor { display: none; }
+.card-detail-inline .detail-header h2 { margin: 0; font-size: 11px; }
+.card-detail-inline .detail-body { padding: 0 8px; }
+.card-detail-inline .detail-body ul { display: none; }
+.card-detail-inline .detail-body { font-size: 10px; }
+.card-detail-inline .detail-empty { margin: 0; padding: 4px 8px; }
+
+.intel-drawer {
+  margin-top: 10px;
+  border: 1px solid #2a2925;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(180deg, #111416, #0a0c0e);
+  box-shadow: 0 8px 22px #0006;
+}
+.intel-drawer > summary {
+  display: flex; align-items: center; gap: 12px;
+  min-height: 42px; padding: 9px 14px;
+  color: #d0c6b5; cursor: pointer; list-style: none;
+}
+.intel-drawer > summary::-webkit-details-marker { display: none; }
+.intel-drawer > summary::before {
+  content: '+'; display: grid; place-items: center;
+  width: 19px; height: 19px; border: 1px solid #514537;
+  color: #c4a47c; font-size: 15px; line-height: 1;
+}
+.intel-drawer[open] > summary::before { content: '−'; }
+.intel-drawer > summary span { font-size: 11px; letter-spacing: 2px; font-weight: 700; }
+.intel-drawer > summary small { color: #81796e; font-size: 10px; }
+.intel-drawer > summary em {
+  margin-left: auto; color: #8d806e; font-size: 9px; font-style: normal; letter-spacing: 1px;
+}
+.intel-grid {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px; padding: 0 10px 10px;
+}
+.intel-grid > .panel { min-width: 0; }
+.intel-log-panel { grid-column: 1 / -1; }
+.intel-log-panel .log { max-height: 260px; }
+.intel-grid .roster { grid-template-columns: repeat(2, minmax(0, 1fr)); max-height: 390px; }
+.intel-grid .roster-person { min-width: 0; }
+.intel-grid .threat-list { margin-top: 0; }
+
+@media (max-width: 900px) {
+  .topbar { flex-direction: column; }
+  .topbar-identity { width: 100%; }
+  .mission-strip { width: 100%; }
+  .hunt-plan { grid-template-columns: 1fr 1.2fr; }
+  .hunt-plan-prep { grid-column: 1 / -1; }
+}
+@media (max-width: 700px) {
+  .hunt-plan { grid-template-columns: 1fr; gap: 7px; }
+  .hunt-plan-prep { grid-column: auto; }
+  .card-detail-inline { grid-template-columns: 1fr; gap: 4px; }
+  .intel-grid, .intel-grid .roster { grid-template-columns: 1fr; }
+  .intel-log-panel { grid-column: auto; }
+  .intel-drawer > summary { flex-wrap: wrap; gap: 6px 9px; }
+  .intel-drawer > summary em { margin-left: auto; }
+  .map-event-feed { width: 82%; max-height: 36%; left: 6px; bottom: 6px; }
+  .map-event { font-size: 9px; padding: 5px 7px; }
+}
