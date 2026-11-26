@@ -52,8 +52,8 @@ import { playSfx, setMusic, toggleMute, unlockAudio } from './ui/audio';
 
 type Screen = 'menu' | 'game' | 'result';
 
-// 先把手动调的平衡数据套进卡牌与能力，之后任何界面读到的都是最新值
-applyTuning();
+// 平衡工作台只在本地开发模式加载；正式网页始终使用仓库中的正式数值。
+if (import.meta.env.DEV) applyTuning();
 
 let save: SaveData = loadSave();
 let game: GameState | null = null;
@@ -61,7 +61,7 @@ let screen: Screen = 'menu';
 let editorOpen = false;
 let shopOpen = false;
 let guideOpen = false;
-let adminOpen = false;
+let adminOpen = import.meta.env.DEV && new URLSearchParams(window.location.search).get('admin') === '1';
 let editorDeck: string[] = [...save.deck];
 let resultApplied = false;
 /** 本局新解锁的卡牌，用于结算面板只提示真正新增的那张 */
@@ -237,6 +237,7 @@ app.addEventListener('click', (event) => {
   }
 
   if (action === 'admin') {
+    if (!import.meta.env.DEV) return;
     adminOpen = true;
     render();
     return;
