@@ -1297,14 +1297,15 @@ function caseWitnessFearAndUnifiedSabotage(): void {
     `awareness=${doorwayWitness.awareness} alert=${doorwayWitness.alert} intent=${doorwayWitness.intent}`);
 
   const door = newGame();
+  const poweredDoorRooms = new Set((Object.keys(ROOM_MAP) as RoomId[]).filter((room) => isRoomLit(door, room)));
   const doorRoom = (Object.keys(ROOM_MAP) as RoomId[]).find((room) =>
-    ROOM_MAP[room].neighbors.length > 0 &&
+    ROOM_MAP[room].neighbors.some((next) => poweredDoorRooms.has(next)) &&
     !PHONE_ROOMS.includes(room) && !RADIO_ROOMS.includes(room) &&
     !door.powerCircuits.some((c) => c.breakerRoom === room) &&
     !door.siteItems.some((item) => item.room === room && !item.broken),
   )!;
   door.playerRoom = doorRoom;
-  const neighbor = ROOM_MAP[door.playerRoom].neighbors[0];
+  const neighbor = ROOM_MAP[door.playerRoom].neighbors.find((room) => poweredDoorRooms.has(room))!;
   door.roomLocks[neighbor] = 2;
   const inside = door.people.find((p) => p.role !== 'police')!;
   inside.room = neighbor; inside.hp = 4; inside.alert = 0; inside.fear = 0;
@@ -1848,7 +1849,8 @@ caseMarkedTargetIdentification();
 function caseNpcLocksAndPersistentTrails(): void {
   const locked = newGame();
   const survivor = player(locked);
-  const lockedRoom = Object.values(ROOM_MAP).find((room) => room.neighbors.length >= 2)?.id ?? locked.playerRoom;
+  const poweredLockedRooms = (Object.keys(ROOM_MAP) as RoomId[]).filter((room) => isRoomLit(locked, room) && ROOM_MAP[room].neighbors.length >= 2);
+  const lockedRoom = poweredLockedRooms[0] ?? locked.playerRoom;
   survivor.room = lockedRoom;
   survivor.alert = 100;
   survivor.intent = 'flee';
@@ -1860,8 +1862,10 @@ function caseNpcLocksAndPersistentTrails(): void {
 
   const outside = newGame();
   const target = player(outside);
-  const from = outside.playerRoom;
-  const lockedDestination = ROOM_MAP[from].neighbors.find((r) => !OBSTACLE_ROOMS.includes(r));
+  const poweredOutsideRooms = new Set((Object.keys(ROOM_MAP) as RoomId[]).filter((room) => isRoomLit(outside, room)));
+  const from = (Object.keys(ROOM_MAP) as RoomId[]).find((room) => ROOM_MAP[room].neighbors.some((next) => poweredOutsideRooms.has(next))) ?? outside.playerRoom;
+  outside.playerRoom = from;
+  const lockedDestination = ROOM_MAP[from].neighbors.find((r) => poweredOutsideRooms.has(r) && !OBSTACLE_ROOMS.includes(r));
   if (lockedDestination) {
     outside.roomLocks[lockedDestination] = 3;
     target.room = from;
