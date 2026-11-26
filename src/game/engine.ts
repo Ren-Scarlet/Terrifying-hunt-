@@ -2710,15 +2710,27 @@ export function attack(state: GameState, targetId?: string): boolean {
     log(state, `夜幕锁定 ${target.name}：这一刀直接把他放倒。`);
   }
   const hpBeforeHit = target.hp;
-  damagePerson(state, target, noedActive || (heavy && state.killer === '迈克尔·迈尔斯')
+  // 卡牌联动：定位、控制、伏击都能转化成真正的猎杀优势，而不是只提供一段说明文字。
+  const trackingCombo = target.role !== 'police' && target.trackedTurns > 0;
+  const controlCombo = target.role !== 'police' && target.blockedTurns > 0;
+  const baseDamage = noedActive || (heavy && state.killer === '迈克尔·迈尔斯')
     ? SURVIVOR_MAX_HP
-    : heavy || nightfallKill || ambushStrike ? 2 : 1);
+    : heavy || nightfallKill || ambushStrike ? 2 : 1;
+  const comboDamage = controlCombo && baseDamage < SURVIVOR_MAX_HP ? 1 : 0;
+  damagePerson(state, target, baseDamage + comboDamage);
   if (heavy && state.killer === '迈克尔·迈尔斯' && target.hp < hpBeforeHit) {
     state.huntStats.myersBurstHits += 1;
   }
   if (ambushStrike) {
     state.ambushTurn = 0;
     log(state, `致命窗口：${target.name} 独自一人且尚未察觉，你的伏击造成重创（2 点伤害）。`);
+  }
+  if (target.role !== 'police' && target.hp < hpBeforeHit) {
+    if (controlCombo) log(state, `控制连携：你趁${target.name}被限制行动时出手，额外造成 1 点伤害。`);
+    if (trackingCombo) {
+      state.energy += 1;
+      log(state, `定位连携：你沿着追踪标记精准截住${target.name}，返还 1 点行动点。`);
+    }
   }
   if (target.role !== 'police' && target.hp < hpBeforeHit) {
     if (state.hexHuntressActive && !state.hexHuntressUsed) {
