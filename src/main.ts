@@ -40,6 +40,7 @@ import {
   setPowerOpValue,
 } from './game/tuning';
 import { ROOM_MAP } from './game/rooms';
+import { EXECUTION_METHODS, type ExecutionMethodId } from './game/executions';
 import type { GameState, RoomId, SaveData } from './game/types';
 import {
   cardDetailHtml,
@@ -249,6 +250,14 @@ function sfxFromLogs(): void {
 function afterAction(): void {
   pulseFeedback();
   sfxFromLogs();
+  if (game?.executionMethodsUsed.length) {
+    const known = new Set(save.executionRecords ?? []);
+    game.executionMethodsUsed.forEach((id) => known.add(id));
+    if (known.size !== (save.executionRecords ?? []).length) {
+      save = { ...save, executionRecords: [...known] };
+      writeSave(save);
+    }
+  }
   if (game && game.phase === 'gameover' && screen !== 'result') {
     playSfx(game.result === 'win' ? 'win' : 'lose');
     screen = 'result';
@@ -583,10 +592,10 @@ app.addEventListener('click', (event) => {
     return;
   }
 
-  if (action === 'execute-fridge' || action === 'execute-microwave') {
+  if (action === 'execute-special') {
     if (!game || screen !== 'game') return;
-    executeCarriedPerson(game, action === 'execute-fridge' ? 'fridge' : 'microwave');
-    playSfx('kill');
+    const method = target.dataset.method as ExecutionMethodId | undefined;
+    if (method && executeCarriedPerson(game, method)) playSfx('kill');
     afterAction();
     return;
   }
