@@ -127,14 +127,14 @@ function doorMarkersHtml(state: GameState): string {
 function mapEventFeedHtml(state: GameState): string {
   const important = /没能再起来|停止了呼吸|处决了|处决成功|砸毁了|砸烂了|你砸了|立即断电|电话线被剪断|封锁了|陷阱触发|报警成功|逃出了房子|翻出了后院|被警察逮捕/;
   const recent = state.log.filter((line) => {
-    const match = line.match(/^\\[第 (\\d+) 回合\\]/);
+    const match = line.match(/^\[第 (\d+) 回合\]/);
     const turn = match ? Number(match[1]) : state.turn;
     return state.turn - turn <= 1 && important.test(line);
   }).slice(0, 3).reverse();
   if (!recent.length) return '';
   return `<div class="map-event-feed" aria-live="polite">
     <span class="map-event-feed-title">现场动态</span>
-    ${recent.map((line, index) => `<div class="map-event ${index === recent.length - 1 ? 'latest' : ''}">${escape(line.replace(/^\\[第 \\d+ 回合\\]\\s*/, ''))}</div>`).join('')}
+    ${recent.map((line, index) => `<div class="map-event ${index === recent.length - 1 ? 'latest' : ''}">${escape(line.replace(/^\[第 \d+ 回合\]\s*/, ''))}</div>`).join('')}
   </div>`;
 }
 
