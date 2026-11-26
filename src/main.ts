@@ -132,7 +132,7 @@ function renderMarkupPreservingMap(html: string): void {
   const previousFloorplan = previousViewport?.querySelector<HTMLElement>('.floorplan') ?? null;
   const previousCanvas = previousFloorplan?.querySelector<HTMLCanvasElement>('.floorplan-canvas') ?? null;
 
-  renderMarkupPreservingMap(html);
+  app.innerHTML = html;
 
   if (!previousViewport || !previousFloorplan || !previousCanvas) return;
   const nextViewport = app.querySelector<HTMLElement>('.map-viewport');
@@ -222,7 +222,7 @@ function render(): void {
     if (screen === 'result') html += renderResult(game, lastNewCard);
   }
   if (guideOpen) html += renderGuide();
-  app.innerHTML = html;
+  renderMarkupPreservingMap(html);
   if (pendingMapAttackTarget !== null) {
     const targetId = pendingMapAttackTarget;
     pendingMapAttackTarget = null;
