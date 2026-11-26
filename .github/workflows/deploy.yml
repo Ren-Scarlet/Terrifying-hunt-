@@ -1,3 +1,4 @@
+# UI HUD 原型与厨房美术预览共用隔离的 /preview/ 构建产物。
 name: Deploy to GitHub Pages
 
 on:
