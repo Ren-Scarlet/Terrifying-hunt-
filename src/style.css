@@ -3473,3 +3473,58 @@ button, .room-hit, .hand-row { touch-action: manipulation; }
 .tune-description { display: grid; gap: 5px; margin: 8px 0; color: #cdbf9f; font-size: 11px; }
 .tune-description textarea { width: 100%; min-height: 62px; resize: vertical; padding: 7px; border: 1px solid #4a4032; background: #0b0d0e; color: #e8dfcc; font: inherit; line-height: 1.5; }
 .tune-no-action { display: flex; align-items: center; gap: 7px; margin: 7px 0; color: #e0c27e; font-size: 11px; }
+
+
+/* 2026-11 卡牌工作台可读性：独立放大管理界面，不影响游戏 HUD */
+.admin-overlay { padding: 22px 18px; }
+.admin-modal { width: min(1480px, 98vw); }
+.admin-modal .subtitle { font-size: 13px; letter-spacing: 3px; }
+.admin-modal h1 { font-size: clamp(30px, 3vw, 42px); margin: 8px 0 14px; }
+.admin-lead { font-size: 15px; line-height: 1.8; margin-bottom: 18px; color: #b4ac9d; }
+.admin-toolbar { gap: 12px; padding: 12px 14px; margin-bottom: 18px; }
+.admin-state { font-size: 13px; letter-spacing: .5px; }
+.admin-toolbar .btn { min-height: 40px; padding: 8px 15px; font-size: 13px; }
+.admin-export { padding: 14px; margin-bottom: 18px; }
+.admin-export label { font-size: 14px; }
+.admin-export p { font-size: 13px; line-height: 1.7; }
+.admin-export textarea { font-size: 13px; line-height: 1.65; padding: 11px; min-height: 120px; }
+.admin-sections section { margin-bottom: 30px; }
+.admin-sections h2 { font-size: 19px; letter-spacing: 1px; margin-bottom: 14px; padding-bottom: 10px; }
+.admin-sections h2 small { font-size: 13px; }
+.admin-grid { grid-template-columns: repeat(auto-fill, minmax(430px, 1fr)); gap: 14px; }
+.tune-card { padding: 14px 15px 16px; }
+.tune-head { gap: 11px; margin-bottom: 12px; }
+.tune-head b { font-size: 17px; letter-spacing: 0; }
+.tune-perk { width: 34px; height: 34px; }
+.tune-power-icon { width: 32px; height: 32px; }
+.tune-cost { font-size: 13px; gap: 7px; }
+.tune-cost input { width: 56px; min-height: 34px; font-size: 15px; }
+.tune-description { font-size: 14px; gap: 8px; margin: 12px 0; }
+.tune-description textarea { min-height: 88px; padding: 10px; font-size: 14px; line-height: 1.65; }
+.tune-no-action { font-size: 13px; gap: 10px; margin: 12px 0; }
+.tune-no-action input { width: 18px; height: 18px; }
+.tune-ops { gap: 8px; }
+.tune-op { gap: 8px; padding: 5px 0 5px calc(var(--depth, 0) * 12px); }
+.tune-op-name { min-width: 90px; font-size: 13px; }
+.tune-op select, .tune-op input, .tune-cost input {
+  font-size: 14px; padding: 7px 9px; min-height: 36px;
+}
+.tune-op select { max-width: 180px; }
+.tune-op input[type='number'] { width: 70px; }
+.tune-text, .tune-empty { font-size: 13px; }
+.tune-pre { margin-top: 10px; font-size: 13px; line-height: 1.6; }
+.tune-nested { margin: 8px 0 8px 14px; padding-left: 12px; }
+.tune-cond { font-size: 12px; margin-bottom: 6px; }
+.tune-branch { margin-bottom: 8px; }
+.tune-branch em { font-size: 12px; margin-bottom: 5px; }
+.tune-killer { margin-bottom: 20px; }
+.tune-killer h3 { font-size: 16px; letter-spacing: 1px; margin-bottom: 10px; }
+.tune-killer h3 small { font-size: 13px; }
+.tune-killer-powers { grid-template-columns: repeat(auto-fill, minmax(430px, 1fr)); gap: 14px; }
+.admin-import textarea { min-height: 140px; }
+@media (max-width: 720px) {
+  .admin-overlay { padding: 8px 6px; }
+  .admin-modal { width: 100%; }
+  .admin-grid, .tune-killer-powers { grid-template-columns: 1fr; }
+  .tune-op select { max-width: min(58vw, 220px); }
+}
