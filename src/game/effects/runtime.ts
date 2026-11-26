@@ -235,10 +235,6 @@ export function executeOps(state: GameState, ops: Op[], runtime: EffectRuntime):
         state.frenzyStreak = 0;
         log(state, `你被绊了一下，下回合少 ${state.stunTurns} 点行动点。`);
         break;
-      case 'evidence':
-        state.evidence += op.amount;
-        log(state, `证据 ${op.amount >= 0 ? '+' : ''}${op.amount}（当前 ${state.evidence}）。`);
-        break;
       case 'discount':
         state.discount = Math.min(2, state.discount + op.amount);
         log(state, `本回合后续卡牌费用 -${op.amount}。`);
