@@ -55,41 +55,84 @@ function makeTexture(kind: MatKind): HTMLCanvasElement {
   }
 
   if (kind === 'wood' || kind === 'woodV') {
-    // 板宽按真实地板条的比例：俯视 1 米约 60px 时，一块板 12–16px 才对
-    const plank = 14;
-    for (let y = 0; y < TEX; y += plank) {
-      c.fillStyle = `rgba(${132 + rand() * 44},${96 + rand() * 28},${62 + rand() * 22},${0.08 + rand() * 0.16})`;
+    // 老旧木地板：错缝板材、细长木纹、钉孔与磨损边缘。
+    const plank = 24;
+    for (let row = 0; row < TEX / plank + 1; row++) {
+      const y = row * plank;
+      const stagger = row % 2 ? -TEX * 0.22 : 0;
+      const tone = Math.floor(rand() * 18);
+      c.fillStyle = `rgba(${112 + tone},${78 + tone * 0.65},${49 + tone * 0.45},.18)`;
       c.fillRect(0, y, TEX, plank - 1);
-      c.fillStyle = 'rgba(0,0,0,.55)';
-      c.fillRect(0, y + plank - 1.4, TEX, 1.4);
-      for (let i = 0; i < 5; i++) {
-        c.strokeStyle = `rgba(${26 + rand() * 26},${16 + rand() * 16},${9 + rand() * 12},${0.18 + rand() * 0.22})`;
-        c.lineWidth = 0.4 + rand() * 0.7;
+      c.fillStyle = 'rgba(0,0,0,.58)';
+      c.fillRect(0, y + plank - 1.2, TEX, 1.2);
+
+      // 板材端缝错开，避免重复的方格纹理。
+      for (let seam = stagger + TEX * 0.28; seam < TEX + TEX * 0.3; seam += TEX * 0.48) {
+        c.fillStyle = 'rgba(0,0,0,.42)';
+        c.fillRect(seam, y + 1, 1.1, plank - 2);
+        c.fillStyle = 'rgba(205,163,112,.08)';
+        c.fillRect(seam + 1.2, y + 1, 0.7, plank - 2);
+      }
+
+      // 木纹并非规则平行线，局部弯曲并在板缝处消失。
+      for (let grain = 0; grain < 8; grain++) {
+        const gy = y + 2 + rand() * (plank - 4);
+        const x0 = rand() * TEX * 0.18;
+        const x1 = TEX * (0.65 + rand() * 0.5);
+        c.strokeStyle = `rgba(${18 + rand() * 18},${13 + rand() * 13},${9 + rand() * 9},${0.12 + rand() * 0.22})`;
+        c.lineWidth = 0.35 + rand() * 0.65;
         c.beginPath();
-        const gy = y + 2 + rand() * (plank - 5);
-        c.moveTo(-8, gy);
-        c.bezierCurveTo(TEX * 0.32, gy + (rand() - 0.5) * 2.2, TEX * 0.68, gy + (rand() - 0.5) * 2.2, TEX + 8, gy);
+        c.moveTo(x0, gy);
+        c.bezierCurveTo(TEX * 0.32, gy + (rand() - 0.5) * 3, TEX * 0.62, gy + (rand() - 0.5) * 3, x1, gy + (rand() - 0.5) * 1.5);
         c.stroke();
       }
-      for (let k = 0; k < 2; k++) {
-        const seam = rand() * TEX;
-        c.fillStyle = 'rgba(0,0,0,.5)';
-        c.fillRect(seam, y, 1.2, plank - 1.4);
+
+      // 偶尔出现的木结与磨损，不做成装饰性花纹。
+      if (rand() > 0.56) {
+        const kx = rand() * TEX;
+        const ky = y + plank * (0.25 + rand() * 0.5);
+        c.strokeStyle = 'rgba(12,8,5,.28)';
+        c.lineWidth = 1;
+        c.beginPath();
+        c.ellipse(kx, ky, 3 + rand() * 4, 1 + rand() * 1.8, rand() * 0.3, 0, Math.PI * 2);
+        c.stroke();
       }
-      c.fillStyle = 'rgba(255,232,198,.035)';
-      c.fillRect(0, y + 0.5, TEX, 0.8);
+      c.fillStyle = 'rgba(255,226,185,.045)';
+      c.fillRect(0, y + 0.7, TEX, 0.7);
     }
-    speckle(160, ['#000000', '#5b452f', '#2a1d13'], 1.6, 0.28);
+    // 踩踏形成的细碎划痕与灰尘。
+    for (let i = 0; i < 110; i++) {
+      const x = rand() * TEX;
+      const y = rand() * TEX;
+      c.strokeStyle = `rgba(${rand() > 0.5 ? '0,0,0' : '190,153,112'},${0.08 + rand() * 0.16})`;
+      c.lineWidth = 0.35 + rand() * 0.55;
+      c.beginPath();
+      c.moveTo(x, y);
+      c.lineTo(x + (rand() - 0.5) * 9, y + (rand() - 0.5) * 2);
+      c.stroke();
+    }
+    speckle(260, ['#000000', '#5b452f', '#2a1d13', '#786047'], 1.4, 0.3);
   } else if (kind === 'tile') {
-    const t = 26;
+    // 老旧瓷砖：每块砖有独立的釉面、暗边和不均匀反光。
+    const t = 32;
     for (let y = 0; y < TEX; y += t) {
       for (let x = 0; x < TEX; x += t) {
-        c.fillStyle = `rgba(${180 + rand() * 40},${190 + rand() * 40},${196 + rand() * 40},${0.02 + rand() * 0.05})`;
-        c.fillRect(x + 1.5, y + 1.5, t - 3, t - 3);
+        const shade = Math.floor(rand() * 12);
+        c.fillStyle = `rgba(${132 + shade},${143 + shade},${147 + shade},.16)`;
+        c.fillRect(x + 1.8, y + 1.8, t - 3.6, t - 3.6);
+        const sheen = c.createLinearGradient(x + 2, y + 2, x + t - 2, y + t - 2);
+        sheen.addColorStop(0, 'rgba(225,232,230,.12)');
+        sheen.addColorStop(0.42, 'rgba(160,174,177,.025)');
+        sheen.addColorStop(1, 'rgba(0,0,0,.12)');
+        c.fillStyle = sheen;
+        c.fillRect(x + 2, y + 2, t - 4, t - 4);
+        c.strokeStyle = 'rgba(0,0,0,.3)';
+        c.lineWidth = 0.8;
+        c.strokeRect(x + 2, y + 2, t - 4, t - 4);
       }
     }
-    c.strokeStyle = 'rgba(12,14,16,.8)';
-    c.lineWidth = 1.8;
+    c.strokeStyle = 'rgba(7,10,12,.86)';
+    c.lineWidth = 2.2;
     for (let i = 0; i <= TEX; i += t) {
       c.beginPath();
       c.moveTo(i, 0);
@@ -98,7 +141,28 @@ function makeTexture(kind: MatKind): HTMLCanvasElement {
       c.lineTo(TEX, i);
       c.stroke();
     }
-    speckle(150, ['#000000', '#565d60', '#33383b'], 1.5, 0.28);
+    c.strokeStyle = 'rgba(205,215,216,.09)';
+    c.lineWidth = 0.7;
+    for (let i = 0; i <= TEX; i += t) {
+      c.beginPath();
+      c.moveTo(i + 2, 0);
+      c.lineTo(i + 2, TEX);
+      c.moveTo(0, i + 2);
+      c.lineTo(TEX, i + 2);
+      c.stroke();
+    }
+    // 潮湿环境留下的水垢和细小擦痕。
+    for (let i = 0; i < 42; i++) {
+      const x = rand() * TEX;
+      const y = rand() * TEX;
+      c.strokeStyle = `rgba(5,8,10,${0.08 + rand() * 0.16})`;
+      c.lineWidth = 0.4 + rand() * 0.8;
+      c.beginPath();
+      c.moveTo(x, y);
+      c.lineTo(x + (rand() - 0.5) * 8, y + 2 + rand() * 5);
+      c.stroke();
+    }
+    speckle(220, ['#000000', '#565d60', '#33383b', '#a1a7a5'], 1.3, 0.25);
   } else if (kind === 'concrete' || kind === 'plaster') {
     speckle(1100, ['#43474a', '#24272a', '#4d5155', '#1c1e20'], 2.4, 0.3);
     if (kind === 'concrete') {
