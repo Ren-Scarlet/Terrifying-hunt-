@@ -83,6 +83,7 @@ function makePerson(
     bloodSacrifice: false,
     archetype,
     alert: 0,
+    fear: 0,
     awareness: 0,
     dialogue: randomOf(['今晚吃什么？', '这里还挺安静的。', '等会儿要不要看电影？', '我有点饿了。', '忙完就去休息吧。']),
     activity: randomOf(ACTIVITIES),
