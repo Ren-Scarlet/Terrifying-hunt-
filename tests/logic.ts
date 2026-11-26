@@ -25,6 +25,7 @@ import {
   executeDownedPerson,
   executeBlockReason,
   carryPerson,
+  canCoordinateRescue,
   executeCarriedPerson,
   isRoomLit,
   missionTaskProgress,
@@ -95,11 +96,35 @@ function newGame(): GameState {
   const deck = ['silent_step', 'sprint', 'choke', 'shuriken', 'execute', 'clean', 'night_cover', 'aim'];
   return createGame(deck, undefined, '迈克尔·迈尔斯');
 }
+function casePhoneLineCoordination(): void {
+  const s = newGame();
+  const farRoom = ROOMS.map((room) => room.id)
+    .filter((room) => roomDistance('hall', room) > 3)
+    .sort((a, b) => roomDistance('hall', b) - roomDistance('hall', a))[0];
+  const adjacentRoom = ROOM_MAP.hall.neighbors[0];
+  s.phoneCut = true;
+  check('电话线：剪断后仍可在同屋协调救援', canCoordinateRescue(s, 'hall', 'hall'));
+  check('电话线：无线电正常时保留有限远程协调（3 格内）',
+    canCoordinateRescue(s, 'hall', adjacentRoom) &&
+    (!farRoom || !canCoordinateRescue(s, 'hall', farRoom)),
+    '备用无线电范围为 3 格');
+  s.sabotage.push('radio');
+  check('电话线与无线电都被破坏时，只能同屋或相邻呼救',
+    canCoordinateRescue(s, 'hall', adjacentRoom) &&
+    (!farRoom || !canCoordinateRescue(s, 'hall', farRoom)),
+    '无线电失效后协调范围缩至 1 格');
+  s.phoneCut = false;
+  check('电话线路正常时恢复全屋远程救援协调',
+    !farRoom || canCoordinateRescue(s, 'hall', farRoom));
+}
+
 
 /** 房间导航模块：验证随机生成的房屋图最短路与候选点选择。 */
 
 /** 新抽牌规则：每回合补 1 张、主动抽牌、六张上限、洗牌推进团队进度。 */
 /** 环境事件：每三回合改变一次现场局势，并正确区分临时闪断与永久断电。 */
+casePhoneLineCoordination();
+
 function caseEnvironmentalEvents(): void {
   const s = newGame();
   s.turn = 2;
