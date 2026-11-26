@@ -569,20 +569,20 @@ function npcReact(state: GameState): void {
     // 恐惧范围：相邻房间先起疑；范围 2 的杀手会在隔壁直接引发逃跑，两格外也会察觉。
     const distanceToPlayer = roomDistance(person.room, state.playerRoom);
     if (fearRadius >= 2 && distanceToPlayer === 1 && person.alert < 45) {
-      person.alert = Math.max(person.alert, 55);
-      person.awareness = awarenessStage(person.alert);
+      person.awareness = Math.max(person.awareness, 2);
+      person.alert = Math.max(person.alert, 45);
       person.intent = 'flee';
       person.activity = '察觉到杀手逼近，立刻逃跑';
       if (person.movesThisTurn < REACT_MOVE_CAP && fleeAway(state, person, true)) person.movesThisTurn += 1;
       continue;
-    } else if (fearRadius >= 1 && distanceToPlayer === 1 && awarenessStage(person.alert) === 0 && person.alert < 50) {
-      person.alert = Math.max(person.alert, 25);
-      person.awareness = awarenessStage(person.alert);
+    } else if (fearRadius >= 1 && distanceToPlayer === 1 && person.awareness === 0 && person.alert < 40) {
+      person.awareness = 1;
+      person.alert = Math.max(person.alert, 12);
       person.intent = 'wary';
       person.activity = '听见附近有动静，停下来观察';
-    } else if (fearRadius >= 2 && distanceToPlayer === 2 && awarenessStage(person.alert) === 0 && person.alert < 50) {
-      person.alert = Math.max(person.alert, 25);
-      person.awareness = awarenessStage(person.alert);
+    } else if (fearRadius >= 2 && distanceToPlayer === 2 && person.awareness === 0 && person.alert < 40) {
+      person.awareness = 1;
+      person.alert = Math.max(person.alert, 12);
       person.intent = 'wary';
       person.activity = '远处传来令人不安的动静';
     }
@@ -1638,13 +1638,13 @@ function npcTurn(state: GameState): void {
     if (state.result) return;
     if (!state.people.some((p) => p.id === person.id)) continue;
     const totemIndex = state.totems.indexOf(person.room);
-    if (totemIndex >= 0 && person.hp > 0 && awarenessStage(person.alert) >= 1 && random() < 0.18) {
+    if (totemIndex >= 0 && person.hp > 0 && person.awareness >= 1 && random() < 0.18) {
       state.totems.splice(totemIndex, 1);
       log(state, `${person.name} 在${roomName(person.room)}发现并破坏了图腾。`);
     }
 
-    // 警觉值只代表情绪强度；认知阶段决定 NPC 是否真的知道危险存在。
-    person.awareness = awarenessStage(person.alert);
+    // 即时警觉值可以下降，但已经确认的危险不会被忘记。
+    person.awareness = Math.max(person.awareness, person.alert >= 75 ? 3 : person.alert >= 40 ? 2 : person.alert >= 12 ? 1 : 0);
 
     // 被抱起的人不会参与救援或移动，但仍然会继续流血倒计时。
     if (person.id === state.carryPersonId) {
@@ -1674,9 +1674,9 @@ function npcTurn(state: GameState): void {
     }
 
     // 日常生活阶段不会因为房间亮着灯就逐渐怀疑异常。
-    if (isRoomLit(state, person.room) && awarenessStage(person.alert) > 0) {
+    if (isRoomLit(state, person.room) && person.awareness > 0) {
       person.alert = clamp(person.alert + 4, 0, 100);
-      if (awarenessStage(person.alert) >= 2 && (person.goal === 'objective' || person.goal === 'generator' || person.goal === 'key' || person.intent === 'work')) {
+      if (person.awareness >= 2 && (person.goal === 'objective' || person.goal === 'generator' || person.goal === 'key' || person.intent === 'work')) {
         addTeamProgress(state, scaleSurvivorProgress(state, person, 2));
         log(state, `${roomName(person.room)}仍有照明，${person.name}借着灯光加快了行动（团队进度 +2）。`);
       }
@@ -1725,13 +1725,13 @@ function npcTurn(state: GameState): void {
     const nearbyVictim = npcs(state).some(
       (other) => other.id !== person.id && (other.hp <= 0 || (other.hp > 0 && other.hp <= SURVIVOR_INJURED_HP)) && roomDistance(other.room, person.room) <= 1,
     );
-    if (nearbyVictim && awarenessStage(person.alert) < 2) {
-      person.alert = Math.max(person.alert, 55);
-      person.awareness = awarenessStage(person.alert);
+    if (nearbyVictim && person.awareness < 2) {
+      person.alert = Math.max(person.alert, 45);
+      person.awareness = 2;
     }
 
     // 没有任何异常线索时，幸存者继续自己的日常，不修逃生设施、不报警、不集体行动。
-    if (awarenessStage(person.alert) === 0) {
+    if (person.awareness === 0) {
       person.intent = 'idle';
       if (random() < 0.18) {
         const options = ROOM_MAP[person.room].neighbors.filter((room) => room !== state.playerRoom && !isLocked(state, room));
@@ -1749,7 +1749,7 @@ function npcTurn(state: GameState): void {
     }
 
     // 只有察觉到异常但尚未确认危险的人会停下来倾听、查看，不会立刻逃生。
-    if (awarenessStage(person.alert) === 1 && person.room !== state.playerRoom) {
+    if (person.awareness === 1 && person.alert < 40 && person.room !== state.playerRoom) {
       person.intent = 'wary';
       person.activity = randomOf(['停下手里的事，侧耳听着', '四处看了看，像是在找声音来源', '有些疑惑地检查周围']);
       continue;
@@ -1844,11 +1844,11 @@ function npcTurn(state: GameState): void {
       actByArchetype(state, person);
       continue;
     }
-    if (awarenessStage(person.alert) >= 2) {
+    if (person.alert >= 42) {
       actByArchetype(state, person);
       continue;
     }
-    if (awarenessStage(person.alert) >= 1) {
+    if (person.alert >= 22) {
       person.intent = 'wary';
       if (random() < 0.5) actByArchetype(state, person);
       else person.activity = '紧张地四处张望';
@@ -2410,8 +2410,7 @@ export function playCard(state: GameState, cardUid: string): boolean {
     if (sacrifice) {
       state.myersFoodMarks = Math.min(8, state.myersFoodMarks + 1);
       sacrifice.alert = Math.max(sacrifice.alert, 55);
-      sacrifice.alert = Math.max(sacrifice.alert, 55);
-      sacrifice.awareness = awarenessStage(sacrifice.alert);
+      sacrifice.awareness = Math.max(sacrifice.awareness, 2);
       sacrifice.intent = 'flee';
       sacrifice.activity = '被迈尔斯戏耍，仓皇逃离视线';
       if (sacrifice.movesThisTurn < REACT_MOVE_CAP) {
@@ -2874,8 +2873,8 @@ export function usePower(state: GameState, powerId: string): boolean {
     state.stalkPressure = Math.min(100, state.stalkPressure + 20);
     log(state, '你花费 1 点行动点凝视 ' + target.name + '：尾随值 +' + stalkGain + '（' + state.stalkMeter + '/100）。');
     if (state.stalkPressure >= 40 && state.stalkPressure < 60) {
-      target.alert = Math.max(target.alert, 25);
-      target.awareness = awarenessStage(target.alert);
+      target.alert = Math.max(target.alert, 20);
+      target.awareness = Math.max(target.awareness, 1);
       target.intent = 'wary';
       target.activity = '总觉得有人在暗处盯着自己';
       log(state, target.name + ' 开始怀疑自己正被什么东西注视。');
@@ -2883,7 +2882,7 @@ export function usePower(state: GameState, powerId: string): boolean {
     if (state.stalkPressure >= 60) {
       const detected = random() < 0.3;
       target.alert = Math.max(target.alert, detected ? 100 : 55);
-      target.awareness = awarenessStage(target.alert);
+      target.awareness = Math.max(target.awareness, detected ? 3 : 2);
       target.intent = 'flee';
       target.activity = detected ? '发现迈尔斯后惊恐逃跑' : '不安地逃离被注视的位置';
       if (detected) log(state, target.name + ' 突然发现了暗处的迈尔斯！');
