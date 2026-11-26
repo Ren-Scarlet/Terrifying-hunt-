@@ -757,7 +757,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
             <span>${icon('totem', 'ui-icon tiny')} 图腾</span>
             <span>${icon('cabinet', 'ui-icon tiny')} 柜子</span>
             <span>${icon('obstacle', 'ui-icon tiny')} 障碍物</span>
-            <span>⚡ 电闸 / 💡 照明</span>
+            <span>⚡ 电闸</span>
             <span>☎ 电话 / ▣ 无线电</span>
             <span>⚒ 捕兽夹 / ＋ 陷阱补给（设陷者）</span>
             <span class="legend-intent"><i class="intent-dot i-flee"></i> 逃跑中 <i class="intent-dot i-call"></i> 打电话 <i class="intent-dot i-escape"></i> 翻篱笆 <i class="intent-dot i-rescue"></i> 救援</span>
