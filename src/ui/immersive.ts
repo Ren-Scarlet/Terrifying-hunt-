@@ -22,6 +22,9 @@ let viewportHeight = 0;
 let playerX = 0;
 let playerY = 0;
 let frame = 0;
+let heldPanFrame = 0;
+let heldPanLastTime = 0;
+const heldPanKeys = new Set<string>();
 let animationStart = 0;
 let animationFrom = { x: 0, y: 0, zoom: 1.18 };
 let animationTo = { x: 0, y: 0, zoom: 1.18 };
@@ -241,6 +244,42 @@ export function handleImmersiveAction(action: string | undefined): boolean {
   return false;
 }
 
+
+function stopHeldCameraPan(): void {
+  heldPanKeys.clear();
+  heldPanLastTime = 0;
+  if (heldPanFrame) window.cancelAnimationFrame(heldPanFrame);
+  heldPanFrame = 0;
+}
+
+function startHeldCameraPan(key: string): void {
+  if (!['arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) return;
+  if (!heldPanKeys.has(key)) {
+    heldPanKeys.add(key);
+    following = false;
+    globalView = false;
+    stopCameraAnimation();
+  }
+  if (heldPanFrame) return;
+  const tick = (now: number): void => {
+    if (!heldPanKeys.size || !mapElement) { heldPanFrame = 0; return; }
+    const elapsed = heldPanLastTime ? Math.min(0.05, (now - heldPanLastTime) / 1000) : 0;
+    heldPanLastTime = now;
+    const speed = 560;
+    let dx = 0;
+    let dy = 0;
+    if (heldPanKeys.has('arrowleft')) dx += speed * elapsed;
+    if (heldPanKeys.has('arrowright')) dx -= speed * elapsed;
+    if (heldPanKeys.has('arrowup')) dy += speed * elapsed;
+    if (heldPanKeys.has('arrowdown')) dy -= speed * elapsed;
+    panX = cameraX + dx;
+    panY = cameraY + dy;
+    setCameraTransform(panX, panY, zoom);
+    heldPanFrame = window.requestAnimationFrame(tick);
+  };
+  heldPanFrame = window.requestAnimationFrame(tick);
+}
+
 let keysInstalled = false;
 export function installImmersiveKeys(): void {
   if (keysInstalled) return;
@@ -268,10 +307,21 @@ export function installImmersiveKeys(): void {
       else if (intel?.open) { intel.open = false; intelDrawerOpen = false; }
     } else if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
       event.preventDefault();
-      const amount = 54;
-      pan(key === 'arrowleft' ? amount : key === 'arrowright' ? -amount : 0, key === 'arrowup' ? amount : key === 'arrowdown' ? -amount : 0);
+      startHeldCameraPan(key);
     }
   });
+  window.addEventListener('keyup', (event) => {
+    const key = event.key.toLowerCase();
+    if (heldPanKeys.has(key)) {
+      heldPanKeys.delete(key);
+      if (!heldPanKeys.size) {
+        if (heldPanFrame) window.cancelAnimationFrame(heldPanFrame);
+        heldPanFrame = 0;
+        heldPanLastTime = 0;
+      }
+    }
+  });
+  window.addEventListener('blur', stopHeldCameraPan);
   window.addEventListener('resize', () => {
     if (!root) return;
     const viewport = root.querySelector<HTMLElement>('.map-viewport');
