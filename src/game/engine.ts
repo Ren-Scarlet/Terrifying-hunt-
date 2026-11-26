@@ -587,13 +587,13 @@ function npcReact(state: GameState): void {
       person.activity = '远处传来令人不安的动静';
     }
 
-    // 同房间的目击者也要有动作：刚被砍的那个人本回合已经反应过，不重复
+    // 同房间的目击者也要有动作：刚被砍的那个人本回合已经反应过，不重复。
+    // 只依据持久认知阶段判断是否进入恐慌；不能用进门刚增加的 alert 反过来触发即时逃跑。
     const sameRoom = person.room === state.playerRoom;
     if (sameRoom && person.id === state.lastAttackedId) continue;
     if (sameRoom) {
-      // 伏击这一下他们根本没察觉；低警觉者也不会因玩家已经在屋里而每次行动都突然逃跑。
       if (state.ambushTurn === state.turn) continue;
-      if (person.alert < 75 && person.awareness < 2) continue;
+      if (person.awareness < 2) continue;
       if (person.movesThisTurn >= REACT_MOVE_CAP) continue;
       if (witnessInRoom(state, person)) person.movesThisTurn += 1;
       continue;
@@ -1178,6 +1178,8 @@ function npcOnPlayerEnter(state: GameState): void {
     // 只有警觉达到「警戒」(75+) 才会夺路而逃；低于阈值先观察、怀疑或继续原本的事。
     const wasAlert = person.alert;
     const darkRoom = !isRoomLit(state, state.playerRoom);
+    // 进门前已经恐慌的人会在这次照面中确认危险；低于恐慌者不因进门噪声直接升级认知。 
+    if (wasAlert >= 40) person.awareness = Math.max(person.awareness, 2);
 
     let gain = 30;
     if (threat === 'spiritual') gain = 65;
