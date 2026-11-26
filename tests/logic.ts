@@ -56,7 +56,7 @@ import {
 } from '../src/game/engine';
 import { OBSTACLE_ROOMS, ROOM_MAP, ROOMS, buildLayout, doorMarkerPosition } from '../src/game/rooms';
 import { cardImage } from '../src/game/assetMap';
-import { personChip } from '../src/ui/render/shared';
+import { personChip, personDetailHtml } from '../src/ui/render/shared';
 import { SURVIVOR_MAP } from '../src/game/survivors';
 import { generateMission } from '../src/game/missions';
 import type { GameState, RoomId } from '../src/game/types';
@@ -468,6 +468,32 @@ function caseUnaware(): void {
     darkVictim.room === darkNext && darkVictim.alert <= 12 && darkVictim.intent !== 'flee',
     `警觉=${darkVictim.alert}，意图=${darkVictim.intent}，状态=${darkVictim.activity}`);
 
+  const prePanic = newGame();
+  prePanic.people.forEach((person) => { person.item = null; person.itemUses = 0; person.armed = false; });
+  const suspiciousTarget = player(prePanic);
+  const suspiciousRoom = openNeighbor(prePanic.playerRoom);
+  suspiciousTarget.room = suspiciousRoom;
+  suspiciousTarget.alert = 30;
+  suspiciousTarget.awareness = 1;
+  suspiciousTarget.intent = 'wary';
+  movePlayer(prePanic, suspiciousRoom);
+  check('E 进门前低于恐慌的幸存者不会被瞬时警觉推成逃跑',
+    suspiciousTarget.room === suspiciousRoom && suspiciousTarget.intent !== 'flee',
+    `警觉=${suspiciousTarget.alert}，意图=${suspiciousTarget.intent}`);
+
+  const darkPanic = newGame();
+  darkPanic.people.forEach((person) => { person.item = null; person.itemUses = 0; person.armed = false; });
+  darkPanic.powerCircuits.forEach((circuit) => { circuit.broken = true; });
+  const darkAlreadyWary = player(darkPanic);
+  const darkWaryRoom = openNeighbor(darkPanic.playerRoom);
+  darkAlreadyWary.room = darkWaryRoom;
+  darkAlreadyWary.alert = 30;
+  darkAlreadyWary.awareness = 1;
+  movePlayer(darkPanic, darkWaryRoom);
+  check('E 暗处进入只增加极少警觉，低于恐慌者仍不逃跑',
+    darkAlreadyWary.room === darkWaryRoom && darkAlreadyWary.alert <= 37 && darkAlreadyWary.intent !== 'flee',
+    `警觉=${darkAlreadyWary.alert}，意图=${darkAlreadyWary.intent}`);
+
   const panic = newGame();
   const alarmed = player(panic);
   const panicNext = openNeighbor(panic.playerRoom);
@@ -559,6 +585,23 @@ function caseFinisher(): void {
   attack(s3, v3.id);
   check('F 迈尔斯恶魔附身一刀击倒健康幸存者', v3.hp === 0 && conditionOf(v3) === 'downed');
 }
+
+/** G：猎杀动作必须明确区分，人物档案必须展示背景与实时状态。 */
+function caseHuntActionAndDossierUi(): void {
+  const s = newGame();
+  const victim = player(s);
+  victim.room = s.playerRoom;
+  victim.hp = 0;
+  victim.downedTurns = 0;
+  victim.activity = '倒在地上，试图呼救';
+  s.energy = 3;
+  const dossier = personDetailHtml(s, victim.id);
+  check('G 人物档案显示角色背景',
+    dossier.includes(SURVIVOR_MAP[victim.id].bio));
+  check('G 人物档案显示当前状态与正在做的事',
+    dossier.includes('倒地') && dossier.includes('倒在地上，试图呼救'));
+}
+caseHuntActionAndDossierUi();
 
 /** G：卡牌数据仍然挂着正确的指令，而且不再直接造成伤害 */
 function caseCardData(): void {

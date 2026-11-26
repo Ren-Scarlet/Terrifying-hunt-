@@ -587,13 +587,13 @@ function npcReact(state: GameState): void {
       person.activity = '远处传来令人不安的动静';
     }
 
-    // 同房间的目击者也要有动作：刚被砍的那个人本回合已经反应过，不重复
+    // 同房间的目击者也要有动作：刚被砍的那个人本回合已经反应过，不重复。
+    // 只依据持久认知阶段判断是否进入恐慌；不能用进门刚增加的 alert 反过来触发即时逃跑。
     const sameRoom = person.room === state.playerRoom;
     if (sameRoom && person.id === state.lastAttackedId) continue;
     if (sameRoom) {
-      // 伏击这一下他们根本没察觉；低警觉者也不会因玩家已经在屋里而每次行动都突然逃跑。
       if (state.ambushTurn === state.turn) continue;
-      if (person.alert < 75 && person.awareness < 2) continue;
+      if (person.awareness < 2) continue;
       if (person.movesThisTurn >= REACT_MOVE_CAP) continue;
       if (witnessInRoom(state, person)) person.movesThisTurn += 1;
       continue;
@@ -1178,6 +1178,8 @@ function npcOnPlayerEnter(state: GameState): void {
     // 只有警觉达到「警戒」(75+) 才会夺路而逃；低于阈值先观察、怀疑或继续原本的事。
     const wasAlert = person.alert;
     const darkRoom = !isRoomLit(state, state.playerRoom);
+    // 进门前已经恐慌的人会在这次照面中确认危险；低于恐慌者不因进门噪声直接升级认知。 
+    if (wasAlert >= 40) person.awareness = Math.max(person.awareness, 2);
 
     let gain = 30;
     if (threat === 'spiritual') gain = 65;
@@ -1186,7 +1188,8 @@ function npcOnPlayerEnter(state: GameState): void {
     else if (threat === 'team') gain = 38;
     if (threat !== 'spiritual') {
       if (hidden) gain = Math.round(gain * 0.4);
-      if (darkRoom) gain = Math.round(gain * 0.25);
+      // 黑暗会显著削弱幸存者对入侵者的辨认能力。
+      if (darkRoom) gain = Math.round(gain * 0.1);
     }
     person.alert = clamp(person.alert + gain, 0, 100);
     // 迈尔斯的尾随：盯着看得越久，越不容易被屋里的人察觉
@@ -1204,7 +1207,9 @@ function npcOnPlayerEnter(state: GameState): void {
     // 已经跑满这一回合的人，腿已经不听使唤了：门一开他也只能贴着墙喘气。
     // 这是玩家唯一能稳稳砍中「警觉的人」的机会，也是痕迹系统的兑现点。
     const exhausted = person.movesThisTurn >= REACT_MOVE_CAP;
-    if (!exhausted && person.alert >= 75 && fleeAway(state, person)) {
+    // 进门瞬间的警觉增长不能把未发觉 / 怀疑阶段直接推成逃亡。
+    // 只有进门前已经达到恐慌（40+）的人，才会因这次照面立即逃跑。
+    if (!exhausted && wasAlert >= 40 && fleeAway(state, person)) {
       person.movesThisTurn += 1;
       person.alert = 100;
       log(

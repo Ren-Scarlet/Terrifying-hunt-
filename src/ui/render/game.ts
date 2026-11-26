@@ -511,14 +511,17 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
     : `攻击：只对站立的幸存者造成伤害，消耗 ${ATTACK_COST} 点行动点；倒地者请使用独立的「处决」按钮。砍完要再做一件事（或花 ${WIPE_COST} 点擦刀）才能再次攻击。`;
   const attackBtn = `<button class="btn attack ${atkOk ? '' : 'spent'} ${possessed ? 'possessed' : ''}" data-action="attack" ${atkOk ? '' : 'disabled'}
       title="${escape(atkOk ? atkTitle : atkReason)}">
-      <span class="atk-name">${possessed ? '附身 · 攻击' : '攻击'}</span>
+      <span class="atk-name">${possessed ? '附身 · 挥刀' : '挥刀攻击'}</span>
       <span class="atk-meta">${atkOk ? (possessed ? `${ATTACK_COST} AP · 2 点伤害` : `${ATTACK_COST} AP · 对站立目标`) : escape(atkReason)}</span>
     </button>`;
+  const downedHere = here.filter((person) => person.role !== 'police' && person.hp <= 0);
   const executeReason = executeBlockReason(state);
-  const executeBtn = `<button class="btn execute-action ${executeReason ? 'spent' : ''}" data-action="execute" ${executeReason ? 'disabled' : ''}
-      title="${escape(executeReason || '处决当前房间一名倒地的幸存者，消耗 1 点行动点。若暂时放过他，同伴仍可能赶来救援。')}">
-      <span class="atk-name">处决</span>
-      <span class="atk-meta">${executeReason ? escape(executeReason) : '1 AP · 立即结束目标'}</span>
+  const executeTargetSummary = downedHere.length === 1 ? downedHere[0].name : downedHere.length > 1 ? `${downedHere.length} 名倒地幸存者` : '';
+  const executeBtn = `<button class="btn execute-action ${executeReason ? 'spent' : 'ready'}" data-action="execute" ${executeReason ? 'disabled' : ''}
+      aria-label="${escape(executeReason || `处决${executeTargetSummary}，消耗 1 点行动点`)}"
+      title="${escape(executeReason || `处决${executeTargetSummary}，消耗 1 点行动点。也可以暂时放过，等待同伴前来救援。`)}">
+      <span class="execute-symbol" aria-hidden="true">☠</span>
+      <span class="execute-copy"><b>处决倒地者</b><small>${executeReason ? escape(executeReason) : `1 AP · ${executeTargetSummary}`}</small></span>
     </button>`;
   const wipeReason = wipeBlockReason(state);
   const wipeBtn = `<button class="btn wipe ${wipeReason ? 'spent' : ''}" data-action="wipe" ${wipeReason ? 'disabled' : ''}
@@ -573,38 +576,6 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
       </div>
     </div>
 
-    <div class="layout">
-      <div class="main-column">
-        <div class="panel map-panel">
-          <div class="panel-heading"><h2>房屋平面</h2><span>门形=通道 · 绿门=当前可走 · 红叉=封锁 · 黄门=堵门/行动点不足 · 蓝框=目标点</span>
-            <button class="btn ghost mini" data-action="guide">玩法指引</button>
-            <button class="btn ghost mini audio-toggle" data-action="mute" title="开关音效与背景音乐">${isMuted() ? '音效 关' : '音效 开'}</button>
-          </div>
-          ${statusHtml}${carryStatus}${huntPlanHtml}
-          ${state.lookingAround ? '<div class="look-prompt" role="status"><b>选择要查看的房间</b><span>地图上亮起边框的房间都与当前位置相邻。点击其中一个，消耗 1 点行动点查看。</span><button class="btn ghost mini" data-action="look-cancel">取消</button></div>' : ''}
-          <div class="map-viewport">
-            <div class="floorplan" style="--ar:${layoutAspectNum().toFixed(4)};aspect-ratio:${layoutAspect()}">
-              ${rooms}
-              ${doorMarkersHtml(state)}
-              ${trailOverlay(state)}
-              ${playerMarker}
-              ${mapEventFeedHtml(state)}
-            </div>
-          </div>
-          <div class="map-legend">
-            <span>${icon('escape', 'ui-icon tiny')} 逃生点（第4阶段开启）</span>
-            <span>${icon('totem', 'ui-icon tiny')} 图腾</span>
-            <span>${icon('cabinet', 'ui-icon tiny')} 柜子</span>
-            <span>${icon('obstacle', 'ui-icon tiny')} 障碍物</span>
-            <span class="legend-intent"><i class="intent-dot i-flee"></i> 逃跑中 <i class="intent-dot i-call"></i> 打电话 <i class="intent-dot i-escape"></i> 翻篱笆 <i class="intent-dot i-rescue"></i> 救援</span>
-            <span class="legend-fog">？ 最后确认位置</span>
-            <span class="legend-trail"><i class="legend-claw"></i> 鞋印：只看得见当前房间，跟丢了就断</span>
-            <span class="legend-noise">${icon('crow', 'crow-icon tiny')} 动静：乌鸦叫 / 地板响，有人刚经过（短线索）</span>
-            <span class="legend-objective">蓝框：他们的团队目标点</span>
-            <span class="legend-sites">${icon('itemBox', 'ui-icon tiny')} 道具箱 ${icon('generator', 'ui-icon tiny')} 发电机：他们能用，你只能砸</span>
-          </div>
-        </div>
-
       <details class="intel-drawer">
         <summary>
           <span>现场情报</span>
@@ -644,6 +615,40 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
           </div>
         </div>
       </details>
+
+    <div class="layout">
+      <div class="main-column">
+        <div class="panel map-panel">
+          <div class="panel-heading"><h2>房屋平面</h2><span>门形=通道 · 绿门=当前可走 · 红叉=封锁 · 黄门=堵门/行动点不足 · 蓝框=目标点</span>
+            <button class="btn ghost mini" data-action="guide">玩法指引</button>
+            <button class="btn ghost mini audio-toggle" data-action="mute" title="开关音效与背景音乐">${isMuted() ? '音效 关' : '音效 开'}</button>
+          </div>
+          ${statusHtml}${carryStatus}${huntPlanHtml}
+          ${state.lookingAround ? '<div class="look-prompt" role="status"><b>选择要查看的房间</b><span>地图上亮起边框的房间都与当前位置相邻。点击其中一个，消耗 1 点行动点查看。</span><button class="btn ghost mini" data-action="look-cancel">取消</button></div>' : ''}
+          <div class="map-viewport">
+            <div class="floorplan" style="--ar:${layoutAspectNum().toFixed(4)};aspect-ratio:${layoutAspect()}">
+              ${rooms}
+              ${doorMarkersHtml(state)}
+              ${trailOverlay(state)}
+              ${playerMarker}
+              ${mapEventFeedHtml(state)}
+            </div>
+          </div>
+          <div class="map-legend">
+            <span>${icon('escape', 'ui-icon tiny')} 逃生点（第4阶段开启）</span>
+            <span>${icon('totem', 'ui-icon tiny')} 图腾</span>
+            <span>${icon('cabinet', 'ui-icon tiny')} 柜子</span>
+            <span>${icon('obstacle', 'ui-icon tiny')} 障碍物</span>
+            <span class="legend-intent"><i class="intent-dot i-flee"></i> 逃跑中 <i class="intent-dot i-call"></i> 打电话 <i class="intent-dot i-escape"></i> 翻篱笆 <i class="intent-dot i-rescue"></i> 救援</span>
+            <span class="legend-fog">？ 最后确认位置</span>
+            <span class="legend-trail"><i class="legend-claw"></i> 鞋印：只看得见当前房间，跟丢了就断</span>
+            <span class="legend-noise">${icon('crow', 'crow-icon tiny')} 动静：乌鸦叫 / 地板响，有人刚经过（短线索）</span>
+            <span class="legend-objective">蓝框：他们的团队目标点</span>
+            <span class="legend-sites">${icon('itemBox', 'ui-icon tiny')} 道具箱 ${icon('generator', 'ui-icon tiny')} 发电机：他们能用，你只能砸</span>
+          </div>
+        </div>
+
+
 
         <div class="bottom-dock">
         <div class="panel resource-bar">
