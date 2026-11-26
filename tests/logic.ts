@@ -1566,7 +1566,17 @@ function caseContractsPowerAndCarry(): void {
   check('AB 未发生报警时无报警目标保持完成', missionTaskProgress(contract, alarmTask) === 1);
   contract.npcAlarmed = true;
   check('AB 幸存者成功报警后无报警目标失败', missionTaskProgress(contract, alarmTask) === 0);
-  check('AB 组合目标均为已支持类型', (contract.mission.tasks ?? []).every((task) => ['kill_count', 'marked_kill', 'execute', 'special_execute', 'no_alarm', 'break_circuit'].includes(task.kind)));
+  check('AB 组合目标均为已支持类型', (contract.mission.tasks ?? []).every((task) => ['kill_count', 'kill_count_before_turn', 'marked_kill', 'execute', 'special_execute', 'no_alarm', 'break_circuit'].includes(task.kind)));
+  const timed = newGame();
+  const timedTask = { id: 'timed-check', kind: 'kill_count_before_turn' as const, label: '限时猎杀', target: 2, deadlineTurn: 5 };
+  timed.survivorKills = 2; timed.turn = 4;
+  check('AB 限时任务：期限内达成后记录完成', missionTaskProgress(timed, timedTask) === 2);
+  timed.completedMissionTasks.push(timedTask.id); timed.turn = 8;
+  check('AB 限时任务：完成记录不会因回合推进而倒退', missionTaskProgress(timed, timedTask) === 2);
+  const expired = newGame();
+  expired.mission.tasks = [{ ...timedTask, optional: false }]; expired.turn = 6;
+  endTurn(expired);
+  check('AB 限时核心任务超时会判定失败', expired.result === 'failed' && expired.resultReason.includes('限时目标失败'));
   const grid = newGame();
   const circuit = grid.powerCircuits[0];
   const affected = circuit.affectedRooms[0];
