@@ -1339,7 +1339,7 @@ function caseSurvivorItems(): void {
   check('Y 幸存者道具能推进团队进度', s3.teamProgress > before, `${before} → ${s3.teamProgress}`);
 }
 
-/** 本轮：擦刀 / 同屋目击者 / 守尸 / 袭警 / 道具次数 / 拉扯型 */
+/** 本轮：擦刀 / 同屋目击者 / 袭警 / 道具次数 / 拉扯型 */
 function caseNewMechanics() {
   check('Z 行动点上限为 4', BASE_AP === 4, `BASE_AP=${BASE_AP}`);
   const sacrifice = newGame();
@@ -1397,7 +1397,7 @@ function caseNewMechanics() {
   attack(g, pair[0].id);
   check('Z 同屋另一名幸存者不会站着不动', pair[1].alert > 0 || pair[1].movesThisTurn > 0 || g.teamProgress > tp, `alert=${pair[1].alert} tp=${g.teamProgress}`);
 
-  // 守尸：站在倒地者房间干等，其他人把团队进度赶上去
+  // 倒地者不再触发守尸惩罚，玩家可以选择继续追击或处决。
   const c = newGame();
   c.people.forEach((p) => { p.item = null; p.itemUses = 0; p.alert = 0; });
   const downed = c.people.find((p) => p.role !== 'police')!;
@@ -1406,7 +1406,7 @@ function caseNewMechanics() {
   downed.downedTurns = 0;
   const tp2 = c.teamProgress;
   endTurn(c);
-  check('Z 守尸会推进团队进度', c.guardingTurns > 0 && c.teamProgress > tp2, `${tp2} → ${c.teamProgress}`);
+  check('Z 倒地者不再触发守尸惩罚', c.teamProgress === tp2, `${tp2} → ${c.teamProgress}`);
 
   // 袭警：现在可以砍警员，但通缉立刻暴涨
   const f = newGame();
@@ -1552,7 +1552,7 @@ function caseContractsPowerAndCarry(): void {
   check('AB 未发生报警时无报警目标保持完成', missionTaskProgress(contract, alarmTask) === 1);
   contract.npcAlarmed = true;
   check('AB 幸存者成功报警后无报警目标失败', missionTaskProgress(contract, alarmTask) === 0);
-  check('AB 组合目标均为已支持类型', (contract.mission.tasks ?? []).every((task) => ['kill_count', 'marked_kill', 'execute', 'no_alarm', 'break_circuit'].includes(task.kind)));
+  check('AB 组合目标均为已支持类型', (contract.mission.tasks ?? []).every((task) => ['kill_count', 'marked_kill', 'execute', 'special_execute', 'no_alarm', 'break_circuit'].includes(task.kind)));
   const grid = newGame();
   const circuit = grid.powerCircuits[0];
   const affected = circuit.affectedRooms[0];
