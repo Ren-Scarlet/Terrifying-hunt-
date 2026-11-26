@@ -57,6 +57,7 @@ import {
 import { renderAdmin } from './ui/admin';
 import { mountFloorplanScene, type SceneHandle } from './ui/scene';
 import { playSfx, playSfxRepeat, setMusic, toggleMute, unlockAudio } from './ui/audio';
+import type { SfxName } from './ui/audio';
 import { rollMenuMap } from './ui/mapArt';
 
 type Screen = 'menu' | 'game' | 'result';
@@ -205,6 +206,13 @@ function flash(cls: 'hit-kill' | 'hit-alert'): void {
   window.setTimeout(() => document.body.classList.remove(cls), 520);
 }
 
+/** 日志里的人名做稳定哈希：同一个幸存者始终是同一种嗓音（数据层没有性别字段） */
+function playVoice(head: string, kind: 'Hurt' | 'Hit' | 'Scream' | 'Startle'): void {
+  let h = 0;
+  for (let i = 0; i < head.length; i += 1) h = (h * 31 + head.charCodeAt(i)) | 0;
+  playSfx(`voice${(h & 1) ? 'F' : 'M'}${kind}` as SfxName);
+}
+
 /** 引擎日志里刚发生的事 → 补上对应音效（不侵入纯逻辑层） */
 let lastLogHead = '';
 function sfxFromLogs(): void {
@@ -212,14 +220,29 @@ function sfxFromLogs(): void {
   const head = game.log[0] ?? '';
   if (head === lastLogHead) return;
   lastLogHead = head;
-  if (/地图出现两个逃生点|第四阶段完成/.test(head)) playSfx('gate');
+  if (/你处决了|特殊处决：/.test(head)) {
+    playSfx('execute');
+    window.setTimeout(() => playSfx('wipe'), 260);
+  }
+  else if (/砸毁|断电|控制箱|电闸/.test(head)) {
+    playSfx('breaker');
+    window.setTimeout(() => playSfx('spark'), 150);
+  }
+  else if (/成功逃离|已经不在房子里了/.test(head)) playSfx('flee');
+  else if (/发电机重新亮了起来|用钥匙捅开|联系上了外面|修发电机/.test(head)) playSfx('objective');
+  else if (/地图出现两个逃生点|第四阶段完成/.test(head)) playSfx('gate');
   else if (/幸存者团队完成第/.test(head)) playSfx('stage');
   else if (/红色人影|显形|监视值满了/.test(head)) playSfxRepeat('heartbeat', 3);
   else if (/恶魔附身：/.test(head)) playSfx('possess');
-  else if (/停止了呼吸|处决了/.test(head)) playSfx('kill');
+  else if (/打倒在地上|受到 \d+ 点伤害/.test(head)) { playSfx('attack'); playVoice(head, 'Hit'); }
+  else if (/受伤了（|在流血/.test(head)) playVoice(head, 'Hurt');
+  else if (/喊了一声|警觉升到|尖叫/.test(head)) playVoice(head, 'Scream');
+  else if (/猛一回头|忽然抬头|察觉到异常|发抖/.test(head)) playVoice(head, 'Startle');
+  else if (/停止了呼吸/.test(head)) playSfx('kill');
   else if (/致盲|击晕|手电筒|逼退/.test(head)) playSfx('stun');
   else if (/乌鸦|动静/.test(head)) playSfx('crow');
   else if (/翻出了|拾起|拿到了武器/.test(head)) playSfx('pickup');
+  else if (/发现并破坏了|破坏了图腾/.test(head)) playSfx('smash');
   else if (/发电机/.test(head)) playSfx('generator');
 }
 

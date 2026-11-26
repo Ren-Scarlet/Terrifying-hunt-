@@ -24,26 +24,32 @@
  *   killerPick.ogg 选择角色框
  *   enterMap.ogg  进入地图（准备完成）时播放，不是地图场景音乐
  *
- * ── 第二批：文件已入库、key 已定义，触发点待接 ──
+ * ── 第二批：触发点已接好 ──
  *   flee.ogg      人类逃走了（游戏失败分支）
  *   objective.ogg 完成一项任务条件，或一些事件
  *   breaker.ogg   破坏电闸声音
  *   voiceFHurt / voiceFHit / voiceFScream / voiceFStartle   女幸存者：受伤 / 受击 / 尖叫 / 受惊
  *   voiceMHurt / voiceMHit / voiceMScream / voiceMStartle   男幸存者：受伤 / 受击 / 尖叫 / 受惊
  *
- * 仍缺文件的槽位（click / step / attack / hit / down / wipe / stun / generator /
- * endturn / bgm）保持静默跳过：error 后加入 missing 集合不再重试，不会打断游戏，
- * 也不会弹错。浏览器要求「先有用户交互」才能出声，第一次点击会调 unlockAudio()
- * 把当前音乐真正响起来。
+ * ── 第三批：本次新增素材 ──
+ *   execute.ogg   处决声音（处决后延迟接擦刀）
+ *   wipe.ogg      擦刀音效
+ *   attack.ogg    重攻击（伤害高的音效）
+ *   spark.ogg     电流火花声（破坏电闸后接上）
+ *   smash.ogg     破坏声音（通用破坏）
+ *
+ * 仍缺文件的槽位（click / step / hit / down / stun / generator / endturn / bgm）
+ * 保持静默跳过：error 后加入 missing 集合不再重试，不会打断游戏，也不会弹错。
+ * 浏览器要求「先有用户交互」才能出声，第一次点击会调 unlockAudio() 把当前音乐真正响起来。
  */
 const SFX_FILES = {
   click: 'click.mp3',
   step: 'step.mp3',
-  attack: 'attack.mp3',
+  attack: 'attack.ogg',
   hit: 'hit.mp3',
   down: 'down.mp3',
   kill: 'kill.ogg',
-  wipe: 'wipe.mp3',
+  wipe: 'wipe.ogg',
   sabotage: 'sabotage.wav',
   stun: 'stun.mp3',
   pickup: 'pickup.ogg',
@@ -62,7 +68,7 @@ const SFX_FILES = {
   menuButton: 'menuButton.ogg',
   killerPick: 'killerPick.ogg',
   enterMap: 'enterMap.ogg',
-  // 第二批：文件已入库，触发点待接
+  // 第二批：触发点已接好
   flee: 'flee.ogg',
   objective: 'objective.ogg',
   breaker: 'breaker.ogg',
@@ -74,6 +80,10 @@ const SFX_FILES = {
   voiceMHit: 'voiceMHit.ogg',
   voiceMScream: 'voiceMScream.ogg',
   voiceMStartle: 'voiceMStartle.ogg',
+  // 第三批：本次新增素材
+  execute: 'execute.ogg',
+  spark: 'spark.ogg',
+  smash: 'smash.ogg',
 } as const;
 
 export type SfxName = keyof typeof SFX_FILES;
@@ -106,6 +116,9 @@ const VOLUME: Partial<Record<SfxName, number>> = {
   flee: 0.75,
   objective: 0.6,
   breaker: 0.65,
+  execute: 0.85,
+  spark: 0.6,
+  smash: 0.7,
 };
 
 /* ---------- 背景音乐：菜单一首、对局一首，按界面自动切换 ---------- */
