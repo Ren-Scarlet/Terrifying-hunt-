@@ -214,22 +214,7 @@ function farthestRoomPair(): RoomId[] {
   return pairs.length ? randomOf(pairs) : [ENTRY_ROOM, EXIT_ROOM];
 }
 
-function completeTeamStage(state: GameState): void {
-  state.teamStage = Math.min(TEAM_STAGE_COUNT, state.teamStage + 1);
-  log(state, `幸存者团队完成第 ${state.teamStage}/${TEAM_STAGE_COUNT} 阶段：${state.teamGoalLabel}。`);
-  if (state.teamStage !== TEAM_STAGE_COUNT) return;
-  state.teamProgress = TEAM_GOAL_MAX;
-  state.escapeRooms = farthestRoomPair();
-  const names = state.escapeRooms.map(roomName).join('、');
-  for (const person of state.people) {
-    if (person.role === 'police' || person.hp <= 0) continue;
-    person.goal = 'exit'; person.intent = 'escape'; person.alert = 100;
-    person.escapeProgress = 0; person.activity = '正在赶往逃生点';
-  }
-  log(state, `第四阶段完成！地图出现两个逃生点：${names}。所有幸存者开始撤离！`);
-}
-
-/** 团队进度跨过 25% 里程碑时完成阶段；已完成阶段不会倒退。 */
+/** 旧团队进度系统已废弃；NPC 不再通过设施劳动推进集体逃生。 */
 function addTeamProgress(state: GameState, amount: number): void {
   // 旧团队进度系统已废弃；保留空函数以兼容尚未改版的卡牌脚本。
   void state; void amount;
@@ -1521,6 +1506,11 @@ function actByArchetype(state: GameState, person: Person): void {
     person.activity = '房门被封锁，无法离开';
     return;
   }
+  if (person.alert >= 85 && !state.phoneCut && PHONE_ROOMS.includes(person.room) && person.hp > 0) {
+    tryCall(state, person);
+    log(state, `${person.name}因高度警戒，正在尝试报警！`);
+    return;
+  }
   if (state.escapeRooms.length && person.alert >= 75 && person.hp > 0) {
     const exit = nearestOf(person.room, state.escapeRooms);
     if (exit === person.room) { person.intent = 'escape'; person.activity = '已抵达逃生点'; return; }
@@ -2185,8 +2175,6 @@ function escapePhase(state: GameState): void {
 /* ==================================================================== */
 
 function policeNextStep(state: GameState, police: Person): RoomId {
-  // 警察只追「新鲜的现场」：两回合内没有新的报警，他就开始挨屋搜查，
-  // 而不是永远贴着玩家跑。这样玩家可以甩掉他，而不是被一路加暴露度到逮捕。
   const fresh = state.heatTurn >= state.turn - 1;
   const destination = state.emergencyActive ? state.playerRoom : state.decoyRoom ?? (fresh ? state.lastCrimeRoom ?? state.playerRoom : null);
   if (!destination) {
@@ -2194,8 +2182,7 @@ function policeNextStep(state: GameState, police: Person): RoomId {
     return options.length ? randomOf(options) : police.room;
   }
   if (police.room === destination) return police.room;
-  const step = nextStepToward(state, police.room, destination, [], true);
-  return step ?? police.room;
+  return nextStepToward(state, police.room, destination, [], true) ?? police.room;
 }
 
 function policePhase(state: GameState): void {
@@ -2788,7 +2775,7 @@ export function attack(state: GameState, targetId?: string): boolean {
       const totemRoom = randomOf(totemCandidates);
       if (totemRoom && !state.totems.includes(totemRoom)) state.totems.push(totemRoom);
       log(state, `厄咒：猎杀戾气触发，${roomName(totemRoom ?? state.playerRoom)}生成了一个图腾。幸存者可能会将其破坏。`);
-      if (state.hexNoedActive && state.teamStage >= 4 && !state.hexNoedBonusGranted) {
+      if (state.hexNoedActive && state.emergencyActive && !state.hexNoedBonusGranted) {
         state.energy += 2;
         state.hexNoedBonusGranted = true;
         log(state, '难逃一死生效：图腾仍然存留，你获得 2 点额外行动点。');
