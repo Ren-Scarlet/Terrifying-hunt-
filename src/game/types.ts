@@ -170,8 +170,10 @@ export interface Person {
   bloodSacrifice: boolean;
   /** 行为类型 */
   archetype: Archetype;
-  /** 警觉度 0–100：越高越可能逃离玩家所在房间 */
+  /** 警戒值 0–100：越高越容易报警、求助或寻找逃生点。 */
   alert: number;
+  /** 恐惧值 0–100：满值后崩溃；此时再次受到攻击会直接倒地。 */
+  fear: number;
   /** 已确认危险的持久认知阶段：0 未发觉、1 怀疑、2 恐慌、3 警觉；不会因即时 alert 衰减而忘记已知信息 */
   awareness: number;
   /** 当前头顶显示的短暂对白 */
@@ -257,7 +259,7 @@ export interface Disturbance {
 
 export type MissionKind = 'assassinate' | 'bodyCount' | 'escape';
 
-export type MissionTaskKind = 'kill_count' | 'marked_kill' | 'execute' | 'special_execute' | 'no_alarm' | 'break_circuit';
+export type MissionTaskKind = 'kill_count' | 'kill_count_before_turn' | 'marked_kill' | 'execute' | 'special_execute' | 'no_alarm' | 'break_circuit';
 
 export interface MissionTask {
   id: string;
@@ -266,6 +268,8 @@ export interface MissionTask {
   target: number;
   /** optional 仅提供额外奖励，不阻止核心任务通关。 */
   optional?: boolean;
+  /** 限时击杀目标的最晚回合；仅 kill_count_before_turn 使用。 */
+  deadlineTurn?: number;
 }
 
 export interface Mission {
@@ -388,6 +392,8 @@ export interface GameState {
   drawPile: CardInstance[];
   discardPile: CardInstance[];
   mission: Mission;
+  /** 已在期限内完成的任务 ID，避免后续回合让限时目标倒退。 */
+  completedMissionTasks: string[];
   log: string[];
   kills: number;
   killsThisTurn: number;
@@ -398,7 +404,7 @@ export interface GameState {
   executionMethodsUsed: string[];
   npcAlarmed: boolean;
   carryPersonId: string | null;
-  /** 当前搬运已走过的房间数；普通杀手最多两格。 */
+  /** 当前搬运已走过的房间数；前 3 格安全，继续搬运需要 D6 检定。 */
   carryDistance: number;
   markedKilled: number;
   decoyRoom: RoomId | null;
@@ -503,8 +509,10 @@ export interface GameState {
   resultReason: string;
 
   /* ---------- 战争迷雾与暴露度 ---------- */
-  /** 暴露度 0–100：团队警戒与通缉/逮捕合并后的唯一失败压力条，满值被捕 / 被驱散 */
+  /** 全局警报值 0–100：达到阈值开放逃生点，满值进入最终危机阶段。 */
   alarm: number;
+  /** 警报值满后进入最终阶段；普通杀手召来警察，灵异杀手迫使所有人逃亡。 */
+  emergencyActive: boolean;
   /** 已探索的房间：进过、或侦查过 */
   explored: RoomId[];
   /** 临时视野：房间 -> 还看得见几回合 */
