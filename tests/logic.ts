@@ -400,7 +400,8 @@ function caseMyersStalkingAndFearRadius(): void {
   const trapper = createGame(STARTING_DECK, undefined, '设陷者');
   const trapRoom = ROOMS.find((room) =>
     room.id !== trapper.playerRoom && room.id !== 'garden' && room.id !== 'garage' &&
-    !trapper.objectiveRooms.includes(room.id) && room.neighbors.length >= 2,
+    !trapper.objectiveRooms.includes(room.id) && room.neighbors.length >= 2 &&
+    !trapper.people.some((person) => person.role !== 'police' && person.hp > 0 && person.room === room.id),
   )?.id ?? openNeighbor(trapper.playerRoom);
   trapper.playerRoom = trapRoom;
   trapper.energy = 4;
@@ -412,6 +413,7 @@ function caseMyersStalkingAndFearRadius(): void {
   const trappedPerson = player(trapper);
   trappedPerson.room = trapRoom;
   trappedPerson.hp = 4;
+  trappedPerson.alert = 0;
   triggerBearTrapForPerson(trapper, trappedPerson);
   check('设陷者：捕兽夹触发后造成伤害、限制移动并记录猎杀风格',
     trappedPerson.hp === 3 && trappedPerson.blockedTurns === 1 &&
