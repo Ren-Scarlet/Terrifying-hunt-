@@ -1905,7 +1905,7 @@ function npcTurn(state: GameState): void {
       person.alert = Math.max(0, person.alert - 30);
       person.intent = 'wary';
       person.activity = '跑不动了，蹲在原地喘气';
-      if (CABINET_ROOMS.includes(person.room) && random() < 0.55) {
+      if (cabinetRoomsFor(state).includes(person.room) && random() < 0.55) {
         person.hidden = true;
         person.activity = '钻进柜子，屏住呼吸';
         log(state, `${person.name} 躲进了${roomName(person.room)}的柜子——地板上的痕迹到这里就断了。`);
@@ -1969,7 +1969,7 @@ function npcTurn(state: GameState): void {
                 : person.goal === 'weapon' || person.goal === 'gather'
                   ? WEAPON_ROOMS
                   : person.goal === 'hide'
-                    ? CABINET_ROOMS
+                    ? cabinetRoomsFor(state)
                     : person.goal === 'help'
                       ? [nearestOf(person.room, cabinetRoomsFor(state))]
                       : person.goal === 'exit' || person.goal === 'panic'
@@ -2325,7 +2325,7 @@ function useSurvivorItem(state: GameState, person: Person): boolean {
       if (person.alert < 18) return false;
       consumeItem(state, person);
       person.alert = Math.max(0, person.alert - 35);
-      if (CABINET_ROOMS.includes(person.room) && random() < 0.6) person.hidden = true;
+      if (cabinetRoomsFor(state).includes(person.room) && random() < 0.6) person.hidden = true;
       state.trails = state.trails.filter((t) => t.room !== person.room);
       person.activity = '丢出烟雾弹，从视线里消失了';
       log(state, `${person.name} 丢了烟雾弹，脚印和视线一起断在这里。`);
@@ -3245,7 +3245,7 @@ export function throwHuntressHatchet(state: GameState, targetId: string): boolea
 }
 
 export function refillHuntressHatchets(state: GameState): boolean {
-  if (state.killer !== '女猎手' || !CABINET_ROOMS.includes(state.playerRoom) || state.hatchets >= 3 || state.energy < 1) {
+  if (state.killer !== '女猎手' || !cabinetRoomsFor(state).includes(state.playerRoom) || state.hatchets >= 3 || state.energy < 1) {
     log(state, '只有在柜子房间内、行动点充足且飞斧未满时才能补充。');
     return false;
   }
