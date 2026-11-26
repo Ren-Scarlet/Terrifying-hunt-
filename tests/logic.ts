@@ -1578,10 +1578,11 @@ function caseContractsPowerAndCarry(): void {
     for (const next of ROOM_MAP[current.room].neighbors) if (!seen.has(next)) { seen.add(next); frontier.push({ room: next, path: [...current.path, next] }); }
   }
   carry.freeMove = true; for (const room of route) movePlayer(carry, room);
-  check('AB 搬运超过三间房后仍无法自行挣脱或逃跑',
-    route.length === 3 && carry.carryPersonId === victim.id && victim.hp === 0 &&
-    victim.room === route[route.length - 1],
-    'route=' + route.length + ' carried=' + (carry.carryPersonId === victim.id) + ' hp=' + victim.hp);
+  const carryBlocked = route.length === 3 && carry.playerRoom === route[1] && carry.carryDistance === 2;
+  check('AB 搬运两格后必须就近处置或放下目标',
+    carryBlocked && carry.carryPersonId === victim.id && victim.hp === 0 &&
+    victim.room === route[1],
+    'route=' + route.length + ' distance=' + carry.carryDistance + ' carried=' + (carry.carryPersonId === victim.id));
   const special = newGame();
   special.people = special.people.filter((p) => p.role !== 'police').slice(0, 1);
   const target = special.people[0]; target.room = 'kitchen'; target.hp = 0; target.downedTurns = 0;
