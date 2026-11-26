@@ -8,6 +8,7 @@ import { KILLERS, type KillerProfile } from '../../game/killers';
 import { roomName } from '../../game/missions';
 import { getPersonProfile, type PersonProfile } from '../../game/people';
 import { SURVIVOR_MAP } from '../../game/survivors';
+import { awarenessLabel } from '../../game/npc/awareness';
 import type { GameState, Person, SaveData } from '../../game/types';
 
 export const escape = (s: string) =>
@@ -168,7 +169,7 @@ export function personChip(person: Person, attackable = false, carryable = false
         ? ' · 点击对他挥刀'
         : '';
   return `<button type="button" class="person-chip ${cls} ${person.bloodSacrifice ? 'blood-sacrifice' : ''} ${health === 'downed' ? 'is-downed' : ''} ${attackable ? 'can-hit' : ''}" data-action="${action}" data-person-id="${person.id}"${attackable ? ' data-attack="1"' : ''}
-    title="${escape(person.name)} · ${HEALTH_LABEL[health]} · 警觉 ${person.alert}/100 · ${escape(ARCH_LABEL[person.archetype])} · ${escape(GOAL_LABEL[person.goal])} · 正在${escape(label)}${note}">
+    title="${escape(person.name)} · ${HEALTH_LABEL[health]} · ${awarenessLabel(person.alert)} ${person.alert}/100 · ${escape(ARCH_LABEL[person.archetype])} · ${escape(GOAL_LABEL[person.goal])} · 正在${escape(label)}${note}">
     ${img ? `<img src="${img}" alt="" onerror="this.style.display='none'">` : ''}
     ${dialogue}<span>${escape(person.name)}</span>${contractTargetMark}${sacrificeMark}${intentDot(person)}${stateMark}${alertMark}${watchMark}${person.item ? itemBadge(person.item, person.itemUses) : ''}
   </button>`;
