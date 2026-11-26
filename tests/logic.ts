@@ -117,10 +117,12 @@ function caseGeneratorBreakerNetwork(): void {
   if (source) {
     source.jammedTurns = 1;
     check('发电机：停机时其供电区域自动熄灭', !isRoomLit(s, room));
+    circuit.enabled = false;
     const blockReason = breakerBlockReason(s, circuit.id);
     check('发电机：供电源停机时禁止合闸', !!blockReason && blockReason.includes('发电机'));
     source.jammedTurns = 0;
-    check('发电机：恢复后电路重新获得供电', isRoomLit(s, room));
+    const restored = togglePowerCircuit(s, circuit.id);
+    check('发电机：恢复后允许合闸并重新供电', restored && isRoomLit(s, room));
   }
   circuit.broken = true;
   check('电闸：控制箱损坏后所属区域保持断电', !isRoomLit(s, room));
