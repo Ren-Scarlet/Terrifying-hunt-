@@ -69,7 +69,7 @@ import {
   nextStepToward,
   updateNpcDialogue,
 } from '../src/game/engine';
-import { CABINET_ROOMS, OBSTACLE_ROOMS, ROOM_MAP, ROOMS, buildLayout, doorMarkerPosition, layoutAspect } from '../src/game/rooms';
+import { CABINET_ROOMS, OBSTACLE_ROOMS, PHONE_ROOMS, ROOM_MAP, ROOMS, buildLayout, doorMarkerPosition, layoutAspect } from '../src/game/rooms';
 import { cardImage } from '../src/game/assetMap';
 import { readdirSync } from 'node:fs';
 import { personChip, personDetailHtml } from '../src/ui/render/shared';
@@ -1187,7 +1187,7 @@ function caseWitnessFearAndUnifiedSabotage(): void {
     `alert=${inside.alert} fear=${inside.fear}`);
 
   const phone = newGame();
-  phone.playerRoom = 'livingroom';
+  phone.playerRoom = PHONE_ROOMS[0];
   phone.phoneCut = false;
   phone.energy = 4;
   const phoneBroken = sabotageSiteItem(phone);
