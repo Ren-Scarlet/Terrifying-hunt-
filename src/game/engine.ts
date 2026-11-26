@@ -819,7 +819,7 @@ function killPerson(state: GameState, person: Person): void {
 /** 受到伤害：只能推进一档，倒地的人再挨一下才会死 */
 function damagePerson(state: GameState, person: Person, amount: number, suppressFlee = false): void {
   if (!state.people.some((p) => p.id === person.id)) return;
-  const dmg = Math.max(0, amount + state.bonusDamage);
+  let dmg = Math.max(0, amount + state.bonusDamage);
   state.bonusDamage = 0;
   if (dmg <= 0) return;
   // 见血就清醒：杀戮值一脚踩空
@@ -1111,7 +1111,7 @@ function movePersonTo(state: GameState, person: Person, room: RoomId, clearAlert
  * （逃跑中 / 目的就是出口 / 警觉够高），就算他要走。
  */
 function wantsToLeave(state: GameState, person: Person): boolean {
-  if (state.teamStage < TEAM_STAGE_COUNT || !state.escapeRooms.includes(person.room)) return false;
+  if (!state.escapeRooms.length || !state.escapeRooms.includes(person.room)) return false;
   return (
     person.intent === 'escape' ||
     person.intent === 'flee' ||
@@ -1521,6 +1521,12 @@ function actByArchetype(state: GameState, person: Person): void {
     person.activity = '房门被封锁，无法离开';
     return;
   }
+  if (state.escapeRooms.length && person.alert >= 75 && person.hp > 0) {
+    const exit = nearestOf(person.room, state.escapeRooms);
+    if (exit === person.room) { person.intent = 'escape'; person.activity = '已抵达逃生点'; return; }
+    const step = nextStepToward(state, person.room, exit, [state.playerRoom]);
+    if (step) { person.room = step; person.intent = 'escape'; person.goal = 'exit'; person.activity = `正前往逃生点：${roomName(exit)}`; return; }
+  }
   switch (person.archetype) {
     case 'kiter': {
       // 拉扯型：不硬拼，绕远路、抹脚印、必要时丢烟雾，专门把追逐拖长
@@ -1823,7 +1829,7 @@ function npcTurn(state: GameState): void {
       person.intent = 'stunned';
       continue;
     }
-    if (person.hidden && state.teamStage < TEAM_STAGE_COUNT) {
+    if (person.hidden && !state.emergencyActive) {
       // 藏起来的人只在玩家进房间且警觉拉满时才会冲出去
       if (person.room === state.playerRoom && person.alert >= 85) {
         person.hidden = false;
@@ -1837,7 +1843,7 @@ function npcTurn(state: GameState): void {
       }
       continue;
     }
-    if (person.hidden && state.teamStage >= TEAM_STAGE_COUNT) person.hidden = false;
+    if (person.hidden && state.emergencyActive) person.hidden = false;
 
     // 发现同屋或相邻房间的倒地/重伤者属于明确异常，会立刻触发救援意识。
     const nearbyVictim = npcs(state).some(
@@ -1874,7 +1880,7 @@ function npcTurn(state: GameState): void {
     }
 
     // 第四阶段开启后，所有幸存者都以两个动态逃生点为目标，不再执行原本的个人工作。
-    if (state.teamStage >= TEAM_STAGE_COUNT && state.escapeRooms.length === 2) {
+    if (state.emergencyActive && state.escapeRooms.length === 2) {
       person.goal = 'exit'; person.intent = 'escape'; person.alert = 100;
       if (state.escapeRooms.includes(person.room)) {
         person.activity = person.escapeProgress > 0 ? '正在翻越逃生点' : '已抵达逃生点';
@@ -2178,13 +2184,11 @@ function escapePhase(state: GameState): void {
 /*  警察                                                                */
 /* ==================================================================== */
 
-function policeNextStep(state: GameState): RoomId {
-  const police = state.people.find((p) => p.role === 'police');
-  if (!police) return POLICE_START;
+function policeNextStep(state: GameState, police: Person): RoomId {
   // 警察只追「新鲜的现场」：两回合内没有新的报警，他就开始挨屋搜查，
   // 而不是永远贴着玩家跑。这样玩家可以甩掉他，而不是被一路加暴露度到逮捕。
   const fresh = state.heatTurn >= state.turn - 1;
-  const destination = state.decoyRoom ?? (fresh ? state.lastCrimeRoom ?? state.playerRoom : null);
+  const destination = state.emergencyActive ? state.playerRoom : state.decoyRoom ?? (fresh ? state.lastCrimeRoom ?? state.playerRoom : null);
   if (!destination) {
     const options = ROOM_MAP[police.room].neighbors.filter((r) => !isLocked(state, r));
     return options.length ? randomOf(options) : police.room;
@@ -2195,34 +2199,39 @@ function policeNextStep(state: GameState): RoomId {
 }
 
 function policePhase(state: GameState): void {
-  const police = state.people.find((p) => p.role === 'police');
-  if (!police) return;
-
-  const next = policeNextStep(state);
-  if (state.wiretap) log(state, `窃听：警察正在前往${roomName(next)}。`);
-  if (state.policeBlocked) {
-    state.policeBlocked = false;
-    log(state, '后院大门被锁，警察本回合无法移动。');
-  } else if (next !== police.room) {
-    police.room = next;
-    log(state, `警察移动到${roomName(next)}。`);
+  const officers = state.people.filter((p) => p.role === 'police');
+  if (!officers.length) return;
+  let reachedPlayer = false;
+  for (const police of officers) {
+    const next = policeNextStep(state, police);
+    if (state.wiretap) log(state, `窃听：警察正在前往${roomName(next)}。`);
+    if (state.policeBlocked) {
+      state.policeBlocked = false;
+      log(state, '后院大门被锁，警察本回合无法移动。');
+    } else if (next !== police.room) {
+      police.room = next;
+      log(state, `${police.name}移动到${roomName(next)}。`);
+    }
+    if (police.room === state.playerRoom) reachedPlayer = true;
   }
-
-  if (police.room !== state.playerRoom) state.policeLock = 0;
-
-  if (police.room === state.playerRoom) {
-    // 警戒/逮捕合并：警察不再单独判负，而是持续把「暴露度」往上顶。
-    // 盯得越久涨得越快，满 100 才由 addAlarm 统一收束（被捕 / 被驱散）。
-    state.policeLock += 1;
-    const pressure = state.policeLock >= 2 ? 18 : 10;
-    addAlarm(state, pressure);
-    log(
-      state,
-      state.policeLock >= 2
-        ? `警察咬住你不放，你的存在彻底暴露了（暴露度 ${state.alarm}/${ALARM_MAX}）。`
-        : `警察按住你的肩膀盯了两秒——再不甩开他，暴露度会一路涨满（${state.alarm}/${ALARM_MAX}）。`,
-    );
+  if (!reachedPlayer) { state.policeLock = 0; return; }
+  state.policeLock += 1;
+  if (state.emergencyActive) {
+    state.stunTurns = Math.max(state.stunTurns, 1);
+    log(state, state.policeLock >= 3
+      ? '警察从多个方向包围了你，枪托与电击器接连落下——你已无力继续抵抗！'
+      : '警察冲入你的房间并向你发动攻击！你必须甩开包围，不能再停留。');
+    if (state.policeLock >= 3) {
+      state.resultReason = '警察增援完成包围，你被制服。';
+      finish(state, 'caught');
+    }
+    return;
   }
+  const pressure = state.policeLock >= 2 ? 18 : 10;
+  addAlarm(state, pressure);
+  log(state, state.policeLock >= 2
+    ? `警察咬住你不放，警报值升至 ${state.alarm}/${ALARM_MAX}。`
+    : `警察短暂拦住了你，警报值升至 ${state.alarm}/${ALARM_MAX}。`);
 }
 
 function witnessPhase(state: GameState): void {
