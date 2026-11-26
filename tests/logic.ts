@@ -1223,7 +1223,7 @@ function caseWitnessFearAndUnifiedSabotage(): void {
   const pickedUp = carryPerson(carryWitnessState, carriedVictim.id);
   const pickupSeen = pickedUp && carryWitness.awareness >= 2 &&
     carryWitness.alert >= 78 && carryWitness.intent !== 'idle' &&
-    carryWitnessState.log.some((line) => line.includes('目击倒地者被强行带走'));
+    carryWitnessState.log.some((line) => line.includes('目睹倒地者被强行带走'));
   carryWitnessState.freeMove = true;
   const carriedIntoRoom = movePlayer(carryWitnessState, carryDestination);
   check('目击搬运：抱起倒地者时，同屋 NPC 会立即识别并行动',
