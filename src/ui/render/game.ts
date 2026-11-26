@@ -89,7 +89,11 @@ function roomFeatures(state: GameState, roomId: RoomId): string {
       );
     });
   const lighting = state.powerCircuits.find((c) => c.affectedRooms.includes(roomId));
-  if (lighting) parts.push(`<span class="room-feature light ${lighting.broken ? 'off' : 'on'}" title="${escape(lighting.name)}：${lighting.broken ? '断电' : '供电中'}">${lighting.broken ? '☾' : '💡'}</span>`);
+  if (lighting) {
+    const flickering = !lighting.broken && (lighting.flickerTurns ?? 0) > 0;
+    const lightStatus = lighting.broken ? '断电' : flickering ? '临时闪断' : '供电中';
+    parts.push(`<span class="room-feature light ${lighting.broken ? 'off' : flickering ? 'flickering' : 'on'}" title="${escape(lighting.name)}：${lightStatus}">${lighting.broken ? '☾' : flickering ? '⚡' : '💡'}</span>`);
+  }
   const circuitAt = state.powerCircuits.find((c) => c.breakerRoom === roomId);
   if (circuitAt) parts.push(`<span class="room-feature breaker ${circuitAt.broken ? 'broken' : ''}" title="${escape(circuitAt.name)}：${circuitAt.broken ? '已破坏' : '可破坏；影响 ' + circuitAt.affectedRooms.map(roomName).join('、')}">⚡</span>`);
   if (roomId === 'kitchen') parts.push('<span class="room-feature execution-site" title="特殊处决地点：冰箱 / 微波炉">☠</span>');
@@ -125,7 +129,7 @@ function doorMarkersHtml(state: GameState): string {
 
 /** 把最近发生的关键行动投射到地图上；完整记录仍保留在情报抽屉。 */
 function mapEventFeedHtml(state: GameState): string {
-  const important = /没能再起来|停止了呼吸|处决了|处决成功|砸毁了|砸烂了|你砸了|立即断电|电话线被剪断|封锁了|陷阱触发|报警成功|逃出了房子|翻出了后院|被警察逮捕/;
+  const important = /没能再起来|停止了呼吸|处决了|处决成功|砸毁了|砸烂了|你砸了|立即断电|电话线被剪断|封锁了|陷阱触发|报警成功|逃出了房子|翻出了后院|被警察逮捕|【环境事件】|雷雨|电话突然响起|玻璃碎裂声|灯光突然闪烁/;
   const recent = state.log.filter((line) => {
     const match = line.match(/^\[第 (\d+) 回合\]/);
     const turn = match ? Number(match[1]) : state.turn;
@@ -475,6 +479,8 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
   if (state.phoneCut) preparations.push('通讯已切断');
   const darkCircuits = state.powerCircuits.filter((circuit) => circuit.broken).length;
   if (darkCircuits) preparations.push(`照明区域已切断 ${darkCircuits} 处`);
+  const flickeringCircuits = state.powerCircuits.filter((circuit) => !circuit.broken && (circuit.flickerTurns ?? 0) > 0).length;
+  if (flickeringCircuits) preparations.push(`照明临时闪断 ${flickeringCircuits} 处`);
   if (state.barricades.length || state.exitBlockedTurns > 0) preparations.push('退路受到控制');
   if (state.bonusDamage > 0) preparations.push(`下一刀伤害 +${state.bonusDamage}`);
   if (state.ambushTurn === state.turn) preparations.push('伏击状态就绪');
