@@ -224,10 +224,11 @@ function sfxFromLogs(): void {
   const head = game.log[0] ?? '';
   if (head === lastLogHead) return;
   lastLogHead = head;
-  if (/你处决了|特殊处决：/.test(head)) {
+  if (/你处决了|特殊处决[：【]/.test(head)) {
     playSfx('execute');
     window.setTimeout(() => playSfx('wipe'), 260);
   }
+  else if (/你杀死了/.test(head)) playSfx('kill');
   else if (/砸毁|断电|控制箱|电闸/.test(head)) {
     playSfx('breaker');
     window.setTimeout(() => playSfx('spark'), 150);
@@ -238,7 +239,7 @@ function sfxFromLogs(): void {
   else if (/幸存者团队完成第/.test(head)) playSfx('stage');
   else if (/红色人影|显形|监视值满了/.test(head)) playSfxRepeat('heartbeat', 3);
   else if (/恶魔附身：/.test(head)) playSfx('possess');
-  else if (/打倒在地上|受到 \d+ 点伤害/.test(head)) { playSfx('attack'); playVoice(head, 'Hit'); }
+  else if (/打倒在地上|受到 \d+ 点伤害/.test(head)) playVoice(head, 'Hit');
   else if (/受伤了（|在流血/.test(head)) playVoice(head, 'Hurt');
   else if (/喊了一声|警觉升到|尖叫/.test(head)) playVoice(head, 'Scream');
   else if (/猛一回头|忽然抬头|察觉到异常|发抖/.test(head)) playVoice(head, 'Startle');
@@ -572,8 +573,12 @@ app.addEventListener('click', (event) => {
   if (action === 'attack-target') {
     if (!game || screen !== 'game') return;
     const personId = target.dataset.personId;
-    if (personId) attack(game, personId);
-    playSfx('attack');
+    if (personId) {
+      const killsBefore = game.kills;
+      attack(game, personId);
+      playSfx('attack');
+      if (game.kills > killsBefore) playSfx('kill');
+    }
     afterAction();
     return;
   }
@@ -582,7 +587,11 @@ app.addEventListener('click', (event) => {
     if (!game || screen !== 'game') return;
     const personId = action === 'execute-target' ? target.dataset.personId : undefined;
     const executed = executeDownedPerson(game, personId);
-    if (executed) playSfx('kill');
+    if (executed) {
+      playSfx('execute');
+      window.setTimeout(() => playSfx('wipe'), 260);
+      lastLogHead = game.log[0] ?? '';
+    }
     afterAction();
     return;
   }
@@ -598,7 +607,11 @@ app.addEventListener('click', (event) => {
   if (action === 'execute-special') {
     if (!game || screen !== 'game') return;
     const method = target.dataset.method as ExecutionMethodId | undefined;
-    if (method && executeCarriedPerson(game, method)) playSfx('kill');
+    if (method && executeCarriedPerson(game, method)) {
+      playSfx('execute');
+      window.setTimeout(() => playSfx('wipe'), 260);
+      lastLogHead = game.log[0] ?? '';
+    }
     afterAction();
     return;
   }
