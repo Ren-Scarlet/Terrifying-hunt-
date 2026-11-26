@@ -1255,7 +1255,7 @@ function caseContractsPowerAndCarry(): void {
   check('AB 搬运达到三间房后挣脱并恢复受伤状态', route.length === 3 && carry.carryPersonId === null && victim.hp === 2, 'route=' + route.length + ' hp=' + victim.hp);
   const special = newGame();
   special.people = special.people.filter((p) => p.role !== 'police').slice(0, 1);
-  const target = special.people[0]; target.room = 'kitchen'; target.hp = 0; target.downedTurns = DOWNED_LOCK_TURNS;
+  const target = special.people[0]; target.room = 'kitchen'; target.hp = 0; target.downedTurns = 0;
   special.playerRoom = 'kitchen'; special.carryPersonId = target.id; special.carryDistance = 1; special.energy = BASE_AP;
   const executed = executeCarriedPerson(special, 'fridge');
   check('AB 厨房冰箱特殊处决会击杀目标并计入处决数', executed && special.executions === 1 && !special.people.some((p) => p.id === target.id));
