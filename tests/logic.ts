@@ -985,9 +985,14 @@ function casePanicRun(): void {
 function caseWorldTicks(): void {
   const s = newGame();
   const v = player(s);
-  const hop1 = openNeighbor(s.playerRoom);
-  const hop2 = ROOM_MAP[hop1].neighbors.find((r) => r !== s.playerRoom);
-  if (!hop2) {
+  const hop1 = ROOM_MAP[s.playerRoom].neighbors.find((candidate) =>
+    !OBSTACLE_ROOMS.includes(candidate) &&
+    ROOM_MAP[candidate].neighbors.some((next) => next !== s.playerRoom && !OBSTACLE_ROOMS.includes(next)),
+  );
+  const hop2 = hop1
+    ? ROOM_MAP[hop1].neighbors.find((r) => r !== s.playerRoom && !OBSTACLE_ROOMS.includes(r))
+    : undefined;
+  if (!hop1 || !hop2) {
     check('J 玩家走一步，逃跑的人也跟着动', true, '本局入口没有两跳走廊，跳过此布局');
     return;
   }
