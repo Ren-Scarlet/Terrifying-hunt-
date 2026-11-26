@@ -797,8 +797,8 @@ function killPerson(state: GameState, person: Person): void {
     const discoveryRadius = state.mapId === 'lampkin' ? 2 : 1;
     if (roomDistance(other.room, person.room) <= discoveryRadius) {
       const nearby = other.room === person.room;
-      other.fear = clamp(other.fear + (nearby ? 32 : 18), 0, 100);
-      other.alert = clamp(other.alert + (nearby ? 18 : 10), 0, 100);
+      other.fear = clamp(other.fear + (nearby ? 38 : 18), 0, 100);
+      other.alert = clamp(other.alert + (nearby ? 20 : 10), 0, 100);
       stirred += 1;
     }
   });
@@ -855,11 +855,20 @@ function damagePerson(state: GameState, person: Person, amount: number, suppress
   person.goal = 'exit';
   if (before > SURVIVOR_INJURED_HP && person.hp <= SURVIVOR_INJURED_HP) log(state, `${person.name} 受伤了（${person.hp}/${SURVIVOR_MAX_HP}），丢下手里的东西就跑。`);
   else log(state, `${person.name} 受到 ${dmg} 点伤害（剩余 ${person.hp}/${SURVIVOR_MAX_HP}）。`);
-  peopleInRoom(state, state.playerRoom)
-    .filter((p) => p.id !== person.id && p.role !== 'police')
-    .forEach((p) => {
+  // 同屋目击者亲眼看到袭击：恐惧与警戒同时上升；隔壁只听见动静。
+  let witnesses = 0;
+  npcs(state).filter((p) => p.id !== person.id && p.hp > 0 && !p.hidden).forEach((p) => {
+    const distance = roomDistance(p.room, state.playerRoom);
+    if (distance === 0) {
+      p.fear = clamp(p.fear + 22, 0, 100);
       p.alert = clamp(p.alert + 18, 0, 100);
-    });
+      witnesses += 1;
+    } else if (distance === 1) {
+      p.fear = clamp(p.fear + 8, 0, 100);
+      p.alert = clamp(p.alert + 6, 0, 100);
+    }
+  });
+  if (witnesses) log(state, `有人亲眼目睹袭击，恐惧在房间里蔓延（${witnesses} 名目击者）。`);
   addAlarm(state, 3);
   if (suppressFlee) {
     person.blockedTurns = 1;
@@ -3263,35 +3272,53 @@ export function togglePowerCircuit(state: GameState, circuitId?: string): boolea
   return true;
 }
 
+/** 统一破坏入口：相邻门锁、电话线、无线电、电闸、发电机与道具箱。 */
+function sabotageTarget(state: GameState): { kind: 'door'; room: RoomId } | { kind: 'phone' | 'radio' } | { kind: 'facility' } | null {
+  const breaker = state.powerCircuits.some((c) => c.breakerRoom === state.playerRoom && !c.broken);
+  const item = state.siteItems.some((i) => i.room === state.playerRoom && !i.broken && (i.kind !== 'itemBox' || i.charges > 0));
+  if (breaker || item) return { kind: 'facility' };
+  if (PHONE_ROOMS.includes(state.playerRoom) && !state.phoneCut) return { kind: 'phone' };
+  if (RADIO_ROOMS.includes(state.playerRoom) && !state.sabotage.includes('radio')) return { kind: 'radio' };
+  const lockedNeighbor = ROOM_MAP[state.playerRoom].neighbors.find((room) => isLocked(state, room));
+  return lockedNeighbor ? { kind: 'door', room: lockedNeighbor } : null;
+}
+
 export function sabotageBlockReason(state: GameState): string | null {
   if (state.phase !== 'playing') return '这一局已经结束了。';
   if (state.energy < SABOTAGE_COST) return `行动点不足：破坏需要 ${SABOTAGE_COST} 点。`;
-  const breaker = state.powerCircuits.some((c) => c.breakerRoom === state.playerRoom && !c.broken);
-  const here = state.siteItems.filter(
-    (i) => i.room === state.playerRoom && !i.broken && (i.kind === 'itemBox' ? i.charges > 0 : true),
-  );
-  if (!here.length && !breaker) return '这间屋子没有还能破坏的设施。';
-  return null;
+  return sabotageTarget(state) ? null : '附近没有可破坏的门锁、通讯设施或现场设施。';
 }
 
-/**
- * 砸掉当前房间的道具箱 / 发电机。
- * 道具箱一毁，幸存者再也拿不到补给；发电机被砸会掉修复进度、停机两回合，
- * 已经通电的还会把团队进度拖回去。破坏本身会弄出动静、引来乌鸦——
- * 所以「什么时候砸」也是个抉择，不是白嫖。
- */
 export function sabotageSiteItem(state: GameState): boolean {
   const reason = sabotageBlockReason(state);
   if (reason) {
     log(state, reason);
     return false;
   }
-  const circuit = state.powerCircuits.find((c) => c.breakerRoom === state.playerRoom && !c.broken);
-  const item = state.siteItems.find(
-    (i) => i.room === state.playerRoom && !i.broken && (i.kind === 'itemBox' ? i.charges > 0 : true),
-  );
-  if (!circuit && !item) return false;
+  const target = sabotageTarget(state);
+  if (!target) return false;
   state.energy -= SABOTAGE_COST;
+  state.huntStats.environmentActions += 1;
+  if (target.kind === 'door') {
+    state.roomLocks[target.room] = 0;
+    log(state, `你用蛮力撞开通往${roomName(target.room)}的门锁！屋内的人被巨响惊动。`);
+    npcs(state).filter((p) => p.room === target.room && p.hp > 0).forEach((p) => {
+      p.alert = clamp(p.alert + 24, 0, 100);
+      p.fear = clamp(p.fear + 12, 0, 100);
+    });
+    addAlarm(state, 5);
+  } else if (target.kind === 'phone') {
+    state.phoneCut = true;
+    log(state, '你扯断了电话线，电话求救暂时中断。');
+    addAlarm(state, 2);
+  } else if (target.kind === 'radio') {
+    state.sabotage.push('radio');
+    log(state, '你砸毁了备用无线电，幸存者无法再通过它协调求救。');
+    addAlarm(state, 2);
+  } else {
+    const circuit = state.powerCircuits.find((c) => c.breakerRoom === state.playerRoom && !c.broken);
+    const item = state.siteItems.find((i) => i.room === state.playerRoom && !i.broken && (i.kind === 'itemBox' ? i.charges > 0 : true));
+    if (!circuit && !item) return false;
   state.huntStats.environmentActions += 1;
   if (state.hexRuinActive && !state.hexRuinUsed) {
     state.hexRuinUsed = true;
@@ -3299,15 +3326,15 @@ export function sabotageSiteItem(state: GameState): boolean {
     log(state, '粉碎希望触发：首次破坏使团队进度额外倒退 10。');
   }
 
-  if (circuit) {
+  if (target.kind === 'facility' && circuit) {
     circuit.broken = true;
     circuit.enabled = false;
     log(state, `你砸毁了${circuit.name}控制箱！${circuit.affectedRooms.map(roomName).join('、')}立即断电，灯光熄灭。`);
-  } else if (item!.kind === 'itemBox') {
+  } else if (target.kind === 'facility' && item!.kind === 'itemBox') {
     item!.broken = true;
     item!.charges = 0;
     log(state, `你砸烂了${roomName(item!.room)}的道具箱——从今往后，没人能从这里翻到道具了。`);
-  } else {
+  } else if (target.kind === 'facility') {
     const before = item!.progress;
     item!.progress = Math.max(0, item!.progress - SABOTAGE_GEN_LOSS);
     if (item!.charged) {
@@ -3321,9 +3348,10 @@ export function sabotageSiteItem(state: GameState): boolean {
     const affected = state.powerCircuits.filter((circuit) => circuit.generatorId === item!.id).map((circuit) => circuit.name);
     log(state, `你砸了${roomName(item!.room)}的发电机，修复进度 ${before}% → ${item!.progress}%，停机 ${GENERATOR_JAM_TURNS} 回合。${affected.length ? '受其供电的 ' + affected.join('、') + ' 也随之熄灭。' : ''}`);
   }
+  }
 
   addDisturbance(state, state.playerRoom);
-  addAlarm(state, 3);
+  if (target.kind === 'facility') addAlarm(state, 3);
   // 砸东西也算「做了一件事」，刀可以收回来
   state.attackReady = true;
   afterPlayerAction(state);

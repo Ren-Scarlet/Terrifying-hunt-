@@ -69,7 +69,7 @@ import {
   nextStepToward,
   updateNpcDialogue,
 } from '../src/game/engine';
-import { CABINET_ROOMS, OBSTACLE_ROOMS, ROOM_MAP, ROOMS, buildLayout, doorMarkerPosition, layoutAspect } from '../src/game/rooms';
+import { CABINET_ROOMS, OBSTACLE_ROOMS, PHONE_ROOMS, RADIO_ROOMS, ROOM_MAP, ROOMS, buildLayout, doorMarkerPosition, layoutAspect } from '../src/game/rooms';
 import { cardImage } from '../src/game/assetMap';
 import { readdirSync } from 'node:fs';
 import { personChip, personDetailHtml } from '../src/ui/render/shared';
@@ -1158,6 +1158,49 @@ function caseTeamGoal(): void {
     ghost.emergencyActive && ghost.people.every((p) => p.role !== 'police' && p.intent === 'escape'));
 }
 
+/** 目击袭击、尸体与统一破坏入口回归。 */
+function caseWitnessFearAndUnifiedSabotage(): void {
+  const attackState = newGame();
+  const victim = attackState.people.find((p) => p.role !== 'police' && p.hp > 0)!;
+  const witness = attackState.people.find((p) => p.id !== victim.id && p.role !== 'police' && p.hp > 0)!;
+  victim.room = attackState.playerRoom;
+  witness.room = attackState.playerRoom;
+  victim.hidden = false; witness.hidden = false;
+  victim.hp = 4; witness.fear = 0; witness.alert = 0;
+  attackState.people.filter((p) => p.id !== victim.id && p.id !== witness.id && p.role !== 'police').forEach((p) => { p.room = 'attic'; p.hidden = true; });
+  attackState.energy = 4; attackState.attackReady = true;
+  const attacked = attack(attackState, victim.id);
+  check('目击袭击：同屋目击者同时增加恐惧值与警戒值',
+    attacked && witness.fear >= 22 && witness.alert >= 18,
+    `fear=${witness.fear} alert=${witness.alert}`);
+
+  const door = newGame();
+  const doorRoom = (Object.keys(ROOM_MAP) as RoomId[]).find((room) =>
+    ROOM_MAP[room].neighbors.length > 0 &&
+    !PHONE_ROOMS.includes(room) && !RADIO_ROOMS.includes(room) &&
+    !door.powerCircuits.some((c) => c.breakerRoom === room) &&
+    !door.siteItems.some((item) => item.room === room && !item.broken),
+  )!;
+  door.playerRoom = doorRoom;
+  const neighbor = ROOM_MAP[door.playerRoom].neighbors[0];
+  door.roomLocks[neighbor] = 2;
+  const inside = door.people.find((p) => p.role !== 'police')!;
+  inside.room = neighbor; inside.hp = 4; inside.alert = 0; inside.fear = 0;
+  door.energy = 4;
+  const doorBroken = sabotageSiteItem(door);
+  check('统一破坏：可以从相邻房间撞开门锁', doorBroken && !isLocked(door, neighbor));
+  check('强行破门：屋内人类警戒与恐惧都会上升',
+    inside.alert >= 24 && inside.fear >= 12,
+    `alert=${inside.alert} fear=${inside.fear}`);
+
+  const phone = newGame();
+  phone.playerRoom = PHONE_ROOMS[0];
+  phone.phoneCut = false;
+  phone.energy = 4;
+  const phoneBroken = sabotageSiteItem(phone);
+  check('统一破坏：电话房可直接剪断电话线', phoneBroken && phone.phoneCut);
+}
+
 /** 恐惧满值后再次受到攻击会直接倒地；警戒与恐惧保持独立。 */
 function caseFearSystem(): void {
   const s = newGame();
@@ -1482,6 +1525,7 @@ function caseMergeAndMissions(): void {
 }
 
 caseMyersStalkingAndFearRadius();
+caseWitnessFearAndUnifiedSabotage();
 caseFearSystem();
 caseNavigationUtilities();
 caseMergeAndMissions();
