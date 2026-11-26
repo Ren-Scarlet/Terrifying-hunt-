@@ -145,12 +145,13 @@ function renderMarkupPreservingMap(html: string): void {
   if (cameraTransform) previousFloorplan.style.transform = cameraTransform;
 
   const freshWorldNodes = Array.from(nextFloorplan.children);
+  const freshViewportNodes = Array.from(nextViewport.childNodes).filter((node) => node !== nextFloorplan);
   previousFloorplan.replaceChildren(previousCanvas, ...freshWorldNodes);
   nextFloorplan.replaceWith(previousFloorplan);
 
-  // 保留 viewport 本身，避免浏览器在地图层卸载/重挂期间露出黑色底板。
+  // 保留 viewport 本身和地图图例等兄弟层，避免地图卸载/重挂期间露出黑色底板。
   previousViewport.className = nextViewport.className;
-  previousViewport.replaceChildren(previousFloorplan);
+  previousViewport.replaceChildren(previousFloorplan, ...freshViewportNodes);
   nextViewport.replaceWith(previousViewport);
 }
 
