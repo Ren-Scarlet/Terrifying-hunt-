@@ -589,6 +589,7 @@ function npcReact(state: GameState): void {
     if (!state.people.some((p) => p.id === person.id)) continue;
     // 倒地、藏着、被按住的人在原地等；屋里的人留给进门反应与回合结算
     if (person.hp <= 0 || person.hidden) continue;
+    if (person.lastWitnessedEventClock === state.trailClock) continue;
     if (person.blockedTurns > 0 || state.pinnedPeople.includes(person.id)) continue;
 
     // 恐惧范围：相邻房间先起疑；范围 2 的杀手会在隔壁直接引发逃跑，两格外也会察觉。
@@ -774,9 +775,98 @@ function resolveDest(state: GameState, dest: Dest): RoomId {
 /*  生死：健康 → 受伤 → 倒地 → 死亡                                     */
 /* ==================================================================== */
 
+type NpcWitnessedEvent = 'attack' | 'murder' | 'abduction';
+
+/**
+ * NPC 对重大事件的统一感知入口。
+ * 同屋、未被遮挡的幸存者属于直接目击者；他们立即获得明确认知并按人格采取行动。
+ * 超自然杀手造成的事件会引发无法理解的恐慌，不会机械地全部转成报警。
+ */
+function npcWitnessEvent(
+  state: GameState,
+  room: RoomId,
+  event: NpcWitnessedEvent,
+  subjectId: string,
+): number {
+  const witnesses = npcs(state).filter(
+    (person) =>
+      person.id !== subjectId &&
+      person.hp > 0 &&
+      !person.hidden &&
+      person.room === room,
+  );
+  if (!witnesses.length) return 0;
+
+  const supernatural = KILLER_MAP[state.killer]?.school === 'supernatural';
+  const eventLabel =
+    event === 'murder' ? '目睹同伴死亡' :
+    event === 'abduction' ? '目睹倒地者被强行带走' :
+    '目睹同伴遭到袭击';
+
+  // 先由现场目击者发出声音，再让他们各自采取行动；邻近房间只能获得转述信息。
+  shout(state, witnesses[0], event === 'murder' ? 28 : 22);
+
+  for (const witness of witnesses) {
+    const alertFloor = event === 'murder' ? 88 : event === 'abduction' ? 78 : 70;
+    const fearGain = event === 'murder' ? 42 : event === 'abduction' ? 30 : 24;
+    witness.alert = clamp(Math.max(witness.alert + alertFloor, alertFloor), 0, 100);
+    witness.fear = clamp(witness.fear + fearGain, 0, 100);
+    witness.awareness = Math.max(witness.awareness, event === 'murder' ? 3 : 2);
+    witness.lastWitnessedEventClock = state.trailClock;
+    witness.dialogue = supernatural
+      ? randomOf(['那不是人……快躲起来！', '别看它！快跑！', '这到底是什么东西？！'])
+      : event === 'murder'
+        ? randomOf(['他杀了人！快跑！', '我亲眼看见了！救命！', '快报警！有人被杀了！'])
+        : event === 'abduction'
+          ? randomOf(['他把人拖走了！快来帮忙！', '那个人还活着！不能让他带走！', '有人被强行带走了！'])
+          : randomOf(['他袭击了那个人！', '救命！有人受伤了！', '快离开这里！']);
+
+    const previousRoom = witness.room;
+    if (supernatural) {
+      // 面对超自然威胁，普通人优先躲藏或逃命，不会像目击普通凶杀那样统一报警。
+      if (witness.archetype === 'hider') {
+        witness.goal = 'hide';
+        actByArchetype(state, witness);
+      } else {
+        witness.goal = 'panic';
+        witness.intent = 'flee';
+        witness.activity = '目睹无法理解的恐怖，拼命逃离';
+        if (witness.movesThisTurn < REACT_MOVE_CAP && fleeAway(state, witness, true)) {
+          witness.movesThisTurn += 1;
+        }
+      }
+    } else {
+      switch (witness.archetype) {
+        case 'alert': witness.goal = 'exit'; break;
+        case 'caller': witness.goal = 'phone'; break;
+        case 'rescuer': witness.goal = 'help'; break;
+        case 'hider': witness.goal = 'hide'; break;
+        case 'defiant': witness.goal = 'weapon'; break;
+        case 'brave': witness.goal = 'gather'; break;
+        case 'kiter': witness.goal = 'panic'; break;
+      }
+      actByArchetype(state, witness);
+    }
+
+    if (witness.room !== previousRoom) {
+      witness.movesThisTurn = Math.min(REACT_MOVE_CAP, witness.movesThisTurn + 1);
+    }
+    if (witness.intent === 'idle') witness.intent = 'wary';
+    if (witness.activity === '在翻找抽屉' || witness.activity === '靠在窗边抽烟') {
+      witness.activity = eventLabel;
+    }
+  }
+
+  log(state, `【NPC目击】${witnesses.map((person) => person.name).join('、')}${eventLabel}，立即作出反应。`);
+  return witnesses.length;
+}
+
 function killPerson(state: GameState, person: Person): void {
   if (state.carryPersonId === person.id) state.carryPersonId = null;
   if (!state.people.some((p) => p.id === person.id)) return;
+  const directWitnesses = person.role === 'police'
+    ? 0
+    : npcWitnessEvent(state, person.room, 'murder', person.id);
   state.people = state.people.filter((p) => p.id !== person.id);
   state.pinnedPeople = state.pinnedPeople.filter((id) => id !== person.id);
   if (state.bitterMurmurReady && person.role !== 'police') {
@@ -803,7 +893,7 @@ function killPerson(state: GameState, person: Person): void {
   const seenBy = npcs(state).filter(
     (p) => p.room === person.room && p.hp > 0 && !p.hidden && (p.alert >= 25 || p.intent !== 'idle'),
   );
-  if (seenBy.length) {
+  if (directWitnesses > 0 || seenBy.length) {
     addWanted(state, person.role === 'target' ? 2 : 1);
   } else {
     state.huntStats.quietKills += 1;
@@ -862,13 +952,7 @@ function damagePerson(state: GameState, person: Person, amount: number, suppress
     person.alert = 100;
     log(state, `${person.name} 被打倒在地上。现在可以直接处决；如果暂时放过，同伴仍可能赶来救援。`);
     addAlarm(state, 4);
-    peopleInRoom(state, person.room)
-      .filter((p) => p.id !== person.id && p.role !== 'police')
-      .forEach((p) => {
-        p.alert = clamp(p.alert + 30, 0, 100);
-        p.awareness = Math.max(p.awareness, 2);
-        p.intent = p.intent === 'idle' ? 'wary' : p.intent;
-      });
+    npcWitnessEvent(state, person.room, 'attack', person.id);
     return;
   }
 
@@ -879,20 +963,8 @@ function damagePerson(state: GameState, person: Person, amount: number, suppress
   person.goal = 'exit';
   if (before > SURVIVOR_INJURED_HP && person.hp <= SURVIVOR_INJURED_HP) log(state, `${person.name} 受伤了（${person.hp}/${SURVIVOR_MAX_HP}），丢下手里的东西就跑。`);
   else log(state, `${person.name} 受到 ${dmg} 点伤害（剩余 ${person.hp}/${SURVIVOR_MAX_HP}）。`);
-  // 同屋目击者亲眼看到袭击：恐惧与警戒同时上升；隔壁只听见动静。
-  let witnesses = 0;
-  npcs(state).filter((p) => p.id !== person.id && p.hp > 0 && !p.hidden).forEach((p) => {
-    const distance = roomDistance(p.room, state.playerRoom);
-    if (distance === 0) {
-      p.fear = clamp(p.fear + 22, 0, 100);
-      p.alert = clamp(p.alert + 18, 0, 100);
-      witnesses += 1;
-    } else if (distance === 1) {
-      p.fear = clamp(p.fear + 8, 0, 100);
-      p.alert = clamp(p.alert + 6, 0, 100);
-    }
-  });
-  if (witnesses) log(state, `有人亲眼目睹袭击，恐惧在房间里蔓延（${witnesses} 名目击者）。`);
+  // 同屋目击者必须形成真实行为反应；邻近房间只通过喊声获得转述信息。
+  npcWitnessEvent(state, person.room, 'attack', person.id);
   addAlarm(state, 3);
   if (suppressFlee) {
     person.blockedTurns = 1;
@@ -918,6 +990,7 @@ export function carryPerson(state: GameState, personId: string): boolean {
   state.carryDistance = 0;
   person.activity = '被杀手抱起搬运';
   log(state, `你抱起了倒地的${person.name}。搬运途中不会自行挣脱。`);
+  npcWitnessEvent(state, person.room, 'abduction', person.id);
   afterPlayerAction(state);
   return true;
 }
@@ -1195,6 +1268,10 @@ function shout(state: GameState, person: Person, base = 18): void {
     .forEach((p) => {
       if (p.alert < 70) {
         p.alert = clamp(p.alert + base, 0, 100);
+        p.awareness = Math.max(p.awareness, 1);
+        p.lastHeardFrom = person.name;
+        p.lastHeardRoom = person.room;
+        p.lastHeardTurn = state.turn;
         if (p.intent === 'idle') p.intent = 'wary';
         learned += 1;
         log(state, `${p.name} 听见喊声，警觉升到 ${p.alert}/100。`);
@@ -1205,6 +1282,11 @@ function shout(state: GameState, person: Person, base = 18): void {
       .filter((p) => p.role !== 'police' && p.hp > 0 && p.alert < 55)
       .forEach((p) => {
         p.alert = clamp(p.alert + Math.round(base * 0.55), 0, 100);
+        p.awareness = Math.max(p.awareness, 1);
+        p.lastHeardFrom = person.name;
+        p.lastHeardRoom = person.room;
+        p.lastHeardTurn = state.turn;
+        if (p.intent === 'idle') p.intent = 'wary';
         learned += 1;
       });
   });
@@ -1417,24 +1499,17 @@ function witnessInRoom(state: GameState, person: Person): boolean {
     interruptPlayer(state, `${person.name} 拧亮手电筒，一道白光正打在你脸上。`, person.id);
     return true;
   }
-  person.alert = clamp(person.alert + 45, 0, 100);
-  npcs(state)
-    .filter((p) => p.id !== person.id && p.hp > 0 && p.alert < 70 && roomDistance(p.room, person.room) <= 1)
-    .forEach((p) => {
-      p.alert = clamp(p.alert + (p.room === person.room ? 20 : 8), 0, 100);
-    });
+  person.alert = clamp(Math.max(person.alert + 45, 75), 0, 100);
   addDisturbance(state, person.room);
   person.awareness = Math.max(person.awareness, 2);
-  if (person.alert >= 75 && random() < 0.55 && person.movesThisTurn < REACT_MOVE_CAP) {
-    fleeAway(state, person);
-    person.movesThisTurn += 1;
-    log(state, `${person.name} 看见同伴被砍，确认危险后喊了一声夺路而逃。`);
-  } else {
-    addTeamProgress(state, scaleSurvivorProgress(state, person, 3));
-    person.intent = 'work';
-    person.activity = '趁乱把手里的事往前推了一步';
-    log(state, `${person.name} 没跟着跑，反而趁乱多干了一点活（团队进度 +3）。`);
+  person.lastWitnessedEventClock = state.trailClock;
+  shout(state, person, 18);
+  const previousRoom = person.room;
+  actByArchetype(state, person);
+  if (person.room !== previousRoom) {
+    person.movesThisTurn = Math.min(REACT_MOVE_CAP, person.movesThisTurn + 1);
   }
+  log(state, `${person.name} 亲眼确认了危险，按自己的本能作出反应。`);
   return true;
 }
 
@@ -2549,6 +2624,10 @@ export function movePlayer(state: GameState, room: RoomId): boolean {
   }
   // 先让屋里的人对「推门」做反应（障碍伏击要在杂物被踢开之前判定）
   npcOnPlayerEnter(state);
+  if (state.carryPersonId) {
+    const carried = state.people.find((person) => person.id === state.carryPersonId);
+    if (carried) npcWitnessEvent(state, room, 'abduction', carried.id);
+  }
   if (isObstacle(room) && !state.clearedObstacles.includes(room)) {
     state.clearedObstacles.push(room);
     log(state, `你踢开${roomName(room)}门口堆着的杂物，硬挤了进去。`);

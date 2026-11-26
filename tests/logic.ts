@@ -1171,9 +1171,68 @@ function caseWitnessFearAndUnifiedSabotage(): void {
   attackState.people.filter((p) => p.id !== victim.id && p.id !== witness.id && p.role !== 'police').forEach((p) => { p.room = 'attic'; p.hidden = true; });
   attackState.energy = 4; attackState.attackReady = true;
   const attacked = attack(attackState, victim.id);
-  check('目击袭击：同屋目击者同时增加恐惧值与警戒值',
-    attacked && witness.fear >= 22 && witness.alert >= 18,
-    `fear=${witness.fear} alert=${witness.alert}`);
+  check('目击袭击：同屋目击者不仅增加恐惧警戒，还会立刻改变行动',
+    attacked && witness.fear >= 22 && witness.alert >= 70 &&
+    witness.awareness >= 2 && witness.intent !== 'idle',
+    `fear=${witness.fear} alert=${witness.alert} awareness=${witness.awareness} intent=${witness.intent}`);
+
+  const murder = newGame();
+  const murderVictim = murder.people.find((p) => p.role !== 'police' && p.hp > 0)!;
+  const murderWitness = murder.people.find((p) => p.id !== murderVictim.id && p.role !== 'police' && p.hp > 0)!;
+  murderVictim.room = murder.playerRoom;
+  murderVictim.hp = 0;
+  murderWitness.room = murder.playerRoom;
+  murderWitness.hidden = false;
+  murderWitness.hp = 4;
+  murderWitness.alert = 0;
+  murderWitness.fear = 0;
+  murderWitness.awareness = 0;
+  murderWitness.intent = 'idle';
+  murderWitness.movesThisTurn = 0;
+  murder.people.filter((p) => p.id !== murderVictim.id && p.id !== murderWitness.id && p.role !== 'police')
+    .forEach((p) => { p.room = 'attic'; p.hidden = true; });
+  murder.energy = 4;
+  const executed = executeDownedPerson(murder, murderVictim.id);
+  check('目击击杀：一击处决会被同屋 NPC 亲眼目击并触发真实反应',
+    executed && !murder.people.some((p) => p.id === murderVictim.id) &&
+    murderWitness.awareness >= 3 && murderWitness.alert >= 88 &&
+    murderWitness.intent !== 'idle' && murder.log.some((line) => line.includes('【NPC目击】')),
+    `awareness=${murderWitness.awareness} alert=${murderWitness.alert} intent=${murderWitness.intent}`);
+
+  const carryWitnessState = newGame();
+  const carriedVictim = carryWitnessState.people.find((p) => p.role !== 'police' && p.hp > 0)!;
+  const carryWitness = carryWitnessState.people.find((p) => p.id !== carriedVictim.id && p.role !== 'police' && p.hp > 0)!;
+  const doorwayWitness = carryWitnessState.people.find((p) => p.id !== carriedVictim.id && p.id !== carryWitness.id && p.role !== 'police' && p.hp > 0)!;
+  const carryDestination = openNeighbor(carryWitnessState.playerRoom);
+  carriedVictim.room = carryWitnessState.playerRoom;
+  carriedVictim.hp = 0;
+  carryWitness.room = carryWitnessState.playerRoom;
+  carryWitness.hidden = false;
+  carryWitness.alert = 0;
+  carryWitness.awareness = 0;
+  carryWitness.intent = 'idle';
+  doorwayWitness.room = carryDestination;
+  doorwayWitness.hidden = false;
+  doorwayWitness.alert = 0;
+  doorwayWitness.awareness = 0;
+  doorwayWitness.intent = 'idle';
+  carryWitnessState.people.filter((p) =>
+    p.id !== carriedVictim.id && p.id !== carryWitness.id && p.id !== doorwayWitness.id && p.role !== 'police')
+    .forEach((p) => { p.room = 'attic'; p.hidden = true; });
+  carryWitnessState.energy = 12;
+  const pickedUp = carryPerson(carryWitnessState, carriedVictim.id);
+  const pickupSeen = pickedUp && carryWitness.awareness >= 2 &&
+    carryWitness.alert >= 78 && carryWitness.intent !== 'idle' &&
+    carryWitnessState.log.some((line) => line.includes('目击倒地者被强行带走'));
+  carryWitnessState.freeMove = true;
+  const carriedIntoRoom = movePlayer(carryWitnessState, carryDestination);
+  check('目击搬运：抱起倒地者时，同屋 NPC 会立即识别并行动',
+    pickupSeen,
+    `awareness=${carryWitness.awareness} alert=${carryWitness.alert} intent=${carryWitness.intent}`);
+  check('目击搬运：抱着受害者进入新房间时，新的目击者也会作出反应',
+    carriedIntoRoom && doorwayWitness.awareness >= 2 &&
+    doorwayWitness.alert >= 78 && doorwayWitness.intent !== 'idle',
+    `awareness=${doorwayWitness.awareness} alert=${doorwayWitness.alert} intent=${doorwayWitness.intent}`);
 
   const door = newGame();
   const doorRoom = (Object.keys(ROOM_MAP) as RoomId[]).find((room) =>
