@@ -57,7 +57,6 @@ export const EFFECT_OPS: Record<Op['op'], EffectOpMeta> = {
   energy: { label: '行动点', fields: [['amount', 'num']] },
   steps: { label: '行动点（原步数）', fields: [['amount', 'num']] },
   stun: { label: '玩家眩晕', fields: [['amount', 'num']] },
-  evidence: { label: '证据', fields: [['amount', 'num']] },
   discount: { label: '费用减免', fields: [['amount', 'num']] },
   bonusDamage: { label: '攻击加成', fields: [['amount', 'num']] },
   arrestThreshold: { label: '逮捕阈值', fields: [['amount', 'num']] },
