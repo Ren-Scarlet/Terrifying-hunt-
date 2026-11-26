@@ -69,7 +69,7 @@ import {
   nextStepToward,
   updateNpcDialogue,
 } from '../src/game/engine';
-import { CABINET_ROOMS, OBSTACLE_ROOMS, PHONE_ROOMS, ROOM_MAP, ROOMS, buildLayout, doorMarkerPosition, layoutAspect } from '../src/game/rooms';
+import { CABINET_ROOMS, OBSTACLE_ROOMS, PHONE_ROOMS, RADIO_ROOMS, ROOM_MAP, ROOMS, buildLayout, doorMarkerPosition, layoutAspect } from '../src/game/rooms';
 import { cardImage } from '../src/game/assetMap';
 import { readdirSync } from 'node:fs';
 import { personChip, personDetailHtml } from '../src/ui/render/shared';
@@ -1175,7 +1175,14 @@ function caseWitnessFearAndUnifiedSabotage(): void {
     `fear=${witness.fear} alert=${witness.alert}`);
 
   const door = newGame();
-  const neighbor = ROOM_MAP[door.playerRoom].neighbors.find((room) => room !== door.playerRoom)!;
+  const doorRoom = (Object.keys(ROOM_MAP) as RoomId[]).find((room) =>
+    ROOM_MAP[room].neighbors.length > 0 &&
+    !PHONE_ROOMS.includes(room) && !RADIO_ROOMS.includes(room) &&
+    !door.powerCircuits.some((c) => c.breakerRoom === room) &&
+    !door.siteItems.some((item) => item.room === room && !item.broken),
+  )!;
+  door.playerRoom = doorRoom;
+  const neighbor = ROOM_MAP[door.playerRoom].neighbors[0];
   door.roomLocks[neighbor] = 2;
   const inside = door.people.find((p) => p.role !== 'police')!;
   inside.room = neighbor; inside.hp = 4; inside.alert = 0; inside.fear = 0;
