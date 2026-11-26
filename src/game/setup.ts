@@ -76,6 +76,7 @@ export function createGame(
     drawPile: pile,
     discardPile: [],
     mission,
+    completedMissionTasks: [],
     log: [],
     kills: 0,
     killsThisTurn: 0,
