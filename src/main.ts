@@ -1030,8 +1030,14 @@ app.addEventListener('click', (event) => {
   }
 
   if (action === 'play') {
+    const ghosts = captureAttackGhosts();
+    const previousAttackTarget = game.lastAttackedId;
     const cardUid = target.dataset.uid;
     if (cardUid) playCard(game, cardUid);
+    if (game.lastAttackedId && game.lastAttackedId !== previousAttackTarget) {
+      pendingMapAttackTarget = game.lastAttackedId;
+      pendingMapAttackGhost = ghosts.get(game.lastAttackedId) ?? null;
+    }
     playSfx('click');
     afterAction();
     return;
