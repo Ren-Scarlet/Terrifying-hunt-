@@ -311,6 +311,27 @@ body.immersive-hunt { overflow: hidden; min-height: 100dvh; }
 #app.immersive-game .hand-row .card:has(.dbd-perk) .card-name {
   padding-right: 25px;
 }
+#app.immersive-game .hand-row .card:has(.card-tuned) .card-name {
+  padding-left: 17px;
+}
+#app.immersive-game .hand-row .card .card-tuned {
+  position: absolute;
+  z-index: 2;
+  top: 28px;
+  left: 7px;
+  display: grid;
+  place-items: center;
+  width: 13px;
+  height: 13px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid rgba(220,185,112,.45);
+  border-radius: 3px;
+  background: rgba(80,55,24,.86);
+  color: #e6c77f;
+  font-size: 8px;
+  line-height: 1;
+}
 #app.immersive-game .hand-row .card:hover,
 #app.immersive-game .hand-row .card:focus-visible { transform: translateY(-9px); border-color: #dc777b; }
 #app.immersive-game .hand-toggle {
