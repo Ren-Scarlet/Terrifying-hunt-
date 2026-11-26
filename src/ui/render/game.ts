@@ -335,7 +335,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
   const tasks = m.tasks ?? [];
   const markedTargets = state.people.filter((person) => person.marked && person.role !== 'police');
   const markedTargetNames = markedTargets.map((person) => person.name);
-  const objectiveDone = tasks.length > 0 && tasks.every((task) => missionTaskProgress(state, task) >= task.target);
+  const objectiveDone = tasks.filter((task) => !task.optional).length > 0 && tasks.filter((task) => !task.optional).every((task) => missionTaskProgress(state, task) >= task.target);
   const progress = tasks.map((task) => {
     const value = missionTaskProgress(state, task);
     const failed = task.kind === 'no_alarm' && state.npcAlarmed;
@@ -343,7 +343,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
     const targetNames = task.kind === 'marked_kill'
       ? `<small class="mission-target-names">${markedTargetNames.length ? `指定目标：${markedTargetNames.map(escape).join('、')}` : `已击杀指定目标 ${state.markedKilled} 人`}</small>`
       : '';
-    return `<span class="mission-task ${done ? 'done' : failed ? 'failed' : ''}"><b>${done ? '✓' : failed ? '✕' : '○'}</b> ${escape(task.label)} <em>${task.kind === 'no_alarm' ? (failed ? '已报警' : '保持中') : `${Math.min(value, task.target)}/${task.target}`}</em>${targetNames}</span>`;
+    return `<span class="mission-task ${done ? 'done' : failed ? 'failed' : ''} ${task.optional ? 'optional' : 'required'}"><b>${done ? '✓' : failed ? '✕' : '○'}</b> ${escape(task.label)} <em>${task.kind === 'no_alarm' ? (failed ? '已报警' : '保持中') : `${Math.min(value, task.target)}/${task.target}`}</em>${targetNames}</span>`;
   }).join('');
 
   const rooms = ROOMS.map((room) => {
@@ -518,8 +518,6 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
     statusBits.push('<span class="status-badge nightfall">夜幕监视中 · 相邻房间的目标正在显形</span>');
   if (state.chaseTurns >= 2)
     statusBits.push(`<span class="status-badge chase">死追同一人 ${state.chaseTurns} 回合 · 其他幸存者效率 +${Math.round(Math.min(1, state.chaseTurns * 0.25) * 100)}%</span>`);
-  if (state.guardingTurns > 0)
-    statusBits.push('<span class="status-badge guard">守尸中：团队进度正在飞涨，别站着等</span>');
   state.people
     .filter((p) => p.role !== 'police' && p.hp <= 0)
     .forEach((p) => {
@@ -637,7 +635,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
         `<button class="btn execution" data-action="execute-special" data-method="${method.id}" title="${escape(method.description)}">${escape(method.name)} · +35</button>`,
       ).join('')
     : '';
-  const carryStatus = carried ? `<div class="status-badge carrying">抱着 ${escape(carried.name)} · 搬运中不会自行挣脱</div>` : '';
+  const carryStatus = carried ? `<div class="status-badge carrying">抱着 ${escape(carried.name)} · 搬运 ${state.carryDistance}/2 格</div>` : '';
   const trapCacheBtn = state.killer === '设陷者' && state.trapCaches.includes(state.playerRoom)
     ? `<button class="btn search" data-action="collect-trap" ${state.energy < 1 || state.trapInventory >= 4 ? 'disabled' : ''}>收集捕兽夹补给 · +1</button>`
     : '';
@@ -676,7 +674,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
         <div class="mission-icon">${icon('missionTarget', 'ui-icon')}</div>
         <div class="mission-content">
           <div class="mission-title">${escape(m.title)}<em>${escape(ground.name)}</em><em>奖励 ${m.reward}</em></div>
-          <div class="mission-objective"><b>${m.mode === 'free' ? '自主挑战（不强制）' : '全部完成'}</b><div class="mission-task-list">${progress}</div></div>
+          <div class="mission-objective"><b>${m.mode === 'free' ? '自主挑战（不强制）' : '核心目标必做 · 额外挑战加分'}</b><div class="mission-task-list">${progress}</div></div>
           <div class="mission-rules">
             <span class="mission-ok">猎场规则：${escape(ground.ruleName)} · ${escape(ground.ruleDescription)}</span>
             <span class="mission-ok">✓ 成功：${escape(m.successText ?? '达成主目标')}</span>
