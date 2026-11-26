@@ -109,7 +109,7 @@ function powerButtonHtml(state: GameState, killer: KillerProfile): string {
       const ok = canUsePower(state, p.id);
       const reason = powerBlockReason(state, p.id);
       const total = Math.max(1, p.cooldown);
-      const actionHint = p.id === 'myers_gaze' ? (!ok && reason ? reason : (state.myersStalking ? '尾随行动 · 1 AP / +10' : '点击尾随 · 1 AP / +10')) : (cd > 0 ? '冷却 ' + cd + ' 回合' : reason || (p.ultimate ? '可以发动' : '可以使用'));
+      const actionHint = p.id === 'myers_gaze' ? (!ok && reason ? reason : (state.myersStalking ? '尾随行动 · 1 AP / 最多 +15' : '点击尾随 · 1 AP / 最多 +15')) : (cd > 0 ? '冷却 ' + cd + ' 回合' : reason || (p.ultimate ? '可以发动' : '可以使用'));
       const pips = Array.from({ length: total }, (_, i) => {
         const filled = i < cd;
         return `<i class="${filled ? 'on' : ''}"></i>`;
