@@ -1,4 +1,5 @@
 import { CARD_MAP } from '../../game/cards';
+import { awarenessLabel, awarenessStage } from '../../game/npc/awareness';
 import { characterImage, uiIcon } from '../../game/assetMap';
 import {
   ALARM_MAX,
@@ -381,7 +382,9 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
       const img = characterImage(p.id);
       const vis = isPersonVisible(state, p);
       const health = conditionOf(p);
-      const alertLabel = `<em class="alert-tag ${p.alert >= 70 ? 'high' : p.alert >= 35 ? 'mid' : ''}">警觉 ${p.alert}</em>`;
+      const stage = awarenessStage(p.alert);
+      const alertClass = ['', 'mid', 'panic', 'high'][stage];
+      const alertLabel = `<em class="alert-tag ${alertClass}">${awarenessLabel(p.alert)} ${p.alert}</em>`;
       const intentLabel = p.intent === 'idle' ? GOAL_LABEL[p.goal] : INTENT_LABEL[p.intent];
       const where = vis ? roomName(p.room) : `最后在${roomName(p.lastSeenRoom)}`;
       return `<button class="roster-person ${p.room === state.playerRoom ? 'here' : ''} ${p.marked ? 'marked' : ''} ${p.bloodSacrifice ? 'blood-sacrifice' : ''} ${p.intent === 'escape' ? 'escaping' : ''} ${vis ? '' : 'unknown'} ${health === 'downed' ? 'downed' : ''}"
