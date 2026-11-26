@@ -31,6 +31,43 @@ body.immersive-hunt { overflow: hidden; min-height: 100dvh; }
   width: 100%; height: 100%; pointer-events: none;
 }
 #app.immersive-game .floorplan::after { opacity: .1; }
+/*
+ * The map is one authoritative world. Its intrinsic aspect ratio comes from the
+ * generated layout; never inherit the legacy dashboard's fixed vh height.
+ * That old height stretched the room percentages and offset every Canvas light.
+ */
+#app.immersive-game .floorplan {
+  width: min(100vw, calc(100dvh * var(--ar, 1.45))) !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  aspect-ratio: var(--ar, 1.45) !important;
+  transform-origin: 0 0;
+}
+/* Room elements are interaction / information overlays, not painted room cards.
+   Floors, wall contours and room darkness are drawn once by the world renderer. */
+#app.immersive-game .floorplan > .room,
+#app.immersive-game .floorplan > .room.current,
+#app.immersive-game .floorplan > .room.reachable,
+#app.immersive-game .floorplan > .room.reachable.adjacent,
+#app.immersive-game .floorplan > .room.fogged,
+#app.immersive-game .floorplan > .room.dark-room,
+#app.immersive-game .floorplan > .room.lit-room,
+#app.immersive-game .floorplan > .room.outdoor,
+#app.immersive-game .floorplan > .room.objective {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  filter: none !important;
+  transition: none !important;
+}
+#app.immersive-game .floorplan > .room.reachable:hover {
+  background: radial-gradient(ellipse at center, rgba(125,148,166,.055), transparent 72%) !important;
+  box-shadow: none !important;
+}
+
 #app.immersive-game .topline {
   position: fixed; z-index: 30; top: 18px; left: 22px; right: 22px;
   display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
@@ -190,11 +227,89 @@ body.immersive-hunt { overflow: hidden; min-height: 100dvh; }
   max-width: 100%; overflow-x: auto; overflow-y: visible; padding: 2px 5px 4px;
 }
 #app.immersive-game .hand-row .card {
-  box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; align-self: flex-end;
-  flex: 0 0 78px; width: 78px; height: 105px; min-height: 105px; max-height: 105px; overflow: hidden; padding: 9px 8px;
-  border: 1px solid rgba(208,221,228,.24); border-radius: 7px;
-  background: linear-gradient(145deg,rgba(38,51,58,.9),rgba(8,14,18,.84));
+  box-sizing: border-box;
+  position: relative;
+  display: grid;
+  grid-template-rows: 31px minmax(0, 1fr) 18px;
+  align-content: stretch;
+  align-self: flex-end;
+  flex: 0 0 88px;
+  width: 88px;
+  min-width: 88px;
+  max-width: 88px;
+  height: 122px;
+  min-height: 122px;
+  max-height: 122px;
+  padding: 27px 7px 6px;
+  gap: 3px;
+  overflow: hidden;
+  border: 1px solid rgba(208,221,228,.24);
+  border-radius: 7px;
+  background: linear-gradient(145deg,rgba(38,51,58,.94),rgba(8,14,18,.9));
   box-shadow: 0 9px 25px #0008;
+  text-align: left;
+}
+#app.immersive-game .hand-row .card .card-type {
+  position: absolute; top: 8px; left: 8px; right: 29px;
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  font-size: 7px; line-height: 11px; letter-spacing: 1px;
+}
+#app.immersive-game .hand-row .card .card-cost {
+  position: absolute; top: 5px; right: 6px;
+  width: 19px; height: 19px; font-size: 10px;
+}
+#app.immersive-game .hand-row .card .card-name {
+  grid-row: 1;
+  align-self: end;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  min-height: 0;
+  max-height: 29px;
+  margin: 0;
+  padding: 0;
+  font-size: 10px;
+  line-height: 1.35;
+  letter-spacing: .2px;
+  overflow-wrap: anywhere;
+}
+#app.immersive-game .hand-row .card .card-desc {
+  grid-row: 2;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  min-height: 0;
+  max-height: 100%;
+  overflow: hidden;
+  font-size: 8px;
+  line-height: 1.38;
+  overflow-wrap: anywhere;
+}
+#app.immersive-game .hand-row .card .card-flavor {
+  grid-row: 3;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  min-height: 0;
+  overflow: hidden;
+  margin: 0;
+  padding: 3px 0 0;
+  font-size: 7px;
+  line-height: 1.2;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+#app.immersive-game .hand-row .card .dbd-perk {
+  position: absolute;
+  top: 26px;
+  right: 7px;
+  width: 23px;
+  height: 23px;
+  margin: 0;
+}
+#app.immersive-game .hand-row .card:has(.dbd-perk) .card-name {
+  padding-right: 25px;
 }
 #app.immersive-game .hand-row .card:hover,
 #app.immersive-game .hand-row .card:focus-visible { transform: translateY(-9px); border-color: #dc777b; }
@@ -243,7 +358,7 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
   }
   #app.immersive-game .action-pill { max-width: 30vw; padding: 5px; }
   #app.immersive-game .hand { max-width: calc(46vw - 54px); min-width: 0; }
-  #app.immersive-game .hand-row .card { flex-basis: 60px; width: 60px; height: 84px; min-height: 84px; max-height: 84px; padding: 6px; }
+  #app.immersive-game .hand-row .card { flex-basis: 78px; width: 78px; min-width: 78px; max-width: 78px; height: 108px; min-height: 108px; max-height: 108px; padding: 25px 6px 5px; }
   #app.immersive-game .hand-actions .btn { min-height: 30px; padding: 0 7px; font-size: 9px; }
 }
 @media (max-width: 700px) {
@@ -260,7 +375,11 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
   #app.immersive-game .bottom-hud { bottom: 7px; }
   #app.immersive-game .action-pill { max-width: 29vw; }
   #app.immersive-game .hand { max-width: calc(47vw - 45px); }
-  #app.immersive-game .hand-row .card { flex-basis: 55px; width: 55px; height: 78px; min-height: 78px; max-height: 78px; }
+  #app.immersive-game .hand-row .card { flex-basis: 68px; width: 68px; min-width: 68px; max-width: 68px; height: 94px; min-height: 94px; max-height: 94px; padding: 24px 5px 4px; }
+  #app.immersive-game .hand-row .card .card-name { font-size: 8px; line-height: 1.3; max-height: 25px; }
+  #app.immersive-game .hand-row .card .card-desc { font-size: 7px; line-height: 1.3; -webkit-line-clamp: 4; }
+  #app.immersive-game .hand-row .card .card-flavor { font-size: 6px; }
+  #app.immersive-game .hand-row .card .dbd-perk { width: 19px; height: 19px; top: 26px; right: 5px; }
   #app.immersive-game .resource-bar .stat { min-width: 36px; padding: 0 4px; }
   #app.immersive-game .resource-bar .stat b { font-size: 10px; }
   #app.immersive-game .task-pop { right: 12px; top: 58px; width: min(310px,calc(100vw - 24px)); }
