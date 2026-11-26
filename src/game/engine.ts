@@ -349,6 +349,11 @@ function activateEmergency(state: GameState): void {
     person.escapeProgress = 0;
     person.activity = '警报全面爆发，正在逃离猎场';
   }
+  if (state.hexNoedActive && state.totems.length > 0 && !state.hexNoedBonusGranted) {
+    state.energy += 2;
+    state.hexNoedBonusGranted = true;
+    log(state, '难逃一死生效：警报进入最终阶段，图腾仍然存留，你获得 2 点额外行动点。');
+  }
   if (!supernatural) {
     const police = state.people.find((p) => p.role === 'police');
     if (police) {
