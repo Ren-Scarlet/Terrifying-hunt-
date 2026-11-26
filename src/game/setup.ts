@@ -12,6 +12,7 @@ import {
 } from './rooms';
 import type { CardInstance, GameState, Mission, SiteItem } from './types';
 import { drawCards } from './deck';
+import { roomDistance } from './navigation';
 
 let cardUidCounter = 0;
 const uid = (prefix: string) => `${prefix}-${Date.now()}-${cardUidCounter++}`;
@@ -150,10 +151,10 @@ export function createGame(
     teamGoalLabel: '',
     siteItems: [],
     powerCircuits: [
-      { id: 'main-floor', name: '主楼照明', breakerRoom: 'basement', affectedRooms: ['basement', 'hall', 'kitchen', 'dining', 'study'], broken: false },
-      { id: 'upper-floor', name: '二层照明', breakerRoom: 'workshop', affectedRooms: ['workshop', 'bedroom', 'nursery', 'guestroom', 'attic'], broken: false },
-      { id: 'east-wing', name: '东翼照明', breakerRoom: 'conservatory', affectedRooms: ['conservatory', 'garden', 'balcony', 'foyer', 'garage'], broken: false },
-      { id: 'service-wing', name: '服务区照明', breakerRoom: 'laundry', affectedRooms: ['laundry', 'corridor', 'storage', 'wine', 'chapel', 'stairwell', 'bathroom', 'library'], broken: false },
+      { id: 'main-floor', name: '主楼照明', breakerRoom: 'basement', affectedRooms: ['basement', 'hall', 'kitchen', 'dining', 'study'], broken: false, enabled: true },
+      { id: 'upper-floor', name: '二层照明', breakerRoom: 'workshop', affectedRooms: ['workshop', 'bedroom', 'nursery', 'guestroom', 'attic'], broken: false, enabled: true },
+      { id: 'east-wing', name: '东翼照明', breakerRoom: 'conservatory', affectedRooms: ['conservatory', 'garden', 'balcony', 'foyer', 'garage'], broken: false, enabled: true },
+      { id: 'service-wing', name: '服务区照明', breakerRoom: 'laundry', affectedRooms: ['laundry', 'corridor', 'storage', 'wine', 'chapel', 'stairwell', 'bathroom', 'library'], broken: false, enabled: true },
     ],
   };
   // 团队目标：随机挑 3 间房作为「电闸 / 钥匙柜」，再给每个人派一个个人目的。
@@ -183,6 +184,13 @@ export function createGame(
     }
   }
   state.siteItems = items;
+  const generators = items.filter((item) => item.kind === 'generator');
+  state.powerCircuits.forEach((circuit) => {
+    const source = generators
+      .slice()
+      .sort((left, right) => roomDistance(circuit.breakerRoom, left.room) - roomDistance(circuit.breakerRoom, right.room))[0];
+    if (source) circuit.generatorId = source.id;
+  });
 
   state.people
     .filter((p) => p.role !== 'police')
