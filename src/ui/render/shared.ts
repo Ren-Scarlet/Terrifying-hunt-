@@ -210,8 +210,13 @@ export function personDetailHtml(state: GameState, personId: string): string {
     const health = conditionOf(person);
     paras.push(
       `状态：${HEALTH_LABEL[health]}（${person.hp}/4）。行为类型：${ARCH_LABEL[person.archetype]}。`,
-      `目的：${GOAL_LABEL[person.goal]}。警觉 ${person.alert}/100，当前${INTENT_LABEL[person.intent]}。`,
+      `目的：${GOAL_LABEL[person.goal]}。当前状态：${INTENT_LABEL[person.intent]}。`,
+      `即时警觉：${awarenessLabel(person.alert)}（${person.alert}/100）。行为：${person.activity || '暂无明显动作'}。`,
     );
+    if (person.dialogue) paras.push(`听见他说：“${person.dialogue}”`);
+    if (person.item) paras.push(`携带物品：${SURVIVOR_ITEM_LABEL[person.item]}（剩余 ${person.itemUses} 次）。`);
+    if (person.marked) paras.push('契约情报：这是本局指定目标。');
+    if (person.bloodSacrifice) paras.push('特殊身份：本局血祭品。');
     if (isPersonVisible(state, person)) {
       paras.push(`位置：${roomName(person.room)}。`);
     } else {
@@ -254,7 +259,7 @@ export function personDetailHtml(state: GameState, personId: string): string {
     : '';
   return `<div class="person-detail-view">${detailCardHtml(
     profile.name,
-    `${roleName} / ${profile.occupation} / ${profile.age} 岁 · ${profile.tags.join(' · ')}`,
+    `${roleName} / ${profile.occupation} / ${profile.age ? `${profile.age} 岁` : '年龄不详'} · ${profile.tags.join(' · ')}`,
     rarityLabel,
     paras,
     rarityKey,
