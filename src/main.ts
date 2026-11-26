@@ -122,6 +122,39 @@ let pendingMapAttackTarget: string | null = null;
 
 const app = document.getElementById('app')!;
 
+/**
+ * 对局每次行动都会重绘 HUD，但地图世界本身不应被销毁。
+ * 保留原有 viewport / floorplan / Canvas，只替换房间交互层和人物标记，
+ * 这样房间切换时旧场景持续显示，镜头可以从旧位置平滑过渡到新位置。
+ */
+function renderMarkupPreservingMap(html: string): void {
+  const previousViewport = app.querySelector<HTMLElement>('.map-viewport');
+  const previousFloorplan = previousViewport?.querySelector<HTMLElement>('.floorplan') ?? null;
+  const previousCanvas = previousFloorplan?.querySelector<HTMLCanvasElement>('.floorplan-canvas') ?? null;
+
+  renderMarkupPreservingMap(html);
+
+  if (!previousViewport || !previousFloorplan || !previousCanvas) return;
+  const nextViewport = app.querySelector<HTMLElement>('.map-viewport');
+  const nextFloorplan = nextViewport?.querySelector<HTMLElement>('.floorplan');
+  if (!nextViewport || !nextFloorplan) return;
+
+  const cameraTransform = previousFloorplan.style.transform;
+  previousFloorplan.className = nextFloorplan.className;
+  previousFloorplan.setAttribute('style', nextFloorplan.getAttribute('style') ?? '');
+  if (cameraTransform) previousFloorplan.style.transform = cameraTransform;
+
+  const freshWorldNodes = Array.from(nextFloorplan.children);
+  previousFloorplan.replaceChildren(previousCanvas, ...freshWorldNodes);
+  nextFloorplan.replaceWith(previousFloorplan);
+
+  // 保留 viewport 本身，避免浏览器在地图层卸载/重挂期间露出黑色底板。
+  previousViewport.className = nextViewport.className;
+  previousViewport.replaceChildren(previousFloorplan);
+  nextViewport.replaceWith(previousViewport);
+}
+
+
 type DisplayScale = 'standard' | 'large' | 'xlarge';
 type DisplaySettings = { interfaceScale: DisplayScale; fontScale: DisplayScale; mapScale: DisplayScale };
 const DISPLAY_SETTINGS_KEY = 'nightfall-display-settings';
