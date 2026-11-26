@@ -704,37 +704,26 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
       </button>`;
 
   return `
-    <div class="topbar">
-      <div class="topbar-identity">
-        <div class="brand">暗夜<span>杀机</span><small>NIGHTFALL · THE HUNT BEGINS</small></div>
-        <div class="killer-chip">
-          ${killerFaceHtml(killer, 'chip')}
-          <span>${escape(killer.owner)} · ${escape(killer.title)}</span>
-        </div>
+    <div class="topline">
+      <div class="brand">
+        <div class="sigil">†</div>
+        <div><strong>暗 夜 杀 机</strong><small>NIGHT HUNT · THE HUNT BEGINS</small></div>
       </div>
-      <div class="mission-strip ${urgent ? 'urgent' : ''}" data-action="toggle-task-drawer" role="button" tabindex="0">
-        <div class="mission-icon">${icon('missionTarget', 'ui-icon')}</div>
-        <div class="mission-content">
-          <div class="mission-title">${escape(m.title)}<em>${escape(ground.name)}</em><em>奖励 ${m.reward}</em></div>
-          <div class="mission-objective"><b>${m.mode === 'free' ? '自主挑战（不强制）' : state.missionPrimaryCompleted ? '主目标已完成 · 可继续完成额外挑战' : '主目标必做 · 额外挑战自由选择'}</b><div class="mission-task-list">${progress}</div></div>
-          <div class="mission-rules">
-            <span class="mission-ok">猎场规则：${escape(ground.ruleName)} · ${escape(ground.ruleDescription)}</span>
-            <span class="mission-ok">✓ 成功：${escape(m.successText ?? '达成主目标')}</span>
-            <span class="mission-fail">✕ 失败：${escape(m.failText ?? '超时或被捕')}</span>
-          </div>
+      <div class="top-right">
+        <div class="camera-controls" aria-label="镜头控制">
+          <button class="hudbtn" data-action="camera-mode-center" data-camera-mode="center">A 居中</button>
+          <button class="hudbtn active" data-action="camera-mode-smooth" data-camera-mode="smooth">B 平滑</button>
+          <button class="hudbtn icon" data-action="camera-zoom-out" title="缩小">−</button>
+          <span class="zoomread" data-camera-zoom>118%</span>
+          <button class="hudbtn icon" data-action="camera-zoom-in" title="放大">＋</button>
+          <button class="hudbtn" data-action="camera-global">全局</button>
+          <button class="hudbtn" data-action="camera-follow" data-camera-follow>跟随</button>
         </div>
-
       </div>
     </div>
-
-    <div class="camera-controls" aria-label="镜头控制">
-      <button class="btn" data-action="camera-mode-center" data-camera-mode="center">A</button>
-      <button class="btn active" data-action="camera-mode-smooth" data-camera-mode="smooth">B</button>
-      <button class="btn" data-action="camera-zoom-out">−</button>
-      <span class="camera-readout" data-camera-zoom>118%</span>
-      <button class="btn" data-action="camera-zoom-in">＋</button>
-      <button class="btn" data-action="camera-global">全局</button>
-      <button class="btn active" data-action="camera-follow" data-camera-follow>跟随</button>
+    <div class="objective" data-action="toggle-task-drawer" role="button" tabindex="0">
+      <i class="dot"></i>
+      <div><b>${escape(m.title)}</b><span>${escape(ground.name)} · ${state.people.filter((p) => p.role !== 'police' && p.hp > 0).length} 名幸存者仍存活 · 奖励 ${m.reward}</span></div>
     </div>
     <div class="left-hud"><div class="portrait">${killerFaceHtml(killer, 'chip')}</div><div class="meter"><i style="height:${Math.round(state.energy / Math.max(1, state.maxEnergy) * 100)}%"></i></div><div class="tiny-stat">屠夫 · ${state.energy}/${state.maxEnergy} AP</div></div>
     <div class="right-tools">
@@ -742,7 +731,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
       <button class="tool" data-action="toggle-intel-drawer">⌕</button>
       <button class="tool" data-action="toggle-game-hud">◉</button>
     </div>
-    <div class="task-detail-drawer">
+    <div class="task-pop task-detail-drawer">
       <h3>当前任务 / OBJECTIVE</h3>
       <p><b>${escape(m.objective ?? m.title)}</b></p>
       <p>${escape(m.successText ?? '达成主目标')}<br>失败条件：${escape(m.failText ?? '超时或被捕')}</p>
@@ -794,47 +783,46 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
           <div class="log">${state.log.slice(0, 30).map((line) => `<div>${escape(line)}</div>`).join('')}</div>
         </div>
 
-        <div class="bottom-dock">
-        <div class="panel resource-bar">
-          <div class="stats">
-            <div class="stat"><b>${state.turn}<i>/${m.turns}</i></b><small>回合</small></div>
-            <div class="stat energy" title="走路、挥刀、出牌、搜索柜子，全都从这一个池子里扣"><b>${state.energy}<i>/${state.maxEnergy}</i></b><small>行动点</small></div>
-            <div class="stat alarm-stat ${state.alarm >= 70 ? 'hot' : state.alarm >= 40 ? 'warm' : ''}" title="全局警报值：人类报警、目击异常和现场破坏会推高；可通过压制报警与安静行动降低。达到 60 开放逃生点，达到 100 进入最终逃亡阶段。">
-              <b>${state.alarm}<i>/${ALARM_MAX}</i></b>
-              <div class="alarm-track"><span style="width:${state.alarm}%"></span></div>
-              <small>警报值</small>
+        <div class="statusline">
+          <div class="resource-bar">
+            <div class="stats">
+              <div class="stat"><b>${state.turn}<i>/${m.turns}</i></b><small>回合</small></div>
+              <div class="stat energy" title="当前行动点"><b>${state.energy}<i>/${state.maxEnergy}</i></b><small>行动点</small></div>
+              <div class="stat alarm-stat ${state.alarm >= 70 ? 'hot' : state.alarm >= 40 ? 'warm' : ''}" title="全局警报值">
+                <b>${state.alarm}<i>/${ALARM_MAX}</i></b><div class="alarm-track"><span style="width:${state.alarm}%"></span></div><small>警报</small>
+              </div>
+              <div class="stat"><b>${state.kills}</b><small>击杀</small></div>
+              <div class="stat survivor-count"><b>${state.people.filter((p) => p.role !== 'police' && p.hp > 0).length}/${state.survivorTotal}</b><small>存活</small></div>
+              <div class="stat frenzy ${state.frenzy >= FRENZY_THRESHOLD ? 'active' : ''}"><b>${state.frenzy}<i>/${FRENZY_MAX}</i></b><div class="alarm-track"><span style="width:${state.frenzy}%"></span></div><small>杀戮</small></div>
+              <div class="stat score"><b>${currentScore(state)}</b><small>预计得分</small></div>
             </div>
-            <div class="stat"><b>${state.kills}</b><small>击杀</small></div>
-            <div class="stat survivor-count" title="当前存活、逃走、被杀和倒地人数；倒地者仍有机会被同伴救起。"><b>${state.people.filter((p) => p.role !== 'police' && p.hp > 0).length}/${state.survivorTotal}</b><small>存活 · 逃 ${state.escaped} · 杀 ${Math.max(0, state.survivorTotal - state.escaped - state.people.filter((p) => p.role !== 'police').length)}${state.people.filter((p) => p.role !== 'police' && p.hp <= 0).length ? ` · 倒地 ${state.people.filter((p) => p.role !== 'police' && p.hp <= 0).length}` : ''}</small></div>
-            <div class="stat frenzy ${state.frenzy >= FRENZY_THRESHOLD ? 'active' : ''}" title="杀戮：严格踩着脚印连续追才涨；满 ${FRENZY_THRESHOLD} 后每回合多 ${FRENZY_AP_BONUS} 点行动点，路自己走。砍中人或被击晕清零。">
-              <b>${state.frenzy}<i>/${FRENZY_MAX}</i></b>
-              <div class="alarm-track"><span style="width:${state.frenzy}%"></span></div>
-              <small>杀戮 <i class="frenzy-state-icon" title="杀戮状态">☠</i></small>
-            </div>
-            <div class="stat score"><b>${currentScore(state)}</b><small>预计得分</small></div>
+            ${meter || myersMarks ? `<div class="bottom-special-meters">${meter}${myersMarks}</div>` : ''}
           </div>
-          ${meter || myersMarks ? `<div class="bottom-special-meters">${meter}${myersMarks}</div>` : ''}
+          <div class="play-status"><b>${escape(guidanceTitle)}</b><span> · ${escape(guidanceDetail)}</span></div>
         </div>
 
-        <div class="panel hand">
-          ${selectingDiscards ? `<div class="hand-limit-warning">手牌 ${state.hand.length}/${HAND_LIMIT}：请点击要弃掉的牌，直到剩余 ${HAND_LIMIT} 张。</div>` : ''}
-          <div class="hand-actions">
-            ${attackBtn}
-            ${executeBtn}
-            <button class="btn draw-card" data-action="draw" ${state.energy < DRAW_CARD_COST || (state.drawPile.length === 0 && state.discardPile.length === 0) || selectingDiscards ? 'disabled' : ''} title="消耗 ${DRAW_CARD_COST} 点行动点，从牌库抽 1 张">${DRAW_CARD_COST} 点 · 抽 1 张</button>
-            ${wipeBtn}
-            ${searchBtn}
-            ${lookBtn}
-            ${sabotageBtn}${specialExecution}
-            ${trapCacheBtn}${trapRecoverBtn}${hatchetRefillBtn}
-            <div class="power-row">${powerButtonHtml(state, killer)}</div>
-            <button class="btn search wait-action" data-action="wait" ${selectingDiscards || state.energy < 1 ? 'disabled' : ''} title="消耗 1 点行动点；幸存者各自行动一次，你继续观察当前房间与刚离开的房间。">等待 · 1 AP</button>
-            <button class="btn primary end-turn" data-action="end-turn" ${selectingDiscards ? 'disabled' : ''}>结束回合</button>
-            <button class="btn ghost" data-action="${m.mode === 'free' ? 'finish-free-hunt' : objectiveDone ? 'finish-contract' : 'give-up'}">${m.mode === 'free' ? '结束猎杀' : objectiveDone ? '完成主目标 · 结算' : '放弃任务'}</button>
+        <div class="bottom-hud" id="bottomHud">
+          <div class="action-pill">
+            <div class="hand-actions">
+              ${attackBtn}
+              ${executeBtn}
+              <button class="btn draw-card" data-action="draw" ${state.energy < DRAW_CARD_COST || (state.drawPile.length === 0 && state.discardPile.length === 0) || selectingDiscards ? 'disabled' : ''} title="消耗 ${DRAW_CARD_COST} 点行动点，从牌库抽 1 张">${DRAW_CARD_COST} 点 · 抽 1 张</button>
+              ${wipeBtn}
+              ${searchBtn}
+              ${lookBtn}
+              ${sabotageBtn}${specialExecution}
+              ${trapCacheBtn}${trapRecoverBtn}${hatchetRefillBtn}
+              <div class="power-row">${powerButtonHtml(state, killer)}</div>
+              <button class="btn search wait-action" data-action="wait" ${selectingDiscards || state.energy < 1 ? 'disabled' : ''} title="消耗 1 点行动点；幸存者各自行动一次，你继续观察当前房间与刚离开的房间。">等待 · 1 AP</button>
+              <button class="btn primary end-turn" data-action="end-turn" ${selectingDiscards ? 'disabled' : ''}>结束回合</button>
+              <button class="btn ghost" data-action="${m.mode === 'free' ? 'finish-free-hunt' : objectiveDone ? 'finish-contract' : 'give-up'}">${m.mode === 'free' ? '结束猎杀' : objectiveDone ? '完成主目标 · 结算' : '放弃任务'}</button>
+            </div>
           </div>
-          <div class="hand-count">手牌 ${state.hand.length}/${HAND_LIMIT}</div>
-          <div class="hand-row">${hand || '<div style="color:var(--muted);font-size:13px">手牌已空，可花行动点主动抽牌。</div>'}</div>
-        </div>
+          <div class="hand">
+            ${selectingDiscards ? `<div class="hand-limit-warning">手牌 ${state.hand.length}/${HAND_LIMIT}：请点击要弃掉的牌，直到剩余 ${HAND_LIMIT} 张。</div>` : ''}
+            <div class="hand-row">${hand || '<div class="empty-hand">手牌已空，可花行动点主动抽牌。</div>'}</div>
+          </div>
+          <button class="hand-toggle" data-action="toggle-hand" title="收起 / 展开手牌" aria-label="收起或展开手牌" aria-expanded="true">⌄</button>
         </div>
       </div>
       <aside class="hunt-sidebar hunt-sidebar-right">
