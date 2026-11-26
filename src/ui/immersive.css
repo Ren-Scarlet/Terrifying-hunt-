@@ -1361,3 +1361,166 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
     max-width: calc(100vw - 20px);
   }
 }
+
+
+/* 2026-11-27: final HUD positioning, readable doors, fog-of-war and sacrifice frame. */
+#app.immersive-game .bottom-hud {
+  left: 50% !important;
+  right: auto !important;
+  bottom: 18px !important;
+  width: max-content !important;
+  max-width: calc(100vw - 36px) !important;
+  transform: translateX(-50%) !important;
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  align-items: flex-end !important;
+  justify-content: center !important;
+  gap: 10px !important;
+}
+#app.immersive-game .bottom-hud .action-pill {
+  order: 0 !important;
+  flex: 0 1 min(27vw, 470px) !important;
+  width: min(27vw, 470px) !important;
+  max-width: min(27vw, 470px) !important;
+  min-width: 250px;
+}
+#app.immersive-game .bottom-hud .hand-toggle { order: 1 !important; }
+#app.immersive-game .bottom-hud .hand {
+  order: 2 !important;
+  flex: 0 1 min(50vw, 900px) !important;
+  width: min(50vw, 900px) !important;
+  max-width: min(50vw, 900px) !important;
+}
+#app.immersive-game .bottom-hud .ap-display {
+  order: 3 !important;
+  flex: 0 0 86px !important;
+  width: 86px !important;
+  min-width: 86px !important;
+  height: 58px !important;
+  align-self: flex-end !important;
+  margin: 0 0 1px !important;
+  flex-direction: row !important;
+}
+#app.immersive-game .statusline {
+  position: fixed !important;
+  top: 132px !important;
+  bottom: auto !important;
+  left: 22px !important;
+  right: auto !important;
+  z-index: 19 !important;
+  max-width: min(46vw, 720px) !important;
+  padding: 7px 9px !important;
+  border: 1px solid rgba(205,222,231,.14);
+  border-radius: 7px;
+  background: rgba(8,14,18,.48);
+  backdrop-filter: blur(9px);
+}
+#app.immersive-game .resource-bar .stat b { font-size: 16px !important; }
+#app.immersive-game .resource-bar .stat small { font-size: 9px !important; }
+
+/* Door symbols are compact edge markers; color and slash encode the state. */
+#app.immersive-game .floorplan .map-door-marker {
+  display: block !important;
+  width: 25px !important;
+  height: 31px !important;
+  opacity: .96 !important;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,.98)) !important;
+}
+#app.immersive-game .floorplan .map-door-marker::before {
+  inset: 1px 3px 1px !important;
+  border-width: 2px !important;
+  border-bottom: 0 !important;
+  background: linear-gradient(135deg, rgba(48,49,45,.98), rgba(8,12,14,.98)) !important;
+}
+#app.immersive-game .floorplan .map-door-marker i {
+  left: 7px !important;
+  width: 11px !important;
+  height: 20px !important;
+  border-width: 2px !important;
+  background: linear-gradient(90deg,#8b8069,#30291f) !important;
+}
+#app.immersive-game .floorplan .map-door-marker.active { --door-ink: #9be5ad !important; }
+#app.immersive-game .floorplan .map-door-marker.open { --door-ink: #c0c9c7 !important; }
+#app.immersive-game .floorplan .map-door-marker.low-ap { --door-ink: #f0ce83 !important; }
+#app.immersive-game .floorplan .map-door-marker.barricaded { --door-ink: #e7a15d !important; }
+#app.immersive-game .floorplan .map-door-marker.blocked { --door-ink: #f07b78 !important; }
+#app.immersive-game .floorplan .map-door-marker.blocked::after,
+#app.immersive-game .floorplan .map-door-marker.barricaded::after {
+  content: '' !important;
+  position: absolute !important;
+  inset: 0 !important;
+  pointer-events: none !important;
+  background: linear-gradient(45deg,transparent 46%,#f07b78 48% 53%,transparent 55%),
+              linear-gradient(-45deg,transparent 46%,#f07b78 48% 53%,transparent 55%) !important;
+}
+/* Unexplored rooms remain legible as architecture, but their contents stay concealed. */
+#app.immersive-game .floorplan > .room.unexplored:not(.current) .room-head,
+#app.immersive-game .floorplan > .room.unexplored:not(.current) .room-desc,
+#app.immersive-game .floorplan > .room.unexplored:not(.current) .room-features,
+#app.immersive-game .floorplan > .room.unexplored:not(.current) .room-people,
+#app.immersive-game .floorplan > .room.fogged:not(.current) .room-head,
+#app.immersive-game .floorplan > .room.fogged:not(.current) .room-desc,
+#app.immersive-game .floorplan > .room.fogged:not(.current) .room-features,
+#app.immersive-game .floorplan > .room.fogged:not(.current) .room-people {
+  opacity: .28 !important;
+  filter: brightness(.48) saturate(.55) !important;
+}
+/* Blood-sacrifice emblem scales with the enlarged portrait frame. */
+#app.immersive-game .floorplan .room-people .person-chip .person-avatar-wrap .chip-sacrifice-frame {
+  position: absolute !important;
+  inset: -9px !important;
+  width: calc(100% + 18px) !important;
+  height: calc(100% + 18px) !important;
+  max-width: none !important;
+  max-height: none !important;
+  object-fit: contain !important;
+  transform: none !important;
+  z-index: 5 !important;
+  pointer-events: none !important;
+}
+@media (max-width: 900px) {
+  #app.immersive-game .bottom-hud .action-pill {
+    flex-basis: min(27vw, 330px) !important;
+    width: min(27vw, 330px) !important;
+    max-width: min(27vw, 330px) !important;
+    min-width: 190px;
+  }
+  #app.immersive-game .bottom-hud .hand {
+    flex: 1 1 auto !important;
+    width: auto !important;
+    max-width: none !important;
+  }
+  #app.immersive-game .bottom-hud .ap-display {
+    flex-basis: 76px !important;
+    width: 76px !important;
+    min-width: 76px !important;
+  }
+  #app.immersive-game .statusline { top: 112px !important; left: 12px !important; }
+}
+@media (max-width: 700px) {
+  #app.immersive-game .bottom-hud {
+    width: calc(100vw - 12px) !important;
+    max-width: calc(100vw - 12px) !important;
+    gap: 4px !important;
+  }
+  #app.immersive-game .bottom-hud .action-pill {
+    flex: 0 1 34vw !important;
+    width: 34vw !important;
+    max-width: 34vw !important;
+    min-width: 0;
+  }
+  #app.immersive-game .bottom-hud .hand { flex: 1 1 auto !important; min-width: 0; }
+  #app.immersive-game .bottom-hud .ap-display {
+    flex: 0 0 66px !important;
+    width: 66px !important;
+    min-width: 66px !important;
+    height: 54px !important;
+  }
+  #app.immersive-game .statusline {
+    top: 100px !important;
+    left: 8px !important;
+    max-width: calc(100vw - 16px) !important;
+  }
+  #app.immersive-game .floorplan .map-door-marker { width: 22px !important; height: 28px !important; }
+  #app.immersive-game .floorplan .map-door-marker i { left: 6px !important; width: 10px !important; height: 18px !important; }
+}
