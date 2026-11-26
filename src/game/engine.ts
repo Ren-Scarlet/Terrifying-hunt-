@@ -2798,6 +2798,11 @@ export function powerCooldown(state: GameState, powerId: string): number {
   return state.cooldowns[powerId] ?? 0;
 }
 
+function visibleMyersStalkTargets(state: GameState) {
+  // 只排除无法观察的目标；正在逃跑但仍在视野里的幸存者也可以被观察。
+  return npcs(state).filter((person) => person.hp > 0 && !person.hidden && person.role !== 'police' && isPersonVisible(state, person));
+}
+
 export function canUsePower(state: GameState, powerId: string): boolean {
   if (state.phase !== 'playing') return false;
   const killer = KILLER_MAP[state.killer];
@@ -2806,7 +2811,7 @@ export function canUsePower(state: GameState, powerId: string): boolean {
   if (powerCooldown(state, powerId) > 0) return false;
   if (powerId === 'myers_gaze') {
     if (state.killer !== '迈克尔·迈尔斯' || state.possessed || state.energy < 1) return false;
-    return npcs(state).some((p) => p.hp > 0 && !p.hidden && p.role !== 'police' && p.intent !== 'flee' && isPersonVisible(state, p));
+    return visibleMyersStalkTargets(state).length > 0;
   }
   if (power.requires && !power.requires.every((c) => checkCond(state, c))) return false;
   return true;
@@ -2822,7 +2827,7 @@ export function powerBlockReason(state: GameState, powerId: string): string {
   if (powerId === 'myers_gaze') {
     if (state.possessed) return '恶魔附身期间不能尾随';
     if (state.energy < 1) return '至少需要 1 点行动点';
-    if (!npcs(state).some((p) => p.hp > 0 && !p.hidden && p.role !== 'police' && p.intent !== 'flee' && isPersonVisible(state, p))) return '前方视野内没有可尾随的幸存者';
+    if (!visibleMyersStalkTargets(state).length) return '视野内没有可观察的存活幸存者';
   }
   if (power.requires && !power.requires.every((c) => checkCond(state, c))) {
     const need = power.requires.find((c) => !checkCond(state, c));
@@ -2851,46 +2856,16 @@ export function usePower(state: GameState, powerId: string): boolean {
       log(state, powerBlockReason(state, powerId) || '当前无法尾随。');
       return false;
     }
-    const visible = npcs(state).filter((p) => p.hp > 0 && !p.hidden && p.role !== 'police' && p.intent !== 'flee' && isPersonVisible(state, p));
+    const visible = visibleMyersStalkTargets(state);
     const target = visible.find((p) => p.id === state.stalkTargetId) ?? visible[0];
     if (!target) {
       log(state, '前方已经没有可尾随的猎物。');
       return false;
     }
-    if (!state.myersStalking) {
-      state.myersStalking = true;
-      state.stalkTargetId = null;
-      state.stalkPressure = 0;
-      log(state, '你收住脚步，进入尾随姿态：恐惧范围降为 0。');
-    }
-    if (state.stalkTargetId !== target.id) {
-      state.stalkTargetId = target.id;
-      state.stalkPressure = 0;
-    }
     state.energy -= 1;
     const stalkGain = myersStalkGain(target.alert);
     state.stalkMeter = Math.min(100, state.stalkMeter + stalkGain);
-    state.stalkPressure = Math.min(100, state.stalkPressure + 20);
-    log(state, '你花费 1 点行动点凝视 ' + target.name + '：尾随值 +' + stalkGain + '（' + state.stalkMeter + '/100）。');
-    if (state.stalkPressure >= 40 && state.stalkPressure < 60) {
-      target.alert = Math.max(target.alert, 20);
-      target.awareness = Math.max(target.awareness, 1);
-      target.intent = 'wary';
-      target.activity = '总觉得有人在暗处盯着自己';
-      log(state, target.name + ' 开始怀疑自己正被什么东西注视。');
-    }
-    if (state.stalkPressure >= 60) {
-      const detected = random() < 0.3;
-      target.alert = Math.max(target.alert, detected ? 100 : 55);
-      target.awareness = Math.max(target.awareness, detected ? 3 : 2);
-      target.intent = 'flee';
-      target.activity = detected ? '发现迈尔斯后惊恐逃跑' : '不安地逃离被注视的位置';
-      if (detected) log(state, target.name + ' 突然发现了暗处的迈尔斯！');
-      else log(state, target.name + ' 察觉到持续的注视，决定立刻逃离。');
-      if (target.movesThisTurn < REACT_MOVE_CAP && fleeAway(state, target, true)) target.movesThisTurn += 1;
-      state.stalkTargetId = null;
-      state.stalkPressure = 0;
-    }
+    log(state, '你花费 1 点行动点暗中观察 ' + target.name + '：尾随值 +' + stalkGain + '（' + state.stalkMeter + '/100）。');
     state.attackReady = true;
     afterPlayerAction(state);
     checkImmediateWin(state);
