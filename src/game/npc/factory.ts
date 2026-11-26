@@ -150,7 +150,7 @@ export function createPeople(mission: Mission): Person[] {
   cast.slice(markedCount, markedCount + 2).forEach((s) => {
     people.push(makePerson(s, 'target', nextRoom(), 4, false));
   });
-  cast.slice(markedCount + 2, markedCount + 6).forEach((s) => {
+  cast.slice(markedCount + 2, 10).forEach((s) => {
     people.push(makePerson(s, 'civilian', nextRoom(), 4, false));
   });
 

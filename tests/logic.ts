@@ -89,6 +89,17 @@ import { ROUTINE_PROFILE } from '../src/game/npc/catalog';
 let pass = 0;
 let fail = 0;
 
+check('开局会随机生成少量上锁住屋，且断电可解除电子门锁', (() => {
+  const locked = createGame(['silent_step', 'sprint', 'choke', 'shuriken'], undefined, '迈克尔·迈尔斯');
+  const room = Object.keys(locked.roomLocks)[0] as RoomId | undefined;
+  if (!room || !isLocked(locked, room)) return false;
+  const circuit = locked.powerCircuits.find((item) => item.affectedRooms.includes(room));
+  if (!circuit) return false;
+  circuit.enabled = false;
+  return !isLocked(locked, room);
+})());
+check('初始幸存者人数为 10，UI 可按 1/10 形式显示', newGame().survivorTotal === 10);
+
 check('初期可选杀手包含设陷者、护士、女猎手与迈尔斯',
   ACTIVE_KILLERS.map((killer) => killer.owner).join('|') === '设陷者|护士|女猎手|迈克尔·迈尔斯' &&
   STARTER_KILLERS.join('|') === '设陷者|护士|女猎手|迈克尔·迈尔斯',
@@ -115,7 +126,10 @@ check('随机源：可在作用域内注入确定值', injected === 0.25);
 
 function newGame(): GameState {
   const deck = ['silent_step', 'sprint', 'choke', 'shuriken', 'execute', 'clean', 'night_cover', 'aim'];
-  return createGame(deck, undefined, '迈克尔·迈尔斯');
+  const state = createGame(deck, undefined, '迈克尔·迈尔斯');
+  // 大多数规则测试不应被随机开局锁门干扰；锁门机制另有独立测试。
+  state.roomLocks = {};
+  return state;
 }
 function caseRoutineHuntOpportunities(): void {
   const s = newGame();
