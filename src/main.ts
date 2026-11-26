@@ -104,6 +104,19 @@ function applyDisplaySettings(): void {
   app.dataset.interfaceScale = displaySettings.interfaceScale;
   app.dataset.fontScale = displaySettings.fontScale;
   app.dataset.mapScale = displaySettings.mapScale;
+  const names: Record<keyof DisplaySettings, string> = {
+    interfaceScale: '界面',
+    fontScale: '文字',
+    mapScale: '地图',
+  };
+  const values: Record<DisplayScale, string> = { standard: '标准', large: '大', xlarge: '特大' };
+  app.querySelectorAll<HTMLButtonElement>('[data-action="display-setting"]').forEach((button) => {
+    const key = button.dataset.setting as keyof DisplaySettings | undefined;
+    if (key === 'interfaceScale' || key === 'fontScale' || key === 'mapScale') {
+      button.textContent = names[key] + '：' + values[displaySettings[key]];
+      button.setAttribute('aria-label', names[key] + '大小，当前' + values[displaySettings[key]] + '，点击切换');
+    }
+  });
 }
 function cycleDisplaySetting(key: keyof DisplaySettings): void {
   const levels: DisplayScale[] = ['standard', 'large', 'xlarge'];
