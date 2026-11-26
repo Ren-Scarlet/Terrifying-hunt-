@@ -1,4 +1,5 @@
 import type { Op, Precheck } from './effect';
+import type { HuntingGroundId } from './maps';
 
 export type RoomId =
   | 'hall'
@@ -336,6 +337,8 @@ export interface PowerCircuit {
 
 export interface GameState {
   phase: GamePhase;
+  /** 本局实际使用的主题猎场，与主菜单展示插画保持一致。 */
+  mapId: HuntingGroundId;
   killer: string;
   killerRuntime: KillerRuntime;
   arrestThreshold: number;
