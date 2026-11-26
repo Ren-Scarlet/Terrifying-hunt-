@@ -396,6 +396,25 @@ export function buildLayout(style: LayoutStyle = 'wide'): string {
     .filter((index) => !regionRooms.has(index))
     .sort((a, b) => regionArea(regions[b]) - regionArea(regions[a]));
   const freeRooms = sizeOrder.map((id) => roomById.get(id)).filter((room): room is Room => Boolean(room));
+  // 走廊优先分配给长宽比适中的区域，避免偶尔生成一整条横跨地图的极长走廊。
+  const corridor = roomById.get('corridor');
+  const corridorRoomIndex = freeRooms.findIndex((room) => room.id === 'corridor');
+  if (corridor && corridorRoomIndex >= 0 && freeRegions.length) {
+    const corridorRegionIndex = freeRegions.reduce((best, candidate) => {
+      const aspect = Math.max(
+        regions[candidate].width / regions[candidate].height,
+        regions[candidate].height / regions[candidate].width,
+      );
+      const bestAspect = Math.max(
+        regions[best].width / regions[best].height,
+        regions[best].height / regions[best].width,
+      );
+      return Math.abs(aspect - 1.75) < Math.abs(bestAspect - 1.75) ? candidate : best;
+    }, freeRegions[0]);
+    regionRooms.set(corridorRegionIndex, corridor);
+    freeRegions.splice(freeRegions.indexOf(corridorRegionIndex), 1);
+    freeRooms.splice(corridorRoomIndex, 1);
+  }
   freeRegions.forEach((index, order) => regionRooms.set(index, freeRooms[order]));
 
   ROOMS.forEach((room) => {
