@@ -30,8 +30,8 @@ export function createGame(
   mapId: HuntingGroundId = 'lampkin',
 ): GameState {
   // 先生成空间布局，再应用本局场地主题；菜单插画与实际地图使用同一个 mapId。
-  buildLayout();
   const ground = getHuntingGround(mapId);
+  buildLayout(ground.layoutStyle);
   applyHuntingGround(ground.id);
 
   const pile = shuffle(deckIds.filter((id) => CARD_MAP[id])).map<CardInstance>((defId) => ({
