@@ -110,8 +110,6 @@ const OBJECTIVE_GAIN = 5;
 /* ---------- 本轮新增：擦刀 / 守尸 / 追击热度 / 眩晕致盲 / 鬼面夜幕 ---------- */
 /** 擦刀：原地花 1 点收回刀锋，但这一次动作幸存者也会跟着动 */
 export const WIPE_COST = 1;
-/** 站在倒地者房间干等（守尸）时，其他人每回合额外推进的团队进度 */
-const GUARD_TEAM_GAIN = 9;
 /** 每多追同一名幸存者一回合，其他人的工作效率 +25%，最多翻倍 */
 const CHASE_WORK_BONUS = 0.25;
 /** 同屋有倒地同伴时，各原型把人拉起来的意愿（0~1）：人人都可能救，只是有人更奋不顾身 */
@@ -860,6 +858,7 @@ export function carryPerson(state: GameState, personId: string): boolean {
   if (!person || person.role === 'police' || person.hp > 0 || person.room !== state.playerRoom) return false;
   state.energy -= 1;
   state.carryPersonId = person.id;
+  state.carryDistance = 0;
   person.activity = '被杀手抱起搬运';
   log(state, `你抱起了倒地的${person.name}。搬运途中不会自行挣脱。`);
   afterPlayerAction(state);
@@ -882,6 +881,7 @@ export function executeCarriedPerson(state: GameState, methodId: ExecutionMethod
   state.energy -= 1;
   const name = person.name;
   state.carryPersonId = null;
+  state.carryDistance = 0;
   state.executions += 1;
   log(state, `特殊处决【${method.name}】：${method.flavor(name)}（额外奖励 +35 分）。`);
   killPerson(state, person);
@@ -2394,6 +2394,10 @@ function updateFrenzy(state: GameState, from: RoomId, to: RoomId): void {
 }
 
 export function movePlayer(state: GameState, room: RoomId): boolean {
+  if (state.carryPersonId && state.carryDistance >= 2) {
+    log(state, '搬运距离已到极限。你必须就近处决，或放下目标后重新规划路线。');
+    return false;
+  }
   const cost = state.freeMove ? 0 : moveCost(state, room);
   if (!canMoveTo(state, room)) {
     log(state, state.energy < cost ? '行动点不够，走不过去。' : '无法移动到那里：不是相邻房间，或路被堵住了。');
@@ -2417,7 +2421,10 @@ export function movePlayer(state: GameState, room: RoomId): boolean {
   markExplored(state, room);
   if (state.carryPersonId) {
     const carried = state.people.find((p) => p.id === state.carryPersonId);
-    if (carried) carried.room = room;
+    if (carried) {
+      carried.room = room;
+      state.carryDistance += 1;
+    }
   }
   log(
     state,
@@ -3455,8 +3462,8 @@ export function missionTaskProgress(state: GameState, task: MissionTask): number
 
 function checkImmediateWin(state: GameState): void {
   if (state.result || state.mission.mode === 'free') return;
-  const tasks = state.mission.tasks ?? [];
-  if (tasks.length > 0 && tasks.every((task) => missionTaskProgress(state, task) >= task.target)) finish(state, 'win');
+  const required = (state.mission.tasks ?? []).filter((task) => !task.optional);
+  if (required.length > 0 && required.every((task) => missionTaskProgress(state, task) >= task.target)) finish(state, 'win');
 }
 
 export function calculateHuntStyleRating(state: GameState, result: ResultKind): {
@@ -3508,6 +3515,8 @@ function finish(state: GameState, result: ResultKind): void {
   state.huntStyleBreakdown = style.breakdown;
 
   const lines: ScoreLine[] = [{ label: `契约基础分 · ${state.mission.title}`, value: state.mission.reward }];
+  const bonusTasks = (state.mission.tasks ?? []).filter((task) => task.optional && missionTaskProgress(state, task) >= task.target);
+  if (bonusTasks.length) lines.push({ label: `额外挑战 · ${bonusTasks.length} 项`, value: bonusTasks.length * 25 });
   if (state.specialExecutionBonus > 0) lines.push({ label: '地形处决奖励', value: state.specialExecutionBonus });
   lines.push({ label: `凶残 · 击杀 ${state.kills} 人`, value: state.kills * 14 });
   if (state.escaped > 0) lines.push({ label: `逃走 ${state.escaped} 人的失分（每人 -15）`, value: -state.escaped * 15 });
@@ -3598,17 +3607,6 @@ export function endTurn(state: GameState): void {
   }
   checkImmediateWin(state);
   if (state.result) return;
-
-  // 守尸惩罚：站在倒地者房间干等，其他人会把团队任务往前赶一大截
-  const downedHere = npcs(state).some((p) => p.hp <= 0 && p.room === state.playerRoom);
-  if (downedHere) {
-    state.guardingTurns += 1;
-    const gain = GUARD_TEAM_GAIN + Math.min(6, state.guardingTurns * 2);
-    addTeamProgress(state, gain);
-    log(state, `你守在倒地的人旁边没动……其他人趁这段时间把${state.teamGoalLabel}往前赶了一大截（团队进度 +${gain}）。`);
-  } else {
-    state.guardingTurns = 0;
-  }
 
   // 鬼面「夜幕」：监视相邻房间的人；有人闯进鬼面房间就中断，且他能多跑一步
   if (state.killer === '鬼面' && state.nightfallActive) {
