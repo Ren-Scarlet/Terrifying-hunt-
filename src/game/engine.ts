@@ -3440,13 +3440,14 @@ export function missionTaskProgress(state: GameState, task: MissionTask): number
     case 'kill_count': return state.survivorKills;
     case 'marked_kill': return state.markedKilled;
     case 'execute': return state.executions;
+    case 'special_execute': return state.executionMethodsUsed.length;
     case 'no_alarm': return state.npcAlarmed ? 0 : 1;
     case 'break_circuit': return state.powerCircuits.filter((c) => c.broken).length;
   }
 }
 
 function checkImmediateWin(state: GameState): void {
-  if (state.result) return;
+  if (state.result || state.mission.mode === 'free') return;
   const tasks = state.mission.tasks ?? [];
   if (tasks.length > 0 && tasks.every((task) => missionTaskProgress(state, task) >= task.target)) finish(state, 'win');
 }
@@ -3508,7 +3509,7 @@ function finish(state: GameState, result: ResultKind): void {
   if (result === 'win') {
     const bonus = (state.mission.turns - state.turn) * 5;
     if (bonus > 0) lines.push({ label: `猎杀效率 · 剩余 ${state.mission.turns - state.turn} 回合`, value: bonus });
-    state.rewardCards = [UNLOCK_REWARDS[state.mission.kind]].filter(Boolean);
+    state.rewardCards = state.mission.mode === 'free' ? [] : [UNLOCK_REWARDS[state.mission.kind]].filter(Boolean);
   } else if (result === 'caught') {
     lines.push({ label: '被警察当场抓捕', value: -80 });
   } else if (result === 'timeout') {
@@ -3735,8 +3736,19 @@ export function endTurn(state: GameState): void {
   log(state, `新回合开始，行动点恢复${frenzyBonus ? `（杀戮 +${frenzyBonus}）` : ''}。`);
 }
 
+export function finishFreeHunt(state: GameState): boolean {
+  if (state.phase !== 'playing' || state.mission.mode !== 'free') return false;
+  if (state.survivorKills <= 0) {
+    log(state, '至少完成一次猎杀后，才能主动结束自由猎杀。');
+    return false;
+  }
+  state.resultReason = '你主动结束了这场猎杀。';
+  finish(state, 'win');
+  return true;
+}
+
 export function giveUp(state: GameState): void {
-  state.resultReason = '你主动放弃了契约。';
+  state.resultReason = state.mission.mode === 'free' ? '你放弃了这场自由猎杀。' : '你主动放弃了契约。';
   finish(state, 'failed');
 }
 
