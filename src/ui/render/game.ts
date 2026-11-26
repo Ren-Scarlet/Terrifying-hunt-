@@ -57,6 +57,7 @@ import {
   TOTEM_ROOMS,
   layoutAspect,
   layoutAspectNum,
+  doorMarkerPosition,
 } from '../../game/rooms';
 
 
@@ -102,6 +103,26 @@ function roomFeatures(state: GameState, roomId: RoomId): string {
   return parts.join('');
 }
 
+function doorMarkersHtml(state: GameState): string {
+  const seen = new Set<string>();
+  return ROOMS.flatMap((room) => room.neighbors.map((neighborId) => {
+    const key = [room.id, neighborId].sort().join('|');
+    if (seen.has(key)) return '';
+    seen.add(key);
+    const position = doorMarkerPosition(room.id, neighborId);
+    if (!position) return '';
+    const adjacent = state.playerRoom === room.id || state.playerRoom === neighborId;
+    const targetRoom = state.playerRoom === room.id ? neighborId : state.playerRoom === neighborId ? room.id : null;
+    const locked = isLocked(state, room.id) || isLocked(state, neighborId);
+    const barricaded = !!targetRoom && state.barricades.includes(targetRoom);
+    const canPass = !!targetRoom && !locked && canMoveTo(state, targetRoom);
+    const shortOnAp = adjacent && !locked && !canPass;
+    const status = locked ? 'blocked' : barricaded ? 'barricaded' : canPass ? 'active' : shortOnAp ? 'low-ap' : 'open';
+    const title = locked ? '封锁的门' : barricaded ? '堵门：通行需要额外行动点' : canPass ? '当前可通行' : shortOnAp ? '门已打开，但行动点不足' : '可通行的门';
+    return `<span class="map-door-marker ${position.orientation} ${status}" style="left:${position.left.toFixed(3)}%;top:${position.top.toFixed(3)}%" title="${title}" aria-hidden="true"><i></i></span>`;
+  })).join('');
+}
+
 function powerButtonHtml(state: GameState, killer: KillerProfile): string {
   return killer.powers
     .map((p) => {
@@ -109,7 +130,7 @@ function powerButtonHtml(state: GameState, killer: KillerProfile): string {
       const ok = canUsePower(state, p.id);
       const reason = powerBlockReason(state, p.id);
       const total = Math.max(1, p.cooldown);
-      const actionHint = p.id === 'myers_gaze' ? (!ok && reason ? reason : (state.myersStalking ? '尾随行动 · 1 AP / 最多 +15' : '点击尾随 · 1 AP / 最多 +15')) : (cd > 0 ? '冷却 ' + cd + ' 回合' : reason || (p.ultimate ? '可以发动' : '可以使用'));
+      const actionHint = p.id === 'myers_gaze' ? (!ok && reason ? reason : '观察 · 1 AP / 最多 +15') : (cd > 0 ? '冷却 ' + cd + ' 回合' : reason || (p.ultimate ? '可以发动' : '可以使用'));
       const pips = Array.from({ length: total }, (_, i) => {
         const filled = i < cd;
         return `<i class="${filled ? 'on' : ''}"></i>`;
@@ -516,7 +537,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
     <div class="layout">
       <div class="main-column">
         <div class="panel map-panel">
-          <div class="panel-heading"><h2>房屋平面</h2><span>绿边=能走（标行动点） · 黄=障碍多1点 · 蓝框=他们的目标点 · ！动静=有人刚经过 · ？？？=没进去过</span>
+          <div class="panel-heading"><h2>房屋平面</h2><span>门形=通道 · 绿门=当前可走 · 红叉=封锁 · 黄门=堵门/行动点不足 · 蓝框=目标点</span>
             <button class="btn ghost mini" data-action="guide">玩法指引</button>
             <button class="btn ghost mini audio-toggle" data-action="mute" title="开关音效与背景音乐">${isMuted() ? '音效 关' : '音效 开'}</button>
           </div>
@@ -525,6 +546,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
           <div class="map-viewport">
             <div class="floorplan" style="--ar:${layoutAspectNum().toFixed(4)};aspect-ratio:${layoutAspect()}">
               ${rooms}
+              ${doorMarkersHtml(state)}
               ${trailOverlay(state)}
               ${playerMarker}
             </div>
