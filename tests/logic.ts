@@ -2043,15 +2043,9 @@ const pathStart = ROOM_MAP[pathGuard.playerRoom].neighbors[0];
 check('NPC 寻路：避让列表中的玩家房间不能成为路径终点',
   nextStepToward(pathGuard, pathStart, pathGuard.playerRoom, [pathGuard.playerRoom]) === null);
 const revealGuard = newGame();
-const assignedButIdle = revealGuard.people.filter((p) => p.role !== 'police' && ['objective', 'generator', 'key'].includes(p.goal));
-assignedButIdle.forEach((p) => { p.intent = 'idle'; p.revealedActions = 0; });
-runOps(revealGuard, [{ op: 'flag', key: 'revealWorkers', value: 2 }]);
-check('苦涩低语：只分配了团队目标但尚未开工的人不会被显示',
-  assignedButIdle.every((p) => !p.revealedActions));
-const actualWorker = revealGuard.people.find((p) => p.role !== 'police' && p.hp > 0)!;
-actualWorker.intent = 'work';
-runOps(revealGuard, [{ op: 'flag', key: 'revealWorkers', value: 2 }]);
-check('苦涩低语：真正处于工作状态的幸存者会被显示', (actualWorker.revealedActions ?? 0) > 0);
+runOps(revealGuard, [{ op: 'flag', key: 'bitterMurmur' }]);
+check('苦涩低语：出牌后会等待下一次人类死亡，再触发全场回声',
+  revealGuard.bitterMurmurReady && revealGuard.people.filter((p) => p.role !== 'police' && p.hp > 0).every((p) => !(p.revealedActions ?? 0)));
 
 caseNewPerkSystem();
 
