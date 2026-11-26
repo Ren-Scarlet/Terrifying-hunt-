@@ -85,7 +85,7 @@ export function createGame(
     executionMethodsUsed: [],
     npcAlarmed: false,
     carryPersonId: null,
-    evidence: 0,
+    carryDistance: 0,
     markedKilled: 0,
     decoyRoom: null,
     freeMove: false,
@@ -155,7 +155,7 @@ export function createGame(
     blindTurns: 0,
     chaseTargetId: null,
     chaseTurns: 0,
-    guardingTurns: 0,
+
     nightfallActive: false,
     lastAttackedId: null,
     policeAssaulted: false,
