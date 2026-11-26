@@ -1752,6 +1752,8 @@ function caseContractsPowerAndCarry(): void {
   check('AB 迈尔斯契约含尾随不同幸存者的专属奖励任务', myersContract.tasks?.some((task) => task.kind === 'killer_stat' && task.metric === 'myers_stalk') === true);
   const trapperContract = generateMission('设陷者');
   check('AB 设陷者契约含捕兽夹触发的专属奖励任务', trapperContract.tasks?.some((task) => task.kind === 'killer_stat' && task.metric === 'trap_triggers') === true);
+  const huntressContract = generateMission('女猎手');
+  check('AB 女猎手契约含飞斧命中的专属奖励任务', huntressContract.tasks?.some((task) => task.kind === 'killer_stat' && task.metric === 'hatchet_hits') === true);
   const lowAlarmTask = { id: 'low-alarm', kind: 'alarm_below' as const, label: '低报警', target: 1, limit: 35 };
   contract.alarm = 30;
   check('AB 报警上限任务在警报低于阈值时完成', missionTaskProgress(contract, lowAlarmTask) === 1);

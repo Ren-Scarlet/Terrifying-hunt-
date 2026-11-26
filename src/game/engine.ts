@@ -3842,6 +3842,7 @@ export function missionTaskProgress(state: GameState, task: MissionTask): number
       if (task.metric === 'myers_stalk') return state.myersStalkedIds.length;
       if (task.metric === 'trap_triggers') return state.huntStats.trapTriggers;
       if (task.metric === 'nurse_grabs') return state.huntStats.nurseGrabs;
+      if (task.metric === 'hatchet_hits') return state.huntStats.hatchetHits;
       return 0;
   }
 }

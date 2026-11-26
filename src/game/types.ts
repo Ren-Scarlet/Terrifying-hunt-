@@ -282,7 +282,7 @@ export interface Disturbance {
 export type MissionKind = 'assassinate' | 'bodyCount' | 'escape';
 
 export type MissionTaskKind = 'kill_count' | 'kill_count_before_turn' | 'marked_kill' | 'execute' | 'special_execute' | 'no_alarm' | 'break_circuit' | 'alarm_below' | 'killer_stat';
-export type MissionTaskMetric = 'myers_stalk' | 'trap_triggers' | 'nurse_grabs';
+export type MissionTaskMetric = 'myers_stalk' | 'trap_triggers' | 'nurse_grabs' | 'hatchet_hits';
 
 export interface MissionTask {
   id: string;
