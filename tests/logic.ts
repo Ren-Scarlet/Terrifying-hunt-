@@ -530,10 +530,12 @@ function caseFinisher(): void {
   downed.hp = 0;
   downed.downedTurns = 0;
   downed.intent = 'stunned';
+  downed.hidden = false;
   rescuer.room = rescueRoom;
   rescuer.hp = 4;
   rescuer.archetype = 'rescuer';
   rescuer.intent = 'idle';
+  rescuer.hidden = false;
   rescuer.blockedTurns = 0;
   rescue.energy = 0;
   withRandomSource(() => 0, () => endTurn(rescue));
