@@ -55,7 +55,7 @@ export const ARCH_LABEL: Record<Archetype, string> = {
 };
 
 export const ARCH_DESC: Record<Archetype, string> = {
-  alert: '一发现你就跑，边跑边喊，把消息传给隔壁房间。',
+  alert: '警觉逐渐升高；先观察和确认危险，达到高度警戒后才会逃跑并呼救。',
   defiant: '会推家具堵门，会去厨房拿刀——你进门时可能被反击掉步数。',
   caller: '摸向书房或大厅的电话；电话断了会去地下室用无线电。',
   rescuer: '优先治疗受伤、拉起倒地的同伴，是处决最大的障碍。',
