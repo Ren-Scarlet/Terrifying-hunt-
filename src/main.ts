@@ -4,6 +4,7 @@ import {
   attack,
   carryPerson,
   executeCarriedPerson,
+  executeDownedPerson,
   createGame,
   discardCard,
   drawCardAction,
@@ -419,18 +420,31 @@ app.addEventListener('click', (event) => {
   if (action === 'person') {
     const personId = target.dataset.personId;
     if (personId && game && screen === 'game') {
-      // 地图房间里点人头 = 直接对他挥刀；右侧名单 / 不可攻击时 = 看档案
-      if (target.dataset.attack === '1') {
-        attack(game, personId);
-        afterAction();
-        return;
-      }
+      // 点击人物只打开档案，不再把「查看」误触成攻击。
       const panel = document.getElementById('cardDetail');
       if (panel) {
         panel.innerHTML = personDetailHtml(game, personId);
         detailCardUid = null;
       }
     }
+    return;
+  }
+
+  if (action === 'attack-target') {
+    if (!game || screen !== 'game') return;
+    const personId = target.dataset.personId;
+    if (personId) attack(game, personId);
+    playSfx('attack');
+    afterAction();
+    return;
+  }
+
+  if (action === 'execute' || action === 'execute-target') {
+    if (!game || screen !== 'game') return;
+    const personId = action === 'execute-target' ? target.dataset.personId : undefined;
+    const executed = executeDownedPerson(game, personId);
+    if (executed) playSfx('kill');
+    afterAction();
     return;
   }
 

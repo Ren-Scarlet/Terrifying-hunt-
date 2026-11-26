@@ -8,7 +8,6 @@ import {
   ARCH_LABEL,
   BASE_AP,
   BLEEDOUT_TURNS,
-  DOWNED_LOCK_TURNS,
   HAND_LIMIT,
   LOOK_COST,
   drawCardAction,
@@ -23,6 +22,8 @@ import {
   currentScore,
   sabotageSiteItem,
   attack,
+  executeDownedPerson,
+  executeBlockReason,
   carryPerson,
   executeCarriedPerson,
   isRoomLit,
@@ -438,26 +439,47 @@ function caseDefaultWindow(): void {
   check('D 不打卡牌就别想轻松追上', bolted, bolted ? '跑向 ' + v.room : '还留在原地');
 }
 
-/** E：推门就是一次照面——没打伏击，再迟钝的人也会跑 */
+/** E：低警觉者先观察；暗处进一步压低察觉速度；高警觉者仍会逃跑。 */
 function caseUnaware(): void {
-  for (let attempt = 0; attempt < 10; attempt++) {
-    const s = newGame();
-    const v = player(s);
-    const next = openNeighbor(s.playerRoom);
-    v.room = next;
-    v.alert = 0;
-    v.hidden = false;
-    movePlayer(s, next);
-    if (v.room === next) continue;
-    check('E 低警觉者被推门惊动也会跑', true, `换了 ${attempt + 1} 局才碰到能跑的户型`);
-    check(
-      'E 不会再白送「背对着门」的偷袭窗口',
-      v.activity !== '背对着门，没有察觉' && v.alert >= 30,
-      `动作=${v.activity}，警觉=${v.alert}`,
-    );
-    return;
-  }
-  check('E 低警觉者被推门惊动也会跑', false, '10 局都没碰到能跑的户型');
+  const s = newGame();
+  s.people.forEach((person) => { person.item = null; person.itemUses = 0; person.armed = false; });
+  const v = s.people.find((person) => person.role !== 'police' && SURVIVOR_MAP[person.id]?.threat !== 'spiritual')!;
+  const next = openNeighbor(s.playerRoom);
+  v.room = next;
+  v.alert = 0;
+  v.awareness = 0;
+  v.intent = 'idle';
+  movePlayer(s, next);
+  check('E 低警觉者被推门后不会立刻逃跑',
+    v.room === next && v.alert < 75 && v.intent !== 'flee',
+    `房间=${v.room}，警觉=${v.alert}，意图=${v.intent}`);
+
+  const dark = newGame();
+  dark.people.forEach((person) => { person.item = null; person.itemUses = 0; person.armed = false; });
+  dark.powerCircuits.forEach((circuit) => { circuit.broken = true; });
+  const darkVictim = dark.people.find((person) => person.role !== 'police' && SURVIVOR_MAP[person.id]?.threat !== 'spiritual')!;
+  const darkNext = openNeighbor(dark.playerRoom);
+  darkVictim.room = darkNext;
+  darkVictim.alert = 0;
+  darkVictim.awareness = 0;
+  darkVictim.intent = 'idle';
+  movePlayer(dark, darkNext);
+  check('E 暗处进入显著降低幸存者警觉增长',
+    darkVictim.room === darkNext && darkVictim.alert <= 12 && darkVictim.intent !== 'flee',
+    `警觉=${darkVictim.alert}，意图=${darkVictim.intent}，状态=${darkVictim.activity}`);
+
+  const panic = newGame();
+  const alarmed = player(panic);
+  const panicNext = openNeighbor(panic.playerRoom);
+  alarmed.room = panicNext;
+  alarmed.alert = 66;
+  alarmed.awareness = 2;
+  alarmed.intent = 'wary';
+  panic.people.forEach((person) => { person.item = null; person.itemUses = 0; });
+  movePlayer(panic, panicNext);
+  check('E 高警觉者进入房间后仍会立即逃跑',
+    alarmed.room !== panicNext && alarmed.alert >= 75,
+    `房间=${alarmed.room}，警觉=${alarmed.alert}`);
 }
 
 /** F：倒地者挥刀补刀致死 + 处决牌 + 恶魔附身 */
@@ -466,48 +488,65 @@ function caseFinisher(): void {
   const v = player(s);
   v.room = s.playerRoom;
   v.hp = 0;
-  v.downedTurns = DOWNED_LOCK_TURNS;
+  v.downedTurns = 0;
   v.alert = 0;
   v.hidden = false;
   v.intent = 'stunned';
   s.energy = 3;
-  check('F 倒地者能被挥刀补刀（不再砍不动）', canAttack(s), attackBlockReason(s));
-  const stabbed = attack(s, v.id);
-  const gone = !s.people.some((p) => p.id === v.id);
-  check('F 补刀之后目标确实死亡', stabbed && gone, stabbed ? (gone ? '已死亡' : 'hp=' + v.hp) : '刀被拒绝');
+  check('F 倒地者不能再使用普通攻击', !canAttack(s, v.id) && attackBlockReason(s, v.id).includes('处决'));
+  check('F 倒地者可立即处决，无需等待回合', executeBlockReason(s, v.id) === '');
+  const executed = executeDownedPerson(s, v.id);
+  check('F 独立处决按钮能立即结束倒地者并消耗 1 AP',
+    executed && !s.people.some((p) => p.id === v.id) && s.energy === 2 && s.executions === 1,
+    `执行=${executed}，剩余 AP=${s.energy}，处决数=${s.executions}`);
 
   const s2 = newGame();
   const v2 = player(s2);
   v2.room = s2.playerRoom;
   v2.hp = 0;
-  v2.downedTurns = DOWNED_LOCK_TURNS;
+  v2.downedTurns = 0;
   const before2 = s2.people.length;
   const ok2 = play(s2, 'execute');
-  check('F 处决牌也能结束倒地者', ok2 && s2.people.length < before2, ok2 ? (s2.people.length < before2 ? '已处决' : 'hp=' + v2.hp) : '牌被拒绝');
+  check('F 处决卡也能在倒地当回合生效', ok2 && s2.people.length < before2);
 
-  // 处决范围必须限制在玩家当前房间，不能波及其他房间的倒地者
   const scoped = newGame();
   const localDowned = scoped.people.find((p) => p.role !== 'police')!;
   const remoteDowned = scoped.people.find((p) => p.role !== 'police' && p.id !== localDowned.id)!;
   localDowned.room = scoped.playerRoom;
   localDowned.hp = 0;
-  localDowned.downedTurns = DOWNED_LOCK_TURNS;
+  localDowned.downedTurns = 0;
   remoteDowned.room = openNeighbor(scoped.playerRoom);
   remoteDowned.hp = 0;
-  remoteDowned.downedTurns = DOWNED_LOCK_TURNS;
+  remoteDowned.downedTurns = 0;
   runOps(scoped, CARD_MAP.execute!.ops);
-  check(
-    'F 处决牌只处决当前房间目标',
-    !scoped.people.some((p) => p.id === localDowned.id) && scoped.people.some((p) => p.id === remoteDowned.id),
-    `local=${scoped.people.some((p) => p.id === localDowned.id)} remote=${scoped.people.some((p) => p.id === remoteDowned.id)}`,
-  );
+  check('F 处决牌只处决当前房间目标',
+    !scoped.people.some((p) => p.id === localDowned.id) && scoped.people.some((p) => p.id === remoteDowned.id));
+
+  const rescue = newGame();
+  const downed = rescue.people.find((p) => p.role !== 'police')!;
+  const rescuer = rescue.people.find((p) => p.role !== 'police' && p.id !== downed.id)!;
+  const rescueRoom = openNeighbor(rescue.playerRoom);
+  downed.room = rescueRoom;
+  downed.hp = 0;
+  downed.downedTurns = 0;
+  downed.intent = 'stunned';
+  downed.hidden = false;
+  rescuer.room = rescueRoom;
+  rescuer.hp = 4;
+  rescuer.archetype = 'rescuer';
+  rescuer.intent = 'idle';
+  rescuer.hidden = false;
+  rescuer.blockedTurns = 0;
+  rescue.energy = 0;
+  withRandomSource(() => 0, () => endTurn(rescue));
+  check('F 玩家暂不处决时，同伴仍可救起倒地者',
+    downed.hp > 0 && downed.downedTurns === 0,
+    `救援后生命值=${downed.hp}`);
 
   const executioner = KILLERS.find((killer) => killer.owner === '处刑者');
   const ultimate = executioner?.powers.find((power) => power.id === 'executioner_judge');
-  check(
-    'F 处刑者大招也使用当前房间目标',
-    ultimate?.ops.some((op) => op.op === 'execute' && op.who === 'downedHere') ?? false,
-  );
+  check('F 处刑者大招仍只处决当前房间目标',
+    ultimate?.ops.some((op) => op.op === 'execute' && op.who === 'downedHere') ?? false);
 
   const s3 = newGame();
   const v3 = player(s3);
@@ -518,7 +557,7 @@ function caseFinisher(): void {
   s3.possessed = true;
   s3.possessTurns = 3;
   attack(s3, v3.id);
-  check('F 迈尔斯恶魔附身一刀击倒健康幸存者', v3.hp === 0 && conditionOf(v3) === 'downed', `hp=${v3.hp}`);
+  check('F 迈尔斯恶魔附身一刀击倒健康幸存者', v3.hp === 0 && conditionOf(v3) === 'downed');
 }
 
 /** G：卡牌数据仍然挂着正确的指令，而且不再直接造成伤害 */
@@ -988,7 +1027,7 @@ function caseNewMechanics() {
     check('Z DSL 可以单独选择血祭品', sacrifices[0].alert === beforeAlert + 7);
   }
   check('Z 拉扯型幸存者已注册', ARCH_LABEL.kiter === '拉扯型');
-  check('Z 倒地 2 回合后才能补刀', DOWNED_LOCK_TURNS === 2 && BLEEDOUT_TURNS > DOWNED_LOCK_TURNS, `lock=${DOWNED_LOCK_TURNS} bleed=${BLEEDOUT_TURNS}`);
+  check('Z 倒地者有 4 回合流血倒计时，处决不再等待', BLEEDOUT_TURNS === 4);
   const health = newGame();
   const healthy = health.people.find((p) => p.role !== 'police')!;
   check('Z 幸存者初始生命值为 4', healthy.hp === 4 && conditionOf(healthy) === 'healthy');
@@ -997,7 +1036,7 @@ function caseNewMechanics() {
   healthy.hp = 0;
   check('Z 再累计 2 点伤害后倒地', conditionOf(healthy) === 'downed');
 
-  // 倒地保护期：砍倒当回合不能补刀，满 2 回合才能处决
+  // 攻击与处决是两个独立动作，倒地者不会再被攻击按钮误选。
   const e = newGame();
   e.people.forEach((p) => { p.item = null; p.itemUses = 0; p.alert = 0; });
   const freshDown = e.people.find((p) => p.role !== 'police')!;
@@ -1006,11 +1045,9 @@ function caseNewMechanics() {
   freshDown.downedTurns = 0;
   e.attackReady = true;
   const denied = !attack(e, freshDown.id);
-  check('Z 刚倒下 2 回合内不能补刀', denied && e.people.some((p) => p.id === freshDown.id));
-  freshDown.downedTurns = DOWNED_LOCK_TURNS;
-  e.attackReady = true;
-  const executed = attack(e, freshDown.id);
-  check('Z 满 2 回合后可以处决', executed && !e.people.some((p) => p.id === freshDown.id));
+  const executed = executeDownedPerson(e, freshDown.id);
+  check('Z 普通攻击不会误补刀，独立处决立即生效',
+    denied && executed && !e.people.some((p) => p.id === freshDown.id));
 
   // 擦刀：砍完刀锋收不回来，花 1 点原地擦刀就能再砍
   const b = newGame();
@@ -1220,7 +1257,7 @@ function caseContractsPowerAndCarry(): void {
   check('AB 搬运达到三间房后挣脱并恢复受伤状态', route.length === 3 && carry.carryPersonId === null && victim.hp === 2, 'route=' + route.length + ' hp=' + victim.hp);
   const special = newGame();
   special.people = special.people.filter((p) => p.role !== 'police').slice(0, 1);
-  const target = special.people[0]; target.room = 'kitchen'; target.hp = 0; target.downedTurns = DOWNED_LOCK_TURNS;
+  const target = special.people[0]; target.room = 'kitchen'; target.hp = 0; target.downedTurns = 0;
   special.playerRoom = 'kitchen'; special.carryPersonId = target.id; special.carryDistance = 1; special.energy = BASE_AP;
   const executed = executeCarriedPerson(special, 'fridge');
   check('AB 厨房冰箱特殊处决会击杀目标并计入处决数', executed && special.executions === 1 && !special.people.some((p) => p.id === target.id));
