@@ -1,4 +1,5 @@
 import { CARD_MAP } from '../../game/cards';
+import { awarenessLabel, awarenessStage } from '../../game/npc/awareness';
 import { characterImage, uiIcon } from '../../game/assetMap';
 import {
   ALARM_MAX,
@@ -108,7 +109,7 @@ function powerButtonHtml(state: GameState, killer: KillerProfile): string {
       const ok = canUsePower(state, p.id);
       const reason = powerBlockReason(state, p.id);
       const total = Math.max(1, p.cooldown);
-      const actionHint = p.id === 'myers_gaze' ? (!ok && reason ? reason : (state.myersStalking ? '尾随行动 · 1 AP / +10' : '点击尾随 · 1 AP / +10')) : (cd > 0 ? '冷却 ' + cd + ' 回合' : reason || (p.ultimate ? '可以发动' : '可以使用'));
+      const actionHint = p.id === 'myers_gaze' ? (!ok && reason ? reason : (state.myersStalking ? '尾随行动 · 1 AP / 最多 +15' : '点击尾随 · 1 AP / 最多 +15')) : (cd > 0 ? '冷却 ' + cd + ' 回合' : reason || (p.ultimate ? '可以发动' : '可以使用'));
       const pips = Array.from({ length: total }, (_, i) => {
         const filled = i < cd;
         return `<i class="${filled ? 'on' : ''}"></i>`;
@@ -381,7 +382,9 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
       const img = characterImage(p.id);
       const vis = isPersonVisible(state, p);
       const health = conditionOf(p);
-      const alertLabel = `<em class="alert-tag ${p.alert >= 70 ? 'high' : p.alert >= 35 ? 'mid' : ''}">警觉 ${p.alert}</em>`;
+      const stage = awarenessStage(p.alert);
+      const alertClass = ['', 'mid', 'panic', 'high'][stage];
+      const alertLabel = `<em class="alert-tag ${alertClass}">${awarenessLabel(p.alert)} ${p.alert}</em>`;
       const intentLabel = p.intent === 'idle' ? GOAL_LABEL[p.goal] : INTENT_LABEL[p.intent];
       const where = vis ? roomName(p.room) : `最后在${roomName(p.lastSeenRoom)}`;
       return `<button class="roster-person ${p.room === state.playerRoom ? 'here' : ''} ${p.marked ? 'marked' : ''} ${p.bloodSacrifice ? 'blood-sacrifice' : ''} ${p.intent === 'escape' ? 'escaping' : ''} ${vis ? '' : 'unknown'} ${health === 'downed' ? 'downed' : ''}"

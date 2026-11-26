@@ -76,7 +76,6 @@ export function renderMenu(save: SaveData): string {
           <button class="btn" data-action="deck">编辑牌组</button>
           <button class="btn" data-action="shop">卡牌商店</button>
           <button class="btn ghost" data-action="guide">玩法指引</button>
-          <button class="btn ghost mini admin-entry" data-action="admin">平衡调整</button>
         </div>
       </div>
     </div>

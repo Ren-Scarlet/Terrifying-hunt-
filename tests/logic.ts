@@ -50,6 +50,8 @@ import {
   visibleTrails,
   wipeBlade,
   usePower,
+  nextStepToward,
+  updateNpcDialogue,
 } from '../src/game/engine';
 import { OBSTACLE_ROOMS, ROOM_MAP, ROOMS, buildLayout } from '../src/game/rooms';
 import { cardImage } from '../src/game/assetMap';
@@ -59,6 +61,7 @@ import { generateMission } from '../src/game/missions';
 import type { GameState, RoomId } from '../src/game/types';
 import { createSeededRandom, random, withRandomSource } from '../src/game/random';
 import { nearestOf, roomDistance } from '../src/game/navigation';
+import { awarenessLabel, awarenessStage, myersStalkGain } from '../src/game/npc/awareness';
 
 let pass = 0;
 let fail = 0;
@@ -189,15 +192,15 @@ function caseMyersStalkingAndFearRadius(): void {
   prey.hp = 4;
   stalking.energy = 5;
   const stalkStart = stalking.stalkMeter;
-  check('迈尔斯：第一次点击尾随立即进入姿态、消耗 1 AP 并增加 10 尾随值',
-    usePower(stalking, 'myers_gaze') && stalking.myersStalking && stalking.stalkMeter === stalkStart + 10 && stalking.energy === 4,
+  check('迈尔斯：未发觉目标首次尾随增加 15 点尾随值',
+    usePower(stalking, 'myers_gaze') && stalking.myersStalking && stalking.stalkMeter === stalkStart + 15 && stalking.energy === 4,
     `stalk=${stalking.stalkMeter} AP=${stalking.energy}`);
   check('迈尔斯：第二次点击继续消耗行动并使目标开始起疑',
-    usePower(stalking, 'myers_gaze') && stalking.stalkMeter === stalkStart + 20 && stalking.energy === 3 && stalking.stalkPressure === 40 && prey.awareness >= 1,
+    usePower(stalking, 'myers_gaze') && stalking.stalkMeter === stalkStart + 30 && stalking.energy === 3 && stalking.stalkPressure === 40 && prey.awareness >= 1,
     `stalk=${stalking.stalkMeter} pressure=${stalking.stalkPressure} awareness=${prey.awareness}`);
   const thirdStalk = withRandomSource(() => 0.99, () => usePower(stalking, 'myers_gaze'));
   check('迈尔斯：持续盯梢第三次时目标逃离，不能稳定刷同一人',
-    thirdStalk && stalking.stalkMeter === stalkStart + 30 && stalking.stalkPressure === 0 && prey.intent === 'flee',
+    thirdStalk && stalking.stalkMeter === stalkStart + 38 && stalking.stalkPressure === 0 && prey.intent === 'flee',
     `stalk=${stalking.stalkMeter} intent=${prey.intent}`);
 
   const noPrey = newGame();
@@ -1471,6 +1474,36 @@ check('不规则地图：所有门都位于真实共边处', layoutAdjacencyFail
 check('不规则地图：每局 23 个房间保持全图连通', layoutConnectivityFailures === 0, `disconnected maps=${layoutConnectivityFailures}`);
 check('不规则地图：后院始终只有车库一个入口', layoutGardenFailures === 0, `invalid garden exits=${layoutGardenFailures}`);
 check('不规则地图：每局至少出现三种房间尺寸', layoutSizeVarietyFailures === 0, `low-variety maps=${layoutSizeVarietyFailures}`);
+
+
+/* NPC 认知分档、迈尔斯尾随收益、对白真实性与寻路避让。 */
+check('幸存者认知：100 点严格分为未发觉 / 怀疑 / 恐慌 / 警觉',
+  [0, 11, 12, 39, 40, 74, 75, 100].map(awarenessLabel).join('|') === '未发觉|未发觉|怀疑|怀疑|恐慌|恐慌|警觉|警觉' &&
+  [0, 12, 40, 75].map(awarenessStage).join('|') === '0|1|2|3');
+check('迈尔斯尾随：目标越警觉，尾随收益越低',
+  [0, 12, 40, 75].map(myersStalkGain).join('|') === '15|8|3|0');
+const dialogueGuard = newGame();
+const dialoguePerson = dialogueGuard.people.find((p) => p.role !== 'police')!;
+dialoguePerson.alert = 0;
+dialoguePerson.awareness = 3;
+dialoguePerson.intent = 'flee';
+updateNpcDialogue(dialogueGuard);
+check('NPC 对白：未发觉且没有危险认知时，不会声称正在被追',
+  !/追我|他就在后面|快跑|离我远点/.test(dialoguePerson.dialogue), dialoguePerson.dialogue);
+const pathGuard = newGame();
+const pathStart = ROOM_MAP[pathGuard.playerRoom].neighbors[0];
+check('NPC 寻路：避让列表中的玩家房间不能成为路径终点',
+  nextStepToward(pathGuard, pathStart, pathGuard.playerRoom, [pathGuard.playerRoom]) === null);
+const revealGuard = newGame();
+const assignedButIdle = revealGuard.people.filter((p) => p.role !== 'police' && ['objective', 'generator', 'key'].includes(p.goal));
+assignedButIdle.forEach((p) => { p.intent = 'idle'; p.revealedActions = 0; });
+runOps(revealGuard, [{ op: 'flag', key: 'revealWorkers', value: 2 }]);
+check('苦涩低语：只分配了团队目标但尚未开工的人不会被显示',
+  assignedButIdle.every((p) => !p.revealedActions));
+const actualWorker = revealGuard.people.find((p) => p.role !== 'police' && p.hp > 0)!;
+actualWorker.intent = 'work';
+runOps(revealGuard, [{ op: 'flag', key: 'revealWorkers', value: 2 }]);
+check('苦涩低语：真正处于工作状态的幸存者会被显示', (actualWorker.revealedActions ?? 0) > 0);
 
 caseNewPerkSystem();
 

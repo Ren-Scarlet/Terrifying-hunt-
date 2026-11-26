@@ -1,5 +1,6 @@
 import { random, randomOf, shuffle } from './random';
 import { nearestOf, roomDistance } from './navigation';
+import { awarenessStage, myersStalkGain } from './npc/awareness';
 import { ESCAPE_ROOMS, BASE_AP, SABOTAGE_COST, ITEM_BOX_CHARGES, GENERATOR_JAM_TURNS, POSSESS_TURNS, SURVIVOR_MAX_HP, SURVIVOR_INJURED_HP } from './constants';
 import { drawCards } from './deck';
 import { executeOps } from './effects/runtime';
@@ -658,14 +659,14 @@ function afterPlayerAction(state: GameState): void {
 /* ==================================================================== */
 
 
-function nextStepToward(
+export function nextStepToward(
   state: GameState,
   from: RoomId,
   to: RoomId,
   avoid: RoomId[] = [],
   respectLocks = true,
 ): RoomId | null {
-  if (from === to) return null;
+  if (from === to || avoid.includes(to)) return null;
   // 房间封锁的是整扇门：房内 NPC 不能穿门离开，房外 NPC 也不能进入。
   if (respectLocks && isLocked(state, from)) return null;
   const blocked = new Set<RoomId>(avoid);
@@ -1086,7 +1087,7 @@ function fleeAway(state: GameState, person: Person, quiet = false): boolean {
   // 后院是出口：只有本来就打算离开、或者已经吓破胆的人才会往外跑。
   // 否则「被追」等于「自动逃生」，玩家把人逼到院子里反而在帮对手。
   const mayExit =
-    person.goal === 'exit' || person.goal === 'panic' || person.alert >= 70 || person.hp <= SURVIVOR_INJURED_HP;
+    person.goal === 'exit' || person.goal === 'panic' || person.alert >= 75 || person.hp <= SURVIVOR_INJURED_HP;
   const options = ROOM_MAP[person.room].neighbors.filter(
     (r) =>
       r !== state.playerRoom &&
@@ -1468,7 +1469,7 @@ function actByArchetype(state: GameState, person: Person): void {
         return;
       }
       const away = ROOM_MAP[person.room].neighbors.filter((r) => r !== state.playerRoom);
-      const step = away.length ? randomOf(away) : nextStepToward(state, person.room, ESCAPE_ROOMS[0], []);
+      const step = away.length ? randomOf(away) : nextStepToward(state, person.room, ESCAPE_ROOMS[0], [state.playerRoom]);
       if (step) {
         person.room = step;
         person.intent = 'flee';
@@ -1642,7 +1643,7 @@ function npcTurn(state: GameState): void {
       log(state, `${person.name} 在${roomName(person.room)}发现并破坏了图腾。`);
     }
 
-    // 警觉值只代表情绪强度；认知阶段决定 NPC 是否真的知道危险存在。
+    // 即时警觉值可以下降，但已经确认的危险不会被忘记。
     person.awareness = Math.max(person.awareness, person.alert >= 75 ? 3 : person.alert >= 40 ? 2 : person.alert >= 12 ? 1 : 0);
 
     // 被抱起的人不会参与救援或移动，但仍然会继续流血倒计时。
@@ -1936,24 +1937,28 @@ function npcTurn(state: GameState): void {
 }
 
 /** 根据 NPC 真正掌握的信息与当前行为生成头顶短对白。 */
-function updateNpcDialogue(state: GameState): void {
+export function updateNpcDialogue(state: GameState): void {
   const daily = ['今晚吃什么？', '这里还挺安静的。', '等会儿要不要看电影？', '我有点饿了。', '你听说最近的新消息了吗？', '忙完就去休息吧。'];
   const suspicious = ['嗯？刚才是什么动静？', '你听见了吗？', '是不是有什么东西掉了？', '奇怪……我去看看。'];
   const alarmed = ['这里好像不太对劲。', '我们最好待在一起。', '刚才那声音是从哪边来的？', '快去看看其他人怎么样了。'];
   const fleeing = ['救命！他在追我！', '快跑！别回头！', '该死！离我远点！', '有人吗？救救我！', '他就在后面！'];
   const injured = ['好痛……谁来帮帮我。', '我流血了……', '别把我一个人留在这里。'];
   for (const person of npcs(state)) {
+    const stage = awarenessStage(person.alert);
+    person.awareness = stage;
     if (person.hp <= 0) {
       person.dialogue = randomOf(['……', '救……命……', '我动不了了……']);
-    } else if (person.intent === 'flee' || person.intent === 'escape') {
+    } else if ((person.intent === 'flee' || person.intent === 'escape') && stage >= 2) {
       person.dialogue = person.hp <= SURVIVOR_INJURED_HP ? randomOf(injured) : randomOf(fleeing);
-    } else if (person.intent === 'call') {
+    } else if (person.intent === 'call' && stage >= 1) {
       person.dialogue = randomOf(['喂？听得到吗？这里出事了！', '快接电话！求求你们快接！', '我需要帮助！']);
     } else if (person.intent === 'hide' || person.hidden) {
-      person.dialogue = randomOf(['别出声……', '他应该没发现我。', '拜托，快点离开……']);
-    } else if (person.awareness >= 2) {
-      person.dialogue = randomOf(person.awareness >= 3 ? ['他就在附近！', '别分开，快找个安全的地方！', '我们得想办法离开这里！'] : alarmed);
-    } else if (person.awareness === 1) {
+      person.dialogue = randomOf(stage >= 2 ? ['别让他发现我……', '别出声，他就在附近……', '我得找机会逃出去……'] : ['别出声……', '我刚才好像听见了什么。', '拜托，快点离开……']);
+    } else if (stage === 3) {
+      person.dialogue = randomOf(['他就在附近！', '别分开，快找个安全的地方！', '我们得想办法离开这里！']);
+    } else if (stage === 2) {
+      person.dialogue = randomOf(alarmed);
+    } else if (stage === 1) {
       person.dialogue = randomOf(suspicious);
     } else {
       person.dialogue = randomOf(daily);
@@ -2863,20 +2868,21 @@ export function usePower(state: GameState, powerId: string): boolean {
       state.stalkPressure = 0;
     }
     state.energy -= 1;
-    state.stalkMeter = Math.min(100, state.stalkMeter + 10);
+    const stalkGain = myersStalkGain(target.alert);
+    state.stalkMeter = Math.min(100, state.stalkMeter + stalkGain);
     state.stalkPressure = Math.min(100, state.stalkPressure + 20);
-    log(state, '你花费 1 点行动点凝视 ' + target.name + '：尾随值 +10（' + state.stalkMeter + '/100）。');
+    log(state, '你花费 1 点行动点凝视 ' + target.name + '：尾随值 +' + stalkGain + '（' + state.stalkMeter + '/100）。');
     if (state.stalkPressure >= 40 && state.stalkPressure < 60) {
-      target.awareness = Math.max(target.awareness, 1);
       target.alert = Math.max(target.alert, 20);
+      target.awareness = Math.max(target.awareness, 1);
       target.intent = 'wary';
       target.activity = '总觉得有人在暗处盯着自己';
       log(state, target.name + ' 开始怀疑自己正被什么东西注视。');
     }
     if (state.stalkPressure >= 60) {
       const detected = random() < 0.3;
-      target.awareness = Math.max(target.awareness, detected ? 3 : 2);
       target.alert = Math.max(target.alert, detected ? 100 : 55);
+      target.awareness = Math.max(target.awareness, detected ? 3 : 2);
       target.intent = 'flee';
       target.activity = detected ? '发现迈尔斯后惊恐逃跑' : '不安地逃离被注视的位置';
       if (detected) log(state, target.name + ' 突然发现了暗处的迈尔斯！');

@@ -8,6 +8,7 @@ import { KILLERS, type KillerProfile } from '../../game/killers';
 import { roomName } from '../../game/missions';
 import { getPersonProfile, type PersonProfile } from '../../game/people';
 import { SURVIVOR_MAP } from '../../game/survivors';
+import { awarenessLabel, awarenessStage } from '../../game/npc/awareness';
 import type { GameState, Person, SaveData } from '../../game/types';
 
 export const escape = (s: string) =>
@@ -140,11 +141,11 @@ export function personChip(person: Person, attackable = false, carryable = false
     : '';
   const sacrificeMark = person.bloodSacrifice ? '<span class="chip-sacrifice" title="本局血祭品">🩸</span>' : '';
   // 头顶上的警戒值：不用再翻日志判断这个人现在有多怕
-  const alertLevel = person.alert >= 70 ? 'high' : person.alert >= 35 ? 'mid' : 'low';
+  const alertLevel = (['low', 'mid', 'panic', 'high'] as const)[awarenessStage(person.alert)];
   const alertMark =
     person.role === 'police'
       ? ''
-      : `<span class="chip-alert ${alertLevel}" title="警觉 ${person.alert}/100：越高越可能立刻逃跑">${person.alert}</span>`;
+      : `<span class="chip-alert ${alertLevel}" title="${awarenessLabel(person.alert)} ${person.alert}/100：越高越可能立刻逃跑">${person.alert}</span>`;
   const bleedLeft = Math.max(0, BLEEDOUT_TURNS - person.downedTurns);
   const lockLeft = Math.max(0, DOWNED_LOCK_TURNS - person.downedTurns);
   const stateMark =
@@ -168,7 +169,7 @@ export function personChip(person: Person, attackable = false, carryable = false
         ? ' · 点击对他挥刀'
         : '';
   return `<button type="button" class="person-chip ${cls} ${person.bloodSacrifice ? 'blood-sacrifice' : ''} ${health === 'downed' ? 'is-downed' : ''} ${attackable ? 'can-hit' : ''}" data-action="${action}" data-person-id="${person.id}"${attackable ? ' data-attack="1"' : ''}
-    title="${escape(person.name)} · ${HEALTH_LABEL[health]} · 警觉 ${person.alert}/100 · ${escape(ARCH_LABEL[person.archetype])} · ${escape(GOAL_LABEL[person.goal])} · 正在${escape(label)}${note}">
+    title="${escape(person.name)} · ${HEALTH_LABEL[health]} · ${awarenessLabel(person.alert)} ${person.alert}/100 · ${escape(ARCH_LABEL[person.archetype])} · ${escape(GOAL_LABEL[person.goal])} · 正在${escape(label)}${note}">
     ${img ? `<img src="${img}" alt="" onerror="this.style.display='none'">` : ''}
     ${dialogue}<span>${escape(person.name)}</span>${contractTargetMark}${sacrificeMark}${intentDot(person)}${stateMark}${alertMark}${watchMark}${person.item ? itemBadge(person.item, person.itemUses) : ''}
   </button>`;
