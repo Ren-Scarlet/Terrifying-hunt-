@@ -1192,3 +1192,29 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
   58% { transform: translateY(-4px) rotate(-2deg); }
   78% { transform: translateY(1px) rotate(2deg); }
 }
+
+
+#app.immersive-game .floorplan .room-features .room-feature.breaker,
+#app.immersive-game .floorplan .room-features .room-feature.telephone,
+#app.immersive-game .floorplan .room-features .room-feature.radio,
+#app.immersive-game .floorplan .room-features .room-feature.trap-cache,
+#app.immersive-game .floorplan .room-features .room-feature.execution-site,
+#app.immersive-game .floorplan .room-features .room-feature.shrine,
+#app.immersive-game .floorplan .room-features .room-feature.trail-highlight {
+  font-size: 58px;
+  line-height: 1;
+}
+#app.immersive-game .floorplan .room-features .room-feature b { font-size: 11px; }
+#app.immersive-game .hand-actions .btn { margin: 0 !important; }
+@media (max-width: 700px) {
+  #app.immersive-game .ap-display {
+    flex-direction: row;
+    flex-basis: 76px;
+    min-width: 76px;
+    height: 58px;
+    gap: 4px;
+  }
+  #app.immersive-game .ap-display b { font-size: 16px; }
+  #app.immersive-game .ap-display b i { font-size: 8px; }
+  #app.immersive-game .ap-display small { font-size: 7px; }
+}
