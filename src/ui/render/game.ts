@@ -664,6 +664,12 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
         `<button class="btn execution" data-action="execute-special" data-method="${method.id}" title="${escape(method.description)}">${escape(method.name)} · +35</button>`,
       ).join('')
     : '';
+  const mapWorldActions = carried
+    ? `<div class="map-world-actions" aria-label="携带目标操作">
+        <button class="btn" data-action="drop-carried" ${state.energy < 1 ? 'disabled' : ''}>放下目标 · 1 AP</button>
+        ${executionMethodsAtRoom(state.playerRoom).map((method) => `<button class="btn" data-action="execute-special" data-method="${method.id}" title="${escape(method.description)}">特殊处决 · ${escape(method.name)}</button>`).join('')}
+      </div>`
+    : '';
   const carryStatus = carried ? `<div class="status-badge carrying">抱着 ${escape(carried.name)} · 搬运 ${state.carryDistance}/3 格</div>` : '';
   const trapCacheBtn = state.killer === '设陷者' && state.trapCaches.includes(state.playerRoom)
     ? `<button class="btn search" data-action="collect-trap" ${state.energy < 1 || state.trapInventory >= 4 ? 'disabled' : ''}>收集捕兽夹补给 · +1</button>`
@@ -699,7 +705,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
           <span>${escape(killer.owner)} · ${escape(killer.title)}</span>
         </div>
       </div>
-      <div class="mission-strip ${urgent ? 'urgent' : ''}">
+      <div class="mission-strip ${urgent ? 'urgent' : ''}" data-action="toggle-task-drawer" role="button" tabindex="0">
         <div class="mission-icon">${icon('missionTarget', 'ui-icon')}</div>
         <div class="mission-content">
           <div class="mission-title">${escape(m.title)}<em>${escape(ground.name)}</em><em>奖励 ${m.reward}</em></div>
@@ -714,7 +720,28 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
       </div>
     </div>
 
-
+    <div class="camera-controls" aria-label="镜头控制">
+      <button class="btn" data-action="camera-mode-center" data-camera-mode="center">A</button>
+      <button class="btn active" data-action="camera-mode-smooth" data-camera-mode="smooth">B</button>
+      <button class="btn" data-action="camera-zoom-out">−</button>
+      <span class="camera-readout" data-camera-zoom>118%</span>
+      <button class="btn" data-action="camera-zoom-in">＋</button>
+      <button class="btn" data-action="camera-global">全局</button>
+      <button class="btn active" data-action="camera-follow" data-camera-follow>跟随</button>
+    </div>
+    <div class="left-hud"><div class="portrait">${killerFaceHtml(killer, 'chip')}</div><div class="meter"><i style="height:${Math.round(state.energy / Math.max(1, state.maxEnergy) * 100)}%"></i></div><div class="tiny-stat">屠夫 · ${state.energy}/${state.maxEnergy} AP</div></div>
+    <div class="right-tools">
+      <button class="tool" data-action="toggle-task-drawer">☷</button>
+      <button class="tool" data-action="toggle-intel-drawer">⌕</button>
+      <button class="tool" data-action="toggle-game-hud">◉</button>
+    </div>
+    <div class="task-detail-drawer">
+      <h3>当前任务 / OBJECTIVE</h3>
+      <p><b>${escape(m.objective ?? m.title)}</b></p>
+      <p>${escape(m.successText ?? '达成主目标')}<br>失败条件：${escape(m.failText ?? '超时或被捕')}</p>
+      <p>${progress.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()}</p>
+      <p>剩余回合：${left} · 当前猎杀阶段：${huntPhase}</p>
+    </div>
 
     <div class="layout hunt-layout">
       <div class="main-column">
@@ -735,6 +762,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
               ${doorMarkersHtml(state)}
               ${trailOverlay(state)}
               ${playerMarker}
+              ${mapWorldActions}
               ${mapEventFeedHtml(state)}
           </div>
           <div class="map-legend">
@@ -803,7 +831,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
         </div>
       </div>
       <aside class="hunt-sidebar hunt-sidebar-right">
-        <details class="intel-drawer" open>
+        <details class="intel-drawer">
         <summary>
         <span>现场情报</span>
         <small>${known.length} 人已确认 · ${state.siteItems.length} 处设施 · ${state.log.length} 条记录</small>
