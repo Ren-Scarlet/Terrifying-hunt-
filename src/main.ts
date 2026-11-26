@@ -1031,10 +1031,11 @@ app.addEventListener('click', (event) => {
 
   if (action === 'play') {
     const ghosts = captureAttackGhosts();
-    const previousAttackTarget = game.lastAttackedId;
+    const oldLogs = new Set(game.log);
     const cardUid = target.dataset.uid;
     if (cardUid) playCard(game, cardUid);
-    if (game.lastAttackedId && game.lastAttackedId !== previousAttackTarget) {
+    const newLogs = game.log.filter((line) => !oldLogs.has(line));
+    if (game.lastAttackedId && newLogs.some((line) => line.includes('你挥刀砍向') || line.includes('你俯身补上一刀'))) {
       pendingMapAttackTarget = game.lastAttackedId;
       pendingMapAttackGhost = ghosts.get(game.lastAttackedId) ?? null;
     }
