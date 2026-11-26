@@ -40,7 +40,7 @@ import {
   setPowerOpValue,
 } from './game/tuning';
 import { ROOM_MAP } from './game/rooms';
-import { EXECUTION_METHODS, type ExecutionMethodId } from './game/executions';
+import type { ExecutionMethodId } from './game/executions';
 import type { GameState, RoomId, SaveData } from './game/types';
 import {
   cardDetailHtml,
