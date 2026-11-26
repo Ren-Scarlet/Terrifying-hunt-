@@ -727,9 +727,9 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
     </div>
     <div class="left-hud"><div class="portrait">${killerFaceHtml(killer, 'chip')}</div><div class="meter"><i style="height:${Math.round(state.energy / Math.max(1, state.maxEnergy) * 100)}%"></i></div><div class="tiny-stat">屠夫 · ${state.energy}/${state.maxEnergy} AP</div></div>
     <div class="right-tools">
-      <button class="tool" data-action="toggle-task-drawer">☷</button>
-      <button class="tool" data-action="toggle-intel-drawer">⌕</button>
-      <button class="tool" data-action="toggle-game-hud">◉</button>
+      <button class="tool" data-action="toggle-task-drawer" aria-label="任务详情"><span>☷</span><em>任务详情 · T</em></button>
+      <button class="tool" data-action="toggle-intel-drawer" aria-label="现场情报"><span>⌕</span><em>现场情报</em></button>
+      <button class="tool" data-action="toggle-game-hud" aria-label="隐藏界面"><span>◉</span><em>隐藏界面 · H</em></button>
     </div>
     <div class="task-pop task-detail-drawer">
       <h3>当前任务 / OBJECTIVE</h3>
