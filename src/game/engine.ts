@@ -3454,7 +3454,7 @@ export function calculateHuntStyleRating(state: GameState, result: ResultKind): 
   breakdown: ScoreLine[];
 } {
   const stats = state.huntStats;
-  const planning = Math.min(30, stats.routineInsights * 8 + stats.environmentActions * 5 + stats.trapTriggers * 8);
+  const planning = Math.min(30, stats.routineInsights * 8 + stats.environmentActions * 5 + stats.trapTriggers * 8 + stats.nurseBlinks * 2);
   const precision = Math.min(25, stats.hatchetHits * 6 + stats.nurseGrabs * 8 + stats.myersBurstHits * 8 + (state.specialExecutionBonus > 0 ? 8 : 0));
   const stealth = Math.min(20, (state.npcAlarmed ? 0 : 10) + Math.max(0, 10 - Math.floor(state.alarm / 10)));
   const efficiency = result === 'win' ? Math.min(15, Math.max(0, state.mission.turns - state.turn) * 2) : 0;
@@ -3463,6 +3463,7 @@ export function calculateHuntStyleRating(state: GameState, result: ResultKind): 
     stats.environmentActions > 0,
     stats.trapTriggers > 0,
     stats.hatchetHits > 0,
+    stats.nurseBlinks > 0,
     stats.nurseGrabs > 0,
     stats.myersBurstHits > 0,
     stats.quietKills > 0,
