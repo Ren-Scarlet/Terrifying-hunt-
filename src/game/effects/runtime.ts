@@ -355,7 +355,7 @@ export function executeOps(state: GameState, ops: Op[], runtime: EffectRuntime):
             const duration = Number(op.value ?? 2) + 1;
             const targets = state.teamStage >= 4
               ? npcs(state).filter((person) => person.hp > 0 && !person.hidden)
-              : npcs(state).filter((person) => person.hp > 0 && !person.hidden && (person.intent === 'work' || ['objective', 'generator', 'key'].includes(person.goal)));
+              : npcs(state).filter((person) => person.hp > 0 && !person.hidden && person.intent === 'work');
             targets.forEach((person) => { person.revealedActions = Math.max(person.revealedActions ?? 0, duration); });
             log(state, targets.length ? `苦涩低语：${state.teamStage >= 4 ? '所有幸存者' : '正在推进任务的幸存者'}显形。` : '苦涩低语：暂时没有正在推进任务的幸存者。');
             break;
