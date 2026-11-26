@@ -81,6 +81,12 @@ export function killerFaceHtml(killer: KillerProfile, cls = ''): string {
   if (killer.portrait) {
     return `<span class="killer-face art ${cls}"><img src="${killer.portrait}" alt="" onerror="this.style.display='none'"></span>`;
   }
+  // 地图上的玩家标记只显示杀手本身；不叠加力量稀有度底图，避免头像周围出现细小装饰点。
+  if (cls === 'marker') {
+    return `<span class="killer-face glyph marker">
+      <img class="face-icon" src="${killer.icon}" alt="" onerror="this.style.display='none'">
+    </span>`;
+  }
   return `<span class="killer-face glyph ${cls}">
       <img class="face-bg" src="${POWER_RARITY_BG}" alt="" onerror="this.style.display='none'">
       <img class="face-icon" src="${killer.icon}" alt="" onerror="this.style.display='none'">
