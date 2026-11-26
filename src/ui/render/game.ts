@@ -136,7 +136,7 @@ function roomFeatures(state: GameState, roomId: RoomId): string {
   if (TOTEM_ROOMS.includes(roomId)) parts.push(`<span class="room-feature totem" title="图腾：在此结束回合，下回合 +1 行动点">${icon('totem', 'ui-icon tiny')}<b>图腾</b></span>`);
   if (state.totems.includes(roomId)) parts.push(`<span class="room-feature totem cursed" title="厄咒图腾：支撑难逃一死；幸存者可能发现并破坏">${icon('totem', 'ui-icon tiny')}<b>厄咒</b></span>`);
   if (state.trailRevealActions > 0 && state.highlightedTrail && (state.highlightedTrail.room === roomId || state.highlightedTrail.to === roomId)) parts.push('<span class="room-feature trail-highlight" title="猎鹿者显现的最近脚印路线">👣</span>');
-  if (CABINET_ROOMS.includes(roomId)) parts.push(`<span class="room-feature cabinet" title="柜子：藏身者不会被引诱类卡牌锁定">${icon('cabinet', 'ui-icon tiny')}<b>柜子</b></span>`);
+  if (CABINET_ROOMS.includes(roomId) || (state.mapId === 'badham' && ['nursery', 'storage', 'guestroom'].includes(roomId))) parts.push(`<span class="room-feature cabinet" title="柜子：藏身者不会被引诱类卡牌锁定">${icon('cabinet', 'ui-icon tiny')}<b>柜子</b></span>`);
   if (OBSTACLE_ROOMS.includes(roomId) && !cleared) parts.push(`<span class="room-feature obstacle" title="障碍：进入多花 1 点行动点；破门能力可以直接清掉">${icon('obstacle', 'ui-icon tiny')}<b>障碍</b></span>`);
   return parts.join('');
 }
@@ -629,7 +629,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
       <span class="atk-meta">${wipeReason ? escape(wipeReason) : `${WIPE_COST} 点 · 收回刀锋`}</span>
     </button>`;
   const searchOk = state.phase === 'playing' && state.energy >= SEARCH_COST;
-  const cabinetHere = CABINET_ROOMS.includes(state.playerRoom);
+  const cabinetHere = CABINET_ROOMS.includes(state.playerRoom) || (state.mapId === 'badham' && ['nursery', 'storage', 'guestroom'].includes(state.playerRoom));
   const hiddenHere = state.people.some((p) => p.room === state.playerRoom && p.hidden);
   const carried = state.carryPersonId ? state.people.find((p) => p.id === state.carryPersonId) : null;
   const specialExecution = carried && carried.hp <= 0
