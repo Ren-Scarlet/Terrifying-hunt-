@@ -42,6 +42,9 @@ import {
   setCardCost,
   setCardDesc,
   setCardNoAction,
+  addCardOp,
+  removeCardOp,
+  moveCardOp,
   setCardOpValue,
   setPowerCooldown,
   setPowerOpValue,
@@ -374,6 +377,19 @@ app.addEventListener('click', (event) => {
   if (action === 'admin-close') {
     adminOpen = false;
     render();
+    return;
+  }
+
+  if (action === 'admin-op-add') {
+    const id = target.dataset.card;
+    const select = id ? document.getElementById(`addEffect-${id}`) as HTMLSelectElement | null : null;
+    if (id && select && addCardOp(id, select.value)) render();
+    return;
+  }
+  if (action === 'admin-op-remove' || action === 'admin-op-move') {
+    const id = target.dataset.card, index = Number(target.dataset.index);
+    const ok = id && Number.isInteger(index) && (action === 'admin-op-remove' ? removeCardOp(id, index) : moveCardOp(id, index, Number(target.dataset.direction) as -1 | 1));
+    if (ok) render();
     return;
   }
 

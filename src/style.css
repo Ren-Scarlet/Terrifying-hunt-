@@ -3528,3 +3528,26 @@ button, .room-hit, .hand-row { touch-action: manipulation; }
   .admin-grid, .tune-killer-powers { grid-template-columns: 1fr; }
   .tune-op select { max-width: min(58vw, 220px); }
 }
+
+/* 工作台：放大阅读字号，并让效果步骤可增删、排序 */
+.admin-modal { width: min(1480px, calc(100vw - 28px)); max-height: 94vh; overflow: auto; }
+.admin-lead, .admin-modal p { font-size: 15px; line-height: 1.75; }
+.admin-modal h2 { font-size: 21px; }
+.admin-modal h3 { font-size: 18px; }
+.admin-modal label, .admin-modal .tune-op, .admin-modal .tune-pre { font-size: 14px; }
+.admin-modal input, .admin-modal select, .admin-modal textarea { font: inherit; min-height: 38px; }
+.admin-modal textarea { line-height: 1.6; }
+.tune-op-editor { margin: 8px 0; padding: 9px; border: 1px solid #34302a; background: #101214; }
+.tune-op-controls { display:flex; gap:6px; justify-content:flex-end; margin-top:6px; }
+.tune-op-controls button { min-width:36px; min-height:32px; border:1px solid #55483a; background:#211a14; color:#dfc9a7; cursor:pointer; }
+.tune-op-controls button:disabled { opacity:.3; cursor:not-allowed; }
+.tune-op-controls button:last-child { padding:0 12px; color:#e4a69b; border-color:#714036; }
+.tune-add-row { display:flex; gap:8px; align-items:center; margin:10px 0 18px; }
+.tune-add-row select { flex:1; min-width:0; }
+.tune-op { gap:8px; }
+.tune-op input, .tune-op select { font-size:14px; min-height:36px; }
+@media (max-width:720px) {
+ .admin-modal { width:calc(100vw - 12px); max-height:96dvh; }
+ .tune-add-row { flex-wrap:wrap; }
+ .tune-add-row select { flex-basis:100%; }
+}

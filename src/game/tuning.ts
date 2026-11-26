@@ -1,6 +1,7 @@
 import { CARDS, CARD_MAP } from './data/cards';
 import { KILLERS, KILLER_MAP } from './data/killers';
 import type { Op } from './effect';
+import { EFFECT_OPS, type EffectFieldType } from './effectCatalog';
 
 /**
  * ============================================================================
@@ -170,6 +171,40 @@ export function setCardOpValue(id: string, path: string, value: number | string 
   return ok;
 }
 
+function defaultEffectOp(name: string): Op | null {
+  const meta = EFFECT_OPS[name as keyof typeof EFFECT_OPS];
+  if (!meta || name === 'if') return null;
+  const result: Record<string, unknown> = { op: name };
+  for (const [field, type] of meta.fields) {
+    if (['maxHp', 'clearAlert', 'to', 'all', 'adj', 'value'].includes(field) && !(name === 'scout' && field === 'turns')) continue;
+    if (type === 'who') result[field] = 'victim';
+    else if (type === 'dest') result[field] = 'here';
+    else if (type === 'flag') result[field] = 'phoneCut';
+    else if (type === 'sabotage') result[field] = 'phone';
+    else if (type === 'status') result[field] = 'deepWound';
+    else if (type === 'text') result[field] = '效果触发';
+    else result[field] = field === 'turns' ? 2 : field === 'count' || field === 'distance' ? 1 : 1;
+  }
+  if (name === 'scout') result.turns = 2;
+  if (name === 'pursue') result.distance = 2;
+  return result as unknown as Op;
+}
+export function addCardOp(id: string, name: string): boolean {
+  const card = CARD_MAP[id], op = defaultEffectOp(name);
+  if (!card || !op || card.ops.length >= 30) return false;
+  card.ops = [...card.ops, op]; recordCard(id); return true;
+}
+export function removeCardOp(id: string, index: number): boolean {
+  const card = CARD_MAP[id];
+  if (!card || index < 0 || index >= card.ops.length) return false;
+  card.ops = card.ops.filter((_, i) => i !== index); recordCard(id); return true;
+}
+export function moveCardOp(id: string, index: number, direction: -1 | 1): boolean {
+  const card = CARD_MAP[id], next = index + direction;
+  if (!card || index < 0 || next < 0 || next >= card.ops.length) return false;
+  const ops = [...card.ops]; [ops[index], ops[next]] = [ops[next], ops[index]];
+  card.ops = ops; recordCard(id); return true;
+}
 /** 杀手能力：冷却 */
 export function setPowerCooldown(owner: string, powerId: string, cooldown: number): void {
   const power = KILLER_MAP[owner]?.powers.find((p) => p.id === powerId);
@@ -276,49 +311,91 @@ function validateOptionalField(op: string, field: string, value: unknown): boole
   return false;
 }
 
-/** 只允许调整基准 DSL 已有的指令和字段，不允许导入时注入新指令。 */
-function validateOps(value: unknown, baseline: Op[]): value is Op[] {
-  if (!Array.isArray(value) || value.length !== baseline.length) return false;
-  return value.every((candidate, index) => {
-    const base = baseline[index] as unknown as Record<string, unknown>;
-    if (!isRecord(candidate) || candidate.op !== base.op) return false;
-    const keys = Object.keys(base);
-    const optional = OPTIONAL_OP_FIELDS[candidate.op as string] ?? [];
-    const candidateKeys = Object.keys(candidate);
-    if (candidateKeys.some((key) => !keys.includes(key) && !optional.includes(key))) return false;
-    for (const key of candidateKeys) {
-      if (!keys.includes(key) && !validateOptionalField(candidate.op as string, key, candidate[key])) return false;
+const REQUIRED_OP_FIELDS: Record<string, string[]> = {
+  damage: ['who', 'amount'], down: ['who'], execute: ['who'], kill: ['who'], wanted: ['amount'],
+  alert: ['who', 'amount'], block: ['who', 'turns'], status: ['who', 'status', 'turns'], pin: ['who'],
+  move: ['who', 'to'], teleportPlayer: ['to'], lockRoom: ['room', 'turns'], track: ['who', 'turns'],
+  lure: ['to', 'count'], alarm: ['amount'], sabotage: ['key'], draw: ['amount'], energy: ['amount'],
+  steps: ['amount'], stun: ['amount'], discount: ['amount'], bonusDamage: ['amount'], arrestThreshold: ['amount'],
+  heal: ['who', 'amount'], rescue: ['who'], bleed: ['who', 'amount'], stalk: ['amount'],
+  silenceAlarm: ['turns'], pursue: ['who'], flag: ['key'], log: ['text'], if: ['cond', 'then'],
+};
+const OPTIONAL_DYNAMIC_FIELDS: Record<string, string[]> = {
+  damage: ['maxHp'], move: ['clearAlert'], scout: ['to', 'all', 'adj', 'turns'],
+  pursue: ['distance'], flag: ['value'], if: ['else'],
+};
+function validField(type: EffectFieldType, value: unknown): boolean {
+  if (type === 'num') return typeof value === 'number' && Number.isFinite(value) && Math.abs(value) <= 1000;
+  if (type === 'text') return typeof value === 'string' && value.length <= 1000;
+  if (type === 'who') return typeof value === 'string' && WHO_VALUES.has(value);
+  if (type === 'dest') return typeof value === 'string' && DEST_VALUES.has(value);
+  if (type === 'flag') return typeof value === 'string' && FLAG_VALUES.has(value);
+  if (type === 'status') return typeof value === 'string' && STATUS_VALUES.has(value);
+  if (type === 'sabotage') return typeof value === 'string' && SABOTAGE_VALUES.has(value);
+  return false;
+}
+function validateDynamicCondition(value: unknown): boolean {
+  if (!isRecord(value) || typeof value.c !== 'string') return false;
+  const allowed: Record<string, string[]> = {
+    killsThisTurn: ['c', 'gte'], peopleHere: ['c', 'gte'], victimHere: ['c', 'maxHp'],
+    downedHere: ['c'], injuredHere: ['c'], targetAway: ['c'], energy: ['c', 'gte'],
+    wanted: ['c', 'gte', 'lte'], alarm: ['c', 'gte', 'lte'], stalk: ['c', 'gte'],
+    possession: ['c'], visibleSurvivor: ['c'], flag: ['c', 'key'], room: ['c', 'is'],
+    markedAlive: ['c'], escaped: ['c', 'gte'], hasThreat: ['c', 'v'], hasArchetype: ['c', 'a'],
+  };
+  const keys = allowed[value.c];
+  if (!keys || Object.keys(value).some((key) => !keys.includes(key))) return false;
+  for (const key of keys) {
+    if (key === 'c') continue;
+    if (!(key in value)) {
+      if (['wanted', 'alarm', 'victimHere'].includes(value.c) && ['gte', 'lte', 'maxHp'].includes(key)) continue;
+      return false;
     }
-    if (keys.some((key) => !optional.includes(key) && !(key in candidate))) return false;
-    for (const key of keys) {
-      const current = candidate[key];
-      const original = base[key];
-      if (original === undefined && current !== undefined) {
-        if (!validateOptionalField(candidate.op as string, key, current)) return false;
-        continue;
-      }
-      if (key === 'then' || key === 'else') {
-        if (current === undefined && original === undefined) continue;
-        if (!Array.isArray(original) || !Array.isArray(current) || !validateOps(current, original as Op[])) return false;
-      } else if (key === 'cond') {
-        if (!validateCondition(current, original)) return false;
-      } else if (typeof original === 'number') {
-        if (typeof current !== 'number' || !Number.isFinite(current) || Math.abs(current) > 1000) return false;
-      } else if (typeof original === 'string') {
-        if (typeof current !== 'string' || current.length > 1000) return false;
-        if (key === 'who' && !WHO_VALUES.has(current)) return false;
-        if (key === 'status' && candidate.op === 'status' && !STATUS_VALUES.has(current)) return false;
-        if ((key === 'to' || key === 'room') && !DEST_VALUES.has(current)) return false;
-        if (key === 'key' && candidate.op === 'flag' && !FLAG_VALUES.has(current)) return false;
-        if (key === 'key' && candidate.op === 'sabotage' && !SABOTAGE_VALUES.has(current)) return false;
-      } else if (typeof original === 'boolean' && typeof current !== 'boolean') {
+    const v = value[key];
+    if (key === 'key' && value.c === 'flag' && (typeof v !== 'string' || !FLAG_VALUES.has(v))) return false;
+    if (key === 'is' && value.c === 'room' && (typeof v !== 'string' || !DEST_VALUES.has(v))) return false;
+    if (key === 'v' && (typeof v !== 'string' || !['alarm', 'lead', 'team', 'spiritual'].includes(v))) return false;
+    if (key === 'a' && (typeof v !== 'string' || !['alert', 'defiant', 'caller', 'rescuer', 'hider', 'brave'].includes(v))) return false;
+    if (['gte', 'lte', 'maxHp'].includes(key) && (typeof v !== 'number' || !Number.isFinite(v) || Math.abs(v) > 1000)) return false;
+  }
+  return true;
+}
+/** 按 DSL 目录校验效果步骤，不再要求与原卡牌指令数量、顺序相同。 */
+function validateOps(value: unknown, _baseline?: Op[]): value is Op[] {
+  if (!Array.isArray(value) || value.length > 30) return false;
+  return value.every((candidate) => {
+    if (!isRecord(candidate) || typeof candidate.op !== 'string') return false;
+    const meta = EFFECT_OPS[candidate.op as keyof typeof EFFECT_OPS];
+    if (!meta) return false;
+    const allowedFields = meta.fields.map(([field]) => field);
+    const optional = OPTIONAL_DYNAMIC_FIELDS[candidate.op] ?? [];
+    if (Object.keys(candidate).some((key) => key !== 'op' && !allowedFields.includes(key) && !optional.includes(key))) return false;
+    for (const field of REQUIRED_OP_FIELDS[candidate.op] ?? []) if (!(field in candidate)) return false;
+    for (const [field, type] of meta.fields) {
+      if (!(field in candidate)) {
+        if (optional.includes(field)) continue;
         return false;
       }
+      if (!validField(type, candidate[field])) return false;
+    }
+    for (const field of optional) {
+      if (!(field in candidate)) continue;
+      const v = candidate[field];
+      if (candidate.op === 'damage' && field === 'maxHp' && (typeof v !== 'number' || v < 0 || v > 4)) return false;
+      if (candidate.op === 'move' && field === 'clearAlert' && typeof v !== 'boolean') return false;
+      if (candidate.op === 'scout' && field === 'to' && (typeof v !== 'string' || !DEST_VALUES.has(v))) return false;
+      if (candidate.op === 'scout' && ['all', 'adj'].includes(field) && typeof v !== 'boolean') return false;
+      if (candidate.op === 'scout' && field === 'turns' && (typeof v !== 'number' || v < 1 || v > 10)) return false;
+      if (candidate.op === 'pursue' && field === 'distance' && (typeof v !== 'number' || v < 1 || v > 20)) return false;
+      if (candidate.op === 'flag' && field === 'value' && typeof v !== 'boolean' && (typeof v !== 'number' || !Number.isFinite(v))) return false;
+      if (candidate.op === 'if' && field === 'else' && !Array.isArray(v)) return false;
+    }
+    if (candidate.op === 'if') {
+      if (!validateDynamicCondition(candidate.cond) || !validateOps(candidate.then) || (candidate.else !== undefined && !validateOps(candidate.else))) return false;
     }
     return true;
   });
 }
-
 function validateTuning(value: unknown): value is TuningData {
   if (!isRecord(value) || !isRecord(value.cards) || !isRecord(value.powers)) return false;
   if (Object.keys(value).some((key) => key !== 'cards' && key !== 'powers')) return false;
@@ -329,7 +406,7 @@ function validateTuning(value: unknown): value is TuningData {
     if ('cost' in tune && (typeof tune.cost !== 'number' || !Number.isInteger(tune.cost) || tune.cost < 0 || tune.cost > 6)) return false;
     if ('desc' in tune && (typeof tune.desc !== 'string' || tune.desc.length > 500)) return false;
     if ('noAction' in tune && typeof tune.noAction !== 'boolean') return false;
-    if ('ops' in tune && !validateOps(tune.ops, base.ops)) return false;
+    if ('ops' in tune && !validateOps(tune.ops)) return false;
   }
 
   for (const [key, tune] of Object.entries(value.powers)) {

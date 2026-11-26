@@ -59,9 +59,19 @@ function opRow(op: Op, tuneKey: string, depth = 0): string {
   return `<div class="tune-op" style="--depth:${depth}">${head}${inputs}</div>${nested}`;
 }
 
-function opsHtml(ops: Op[], prefix: string): string {
-  if (!ops.length) return '<div class="tune-empty">没有指令</div>';
-  return ops.map((op, i) => opRow(op, `${prefix}${i}`)).join('');
+function opsHtml(ops: Op[], prefix: string, cardId?: string): string {
+  if (!ops.length) return '<div class="tune-empty">没有指令，使用下方菜单添加效果。</div>';
+  return ops.map((op, i) => {
+    const controls = cardId ? '<div class="tune-op-controls">' +
+      '<button type="button" data-action="admin-op-move" data-card="' + cardId + '" data-index="' + i + '" data-direction="-1" ' + (i === 0 ? 'disabled' : '') + '>↑</button>' +
+      '<button type="button" data-action="admin-op-move" data-card="' + cardId + '" data-index="' + i + '" data-direction="1" ' + (i === ops.length - 1 ? 'disabled' : '') + '>↓</button>' +
+      '<button type="button" data-action="admin-op-remove" data-card="' + cardId + '" data-index="' + i + '">删除</button></div>' : '';
+    return '<div class="tune-op-editor">' + opRow(op, prefix + i) + controls + '</div>';
+  }).join('');
+}
+
+function effectOptionsHtml(): string {
+  return Object.entries(EFFECT_OPS).filter(([key]) => key !== 'if').map(([key, meta]) => `<option value="${key}">${meta.label}</option>`).join('');
 }
 
 function cardBlock(): string {
@@ -78,7 +88,8 @@ function cardBlock(): string {
       </div>
       <label class="tune-description">卡牌描述<textarea rows="3" data-tune="card|${card.id}|desc">${escape(card.desc)}</textarea></label>
       <label class="tune-no-action"><input type="checkbox" data-tune="card|${card.id}|noAction" ${card.noAction ? 'checked' : ''}> 不推进幸存者行动（不消耗世界行动）</label>
-      <div class="tune-ops">${opsHtml(card.ops, `card|${card.id}|`)}</div>
+      <div class="tune-ops">${opsHtml(card.ops, `card|${card.id}|`, card.id)}</div>
+      <div class="tune-add-row"><select aria-label="选择要添加的效果" id="addEffect-${card.id}">${effectOptionsHtml()}</select><button type="button" class="btn mini" data-action="admin-op-add" data-card="${card.id}">＋ 添加效果</button></div>
       ${card.precheck ? `<div class="tune-pre">前置：${escape(card.precheck.hint)}</div>` : ''}
     </div>`;
   }).join('');
