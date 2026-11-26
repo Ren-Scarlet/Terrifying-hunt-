@@ -1248,7 +1248,7 @@ function wantsToLeave(state: GameState, person: Person): boolean {
  */
 function fleeAway(state: GameState, person: Person, quiet = false): boolean {
   if (state.pinnedPeople.includes(person.id) || person.blockedTurns > 0 || person.hp <= 0 || person.fear >= 100) return false;
-  if (person.hp <= SURVIVOR_INJURED_HP && person.movesThisTurn % 2 === 1) {
+  if (person.room !== state.playerRoom && person.hp <= SURVIVOR_INJURED_HP && person.movesThisTurn % 2 === 1) {
     person.activity = '重伤拖慢了脚步，踉跄着停了一下';
     return false;
   }
