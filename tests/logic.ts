@@ -31,6 +31,8 @@ import {
   canCoordinateRescue,
   executeCarriedPerson,
   isRoomLit,
+  getHuntOpportunities,
+  recordRoutineObservation,
   missionTaskProgress,
   attackBlockReason,
   canAttack,
@@ -67,6 +69,7 @@ import type { GameState, RoomId } from '../src/game/types';
 import { createSeededRandom, random, withRandomSource } from '../src/game/random';
 import { nearestOf, roomDistance } from '../src/game/navigation';
 import { awarenessLabel, awarenessStage, myersStalkGain } from '../src/game/npc/awareness';
+import { ROUTINE_PROFILE } from '../src/game/npc/catalog';
 
 let pass = 0;
 let fail = 0;
@@ -99,6 +102,53 @@ function newGame(): GameState {
   const deck = ['silent_step', 'sprint', 'choke', 'shuriken', 'execute', 'clean', 'night_cover', 'aim'];
   return createGame(deck, undefined, '迈克尔·迈尔斯');
 }
+function caseRoutineHuntOpportunities(): void {
+  const s = newGame();
+  const person = s.people.find((item) => item.role !== 'police');
+  if (!person) {
+    check('日常习惯：对局至少有一名幸存者可观察', false);
+    return;
+  }
+  person.goal = 'routine';
+  person.room = s.playerRoom;
+  person.routineIndex = 0;
+  person.routineSightings = 0;
+  person.routineObserved = false;
+  person.routineLastObservedTurn = -1;
+  check('日常习惯：七种行为类型均有独立路线',
+    Object.keys(ROUTINE_PROFILE).length === 7 &&
+    Object.values(ROUTINE_PROFILE).every((routine) => routine.rooms.length >= 3));
+  const first = recordRoutineObservation(s, person.room);
+  const repeatedSameTurn = recordRoutineObservation(s, person.room);
+  check('日常习惯：同一回合重复查看不会刷观察次数',
+    first === 0 && repeatedSameTurn === 0 && person.routineSightings === 1 && !person.routineObserved);
+  s.turn += 1;
+  const second = recordRoutineObservation(s, person.room);
+  check('日常习惯：跨回合观察两次后确认路线',
+    second === 1 && person.routineObserved === true && person.routineSightings === 2);
+  const otherRoom: RoomId = person.room === 'garage' ? 'attic' : 'garage';
+  s.people.filter((item) => item.id !== person.id).forEach((item) => { item.room = otherRoom; });
+  person.alert = 0;
+  person.hp = 4;
+  person.hidden = false;
+  person.activity = ROUTINE_PROFILE[person.archetype].activity;
+  const circuit = s.powerCircuits.find((item) => item.affectedRooms.includes(person.room));
+  if (circuit) circuit.enabled = false;
+  const opportunities = getHuntOpportunities(s);
+  check('猎杀机会：独处目标会显示落单窗口',
+    opportunities.some((item) => item.targetId === person.id && item.id.startsWith('isolated-')));
+  if (circuit) {
+    check('猎杀机会：断电房间会显示暗处接近窗口',
+      opportunities.some((item) => item.targetId === person.id && item.id.startsWith('dark-')));
+  }
+  check('猎杀机会：已确认习惯且正在按习惯停留时显示机会',
+    opportunities.some((item) => item.targetId === person.id && item.id.startsWith('routine-')));
+  const dossier = personDetailHtml(s, person.id);
+  check('人物档案：确认路线后显示习惯名称与常去房间',
+    dossier.includes(ROUTINE_PROFILE[person.archetype].label) &&
+    dossier.includes('常去路线'));
+}
+
 function caseGeneratorBreakerNetwork(): void {
   const s = newGame();
   const circuit = s.powerCircuits[0];
@@ -155,6 +205,7 @@ function casePhoneLineCoordination(): void {
 
 /** 新抽牌规则：每回合补 1 张、主动抽牌、六张上限、洗牌推进团队进度。 */
 /** 环境事件：每三回合改变一次现场局势，并正确区分临时闪断与永久断电。 */
+caseRoutineHuntOpportunities();
 caseGeneratorBreakerNetwork();
 casePhoneLineCoordination();
 

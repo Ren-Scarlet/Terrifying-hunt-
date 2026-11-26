@@ -4,6 +4,7 @@ import { ESCAPE_ROOMS } from '../constants';
 import { ENTRY_ROOM, OBSTACLE_ROOMS, POLICE_START, ROOMS } from '../rooms';
 import { SPECIAL_SURVIVORS, SURVIVOR_MAP, SURVIVORS } from '../survivors';
 import type { Archetype, Mission, NpcGoal, Person, PersonRole, RoomId, SurvivorItem } from '../types';
+import { ROUTINE_PROFILE } from './catalog';
 
 const STARTER_ITEM_RATE = 0.32;
 const STARTER_ITEMS: SurvivorItem[] = ['medkit', 'toolbox', 'flashlight', 'smoke', 'flare'];
@@ -69,6 +70,7 @@ function makePerson(
   marked: boolean,
 ): Person {
   const archetype = pickArchetype(s);
+  const routine = ROUTINE_PROFILE[archetype];
   // 三成的人开局就带着一件小东西：只有发现他之后才看得到，值得你优先盯
   const starter: SurvivorItem | null = random() < STARTER_ITEM_RATE ? randomOf(STARTER_ITEMS) : null;
   return {
@@ -86,6 +88,10 @@ function makePerson(
     activity: randomOf(ACTIVITIES),
     intent: 'idle',
     goal: goalForArchetype(archetype),
+    routineIndex: Math.floor(random() * routine.rooms.length),
+    routineSightings: 0,
+    routineObserved: false,
+    routineLastObservedTurn: -1,
     blockedTurns: 0,
     bleed: 0,
     downedTurns: 0,

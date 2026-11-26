@@ -9,7 +9,7 @@ export { drawCards } from './deck';
 export { createGame } from './setup';
 export { BASE_AP, SABOTAGE_COST, ITEM_BOX_CHARGES, GENERATOR_JAM_TURNS, POSSESS_TURNS, SURVIVOR_MAX_HP, SURVIVOR_INJURED_HP } from './constants';
 import { ACTIVITIES, createPeople, itemUsesFor } from './npc/factory';
-import { ARCH_DESC, ARCH_LABEL, GOAL_LABEL, HEALTH_LABEL, INTENT_LABEL, SITE_ITEM_LABEL, SURVIVOR_ITEM_LABEL } from './npc/catalog';
+import { ARCH_DESC, ARCH_LABEL, GOAL_LABEL, HEALTH_LABEL, INTENT_LABEL, ROUTINE_PROFILE, SITE_ITEM_LABEL, SURVIVOR_ITEM_LABEL } from './npc/catalog';
 export { ARCH_DESC, ARCH_LABEL, GOAL_LABEL, HEALTH_LABEL, INTENT_LABEL, SITE_ITEM_LABEL, SURVIVOR_ITEM_LABEL } from './npc/catalog';
 export { ESCAPE_ROOMS } from './constants';
 import { CARD_MAP, UNLOCK_REWARDS } from './cards';
@@ -1878,9 +1878,13 @@ function npcTurn(state: GameState): void {
     // 路过没被砸烂的道具箱就翻一件：他们多一条路，你就多一个要盯的地方
     if (tryTakeSupply(state, person)) continue;
 
+    const routine = ROUTINE_PROFILE[person.archetype];
+    const routineRoom = routine.rooms[(person.routineIndex ?? 0) % routine.rooms.length];
     const goalTargets: RoomId[] =
-      person.goal === 'objective'
-        ? state.objectiveRooms
+      person.goal === 'routine'
+        ? [routineRoom]
+        : person.goal === 'objective'
+          ? state.objectiveRooms
         : person.goal === 'key'
           ? [EXIT_ROOM]
           : person.goal === 'supply'
@@ -1905,7 +1909,11 @@ function npcTurn(state: GameState): void {
       const gen = state.siteItems.find(
         (i) => i.kind === 'generator' && i.room === person.room && !i.broken && i.jammedTurns === 0 && !i.charged,
       );
-      if (gen) {
+      if (person.goal === 'routine') {
+        person.activity = routine.activity;
+        person.intent = 'idle';
+        person.routineIndex = ((person.routineIndex ?? 0) + 1) % routine.rooms.length;
+      } else if (gen) {
         const hasToolbox = person.item === 'toolbox' && person.itemUses > 0;
         // 危急时刻发电机也修得更快：同伴的死亡和倒地都在催他们
         const gain = scaleSurvivorProgress(state, person, Math.round(GENERATOR_GAIN * (1 + workPressure(state)))) * (hasToolbox ? 2 : 1);
@@ -2715,6 +2723,27 @@ export function cancelLookSelection(state: GameState): boolean {
 }
 
 /** 只查看玩家明确点选的一个相邻房间，消耗 1 AP。 */
+/** 玩家每回合最多记录一次同一目标的习惯；连续两次观察才会确认完整路线。 */
+export function recordRoutineObservation(state: GameState, room: RoomId): number {
+  const observed = npcs(state).filter((person) =>
+    person.room === room && person.hp > 0 && !person.hidden && person.goal === 'routine',
+  );
+  let discovered = 0;
+  for (const person of observed) {
+    if (person.routineLastObservedTurn === state.turn) continue;
+    person.routineLastObservedTurn = state.turn;
+    person.routineSightings = (person.routineSightings ?? 0) + 1;
+    if (person.routineSightings >= 2 && !person.routineObserved) {
+      person.routineObserved = true;
+      discovered += 1;
+      log(state, `你已经看出${person.name}的日常规律：${ROUTINE_PROFILE[person.archetype].label}。`);
+    } else if (!person.routineObserved) {
+      log(state, `你记下了${person.name}在${roomName(room)}的行动习惯；再观察一次就能确认他的常去路线。`);
+    }
+  }
+  return discovered;
+}
+
 export function lookAtRoom(state: GameState, room: RoomId): boolean {
   if (state.phase !== 'playing' || !state.lookingAround) return false;
   if (!ROOM_MAP[state.playerRoom].neighbors.includes(room)) {
@@ -2729,6 +2758,7 @@ export function lookAtRoom(state: GameState, room: RoomId): boolean {
   state.energy -= LOOK_COST;
   state.lookingAround = false;
   scoutRoom(state, room, 1);
+  recordRoutineObservation(state, room);
   log(state, `你屏住呼吸查看了「${roomName(room)}」（消耗 ${LOOK_COST} 点行动点）。`);
   state.attackReady = true;
   afterPlayerAction(state);
@@ -2778,6 +2808,71 @@ export function searchRoom(state: GameState): boolean {
 /* ------------------------------------------------------------------ */
 
 /** 为什么现在砸不了：用于按钮禁用与日志 */
+export interface HuntOpportunity {
+  id: string;
+  targetId: string;
+  targetName: string;
+  room: RoomId;
+  title: string;
+  detail: string;
+}
+
+/** 只展示玩家当前确实看得见的机会，避免情报面板泄露未探索房间。 */
+export function getHuntOpportunities(state: GameState): HuntOpportunity[] {
+  const opportunities: HuntOpportunity[] = [];
+  const visible = npcs(state).filter((person) =>
+    person.hp > 0 && !person.hidden && isPersonVisible(state, person),
+  );
+  for (const person of visible) {
+    if (person.alert >= 75) continue;
+    const companions = peopleInRoom(state, person.room).filter((other) =>
+      other.id !== person.id && other.role !== 'police' && other.hp > 0 && !other.hidden,
+    );
+    if (!companions.length) {
+      opportunities.push({
+        id: 'isolated-' + person.id,
+        targetId: person.id,
+        targetName: person.name,
+        room: person.room,
+        title: '目标落单',
+        detail: '房间内没有其他幸存者，目标尚未进入高度警戒。',
+      });
+    }
+    if (!isRoomLit(state, person.room)) {
+      opportunities.push({
+        id: 'dark-' + person.id,
+        targetId: person.id,
+        targetName: person.name,
+        room: person.room,
+        title: '暗处接近',
+        detail: '目标所在区域没有照明，普通幸存者更难及时察觉接近。',
+      });
+    }
+    const routine = ROUTINE_PROFILE[person.archetype];
+    if (person.goal === 'routine' && person.routineObserved && person.activity === routine.activity) {
+      opportunities.push({
+        id: 'routine-' + person.id,
+        targetId: person.id,
+        targetName: person.name,
+        room: person.room,
+        title: '习惯性停留',
+        detail: routine.label + '：目标正按已确认的日常习惯停留在这里。',
+      });
+    }
+    if (person.intent === 'work') {
+      opportunities.push({
+        id: 'distracted-' + person.id,
+        targetId: person.id,
+        targetName: person.name,
+        room: person.room,
+        title: '专注于设施',
+        detail: '目标正在处理现场设施，暂时把注意力放在工作上。',
+      });
+    }
+  }
+  return opportunities.slice(0, 8);
+}
+
 export function isRoomLit(state: GameState, room: RoomId): boolean {
   return state.powerCircuits.some((c) => {
     const source = c.generatorId ? state.siteItems.find((item) => item.id === c.generatorId) : undefined;
