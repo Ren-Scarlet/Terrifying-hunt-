@@ -734,7 +734,7 @@ function resolveDest(state: GameState, dest: Dest): RoomId {
 /* ==================================================================== */
 
 function killPerson(state: GameState, person: Person): void {
-  if (state.carryPersonId === person.id) { state.carryPersonId = null; state.carryDistance = 0; }
+  if (state.carryPersonId === person.id) state.carryPersonId = null;
   if (!state.people.some((p) => p.id === person.id)) return;
   state.people = state.people.filter((p) => p.id !== person.id);
   state.pinnedPeople = state.pinnedPeople.filter((id) => id !== person.id);
@@ -841,31 +841,14 @@ function damagePerson(state: GameState, person: Person, amount: number, suppress
   }
 }
 
-/** 倒地者是否已经过了「不能被补刀」的保护期 */
-function dropCarriedPerson(state: GameState, message: string): void {
-  if (!state.carryPersonId) return;
-  const person = state.people.find((p) => p.id === state.carryPersonId);
-  state.carryPersonId = null;
-  state.carryDistance = 0;
-  if (!person) return;
-  person.hp = SURVIVOR_INJURED_HP;
-  person.downedTurns = 0;
-  person.alert = 100;
-  person.intent = 'flee';
-  person.goal = 'exit';
-  person.activity = '挣脱后拖着伤口逃跑';
-  log(state, message);
-}
-
 export function carryPerson(state: GameState, personId: string): boolean {
   if (state.phase !== 'playing' || state.carryPersonId || state.energy < 1) return false;
   const person = state.people.find((p) => p.id === personId);
   if (!person || person.role === 'police' || person.hp > 0 || person.room !== state.playerRoom) return false;
   state.energy -= 1;
   state.carryPersonId = person.id;
-  state.carryDistance = 0;
   person.activity = '被杀手抱起搬运';
-  log(state, `你抱起了倒地的${person.name}。再移动 3 间房，他就可能挣脱。`);
+  log(state, `你抱起了倒地的${person.name}。搬运途中不会自行挣脱。`);
   afterPlayerAction(state);
   return true;
 }
@@ -882,7 +865,6 @@ export function executeCarriedPerson(state: GameState, method: 'fridge' | 'micro
   state.energy -= 1;
   const name = person.name;
   state.carryPersonId = null;
-  state.carryDistance = 0;
   state.executions += 1;
   const flavor = method === 'fridge'
     ? `你把${name}塞进冰箱，沉重的门缓缓合上……一切归于寂静。`
@@ -1326,7 +1308,7 @@ function interruptPlayer(state: GameState, reason: string, actorId: string): voi
     log(state, `${reason} 恶魔附身下的你连眼都没眨，这一下没起作用。`);
     return;
   }
-  dropCarriedPerson(state, '你被打断，怀里的人趁机挣脱并逃走了。');
+  // 被抱起的倒地者不会因玩家受阻而自行挣脱；仍随玩家携带。
   state.stunTurns += 1;
   state.blindTurns = 1;
   state.attackReady = false;
@@ -1741,7 +1723,7 @@ function npcTurn(state: GameState): void {
         addAlarm(state, 10);
         killPerson(state, person);
       } else {
-        person.activity = '被杀手抱着，无法挣脱（倒计时仍在继续）';
+        person.activity = '被杀手抱着，无法自行挣脱（倒计时仍在继续）';
       }
       continue;
     }
@@ -2421,8 +2403,6 @@ export function movePlayer(state: GameState, room: RoomId): boolean {
   if (state.carryPersonId) {
     const carried = state.people.find((p) => p.id === state.carryPersonId);
     if (carried) carried.room = room;
-    state.carryDistance += 1;
-    if (state.carryDistance >= 3) dropCarriedPerson(state, '搬运距离太远，幸存者挣脱你的控制，恢复受伤状态逃跑了。');
   }
   log(
     state,
@@ -2613,10 +2593,7 @@ export function executeDownedPerson(state: GameState, targetId?: string): boolea
     ? state.people.find((person) => person.id === targetId)!
     : peopleInRoom(state, state.playerRoom).find((person) => person.role !== 'police' && person.hp <= 0)!;
   state.energy -= 1;
-  if (state.carryPersonId === target.id) {
-    state.carryPersonId = null;
-    state.carryDistance = 0;
-  }
+  if (state.carryPersonId === target.id) state.carryPersonId = null;
   executePerson(state, target);
   if (state.result) return true;
   state.attackReady = true;

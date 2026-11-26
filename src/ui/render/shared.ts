@@ -272,7 +272,12 @@ export function personDetailHtml(state: GameState, personId: string): string {
           </div>`;
         })()
     : '';
-  return `<div class="person-detail-view">${detailCardHtml(
+  return `<div class="person-detail-view">
+    <div class="person-detail-toolbar">
+      <span>幸存者档案</span>
+      <button type="button" class="btn ghost mini" data-action="close-person-detail" aria-label="关闭人物档案">收起 ×</button>
+    </div>
+    ${detailCardHtml(
     profile.name,
     `${roleName} / ${profile.occupation} / ${profile.age ? `${profile.age} 岁` : '年龄不详'} · ${profile.tags.join(' · ')}`,
     rarityLabel,

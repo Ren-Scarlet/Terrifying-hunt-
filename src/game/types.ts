@@ -393,7 +393,6 @@ export interface GameState {
   specialExecutionBonus: number;
   npcAlarmed: boolean;
   carryPersonId: string | null;
-  carryDistance: number;
   evidence: number;
   markedKilled: number;
   decoyRoom: RoomId | null;

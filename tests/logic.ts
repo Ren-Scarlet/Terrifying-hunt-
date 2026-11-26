@@ -154,7 +154,8 @@ function caseRoutineHuntOpportunities(): void {
   const dossier = personDetailHtml(s, person.id);
   check('人物档案：确认路线后显示习惯名称与常去房间',
     dossier.includes(ROUTINE_PROFILE[person.archetype].label) &&
-    dossier.includes('常去路线'));
+    dossier.includes('常去路线') &&
+    dossier.includes('data-action="close-person-detail"'));
 }
 
 function caseGeneratorBreakerNetwork(): void {
@@ -1509,11 +1510,14 @@ function caseContractsPowerAndCarry(): void {
     for (const next of ROOM_MAP[current.room].neighbors) if (!seen.has(next)) { seen.add(next); frontier.push({ room: next, path: [...current.path, next] }); }
   }
   carry.freeMove = true; for (const room of route) movePlayer(carry, room);
-  check('AB 搬运达到三间房后挣脱并恢复受伤状态', route.length === 3 && carry.carryPersonId === null && victim.hp === 2, 'route=' + route.length + ' hp=' + victim.hp);
+  check('AB 搬运超过三间房后仍无法自行挣脱或逃跑',
+    route.length === 3 && carry.carryPersonId === victim.id && victim.hp === 0 &&
+    victim.room === route[route.length - 1],
+    'route=' + route.length + ' carried=' + (carry.carryPersonId === victim.id) + ' hp=' + victim.hp);
   const special = newGame();
   special.people = special.people.filter((p) => p.role !== 'police').slice(0, 1);
   const target = special.people[0]; target.room = 'kitchen'; target.hp = 0; target.downedTurns = 0;
-  special.playerRoom = 'kitchen'; special.carryPersonId = target.id; special.carryDistance = 1; special.energy = BASE_AP;
+  special.playerRoom = 'kitchen'; special.carryPersonId = target.id; special.energy = BASE_AP;
   const executed = executeCarriedPerson(special, 'fridge');
   check('AB 厨房冰箱特殊处决会击杀目标并计入处决数', executed && special.executions === 1 && !special.people.some((p) => p.id === target.id));
   check('AB 地形处决会累计额外奖励分', special.specialExecutionBonus === 35, String(special.specialExecutionBonus));

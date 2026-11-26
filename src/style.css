@@ -2962,3 +2962,60 @@ button, .room-hit, .hand-row { touch-action: manipulation; }
   .hunt-style-score { grid-column: 1 / -1; }
   .hunt-style-breakdown { grid-template-columns: 1fr; }
 }
+
+
+/* 地图全景优先：地图缩放设置不再制造内部滚动视口，所有房间始终完整可见。 */
+#app .map-panel { overflow: visible; }
+#app .map-viewport {
+  display: flex;
+  width: 100%;
+  max-width: 100%;
+  max-height: none;
+  min-width: 0;
+  overflow: visible;
+  padding: 2px 0 8px;
+  overscroll-behavior: auto;
+}
+#app .map-viewport .floorplan {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  height: auto;
+  margin-inline: auto;
+  aspect-ratio: var(--ar, 1.45);
+}
+#app[data-map-scale="large"] .map-viewport .floorplan,
+#app[data-map-scale="xlarge"] .map-viewport .floorplan,
+#app[data-map-scale="standard"] .map-viewport .floorplan {
+  width: 100%;
+  max-width: 100%;
+}
+.person-detail-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 10px;
+  border: 1px solid #302925;
+  border-bottom: 0;
+  background: #100e0d;
+  color: #c7bba8;
+  font-size: 12px;
+  letter-spacing: .8px;
+}
+.person-detail-toolbar .btn { flex: 0 0 auto; }
+.card-detail-inline .person-detail-view .detail-card { border-top-left-radius: 0; border-top-right-radius: 0; }
+@media (max-width: 720px) {
+  #app .map-viewport {
+    display: flex;
+    overflow: visible;
+    padding: 2px 0 8px;
+  }
+  #app .map-viewport .floorplan {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    height: auto;
+    margin-inline: auto;
+  }
+}
