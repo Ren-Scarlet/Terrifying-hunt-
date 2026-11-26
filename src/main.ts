@@ -210,6 +210,7 @@ app.addEventListener('click', (event) => {
   const target = (event.target as HTMLElement).closest<HTMLElement>('[data-action]');
   if (!target) return;
   const action = target.dataset.action;
+  if (action?.startsWith('admin') && !import.meta.env.DEV) return;
   // 浏览器要求先有用户交互才允许出声
   unlockAudio();
 
