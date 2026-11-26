@@ -2733,13 +2733,13 @@ button, .room-hit, .hand-row { touch-action: manipulation; }
   overscroll-behavior: contain;
 }
 #app .map-viewport .floorplan {
-  width: calc(100% * var(--map-scale, 1));
+  width: var(--map-width, 100%);
   max-width: none;
   margin-inline: 0;
 }
-#app[data-map-scale="large"] { --map-scale: 1.25; }
-#app[data-map-scale="xlarge"] { --map-scale: 1.5; }
-#app[data-map-scale="standard"] { --map-scale: 1; }
+#app[data-map-scale="large"] { --map-width: 125%; }
+#app[data-map-scale="xlarge"] { --map-width: 150%; }
+#app[data-map-scale="standard"] { --map-width: 100%; }
 
 /* 人物头像达到接近半身头像的视觉权重；状态角标同步放大。 */
 .room-people .person-chip {
