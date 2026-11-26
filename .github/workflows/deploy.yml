@@ -1,4 +1,4 @@
-# UI HUD 原型与厨房美术预览共用隔离的 /preview/ 构建产物。
+# UI HUD 原型与厨房美术预览共用隔离的 /preview/ 构建产物；原型支持地图点击移动。
 name: Deploy to GitHub Pages
 
 on:
