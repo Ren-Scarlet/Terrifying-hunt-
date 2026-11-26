@@ -349,6 +349,21 @@ function caseAmbush(): void {
   check('B 伏击后第一刀能砍中', hit && v.hp < hp, `hp ${hp} → ${v.hp}`);
   check('B 独处且未察觉的伏击触发致命窗口', hit && v.hp === hp - 2 && s.ambushTurn === 0,
     `hp ${hp} → ${v.hp}，伏击标记已消耗=${s.ambushTurn === 0}`);
+  const crowded = newGame();
+  const first = player(crowded);
+  const second = crowded.people.find((person) => person.role !== 'police' && person.id !== first.id)!;
+  first.room = crowded.playerRoom;
+  second.room = crowded.playerRoom;
+  first.hp = 4;
+  second.hp = 4;
+  first.alert = 50;
+  second.alert = 50;
+  crowded.ambushTurn = crowded.turn;
+  const crowdedHp = first.hp;
+  const crowdedHit = withRandomSource(() => 0.99, () => attack(crowded, first.id));
+  check('B 伏击时有其他幸存者在场，不触发独处致命窗口',
+    crowdedHit && first.hp === crowdedHp - 1 && crowded.ambushTurn === crowded.turn,
+    `hp ${crowdedHp} → ${first.hp}`);
 }
 
 /** C：「疾速残暴」把两间房的距离抹平，追上去还能补刀 */
