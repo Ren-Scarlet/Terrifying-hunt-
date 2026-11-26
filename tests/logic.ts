@@ -1816,15 +1816,15 @@ function caseNewPerkSystem(): void {
 
 
   const noed = createGame(['hex_noed'], undefined, '迈克尔·迈尔斯');
-  noed.emergencyActive = true;
-  noed.alarm = 100;
+  noed.emergencyActive = false;
+  noed.alarm = 99;
   noed.totems = ['attic'];
   noed.people.forEach((person) => { person.room = 'bedroom'; person.alert = 0; person.awareness = 0; });
   noed.hand = [{ uid: 'test-noed', defId: 'hex_noed' }];
   noed.energy = 6;
   const noedEnergy = noed.energy;
   playCard(noed, 'test-noed');
-  addAlarm(noed, 0);
+  addAlarm(noed, 1);
   const noedTarget = noed.people.find((person) => person.role !== 'police')!;
   noedTarget.room = noed.playerRoom;
   noedTarget.hp = 4;
