@@ -2,7 +2,7 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [main]
+    branches: [main, kitchen-art-upgrade]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -13,7 +13,6 @@ permissions:
   id-token: write
 
 concurrency:
-  # PR 检查与 main 正式部署分组，避免互相取消。
   group: pages-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
@@ -22,22 +21,47 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
+          path: main-source
+      - uses: actions/checkout@v4
+        with:
+          ref: kitchen-art-upgrade
+          path: preview-source
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
-      - run: npm ci
-      - run: npm run check
-      - run: npm run build
+          cache-dependency-path: |
+            main-source/package-lock.json
+            preview-source/package-lock.json
+      - name: Build production site from main
+        run: |
+          npm ci --prefix main-source
+          npm run check --prefix main-source
+          npm run build --prefix main-source
+      - name: Build kitchen preview
+        run: |
+          npm ci --prefix preview-source
+          npm run check --prefix preview-source
+          npm run build --prefix preview-source
+      - name: Combine production site and isolated preview
+        run: |
+          mkdir -p dist/preview
+          cp -a main-source/dist/. dist/
+          cp -a preview-source/dist/. dist/preview/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
 
   deploy:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/kitchen-art-upgrade')
     needs: build
     runs-on: ubuntu-latest
+    concurrency:
+      group: github-pages-deploy
+      cancel-in-progress: true
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
