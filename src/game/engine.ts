@@ -46,7 +46,6 @@ import type {
   Trail,
   SiteItem,
   SiteItemKind,
-  BearTrap,
   MissionTask,
   SurvivorItem,
 } from './types';
@@ -3369,25 +3368,6 @@ export function usePower(state: GameState, powerId: string): boolean {
     }
     state.stalkMeter = Math.min(100, state.stalkMeter + totalGain);
     log(state, `你观察视野内 ${visible.length} 名幸存者：${names.join('、')}；尾随值 +${totalGain}（${state.stalkMeter}/100）。`);
-    state.attackReady = true;
-    afterPlayerAction(state);
-    checkImmediateWin(state);
-    return true;
-  }
-  if (!canUsePower(state, powerId)) {
-      log(state, powerBlockReason(state, powerId) || '当前无法尾随。');
-      return false;
-    }
-    const visible = visibleMyersStalkTargets(state);
-    const target = visible.find((p) => p.id === state.stalkTargetId) ?? visible[0];
-    if (!target) {
-      log(state, '前方已经没有可尾随的猎物。');
-      return false;
-    }
-    state.energy -= 1;
-    const stalkGain = myersStalkGain(target.alert);
-    state.stalkMeter = Math.min(100, state.stalkMeter + stalkGain);
-    log(state, '你花费 1 点行动点暗中观察 ' + target.name + '：尾随值 +' + stalkGain + '（' + state.stalkMeter + '/100）。');
     state.attackReady = true;
     afterPlayerAction(state);
     checkImmediateWin(state);
