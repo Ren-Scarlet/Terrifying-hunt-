@@ -1,7 +1,7 @@
 import { CARDS, CARD_MAP } from './data/cards';
 import { KILLERS, KILLER_MAP } from './data/killers';
-import type { Op } from './effect';
-import type { CardDef, CardType, Precheck } from './types';
+import type { Op, Precheck } from './effect';
+import type { CardDef, CardType } from './types';
 import { EFFECT_OPS, type EffectFieldType } from './effectCatalog';
 
 /**
@@ -58,7 +58,7 @@ function load(): TuningData {
     if (isRecord(parsed)) { parsed.customCards ??= []; parsed.deletedCards ??= []; }
     return validateTuning(parsed) ? clone(parsed) : emptyTuning();
   } catch {
-    return { cards: {}, powers: {} };
+    return emptyTuning();
   }
 }
 
