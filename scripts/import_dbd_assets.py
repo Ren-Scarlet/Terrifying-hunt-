@@ -3,9 +3,11 @@
 Run from the project root:
     python scripts/import_dbd_assets.py
 
-每一张卡牌对应一个唯一的杀手技能图标（共 29 张，互不重复）。
-映射关系以 dbdwiki 的 perk-icons.manifest.json 为准，脚本结束时会打印一张
-"卡牌 id → 技能英文名（所属杀手）" 的对照表，便于核对。
+每一张卡牌对应一个杀手技能图标：图标 = 卡名所指的那枚技能（共 44 张，
+同名的两张卡共用同一枚图鉴图标，例如「牢牢紧握」的 choke 与 iron_grasp）。
+映射关系以 dbdwiki 的 perk-icons.manifest.json 为准，中文名以 perks.site.json
+为基准做核对，脚本结束时会打印一张 "卡牌 id → 技能中文名（所属杀手）" 的
+对照表，便于核对。
 """
 
 import json
@@ -19,41 +21,62 @@ ROOT = Path(__file__).resolve().parent.parent
 PUBLIC = ROOT / "public" / "assets" / "dbd"
 TEMP = ROOT / ".dbd-cache"
 
-# 卡牌 id -> 图鉴技能 slug。顺序与 src/game/cards.ts 保持一致。
+# 卡牌 id -> 图鉴技能 slug。顺序与 src/game/data/cards.ts 保持一致，
+# 中文名与卡名逐字对应；个别卡没有同名技能，取效果最接近的官方技能并注明。
 CARD_PERKS = {
     # ---- 攻击 ----
-    "shuriken": "sloppy_butcher",          # Sloppy Butcher
-    "choke": "iron_grasp",                 # Iron Grasp
-    "execute": "coup_de_grâce",            # Coup de Grâce
-    "harvest": "blood_echo",               # Blood Echo
-    "final_blow": "cull_the_weak",         # Cull the Weak
-    "break_in": "brutal_strength",         # Brutal Strength
+    "shuriken": "sloppy_butcher",            # 辣手屠夫
+    "choke": "iron_grasp",                   # 牢牢紧握
+    "execute": "coup_de_grâce",              # 恩赐解脱
+    "harvest": "blood_echo",                 # 鲜血回响
+    "final_blow": "cull_the_weak",           # 优胜劣汰
+    "break_in": "brutal_strength",           # 所向无敌
     # ---- 技能 ----
-    "silent_step": "insidious",            # Insidious
-    "sprint": "rapid_brutality",           # Rapid Brutality
-    "clean": "trail_of_torment",           # Trail of Torment
-    "night_cover": "darkness_revealed",    # Darkness Revealed
-    "silence": "hex_huntress_lullaby",     # Hex: Huntress Lullaby
-    "disguise": "dark_devotion",           # Dark Devotion
-    "intimidate": "distressing",           # Distressing
-    "fear": "coulrophobia",                # Coulrophobia
-    "aim": "deerstalker",                  # Deerstalker
-    "evacuate": "blood_warden",            # Blood Warden
-    "search": "hoarder",                   # Hoarder
+    "silent_step": "insidious",              # 静止隐身
+    "sprint": "rapid_brutality",             # 疾速残暴
+    "clean": "trail_of_torment",             # 折磨路径
+    "night_cover": "darkness_revealed",      # 黑暗启迪
+    "silence": "hex_huntress_lullaby",       # 厄咒：猎手摇篮曲
+    "disguise": "dark_devotion",             # 黑暗奉献
+    "intimidate": "distressing",             # 恐惧释放
+    "fear": "coulrophobia",                  # 小丑恐惧症
+    "aim": "deerstalker",                    # 猎鹿者
+    "evacuate": "blood_warden",              # 血腥狱长
+    "search": "hoarder",                     # 囤积者
     # ---- 战术 ----
-    "false_lead": "furtive_chase",         # Furtive Chase
-    "lock_door": "deadlock",               # Deadlock
-    "bait": "spies_from_the_shadows",      # Spies from the Shadows
-    "mind_control": "dominance",           # Dominance
+    "false_lead": "furtive_chase",           # 鬼祟追杀
+    "lock_door": "deadlock",                 # 死锁
+    "bait": "spies_from_the_shadows",        # 鬼鸦谍影
+    "mind_control": "dominance",             # 支配之力
     # ---- 布局 ----
-    "cut_line": "dead_mans_switch",        # Dead Man's Switch
-    "lure": "barbecue_and_chilli",         # Barbecue & Chilli
-    "wiretap": "a_nurses_calling",         # A Nurse's Calling
-    "poltergeist": "hex_haunted_ground",   # Hex: Haunted Ground
-    "blackout": "hex_face_the_darkness",   # Hex: Face the Darkness
-    "block_gate": "bamboozle",             # Bamboozle
-    "ghost_light": "lethal_pursuer",       # Lethal Pursuer
-    "false_report": "hex_retribution",     # Hex: Retribution
+    "cut_line": "dead_mans_switch",          # 失效开关
+    "lure": "barbecue_and_chilli",           # 人肉烧烤
+    "wiretap": "a_nurses_calling",           # 护士的呼唤
+    "poltergeist": "hex_haunted_ground",     # 厄咒：闹鬼之地
+    "blackout": "hex_face_the_darkness",     # 厄咒：直面黑暗
+    "block_gate": "bamboozle",               # 花言巧语
+    "ghost_light": "lethal_pursuer",         # 致命追踪者
+    "false_report": "hex_retribution",       # 厄咒：惩戒
+    # ---- 新版初始卡池 ----
+    "unbreakable": "unrelenting",                    # 不屈不挠
+    "hex_huntress": "hex_thrill_of_the_hunt",        # 厄咒：猎杀戾气
+    "hex_noed": "hex_no_one_escapes_death",          # 厄咒：难逃一死
+    "scourge_shrine": "scourge_hook_monstrous_shrine",  # 天灾钩子：鬼魔神龛
+    "distressing": "distressing",                    # 恐惧释放
+    "hell": "whispers",                              # 恶灵地狱（图鉴无同名技能，
+                                                     # 取「恶灵低语」Whispers 替代：
+                                                     # 同为感知附近逃生者）
+    "iron_grasp": "iron_grasp",                      # 牢牢紧握
+    "deerstalker": "deerstalker",                    # 猎鹿者
+    "hex_ruin": "shattered_hope",                    # 粉碎希望
+    "bitter_murmur": "bitter_murmur",                # 苦涩低语
+    "sloppy_butcher": "sloppy_butcher",              # 辣手屠夫
+    "insidious": "insidious",                        # 静止隐身
+    # ---- 迈尔斯专属 ----
+    "myers_eclipse_light": "cull_the_weak",          # 湮灭之光（Dying Light，
+                                                     # 图鉴中该图标归入 Cull the Weak）
+    "myers_last_best": "save_the_best_for_last",     # 把最好的留在最后
+    "myers_plaything": "play_with_your_food",        # 戏耍食物
 }
 
 POWER_OWNERS = [
@@ -88,6 +111,13 @@ def main():
     perk_manifest = fetch_json(f"{BASE}/data/dbd/perk-icons.manifest.json")
     loadout_manifest = fetch_json(f"{BASE}/data/dbd/loadout-icons.manifest.json")
     addons = fetch_json(f"{BASE}/data/dbd/killer-addons.site.json")
+    # 技能中文名（卡名核对基准）
+    site_perks = fetch_json(f"{BASE}/data/dbd/perks.site.json")["perks"]
+    zh_by_slug = {
+        p["icon"].get("slug"): p.get("title", "")
+        for p in site_perks
+        if p.get("icon", {}).get("slug")
+    }
 
     perk_sheet_path = TEMP / "perk-killer@2x.webp"
     loadout_sheet_path = TEMP / "killer-loadout@2x.webp"
@@ -113,7 +143,7 @@ def main():
             continue
         entry = perk_manifest["icons"][key]
         crop_sprite(perk_sheet, entry["position_2x"]).save(PUBLIC / "perks" / f"{card_id}.png")
-        table.append((card_id, entry.get("name_en", slug), entry.get("character_en", "")))
+        table.append((card_id, zh_by_slug.get(slug) or entry.get("name_en", slug), entry.get("character_en", "")))
 
     # 只导入图标。src/game/killers.ts 为手写的原创机制数据，脚本不再覆盖它。
     for owner in POWER_OWNERS:
@@ -133,7 +163,7 @@ def main():
     fetch_file(f"{BASE}/assets/rarities/perk-very-rare.webp", PUBLIC / "rarity" / "perk-very-rare.webp")
 
     print(f"\nImported {len(table)} perk icons, {len(POWER_OWNERS)} powers, {len(RARITIES) + 1} rarity backgrounds.")
-    print("\n| 卡牌 id | 原技能 | 所属杀手 |")
+    print("\n| 卡牌 id | 卡名（图鉴技能中文名） | 所属杀手 |")
     print("| --- | --- | --- |")
     for card_id, name, character in table:
         print(f"| `{card_id}` | {name} | {character or '通用'} |")
