@@ -2607,3 +2607,71 @@ button, .room-hit, .hand-row { touch-action: manipulation; }
   .room-feature .ui-icon { width: 15px; height: 15px; }
   .room-feature.site { min-width: 45px; }
 }
+
+
+/* 第二轮体验修正：挥刀与处决必须一眼可区分。 */
+.btn.attack .atk-name::before { content: '⚔ '; color: #d48a70; }
+.btn.execute-action {
+  display: flex; flex-direction: row; align-items: center; gap: 9px;
+  min-width: 174px; padding: 7px 13px;
+  border: 1px solid #92713d;
+  background: linear-gradient(180deg, #282113, #14100a);
+  color: #ead4a5; box-shadow: none;
+}
+.btn.execute-action .execute-symbol {
+  display: grid; place-items: center; flex: 0 0 30px; height: 30px;
+  border: 1px solid #80643b; border-radius: 3px;
+  color: #e4c17f; background: #1a160d; font-size: 19px;
+}
+.btn.execute-action .execute-copy { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
+.btn.execute-action .execute-copy b { color: #efd7a1; font-size: 12px; letter-spacing: 1.5px; }
+.btn.execute-action .execute-copy small { color: #ad9870; font-size: 9px; }
+.btn.execute-action.ready { border-color: #b58b49; background: linear-gradient(180deg, #332817, #1c160d); }
+.btn.execute-action.ready:hover:not(:disabled) { border-color: #e0b968; background: linear-gradient(180deg, #46351d, #251b0e); box-shadow: 0 0 12px #9c74352a; }
+.btn.execute-action:disabled, .btn.execute-action.spent {
+  opacity: .38; border-color: #494238; background: #111110; box-shadow: none;
+}
+.btn.execute-action:disabled .execute-symbol { color: #777064; border-color: #454039; }
+
+/* 人物档案锁定显示；卡牌详情仍可临时查看，鼠标移开后恢复档案。 */
+.card-detail-inline:has(.person-detail-view) { grid-template-columns: 1fr; align-items: stretch; }
+.card-detail-inline:has(.person-detail-view) .card-detail-label { display: none; }
+.card-detail-inline .person-detail-view .detail-body {
+  max-height: min(38vh, 360px); min-height: 150px; overflow-y: auto; font-size: 12px;
+}
+.card-detail-inline .person-detail-view .detail-header h2 { font-size: 16px; }
+.card-detail-inline .person-detail-view .detail-header p { display: block; font-size: 11px; }
+.card-detail-inline .person-detail-view .detail-body p { font-size: 12px; line-height: 1.7; }
+
+/* 地图设施标记放大，缩小房间仍保留图形与文字。 */
+.room-features { gap: 5px; }
+.room-feature {
+  min-width: 44px; height: 36px; padding: 4px 7px; gap: 5px;
+  border-radius: 4px; font-size: 14px; background: #07090bea;
+  border-color: #625b4e88; box-shadow: 0 2px 8px #000c, 0 0 0 1px #0008;
+}
+.room-feature b { font-size: 10px; letter-spacing: .4px; }
+.room-feature .ui-icon { width: 24px; height: 24px; }
+.room-feature.site { min-width: 68px; }
+.room-feature.site .ui-icon { width: 26px; height: 26px; }
+.room-feature.execution-site { min-width: 60px; }
+.room-feature.breaker { min-width: 56px; }
+.room-feature.totem, .room-feature.cabinet, .room-feature.obstacle { min-width: 48px; }
+.room.room-size-small .room-features { gap: 3px; }
+.room.room-size-small .room-feature { min-width: 39px; height: 33px; padding: 3px 5px; gap: 3px; }
+.room.room-size-small .room-feature b { font-size: 8px; }
+.room.room-size-small .room-feature .ui-icon { width: 21px; height: 21px; }
+
+/* 情报入口紧贴任务栏；回合、AP、尾随值留在手牌旁。 */
+.intel-drawer { margin: 0 0 9px; }
+.bottom-dock { position: sticky; bottom: 0; z-index: 25; padding-top: 5px; background: linear-gradient(180deg, transparent, #080a0c 12%); }
+@media (max-width: 700px) {
+  .btn.execute-action { min-width: 142px; padding: 6px 8px; gap: 6px; }
+  .btn.execute-action .execute-symbol { flex-basis: 26px; height: 26px; font-size: 16px; }
+  .btn.execute-action .execute-copy b { font-size: 10px; }
+  .room-feature { min-width: 37px; height: 32px; padding: 3px 5px; gap: 3px; }
+  .room-feature b { font-size: 8px; }
+  .room-feature .ui-icon { width: 21px; height: 21px; }
+  .room-feature.site { min-width: 56px; }
+  .room.room-size-small .room-feature { min-width: 34px; height: 30px; }
+}
