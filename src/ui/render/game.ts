@@ -167,12 +167,12 @@ function doorMarkersHtml(state: GameState): string {
 
 /** 把最近发生的关键行动投射到地图上；完整记录仍保留在情报抽屉。 */
 function mapEventFeedHtml(state: GameState): string {
-  const important = /没能再起来|停止了呼吸|处决了|特殊处决|砸毁了|砸烂了|你砸了|立即断电|电话线被剪断|封锁了|踩中捕兽夹|报警成功|成功逃离|已抵达逃生点|警报升高！猎场出现逃生点|被警察逮捕|被同伴救起|【环境事件】|雷雨|电话突然响起|玻璃碎裂声|灯光突然闪烁/;
+  const important = /没能再起来|停止了呼吸|处决了|特殊处决|砸毁了|砸烂了|你砸了|立即断电|电话线被剪断|封锁了|踩中捕兽夹|报警成功|成功逃离|逃出了房子|翻出了后院|已抵达逃生点|地图出现两个逃生点|逃生点开启|大门开启|警报升高！猎场出现逃生点|被警察逮捕|被同伴救起|【环境事件】|雷雨|电话突然响起|玻璃碎裂声|灯光突然闪烁/;
   const recent = state.log.filter((line) => {
     const match = line.match(/^\[第 (\d+) 回合\]/);
     const turn = match ? Number(match[1]) : state.turn;
-    return state.turn - turn <= 1 && important.test(line);
-  }).slice(0, 3).reverse();
+    return state.turn - turn <= 3 && important.test(line);
+  }).slice(0, 5).reverse();
   if (!recent.length) return '';
   return `<div class="map-event-feed" aria-live="polite">
     <span class="map-event-feed-title">现场动态</span>
@@ -413,7 +413,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
     const style = `left:${r.left}%;top:${r.top}%;width:${r.width}%;height:${r.height}%`;
     return `
       <div class="room ${isPlayer ? 'current' : ''} ${reachable ? 'reachable' : 'disabled'} ${adjacent ? 'adjacent' : ''} ${state.lookingAround && adjacent ? 'look-target' : ''} ${state.auraTargeting ? 'aura-target' : ''} ${blinkSelectable ? 'blink-target' : ''} ${obstacleOpen ? 'obstacle' : ''} ${isObjective ? 'objective' : ''} ${darkRoom ? 'dark-room' : 'lit-room'} ${room.id === 'garden' ? 'outdoor' : ''} room-size-${room.size} ${locked ? 'locked' : ''} ${barricaded ? 'barricaded' : ''} ${explored ? 'explored' : 'unexplored'} ${visible ? 'in-sight' : 'fogged'}"
-        style="${style}" data-room="${room.id}" title="${escape(room.name)}${explored ? `：${escape(room.desc)}` : '：还没进去过'}${isObjective ? ' · 他们的目标点' : ''}">
+        style="${style}" data-room="${room.id}" title="${escape(room.name)}${explored ? `：${escape(room.desc)}` : '：还没进去过'}${isObjective ? ' · 设施热点' : ''}">
         ${state.auraTargeting
           ? `<button type="button" class="room-hit aura-hit" data-action="aura-select" data-room="${room.id}" aria-label="选择${escape(room.name)}，显示其中人类的气场">显形</button>`
           : state.nurseBlinkTargeting
@@ -749,7 +749,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
             <span class="legend-fog">？ 最后确认位置</span>
             <span class="legend-trail"><i class="legend-claw"></i> 鞋印：只看得见当前房间，跟丢了就断</span>
             <span class="legend-noise">${icon('crow', 'crow-icon tiny')} 动静：乌鸦叫 / 地板响，有人刚经过（短线索）</span>
-            <span class="legend-objective">蓝框：他们的团队目标点</span>
+            <span class="legend-objective">蓝框：设施热点</span>
             <span class="legend-sites">${icon('itemBox', 'ui-icon tiny')} 道具箱 ${icon('generator', 'ui-icon tiny')} 发电机：幸存者可使用，你可以破坏</span>
           </div>
         </div>
@@ -836,13 +836,19 @@ export function renderResult(state: GameState, newCard: string | null): string {
   const labels: Record<string, string> = {
     win: '猎杀结束', caught: supernatural ? '力量被封印' : '被警察抓捕', timeout: '猎场终止', failed: '猎杀失败',
   };
+  const killerEnding: Record<string, string> = {
+    '迈克尔·迈尔斯': '白色面具在走廊尽头停了一瞬。屋里只剩下拖拽声，随后连脚步也消失了。',
+    '设陷者': '铁夹在地板上缓缓合拢。清晨搜救者只找到一道拖向黑暗的血迹。',
+    '护士': '一阵刺耳的风从墙壁穿过。等灯光恢复，走廊里已经没有任何人影。',
+    '女猎手': '远处传来一段轻轻的摇篮曲。斧刃的回声渐渐远去，屋子重新归于寂静。',
+  };
   const ending = state.result === 'win'
-    ? '目标已经倒下，猎场终于安静下来。你可以回顾这场猎杀，看看哪些行动让结局走向了这里。'
+    ? (supernatural ? '雾气重新吞没房间，门窗在无人触碰时一扇扇合拢。' : killerEnding[state.killer] ?? '目标已经倒下，猎场终于安静下来。')
     : state.result === 'caught'
       ? (supernatural ? '猎场中的力量被某种更强大的力量压制，恶意暂时退回黑暗。' : '警笛声越来越近，退路被封锁。你最终没能逃出警方的包围。')
       : state.result === 'timeout'
         ? (supernatural ? '天光刺破雾幕，恶灵失去依附之所，猎杀被迫终止。' : '天亮了，警队封锁整条街。你不得不放弃这场猎杀。')
-        : (supernatural ? '猎场的诅咒反噬了你，黑暗不再听从召唤。' : '猎场局势失控，目标逃离或行动失败，你没能完成这场猎杀。');
+        : (supernatural ? '猎场的诅咒反噬了你，黑暗不再听从召唤。' : `${killerEnding[state.killer] ?? '猎场重新归于寂静。'}这一次，你没能完成猎杀。`);
   const stars = getStars(state.score);
   const win = state.result === 'win';
   const rank = win ? (state.score >= 260 ? 'S' : state.score >= 190 ? 'A' : 'B') : '—';

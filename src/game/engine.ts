@@ -149,7 +149,7 @@ function workPressure(state: GameState): number {
   return Math.min(KILL_PRESSURE_MAX, state.kills * KILL_PRESSURE) + (downed ? DOWNED_URGENCY : 0);
 }
 
-/** 追一个人越久、杀的人越多，其他人干活越快；这是「守着一个人追 / 一路屠杀」的代价 */
+/** 幸存者行动效率受猎杀压力影响；长时间追踪单一目标不再提供团队进度或效率奖励。
 function scaleSurvivorProgress(state: GameState, person: Person, amount: number): number {
   const radius = effectiveFearRadius(state);
   let multiplier = state.distressingActive && radius > 0 && roomDistance(person.room, state.playerRoom) <= radius ? 0.8 : 1;
@@ -2190,7 +2190,7 @@ function npcTurn(state: GameState): void {
         if (gen.progress >= 100) {
           gen.charged = true;
           addTeamProgress(state, scaleSurvivorProgress(state, person, GENERATOR_CHARGED_BONUS));
-          log(state, `发电机重新亮了起来，他们离逃出去又近了一大步（团队进度 ${state.teamProgress}/${TEAM_GOAL_MAX}）。`);
+          log(state, `发电机重新亮了起来，${circuit.name}区域的照明与设备供电恢复。`);
         }
       } else if ((person.goal === 'objective' || person.goal === 'key') && state.teamProgress < TEAM_GOAL_MAX) {
         // 工具箱：按你的设计，推进团队目标也更快（不只是修发电机）
