@@ -3399,3 +3399,9 @@ button, .room-hit, .hand-row { touch-action: manipulation; }
 #app .floorplan .room.room-size-small .room-shadows {
   max-width: 100%;
 }
+
+
+/* 卡牌目标提示：只覆盖房间点击层，不改变平面图尺寸或布局。 */
+.room.aura-target { outline: 2px solid rgba(184, 86, 118, .58); outline-offset: -3px; }
+.room-hit.aura-hit { z-index: 8; display: grid; place-items: center; color: #ffe8ef; background: rgba(87, 19, 42, .72); border: 1px solid rgba(255, 160, 190, .75); border-radius: 6px; font-size: 11px; font-weight: 700; }
+.room-feature.shrine { color: #d9b2ff; text-shadow: 0 0 7px rgba(164, 94, 255, .8); }
