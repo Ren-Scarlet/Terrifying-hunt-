@@ -2728,8 +2728,8 @@ export function attack(state: GameState, targetId?: string): boolean {
   if (target.role !== 'police' && target.hp < hpBeforeHit) {
     if (controlCombo) log(state, `控制连携：你趁${target.name}被限制行动时出手，额外造成 1 点伤害。`);
     if (trackingCombo) {
-      state.energy += 1;
-      log(state, `定位连携：你沿着追踪标记精准截住${target.name}，返还 1 点行动点。`);
+      state.specialExecutionBonus += 10;
+      log(state, `定位连携：你沿着追踪标记精准截住${target.name}，猎杀评分 +10。`);
     }
   }
   if (target.role !== 'police' && target.hp < hpBeforeHit) {
