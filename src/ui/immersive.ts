@@ -1,5 +1,5 @@
 // Camera controller for the immersive hunt map.
-// The map is re-created with the game HUD, so camera state lives outside the DOM.
+// The map world is kept mounted across HUD renders; camera state also survives view changes.
 // Animation is event-driven: no permanent RAF loop and no layout reads per frame.
 type CameraMode = 'center' | 'smooth';
 
