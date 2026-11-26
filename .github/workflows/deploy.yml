@@ -20,7 +20,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      # 正式网站始终从 main 构建，预览版从独立美术分支构建。
+      # 正式网站始终从 main 构建，预览版从独立美术分支构建；预览资源隔离在 /preview/。
       - uses: actions/checkout@v4
         with:
           ref: main
