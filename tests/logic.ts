@@ -1017,6 +1017,7 @@ function caseWorldTicks(): void {
   v.room = hop2;
   v.alert = 100;
   v.intent = 'flee';
+  v.trackedTurns = 2;
   v.movesThisTurn = 0;
 
   s.energy = 9;
