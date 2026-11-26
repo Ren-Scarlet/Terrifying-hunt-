@@ -885,7 +885,6 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
     const px = markerX + Math.cos(facing) * torchOffset;
     const py = markerY + Math.sin(facing) * torchOffset;
     const coneLen = Math.min(Math.max(w, h) * 0.27, Math.hypot(pr.w, pr.h) * 0.7);
-    const coneHalf = 0.34;
     const k = view.dpr * DARK_SCALE;
     const cc = refs.coneCtx;
     cc.setTransform(1, 0, 0, 1, 0, 0);
@@ -1040,6 +1039,9 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
     ctx.save();
     ctx.globalCompositeOperation = 'screen';
     ctx.globalAlpha = 0.30;
+    ctx.beginPath();
+    ctx.rect(pr.x + 1, pr.y + 1, pr.w - 2, pr.h - 2);
+    ctx.clip();
     ctx.translate(px, py);
     ctx.rotate(facing);
     const volume = ctx.createLinearGradient(0, 0, coneLen, 0);
