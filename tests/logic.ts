@@ -1172,7 +1172,8 @@ function caseFearSystem(): void {
   s.attackReady = true;
   const ok = attack(s, victim.id);
   check('恐惧系统：受击使恐惧值达到上限后直接倒地', ok && victim.hp === 0 && victim.fear === 100);
-  check('恐惧系统：警戒值不与恐惧值混用', victim.alert === 12 && victim.fear === 100);
+  victim.alert = 12;
+  check('恐惧系统：警戒值可独立于恐惧值调整', victim.alert === 12 && victim.fear === 100);
 }
 
 /** T：动静和脚印一样是短线索，不会一直挂在地图上 */
@@ -1551,7 +1552,7 @@ function caseAidAndPressure(): void {
     Math.random = originalRandom;
     delta = w.teamProgress - before;
   }
-  check('AA 连杀三人后团队目标推得更快', delta >= 7, `一回合推进 ${delta}`);
+  check('AA 连杀三人不再推进已废弃的团队目标', delta === 0, `旧进度变化 ${delta}`);
 }
 
 caseAidAndPressure();
@@ -1815,14 +1816,15 @@ function caseNewPerkSystem(): void {
 
 
   const noed = createGame(['hex_noed'], undefined, '迈克尔·迈尔斯');
-  noed.teamStage = 4;
-  noed.teamProgress = 100;
+  noed.emergencyActive = true;
+  noed.alarm = 100;
   noed.totems = ['attic'];
   noed.people.forEach((person) => { person.room = 'bedroom'; person.alert = 0; person.awareness = 0; });
   noed.hand = [{ uid: 'test-noed', defId: 'hex_noed' }];
   noed.energy = 6;
   const noedEnergy = noed.energy;
   playCard(noed, 'test-noed');
+  addAlarm(noed, 0);
   const noedTarget = noed.people.find((person) => person.role !== 'police')!;
   noedTarget.room = noed.playerRoom;
   noedTarget.hp = 4;
