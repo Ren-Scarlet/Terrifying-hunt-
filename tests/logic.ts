@@ -37,6 +37,7 @@ import {
   carryPerson,
   canCoordinateRescue,
   executeCarriedPerson,
+  finishFreeHunt,
   isRoomLit,
   recoverBearTrap,
   getHuntOpportunities,
@@ -73,7 +74,8 @@ import { cardImage } from '../src/game/assetMap';
 import { readdirSync } from 'node:fs';
 import { personChip, personDetailHtml } from '../src/ui/render/shared';
 import { SURVIVOR_MAP } from '../src/game/survivors';
-import { generateMission } from '../src/game/missions';
+import { generateMission, generateFreeHunt } from '../src/game/missions';
+import { HUNTING_GROUNDS } from '../src/game/maps';
 import type { GameState, RoomId } from '../src/game/types';
 import { createSeededRandom, random, withRandomSource } from '../src/game/random';
 import { nearestOf, roomDistance } from '../src/game/navigation';
@@ -244,6 +246,37 @@ function caseExecutionVariety(): void {
   }
 }
 caseExecutionVariety();
+
+function caseHuntingGroundsAndFreeHunt(): void {
+  const aspects = new Set<string>();
+  for (const ground of HUNTING_GROUNDS) {
+    const state = createGame(STARTING_DECK, undefined, '迈克尔·迈尔斯', ground.id);
+    aspects.add(layoutAspect());
+    check('主题猎场：' + ground.name + '使用对应主题和空间布局',
+      state.mapId === ground.id && ROOM_MAP.hall.name === ground.rooms.hall?.name &&
+      state.mission.mode !== 'free',
+      `布局比例 ${layoutAspect()} · ${ROOM_MAP.hall.name}`);
+  }
+  check('主题猎场：五张地图至少形成四种不同的空间比例', aspects.size >= 4, [...aspects].join('、'));
+
+  const freeMission = generateFreeHunt();
+  const free = createGame(STARTING_DECK, freeMission, '迈克尔·迈尔斯', 'lampkin');
+  check('自由猎杀：不指定标记目标，并提供三项非强制挑战',
+    free.mission.mode === 'free' &&
+    free.people.every((person) => !person.marked) &&
+    (free.mission.tasks?.length ?? 0) === 3);
+  free.survivorKills = 3;
+  free.executions = 2;
+  free.executionMethodsUsed.push('fridge');
+  check('自由猎杀：特殊处决挑战能正确累计',
+    missionTaskProgress(free, free.mission.tasks!.find((task) => task.kind === 'special_execute')!) === 1);
+  endTurn(free);
+  check('自由猎杀：完成挑战不会自动结束，玩家保留自主决定权',
+    free.phase === 'playing' && free.result === null);
+  check('自由猎杀：完成至少一次击杀后可以主动结束并结算',
+    finishFreeHunt(free) && free.phase === 'gameover' && free.result === 'win' && free.rewardCards.length === 0);
+}
+caseHuntingGroundsAndFreeHunt();
 
 caseRoutineHuntOpportunities();
 caseGeneratorBreakerNetwork();
