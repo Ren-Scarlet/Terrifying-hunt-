@@ -25,6 +25,7 @@ import {
   SABOTAGE_COST,
   addAlarm,
   currentScore,
+  calculateHuntStyleRating,
   sabotageSiteItem,
   togglePowerCircuit,
   breakerBlockReason,
@@ -444,6 +445,31 @@ function caseMyersStalkingAndFearRadius(): void {
   check('女猎手：在柜子处可以将飞斧补充至 3 把',
     refillHuntressHatchets(huntress) && huntress.hatchets === 3);
   
+  const styleGame = createGame(STARTING_DECK, undefined, '设陷者');
+  styleGame.turn = 5;
+  const baseStyle = calculateHuntStyleRating(styleGame, 'win');
+  check('猎杀风格：普通完成任务有基础评级，但不发额外风格血点',
+    baseStyle.rank === 'C' && baseStyle.bonus === 0 && baseStyle.score >= 40,
+    `rank=${baseStyle.rank} score=${baseStyle.score} bonus=${baseStyle.bonus}`);
+  styleGame.huntStats = {
+    routineInsights: 3,
+    environmentActions: 3,
+    trapTriggers: 2,
+    hatchetHits: 2,
+    nurseBlinks: 2,
+    nurseGrabs: 2,
+    myersBurstHits: 2,
+    quietKills: 3,
+  };
+  styleGame.specialExecutionBonus = 35;
+  const highStyle = calculateHuntStyleRating(styleGame, 'win');
+  check('猎杀风格：多样化计划与专属能力可达到 S 级并获得 40 血点奖励',
+    highStyle.rank === 'S' && highStyle.score === 100 && highStyle.bonus === 40 &&
+    highStyle.breakdown.length >= 6);
+  const failedStyle = calculateHuntStyleRating(styleGame, 'failed');
+  check('猎杀风格：失败任务仍显示行动评价，但不发胜利奖励',
+    failedStyle.score > 0 && failedStyle.bonus === 0);
+
   check('卡牌图标：新版初始卡和迈尔斯专属卡都有可用白色图案资源',
     ['unbreakable','hex_huntress','hex_noed','scourge_shrine','distressing','hell','iron_grasp','deerstalker','hex_ruin','bitter_murmur','sloppy_butcher','insidious','myers_eclipse_light','myers_last_best','myers_plaything'].every((id) => !!cardImage(id) && cardImage(id)!.includes('assets/dbd/perks/')));
   const normal = createGame(['silent_step'], undefined, '设陷者');
