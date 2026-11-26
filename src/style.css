@@ -3203,3 +3203,44 @@ button, .room-hit, .hand-row { touch-action: manipulation; }
   inset: auto !important;
   z-index: auto !important;
 }
+
+
+/* 猎杀界面第二轮：情报分区重排，行动记录叠放地图，不占地图尺寸。 */
+@media (min-width: 1201px) {
+  #app .hunt-sidebar-left { grid-column: 1; grid-row: 2; }
+  #app .hunt-sidebar-right { grid-column: 3; grid-row: 2; }
+  #app .hunt-sidebar-left .intel-grid { display: grid; grid-template-columns: minmax(0,1fr); gap: 8px; padding: 0; }
+  #app .hunt-sidebar-left .roster { grid-template-columns: minmax(0,1fr); max-height: 300px; overflow-y: auto; }
+  #app .hunt-sidebar-left .panel { padding: 9px; }
+  #app .hunt-sidebar-left .panel-heading { gap: 5px; flex-wrap: wrap; }
+  #app .hunt-sidebar-left .panel-heading span { flex-basis: 100%; }
+  #app .hunt-sidebar-left .facility-row { grid-template-columns: 22px minmax(0,1fr); }
+  #app .hunt-sidebar-left .facility-row > .btn,
+  #app .hunt-sidebar-left .facility-state { grid-column: 2; justify-self: start; }
+  #app .hunt-sidebar-right .person-dossier-panel { min-height: 0; }
+  #app .hunt-sidebar-right .person-dossier-panel .person-detail-view .detail-body { max-height: 250px; min-height: 110px; overflow-y: auto; }
+  #app .hunt-sidebar-right .intel-grid { display: grid; grid-template-columns: minmax(0,1fr); padding: 0; gap: 8px; }
+}
+#app .floorplan .intel-log-panel {
+  position: absolute; z-index: 12; left: 10px; bottom: 10px;
+  width: min(340px, 42%); max-height: 34%; overflow: hidden;
+  padding: 8px 10px; border: 1px solid #8a75604d; border-radius: 4px;
+  background: linear-gradient(180deg, #0b0d0eeF, #08090bdF);
+  box-shadow: 0 4px 18px #000b; backdrop-filter: blur(5px);
+  pointer-events: auto;
+}
+#app .floorplan .intel-log-panel .panel-heading { margin-bottom: 5px; }
+#app .floorplan .intel-log-panel .panel-heading h2 { font-size: 10px; letter-spacing: 1.8px; }
+#app .floorplan .intel-log-panel .panel-heading span { font-size: 9px; }
+#app .floorplan .intel-log-panel .log { max-height: 150px; overflow-y: auto; font-size: 10px; line-height: 1.45; }
+@media (max-width: 1200px) {
+  #app .hunt-sidebar-left .intel-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  #app .hunt-sidebar-left .roster { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  #app .hunt-sidebar-right .intel-grid { grid-template-columns: minmax(0,1fr); }
+}
+@media (max-width: 700px) {
+  #app .floorplan .intel-log-panel { left: 5px; bottom: 5px; width: min(260px, 62%); max-height: 28%; padding: 6px; }
+  #app .floorplan .intel-log-panel .log { max-height: 90px; font-size: 9px; }
+  #app .hunt-sidebar-left .intel-grid { grid-template-columns: minmax(0,1fr); }
+  #app .hunt-sidebar-left .roster { grid-template-columns: minmax(0,1fr); }
+}
