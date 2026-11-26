@@ -2534,3 +2534,76 @@ button, .room-hit, .hand-row { touch-action: manipulation; }
   0%, 100% { opacity: .95; }
   50% { opacity: .28; }
 }
+
+
+/* 暗夜杀机 · 本轮沉浸感与操作清晰度修正 */
+.mission-meta { display: none; }
+.bottom-special-meters {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 12px;
+  padding: 8px 10px 2px;
+  border-top: 1px solid #262421;
+}
+.bottom-special-meters .stalk-meter { flex: 1 1 180px; max-width: 360px; }
+.bottom-special-meters .myers-mark-strip { margin: 0; }
+.intel-drawer { margin: 8px 0 12px; }
+.main-column > .intel-drawer { order: 2; }
+.main-column > .bottom-dock { order: 3; }
+
+.btn.attack {
+  box-shadow: 0 2px 6px #0007;
+  background: linear-gradient(180deg, #2a1712, #15100e);
+}
+.btn.attack:hover:not(:disabled) {
+  box-shadow: 0 2px 7px #0008;
+  background: linear-gradient(180deg, #382018, #19110e);
+}
+.btn.execute-action {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 1px;
+  min-width: 150px; padding: 5px 14px 6px;
+  border: 1px solid #735044;
+  background: linear-gradient(180deg, #241719, #120d0e);
+  color: #e8c1b5;
+}
+.btn.execute-action .atk-name { font-size: 13px; font-weight: 800; letter-spacing: 2.5px; color: #e9b6a9; }
+.btn.execute-action .atk-meta { font-size: 9px; color: #a7867d; }
+.btn.execute-action:hover:not(:disabled) { border-color: #a76a5b; background: linear-gradient(180deg, #342023, #181011); }
+.btn.execute-action:disabled, .btn.execute-action.spent { opacity: .42; cursor: not-allowed; }
+.person-detail-view { display: block; min-width: 0; width: 100%; }
+.card-detail-inline .person-detail-view .detail-card { display: block; align-items: initial; }
+.card-detail-inline .person-detail-view .detail-header { min-height: 68px; padding: 10px 13px; }
+.card-detail-inline .person-detail-view .detail-header::after { display: block; }
+.card-detail-inline .person-detail-view .detail-body {
+  display: block; max-height: 230px; overflow-y: auto;
+  padding: 10px 13px; font-size: 11px; line-height: 1.65;
+}
+.card-detail-inline .person-detail-view .detail-body p {
+  display: block; margin: 0 0 7px; color: #c0b8aa;
+}
+.card-detail-inline .person-detail-view .person-detail-lead { float: right; margin: 0 0 8px 12px; }
+.person-detail-actions {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 7px;
+  padding: 8px 10px; border: 1px solid #302925; border-top: 0;
+  background: #100e0d;
+}
+.person-detail-actions small { flex: 1 1 100%; color: #a99a87; font-size: 10px; line-height: 1.5; }
+
+.room-features { flex-wrap: wrap; align-items: flex-start; gap: 4px; max-width: 100%; }
+.room-feature {
+  display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+  width: auto; min-width: 34px; height: 30px; padding: 3px 5px;
+  font-size: 12px; line-height: 1; white-space: nowrap;
+}
+.room-feature b { font-size: 8px; font-weight: 800; letter-spacing: .2px; }
+.room-feature .ui-icon { width: 17px; height: 17px; opacity: 1; }
+.room-feature.site { min-width: 52px; }
+.room-feature.site .ui-icon { width: 18px; height: 18px; }
+.room-feature.execution-site { min-width: 48px; }
+.room-feature.breaker { min-width: 42px; }
+.room-feature.totem, .room-feature.cabinet, .room-feature.obstacle { min-width: 38px; }
+@media (max-width: 700px) {
+  .bottom-special-meters { gap: 7px; padding: 7px 6px 1px; }
+  .room-feature { min-width: 30px; height: 27px; padding: 2px 4px; gap: 2px; }
+  .room-feature b { font-size: 7px; }
+  .room-feature .ui-icon { width: 15px; height: 15px; }
+  .room-feature.site { min-width: 45px; }
+}
