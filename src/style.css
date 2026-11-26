@@ -2838,3 +2838,83 @@ button, .room-hit, .hand-row { touch-action: manipulation; }
 #app[data-font-scale="xlarge"] .opportunity-heading span,
 #app[data-font-scale="xlarge"] .opportunity-row p,
 #app[data-font-scale="xlarge"] .opportunity-empty { font-size: 16px; }
+
+
+/* 暗夜杀机：进一步提高地图设施与人物的可读性，保持地图几何比例不变。 */
+.room-features { flex-wrap: wrap; align-items: flex-start; gap: 6px; max-width: 100%; }
+.room-feature {
+  width: auto; min-width: 38px; min-height: 36px; height: auto;
+  grid-auto-flow: column; grid-template-columns: auto auto; gap: 4px;
+  padding: 4px 6px; border-radius: 4px;
+  background: #080a0deF; border-color: #6c6252;
+}
+.room-feature b { font-size: 10px; line-height: 1.15; color: #eee5d5; white-space: nowrap; }
+.room-feature .ui-icon { width: 23px; height: 23px; opacity: 1; }
+.room-feature.telephone, .room-feature.radio { color: #e3c88e; font-size: 20px; }
+.room-feature.telephone.broken, .room-feature.radio.broken { border-color: #9b5148; color: #e08b80; background: #21110fef; }
+.room-feature.breaker, .room-feature.light { border-color: #8a7958; }
+.room-people .person-chip { min-height: 60px; gap: 8px; padding: 3px 10px 3px 3px; font-size: 15px; }
+.room-people .person-chip img { width: 56px; height: 56px; object-fit: cover; }
+.room-people .chip-alert { min-width: 25px; height: 25px; font-size: 13px; }
+.room-people .chip-state, .room-people .chip-watch { font-size: 11px; min-height: 20px; padding: 2px 5px; }
+
+/* 三档显示比例继续独立：界面、字号、地图分别调节，不触碰浏览器缩放。 */
+#app[data-interface-scale="large"] .room-people .person-chip { min-height: 68px; }
+#app[data-interface-scale="large"] .room-people .person-chip img { width: 64px; height: 64px; }
+#app[data-interface-scale="xlarge"] .room-people .person-chip { min-height: 76px; }
+#app[data-interface-scale="xlarge"] .room-people .person-chip img { width: 72px; height: 72px; }
+#app[data-interface-scale="large"] .room-feature { min-height: 42px; min-width: 44px; padding: 5px 7px; }
+#app[data-interface-scale="large"] .room-feature .ui-icon { width: 27px; height: 27px; }
+#app[data-interface-scale="large"] .room-feature b { font-size: 11px; }
+#app[data-interface-scale="xlarge"] .room-feature { min-height: 48px; min-width: 50px; padding: 6px 8px; }
+#app[data-interface-scale="xlarge"] .room-feature .ui-icon { width: 31px; height: 31px; }
+#app[data-interface-scale="xlarge"] .room-feature b { font-size: 12px; }
+#app[data-interface-scale="xlarge"] .room-people .chip-alert { min-width: 29px; height: 29px; font-size: 15px; }
+
+#app[data-font-scale="large"] .facility-pill,
+#app[data-font-scale="large"] .facility-overview-heading,
+#app[data-font-scale="large"] .threat-live-summary span,
+#app[data-font-scale="large"] .threat-live-summary small,
+#app[data-font-scale="large"] .threat-clear b,
+#app[data-font-scale="large"] .threat-clear span { font-size: 14px; }
+#app[data-font-scale="xlarge"] .facility-pill,
+#app[data-font-scale="xlarge"] .facility-overview-heading,
+#app[data-font-scale="xlarge"] .threat-live-summary span,
+#app[data-font-scale="xlarge"] .threat-live-summary small,
+#app[data-font-scale="xlarge"] .threat-clear b,
+#app[data-font-scale="xlarge"] .threat-clear span { font-size: 16px; }
+#app[data-font-scale="large"] .roster-person small { line-height: 1.55; }
+#app[data-font-scale="xlarge"] .roster-person small { line-height: 1.6; }
+
+/* 地图放大时只扩大地图视口中的画布，房间坐标仍使用原始比例。 */
+#app[data-map-scale="large"] .map-viewport { max-height: 78vh; }
+#app[data-map-scale="xlarge"] .map-viewport { max-height: 82vh; }
+
+/* 设施状态条始终可见，详细设施清单仍保留在现场情报抽屉中。 */
+.facility-overview {
+  display: grid; gap: 7px; margin: 10px 0 12px; padding: 10px 12px;
+  border: 1px solid #38352e; background: linear-gradient(100deg, #151614, #0d1011);
+}
+.facility-overview-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.facility-overview-heading b { color: #e0d0ae; font-size: 13px; letter-spacing: .04em; }
+.facility-overview-heading small { color: #a69c8b; font-size: 11px; }
+.facility-overview-items { display: flex; flex-wrap: wrap; gap: 7px; }
+.facility-pill {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 34px;
+  padding: 5px 9px; border: 1px solid #393a35; background: #0a0d0f;
+  color: #c8c2b6; font-size: 12px; border-radius: 4px;
+}
+.facility-pill i { color: #d8c28f; font-style: normal; font-size: 16px; }
+.facility-pill strong { color: #e3d2ae; font-weight: 700; }
+.facility-pill.offline { border-color: #79443d; background: #1b100f; }
+.facility-pill.offline strong { color: #e08c7f; }
+
+@media (max-width: 700px) {
+  .room-people .person-chip { min-height: 48px; }
+  .room-people .person-chip img { width: 44px; height: 44px; }
+  .room-feature { min-width: 32px; min-height: 30px; padding: 3px 4px; }
+  .room-feature .ui-icon { width: 20px; height: 20px; }
+  .room-feature b { font-size: 9px; }
+  #app[data-interface-scale="xlarge"] .room-people .person-chip { min-height: 64px; }
+  #app[data-interface-scale="xlarge"] .room-people .person-chip img { width: 60px; height: 60px; }
+}
