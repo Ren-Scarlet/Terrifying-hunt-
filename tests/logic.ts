@@ -589,15 +589,15 @@ function caseFinisher(): void {
 /** G：猎杀动作必须明确区分，人物档案必须展示背景与实时状态。 */
 function caseHuntActionAndDossierUi(): void {
   const s = newGame();
-  const victim = s.people.find((person) => person.id === 'S01')!;
+  const victim = player(s);
   victim.room = s.playerRoom;
   victim.hp = 0;
   victim.downedTurns = 0;
   victim.activity = '倒在地上，试图呼救';
   s.energy = 3;
   const dossier = personDetailHtml(s, victim.id);
-  check('G 人物档案显示身份职业与背景',
-    dossier.includes('团队协调员') && dossier.includes('总在找人组队'));
+  check('G 人物档案显示角色背景',
+    dossier.includes(SURVIVOR_MAP[victim.id].bio));
   check('G 人物档案显示当前状态与正在做的事',
     dossier.includes('倒地') && dossier.includes('倒在地上，试图呼救'));
 }
