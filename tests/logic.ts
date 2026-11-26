@@ -1934,7 +1934,8 @@ function caseNewPerkSystem(): void {
   noed.attackReady = true;
   const noedAttack = attack(noed, noedTarget.id);
   check('难逃一死：全局警报满值后无需图腾，一刀处决当前房间人类',
-    noedPlayed && noedAttack && noed.emergencyActive && !noed.people.some((person) => person.id === noedTarget.id));
+    noedPlayed && noedAttack && noed.emergencyActive && !noed.people.some((person) => person.id === noedTarget.id),
+    `played=${noedPlayed} attacked=${noedAttack} emergency=${noed.emergencyActive} targetPresent=${noed.people.some((person) => person.id === noedTarget.id)} room=${noed.playerRoom} targetRoom=${noedTarget.room} hp=${noedTarget.hp} result=${noed.result}`);
 
   const bitter = createGame(['bitter_murmur'], undefined, '迈克尔·迈尔斯');
   const bitterTarget = bitter.people.find((person) => person.role !== 'police')!;
