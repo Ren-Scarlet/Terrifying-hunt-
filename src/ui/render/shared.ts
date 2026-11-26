@@ -8,6 +8,7 @@ import {
 import { KILLERS, type KillerProfile } from '../../game/killers';
 import { roomName } from '../../game/missions';
 import { getPersonProfile, type PersonProfile } from '../../game/people';
+import { ROUTINE_PROFILE } from '../../game/npc/catalog';
 import { SURVIVOR_MAP } from '../../game/survivors';
 import { awarenessLabel, awarenessStage } from '../../game/npc/awareness';
 import type { GameState, Person, SaveData } from '../../game/types';
@@ -205,7 +206,13 @@ export function personDetailHtml(state: GameState, personId: string): string {
   const rarityKey = profile.role === 'police' ? 'rare' : profile.role === 'target' ? 'visceral' : 'common';
   const rarityLabel = person?.marked ? '标记目标' : roleName;
   const threat = SURVIVOR_MAP[personId]?.threat;
-  const paras = [...profile.bio, `习惯：${profile.habit}`, `秘密：${profile.secret}`];
+  const routine = person ? ROUTINE_PROFILE[person.archetype] : null;
+  const habit = person?.goal === 'routine' && routine
+    ? person.routineObserved
+      ? `${routine.label}已确认；常去路线：${routine.rooms.map(roomName).join(' → ')}。`
+      : `${routine.hint}（重复观察两次可确认完整路线。）`
+    : profile.habit;
+  const paras = [...profile.bio, `习惯：${habit}`, `秘密：${profile.secret}`];
   if (person) {
     const health = conditionOf(person);
     paras.push(
