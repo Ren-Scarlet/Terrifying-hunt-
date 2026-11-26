@@ -94,6 +94,14 @@ export function createGame(
     scoreBreakdown: [],
     rewardCards: [],
     phoneCut: false,
+    bearTraps: [],
+    trapInventory: killerId === '设陷者' ? 2 : 0,
+    trapCaches: [],
+    huntressAiming: false,
+    hatchets: killerId === '女猎手' ? 3 : 0,
+    nurseBlinkTargeting: false,
+    nurseFollowUp: false,
+    nurseFatiguePending: false,
     wiretap: false,
     poltergeist: false,
     policeBlocked: false,
@@ -184,6 +192,16 @@ export function createGame(
     }
   }
   state.siteItems = items;
+  if (killerId === '设陷者') {
+    const occupied = new Set([
+      ...items.map((item) => item.room),
+      ...breakerRooms,
+      ...state.objectiveRooms,
+      ENTRY_ROOM,
+      EXIT_ROOM,
+    ]);
+    state.trapCaches = shuffle(objPool.filter((room) => !occupied.has(room) && ROOM_MAP[room].neighbors.length >= 2)).slice(0, 2);
+  }
   const generators = items.filter((item) => item.kind === 'generator');
   state.powerCircuits.forEach((circuit) => {
     const source = generators
