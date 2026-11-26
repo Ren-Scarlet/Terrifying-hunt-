@@ -279,16 +279,6 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
   let worldKey = '';
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  // 尘埃：一半在空气里飘，一半聚在光柱附近
-  const dust = Array.from({ length: 54 }, () => ({
-    x: Math.random(),
-    y: Math.random(),
-    r: 0.4 + Math.random() * 1.6,
-    sp: 0.004 + Math.random() * 0.013,
-    ph: Math.random() * Math.PI * 2,
-    a: 0.05 + Math.random() * 0.16,
-  }));
-
   const wallThick = (): number => clamp(view.w * 0.0095, 9, 16);
   const doorGap = (): number => clamp(view.w * 0.032, 26, 54);
 
@@ -911,10 +901,11 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
     cc.rect(pr.x + 1, pr.y + 1, pr.w - 2, pr.h - 2);
     cc.clip();
     const rg = cc.createRadialGradient(px, py, 0, px, py, coneLen);
-    rg.addColorStop(0, 'rgba(255,54,66,1)');
-    rg.addColorStop(0.22, 'rgba(238,32,48,.96)');
-    rg.addColorStop(0.55, 'rgba(190,20,38,.62)');
-    rg.addColorStop(1, 'rgba(150,12,28,0)');
+    // 手电使用暖白色真实光照，不再把光束画成红色标记。
+    rg.addColorStop(0, 'rgba(255,246,224,.96)');
+    rg.addColorStop(0.2, 'rgba(255,238,207,.78)');
+    rg.addColorStop(0.52, 'rgba(225,218,196,.38)');
+    rg.addColorStop(1, 'rgba(190,202,216,0)');
     cc.fillStyle = rg;
     cc.fillRect(px - coneLen, py - coneLen, coneLen * 2, coneLen * 2);
     cc.restore();
@@ -1021,18 +1012,31 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
       }
     }
 
-    // 暗红手电筒：复用同一张光锥图，光束保留柔和衰减
-    ctx.globalAlpha = 0.76;
+    // 手电在地面形成暖白光斑；以 screen 混合保留材质纹理，不绘制符号或光源图标。
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    ctx.globalAlpha = 0.34;
     ctx.drawImage(refs.coneCv, 0, 0, w, h);
-    ctx.globalAlpha = 1;
+    ctx.restore();
 
-    // 警灯红闪
-    const policeClose =
-      police && (police.room === state.playerRoom || ROOM_MAP[state.playerRoom].neighbors.includes(police.room));
-    if (policeClose) {
-      const pulse = 0.16 + 0.14 * (0.5 + 0.5 * Math.sin(t * 3.4));
-      addLight(ctx, px, py, Math.min(pr.w, pr.h) * 1.7, pulse, [186, 44, 40]);
-    }
+    // 空气中的微弱体积光：沿光束方向渐隐，边缘柔化并受当前房间边界裁切。
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    ctx.beginPath();
+    ctx.moveTo(px, py);
+    ctx.arc(px, py, coneLen, facing - coneHalf, facing + coneHalf);
+    ctx.closePath();
+    ctx.clip();
+    ctx.beginPath();
+    ctx.rect(pr.x + 1, pr.y + 1, pr.w - 2, pr.h - 2);
+    ctx.clip();
+    const beam = ctx.createLinearGradient(px, py, px + Math.cos(facing) * coneLen, py + Math.sin(facing) * coneLen);
+    beam.addColorStop(0, 'rgba(255,236,198,.10)');
+    beam.addColorStop(0.45, 'rgba(255,231,190,.055)');
+    beam.addColorStop(1, 'rgba(225,230,235,0)');
+    ctx.fillStyle = beam;
+    ctx.fillRect(pr.x, pr.y, pr.w, pr.h);
+    ctx.restore();
 
     // 门缝冷光：门槛上的一条细光，不是一团亮斑
     const spill = 0.075 + 0.018 * Math.sin(t * 2.2);
@@ -1090,20 +1094,7 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
     ctx.ellipse(px, py + ps * 0.5, ps * 2.1, ps * 1.1, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // 尘埃：飘在光里的才看得见
-    for (const p of dust) {
-      const x = ((p.x + t * p.sp) % 1) * w;
-      const y = (p.y + Math.sin(t * 0.6 + p.ph) * 0.012) * h;
-      const dxp = x - px;
-      const dyp = y - py;
-      const dist = Math.hypot(dxp, dyp);
-      const inCone = dist < coneLen && Math.abs(Math.atan2(dyp, dxp) - facing) < coneHalf;
-      const boost = inCone ? 2.6 : 1;
-      ctx.fillStyle = `rgba(226,222,206,${clamp(p.a * boost * (0.6 + 0.4 * Math.sin(t * 1.4 + p.ph)), 0, 0.6)})`;
-      ctx.beginPath();
-      ctx.arc(x, y, p.r, 0, Math.PI * 2);
-      ctx.fill();
-    }
+    // 不再把尘埃粒子贴在玩家周围；保持人物标记干净，空气层由柔和雾气承担。
 
     ctx.globalCompositeOperation = 'source-over';
   }
