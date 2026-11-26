@@ -77,6 +77,7 @@ import { generateMission } from '../src/game/missions';
 import type { GameState, RoomId } from '../src/game/types';
 import { createSeededRandom, random, withRandomSource } from '../src/game/random';
 import { nearestOf, roomDistance } from '../src/game/navigation';
+import { EXECUTION_METHODS } from '../src/game/executions';
 import { awarenessLabel, awarenessStage, myersStalkGain } from '../src/game/npc/awareness';
 import { ROUTINE_PROFILE } from '../src/game/npc/catalog';
 
@@ -215,6 +216,35 @@ function casePhoneLineCoordination(): void {
 
 /** 新抽牌规则：每回合补 1 张、主动抽牌、六张上限、洗牌推进团队进度。 */
 /** 环境事件：每三回合改变一次现场局势，并正确区分临时闪断与永久断电。 */
+function caseExecutionVariety(): void {
+  check('特殊处决：六种处决方式分布在六个不同的场地',
+    EXECUTION_METHODS.length === 6 &&
+    new Set(EXECUTION_METHODS.map((method) => method.room)).size === 5 &&
+    EXECUTION_METHODS.some((method) => method.id === 'fridge') &&
+    EXECUTION_METHODS.some((method) => method.id === 'microwave'));
+
+  for (const method of EXECUTION_METHODS) {
+    const s = newGame();
+    const victim = s.people.find((person) => person.role !== 'police');
+    if (!victim) {
+      check('特殊处决：' + method.name + '可以完成并记录', false, '没有幸存者');
+      continue;
+    }
+    s.playerRoom = method.room;
+    victim.room = method.room;
+    victim.hp = 0;
+    victim.downedTurns = 0;
+    s.carryPersonId = victim.id;
+    s.energy = 10;
+    const ok = executeCarriedPerson(s, method.id);
+    check('特殊处决：' + method.name + '完成击杀并写入本局图鉴',
+      ok && !s.people.some((person) => person.id === victim.id) &&
+      s.executionMethodsUsed.includes(method.id) && s.specialExecutionBonus === 35,
+      method.room);
+  }
+}
+caseExecutionVariety();
+
 caseRoutineHuntOpportunities();
 caseGeneratorBreakerNetwork();
 casePhoneLineCoordination();
