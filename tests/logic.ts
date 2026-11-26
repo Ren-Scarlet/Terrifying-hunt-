@@ -1921,7 +1921,7 @@ function caseNewPerkSystem(): void {
     hex.hexHuntressUsed && hex.cardBonusScore === 50);
 
   const noed = createGame(['hex_noed'], undefined, '迈克尔·迈尔斯');
-  noed.people.forEach((person) => { person.room = 'bedroom'; person.alert = 0; person.awareness = 0; });
+  noed.people.forEach((person) => { person.room = 'bedroom'; person.alert = 0; person.awareness = 0; person.item = null; person.itemUses = 0; });
   noed.hand = [{ uid: 'test-noed', defId: 'hex_noed' }];
   noed.energy = 6;
   const noedPlayed = playCard(noed, 'test-noed');
