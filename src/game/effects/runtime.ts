@@ -96,6 +96,14 @@ export function executeOps(state: GameState, ops: Op[], runtime: EffectRuntime):
           p.intent = 'stunned';
         });
         break;
+      case 'status':
+        selectPeople(state, op.who).forEach((p) => {
+          p.statusEffects ??= {};
+          p.statusEffects[op.status] = Math.max(p.statusEffects[op.status] ?? 0, op.turns + 1);
+          const labels = { blind: '障目', undetectable: '无法侦测', danger: '危险', deepWound: '深度伤口', oblivious: '浑然不觉', incurable: '不治', cursed: '被诅咒' };
+          log(state, `${p.name} 获得状态：${labels[op.status]}。`);
+        });
+        break;
       case 'pin':
         selectPeople(state, op.who).forEach((p) => {
           if (!state.pinnedPeople.includes(p.id)) state.pinnedPeople.push(p.id);

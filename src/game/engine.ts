@@ -591,6 +591,9 @@ function npcReact(state: GameState): void {
     if (person.hp <= 0 || person.hidden) continue;
     if (person.lastWitnessedEventClock === state.trailClock) continue;
     if (person.blockedTurns > 0 || state.pinnedPeople.includes(person.id)) continue;
+    const effects = person.statusEffects ?? {};
+    const cannotSense = (effects.undetectable ?? 0) > 0 || (effects.oblivious ?? 0) > 0 || (effects.blind ?? 0) > 0 || !isRoomLit(state, person.room);
+    if (cannotSense) continue;
 
     // 恐惧范围：相邻房间先起疑；范围 2 的杀手会在隔壁直接引发逃跑，两格外也会察觉。
     const distanceToPlayer = roomDistance(person.room, state.playerRoom);
@@ -688,7 +691,14 @@ function afterPlayerAction(state: GameState): void {
   state.trailRevealActions = Math.max(0, state.trailRevealActions - 1);
   state.stealthActions = Math.max(0, state.stealthActions - 1);
   if (state.trailRevealActions === 0) state.highlightedTrail = null;
-  state.people.forEach((person) => { person.revealedActions = Math.max(0, (person.revealedActions ?? 0) - 1); });
+  state.people.forEach((person) => {
+    person.revealedActions = Math.max(0, (person.revealedActions ?? 0) - 1);
+    if (person.statusEffects) {
+      for (const key of Object.keys(person.statusEffects) as Array<keyof NonNullable<Person['statusEffects']>>) {
+        person.statusEffects[key] = Math.max(0, (person.statusEffects[key] ?? 0) - 1);
+      }
+    }
+  });
   // 恶魔附身以行动而非回合计时；每次行动消耗 20 点尾随值。
   if (state.killer === '迈克尔·迈尔斯' && state.possessed) {
     state.stalkMeter = Math.max(0, state.stalkMeter - 20);
@@ -926,6 +936,18 @@ function damagePerson(state: GameState, person: Person, amount: number, suppress
   let dmg = Math.max(0, amount + state.bonusDamage);
   state.bonusDamage = 0;
   if (dmg <= 0) return;
+  if ((person.statusEffects?.danger ?? 0) > 0 && person.hp > 0) {
+    person.statusEffects!.danger = 0;
+    person.hp = 0;
+    person.downedTurns = 0;
+    person.intent = 'stunned';
+    person.activity = '受到攻击，危险状态触发并立即倒地';
+    person.alert = 100;
+    log(state, `${person.name} 处于危险状态，受到攻击后立即倒地！`);
+    addAlarm(state, 4);
+    npcWitnessEvent(state, person.room, 'attack', person.id);
+    return;
+  }
   // 见血就清醒：杀戮值一脚踩空
   state.frenzy = 0;
 
@@ -1052,7 +1074,9 @@ function rescuePerson(state: GameState, person: Person): void {
 function healPerson(state: GameState, person: Person, amount = 1): void {
   if (person.hp <= 0) return;
   const before = person.hp;
-  person.hp = Math.min(SURVIVOR_MAX_HP, person.hp + amount);
+  const maxHp = (person.statusEffects?.incurable ?? 0) > 0 ? SURVIVOR_INJURED_HP : SURVIVOR_MAX_HP;
+  person.hp = Math.min(maxHp, person.hp + amount);
+  if (person.hp > before && amount >= 2 && person.statusEffects?.deepWound) person.statusEffects.deepWound = 0;
   if (person.hp > before) log(state, `${person.name} 的伤口被处理过（${person.hp}/${SURVIVOR_MAX_HP}）。`);
 }
 
@@ -1224,6 +1248,10 @@ function wantsToLeave(state: GameState, person: Person): boolean {
  */
 function fleeAway(state: GameState, person: Person, quiet = false): boolean {
   if (state.pinnedPeople.includes(person.id) || person.blockedTurns > 0 || person.hp <= 0 || person.fear >= 100) return false;
+  if (person.hp <= SURVIVOR_INJURED_HP && person.movesThisTurn % 2 === 1) {
+    person.activity = '重伤拖慢了脚步，踉跄着停了一下';
+    return false;
+  }
   // 房门封锁会把房间内的人也困住，不能从锁住的房间直接跑出去。
   if (isLocked(state, person.room)) return false;
   // 后院是出口：只有本来就打算离开、或者已经吓破胆的人才会往外跑。
@@ -1871,6 +1899,17 @@ function npcTurn(state: GameState): void {
       log(state, `${person.name} 发现并拆除了${roomName(person.room)}的捕兽夹。`);
     }
 
+    person.statusEffects ??= {};
+    if ((person.statusEffects.cursed ?? 0) > 0) {
+      if (state.totems.length === 0) {
+        person.statusEffects.cursed = 0;
+        log(state, `${person.name} 身上的诅咒随着最后一座图腾被摧毁而消散。`);
+      } else {
+        person.fear = clamp(person.fear + 8, 0, 100);
+        person.alert = clamp(person.alert + 5, 0, 100);
+      }
+    }
+    if ((person.statusEffects.deepWound ?? 0) > 0) person.bleed = Math.max(person.bleed, 1);
     // 即时警觉值可以下降，但已经确认的危险不会被忘记。
     person.awareness = Math.max(person.awareness, person.alert >= 75 ? 3 : person.alert >= 40 ? 2 : person.alert >= 12 ? 1 : 0);
 

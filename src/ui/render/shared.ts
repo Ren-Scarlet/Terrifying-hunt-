@@ -127,7 +127,7 @@ export function intentDot(person: Person): string {
   return `<i class="intent-dot i-${person.intent}" title="${escape(INTENT_LABEL[person.intent])}"></i>`;
 }
 
-export function personChip(person: Person, attackable = false, carryable = false, targetMode?: 'hatchet' | 'nurse-grab'): string {
+export function personChip(person: Person, attackable = false, carryable = false, targetMode?: 'hatchet' | 'nurse-grab', darkRoom = false): string {
   const cls =
     person.role === 'police'
       ? 'police'
@@ -155,6 +155,19 @@ export function personChip(person: Person, attackable = false, carryable = false
       : health === 'injured'
         ? '<span class="chip-state injured" title="受伤：再挨一下就会倒地">伤</span>'
         : '';
+  const effects = person.statusEffects ?? {};
+  const statusIcons = [
+    ...(health === 'injured' ? [['🩸', '重伤', '重伤：逃跑速度降低']] : []),
+    ...(darkRoom || (effects.blind ?? 0) > 0 ? [['◉', '障目', '障目：在黑暗中无法察觉杀手']] : []),
+    ...((effects.undetectable ?? 0) > 0 ? [['♧', '无法侦测', '无法侦测：明亮房间也无法发现杀手']] : []),
+    ...(person.blockedTurns > 0 ? [['⛓', '无法行动', '无法行动：被限制移动']] : []),
+    ...((effects.danger ?? 0) > 0 ? [['⚠', '危险', '危险：下一次受到攻击立即倒地']] : []),
+    ...((effects.deepWound ?? 0) > 0 ? [['✚', '深度伤口', '深度伤口：持续流血，需治疗处理']] : []),
+    ...(person.bleed > 0 ? [['🩸', '流血', '流血：回合结束持续失去生命']] : []),
+    ...((effects.oblivious ?? 0) > 0 ? [['☁', '浑然不觉', '浑然不觉：暂时不会主动察觉危险']] : []),
+    ...((effects.incurable ?? 0) > 0 ? [['✖', '不治', '不治：无法治疗至健康状态']] : []),
+    ...((effects.cursed ?? 0) > 0 ? [['☠', '被诅咒', '被诅咒：图腾存在时恐惧持续增加']] : []),
+  ].map(([symbol, _name, desc]) => `<span class="person-status-icon" title="${desc}">${symbol}</span>`).join('');
   const watchMark = person.watched
     ? '<span class="chip-watch locked" title="夜幕锁定：持续显形，下一刀直接击倒">锁定</span>'
     : person.watchValue > 0
@@ -180,7 +193,7 @@ export function personChip(person: Person, attackable = false, carryable = false
   return `<button type="button" class="person-chip ${cls} ${person.bloodSacrifice ? 'blood-sacrifice' : ''} ${health === 'downed' ? 'is-downed' : ''} ${attackable ? 'can-hit' : ''} ${targetMode ? 'targeting-' + targetMode : ''}" data-action="${action}" data-person-id="${person.id}"${attackable ? ' data-attack="1"' : ''}
     title="${escape(person.name)} · ${HEALTH_LABEL[health]} · ${awarenessLabel(person.alert)} ${person.alert}/100 · ${escape(ARCH_LABEL[person.archetype])} · ${escape(GOAL_LABEL[person.goal])} · 正在${escape(label)}${note}">
     ${img ? `<img src="${img}" alt="" onerror="this.style.display='none'">` : ''}
-    ${dialogue}<span>${escape(person.name)}</span>${contractTargetMark}${sacrificeMark}${intentDot(person)}${stateMark}${alertMark}${watchMark}${person.item ? itemBadge(person.item, person.itemUses) : ''}
+    ${dialogue}<span>${escape(person.name)}</span>${contractTargetMark}${sacrificeMark}${intentDot(person)}${stateMark}${statusIcons}${alertMark}${watchMark}${person.item ? itemBadge(person.item, person.itemUses) : ''}
   </button>`;
 }
 

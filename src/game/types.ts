@@ -158,6 +158,8 @@ export interface BearTrap {
 /** 健康 / 受伤 / 倒地。死亡等于从 people 里移除，所以没有第四态。 */
 export type Health = 'healthy' | 'injured' | 'downed';
 
+export type SurvivorStatus = 'blind' | 'undetectable' | 'danger' | 'deepWound' | 'oblivious' | 'incurable' | 'cursed';
+
 export interface Person {
   id: string;
   name: string;
@@ -193,6 +195,8 @@ export interface Person {
   blockedTurns: number;
   /** 流血：每回合结束掉血 */
   bleed: number;
+  /** 幸存者状态剩余行动次数；诅咒还受图腾存续影响。 */
+  statusEffects?: Partial<Record<SurvivorStatus, number>>;
   /** 倒地后已经过去的回合数，撑满 BLEEDOUT 就死 */
   downedTurns: number;
   /** 已经跑到逃生点的人，再待一回合就会真的逃出去（0 未开始，1 正在翻篱笆） */

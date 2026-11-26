@@ -1,7 +1,0 @@
-node_modules/
-dist/
-.dbd-cache/
-.cache/
-*.log
-.tmpshot/
-.workbuddy/

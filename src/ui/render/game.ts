@@ -70,7 +70,7 @@ import {
 
 
 import { isCardTuned } from '../../game/tuning';
-import { isMuted } from '../audio';
+import { isMuted, playHeartbeat } from '../audio';
 import { escape, icon, itemBadge, itemIconHtml, personChip, intentDot, shadowFigures, perkIconHtml, TYPE_NAMES, killerFaceHtml, defaultDetailHtml } from './shared';
 import type { GameState, Person, RoomId, SaveData } from '../../game/types';
 
@@ -329,6 +329,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
   const ground = getHuntingGround(state.mapId);
   const here = state.people.filter((p) => p.room === state.playerRoom && p.role !== 'police');
   const policeHere = state.people.some((p) => p.room === state.playerRoom && p.role === 'police');
+  if (here.some((p) => p.hp > 0 && !p.hidden)) playHeartbeat();
   const isMyers = killer.owner === '迈克尔·迈尔斯';
 
   // 任务条：目标 / 达成条件 / 失败条件 / 实时进度 / 倒计时，一眼看清这一局要做什么
@@ -430,6 +431,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
             false,
             false,
             state.huntressAiming ? 'hatchet' : state.nurseFollowUp && p.hp > 0 && p.room === state.playerRoom ? 'nurse-grab' : undefined,
+            !isRoomLit(state, p.room),
           )).join('')}
           ${police ? personChip(police) : ''}
           ${ghosts.map(() => '<span class="ghost-chip" title="最后确认位置：人可能已经走了">?</span>').join('')}
@@ -444,6 +446,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
   const playerMarker = `
     <div class="player-marker" style="${markerStyle}" title="你在这里：${escape(killer.owner)}">
       ${killerFaceHtml(killer, 'marker')}
+      ${state.frenzy > 0 ? `<span class="killer-frenzy-mark" title="杀戮值 ${state.frenzy}/100">☠ ${state.frenzy}</span>` : ''}
       <span>你</span>
     </div>
   `;

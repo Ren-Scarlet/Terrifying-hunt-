@@ -177,6 +177,7 @@ export type Op =
   | { op: 'wantedHalf' }
   | { op: 'alert'; who: Who; amount: number }
   | { op: 'block'; who: Who; turns: number }
+  | { op: 'status'; who: Who; status: 'blind' | 'undetectable' | 'danger' | 'deepWound' | 'oblivious' | 'incurable' | 'cursed'; turns: number }
   | { op: 'pin'; who: Who }
   /** 把某个 NPC 挪到别处 */
   | { op: 'move'; who: Who; to: Dest; clearAlert?: boolean }

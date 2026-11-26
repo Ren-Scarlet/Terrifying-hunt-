@@ -137,6 +137,15 @@ let musicTrack: MusicTrack | null = null;
 const musicMissing = new Set<MusicTrack>();
 let audioUnlocked = false;
 const missing = new Set<SfxName>();
+let lastHeartbeatAt = 0;
+
+/** 地图会频繁重绘；仅在幸存者与杀手同处一室时限频播放心跳。 */
+export function playHeartbeat(): void {
+  const now = Date.now();
+  if (now - lastHeartbeatAt < 7000) return;
+  lastHeartbeatAt = now;
+  playSfxRepeat('heartbeat', 3, 0.42);
+}
 
 export function isMuted(): boolean {
   return muted;
