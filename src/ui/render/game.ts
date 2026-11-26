@@ -834,7 +834,6 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
         ${threatRowsHtml(state)}
         </div>
         </div>
-        </div>
         </details>
       </aside>
     </div>
