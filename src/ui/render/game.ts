@@ -182,67 +182,20 @@ function threatRowsHtml(state: GameState): string {
   const calling = alive.filter((p) => p.intent === 'call');
   const caring = alive.filter((p) => p.intent === 'rescue' || p.intent === 'heal');
   const armed = alive.filter((p) => p.armed);
-  const barricaded = state.barricades.length;
   const hiding = state.people.filter((p) => p.role !== 'police' && p.hidden);
-
-  const rows: Array<{ name: string; count: number; hint: string; level: 'calm' | 'warn' | 'hot' }> = [
-    {
-      name: '逃生',
-      count: atExit.length + leaving.length,
-      hint: atExit.length
-        ? `${atExit.length} 人已经在后院，撑过这回合就翻出去`
-        : leaving.length
-          ? '正往后院跑，先封门或追上去'
-          : '还没人动身，后院那扇门可以先钉死',
-      level: atExit.length ? 'hot' : leaving.length ? 'warn' : 'calm',
-    },
-    {
-      name: '报警',
-      count: calling.length,
-      hint: state.phoneCut
-        ? '电话线已经剪断，他们只能去地下室碰无线电'
-        : calling.length
-          ? '有人正在摸电话，报警会让暴露度暴涨'
-          : '书房和大厅有电话，先剪线最省事',
-      level: calling.length ? (state.phoneCut ? 'warn' : 'hot') : 'calm',
-    },
-    {
-      name: '救援',
-      count: caring.length + downed.length,
-      hint: downed.length
-        ? `${downed.length} 人倒地 · ${caring.length} 人正赶去救，守尸或钉住他`
-        : '现在没人倒地，救不起来也就没得救',
-      level: downed.length ? (caring.length ? 'hot' : 'warn') : 'calm',
-    },
-    {
-      name: '反抗',
-      count: armed.length + barricaded,
-      hint: armed.length
-        ? `${armed.length} 人手里有家伙，正面撞上会被逼退一步`
-        : barricaded
-          ? `${barricaded} 间房门被堵住，进去要多花一步`
-          : '厨房、车库、温室能翻到武器，提前清掉',
-      level: armed.length > 1 ? 'hot' : armed.length || barricaded ? 'warn' : 'calm',
-    },
-    {
-      name: '躲藏',
-      count: hiding.length,
-      hint: hiding.length ? `${hiding.length} 人藏在柜子或床底，搜一次才揪得出来` : '没人在藏，或者你还没看见',
-      level: hiding.length ? 'warn' : 'calm',
-    },
-  ];
-
-  return `<div class="threat-list">${rows
-    .map(
-      (r) => `<div class="threat-row ${r.level}">
-        <span class="t-name">${r.name}</span>
-        <b class="t-count">${r.count}</b>
-        <span class="t-hint">${escape(r.hint)}</span>
-      </div>`,
-    )
-    .join('')}</div>`;
+  const rows: Array<{ name: string; count: number; hint: string; level: 'warn' | 'hot' }> = [];
+  if (atExit.length || leaving.length) rows.push({ name: '逃生行动', count: atExit.length + leaving.length, hint: atExit.length ? atExit.length + ' 人已抵达逃生点，可能很快逃离。优先封锁出口或拦截。' : leaving.length + ' 人正在前往逃生点，查看地图上的逃生路线。', level: atExit.length ? 'hot' : 'warn' });
+  if (calling.length) rows.push({ name: '通讯求救', count: calling.length, hint: state.phoneCut ? '电话线路已中断；正在尝试无线电或寻找其他求救途径。' : '有人正在使用电话或无线电。破坏通讯设施可以打断这次求救。', level: 'hot' });
+  if (downed.length) rows.push({ name: '救援风险', count: downed.length, hint: caring.length ? caring.length + ' 人正在救援或治疗倒地同伴。隔离救援者，或及时处决目标。' : downed.length + ' 人倒地，暂时无人救援；同伴仍可能改变行动前来营救。', level: caring.length ? 'hot' : 'warn' });
+  if (armed.length) rows.push({ name: '武装反抗', count: armed.length, hint: armed.length + ' 名幸存者持有武器，近身接触可能让你失去行动点。考虑伏击或远程手段。', level: armed.length > 1 ? 'hot' : 'warn' });
+  if (hiding.length) rows.push({ name: '藏匿目标', count: hiding.length, hint: hiding.length + ' 人藏在柜子或床底，需要搜索所在房间才能发现。', level: 'warn' });
+  const brokenCircuits = state.powerCircuits.filter((c) => c.broken).length;
+  const activeGenerators = state.siteItems.filter((i) => i.kind === 'generator' && !i.broken && i.jammedTurns <= 0 && !i.charged).length;
+  const summary = '团队进度 ' + state.teamProgress + '% · 暴露度 ' + state.alarm + '% · ' + downed.length + ' 人倒地 · ' + brokenCircuits + '/' + state.powerCircuits.length + ' 组电路已断';
+  const empty = rows.length ? '' : '<div class="threat-clear"><b>暂未发现正在发生的紧急行动</b><span>留意团队进度、暴露度与现场设施状态；局势变化时这里会显示具体威胁和可采取的反制。</span></div>';
+  return '<div class="threat-live-summary"><b>当前局势</b><span>' + summary + '</span><small>' + (activeGenerators ? activeGenerators + ' 台发电机仍可被幸存者修复。' : '当前没有正在推进的发电机修复。') + '</small></div>' +
+    '<div class="threat-list">' + rows.map((r) => '<div class="threat-row ' + r.level + '"><span class="t-name">' + r.name + '</span><b class="t-count">' + r.count + '</b><span class="t-hint">' + escape(r.hint) + '</span></div>').join('') + empty + '</div>';
 }
-
 /**
  * 地板上的脚印：把血丝划痕素材当 mask，染成锈红，旋转到「朝下一间屋」的方向。
  *
@@ -603,10 +556,12 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
                   ${canSmash ? `<button class="btn mini" data-action="sabotage" title="花 ${SABOTAGE_COST} 点行动点砸掉">砸掉</button>` : ''}
                 </div>`;
               }).join('')}
+              ${state.powerCircuits.map((c) => '<div class="facility-row breaker ' + (c.broken ? 'broken' : '') + '"><span class="facility-symbol">⚡</span><div class="facility-info"><b>' + escape(c.name) + ' · 电闸</b><small>' + escape(roomName(c.breakerRoom)) + ' · ' + (c.broken ? '已断电' : '供电中') + ' · 影响 ' + c.affectedRooms.length + ' 个房间</small></div><span class="facility-state">' + (c.broken ? '断电' : '正常') + '</span></div>').join('')}
+              ${(['study', 'hall'] as RoomId[]).map((room) => '<div class="facility-row telephone ' + (state.phoneCut ? 'broken' : '') + '"><span class="facility-symbol">☎</span><div class="facility-info"><b>' + escape(roomName(room)) + ' · 电话线路</b><small>' + (state.phoneCut ? '主电话线路已剪断；求救者需要寻找其他通讯方式' : '线路正常 · 可用于对外求救') + '</small></div><span class="facility-state">' + (state.phoneCut ? '中断' : '正常') + '</span></div>').join('')}
             </div>
           </div>
           <div class="panel threat-panel">
-            <div class="panel-heading"><h2>幸存者威胁</h2><span>他们正在做什么 · 怎么反制</span></div>
+            <div class="panel-heading"><h2>现场威胁动态</h2><span>只显示当前正在发生的风险</span></div>
             ${threatRowsHtml(state)}
           </div>
           <div class="panel intel-log-panel">
@@ -621,6 +576,9 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
         <div class="panel map-panel">
           <div class="panel-heading"><h2>房屋平面</h2><span>门形=通道 · 绿门=当前可走 · 红叉=封锁 · 黄门=堵门/行动点不足 · 蓝框=目标点</span>
             <button class="btn ghost mini" data-action="guide">玩法指引</button>
+            <button class="btn ghost mini display-control" data-action="display-setting" data-setting="interfaceScale">界面大小</button>
+            <button class="btn ghost mini display-control" data-action="display-setting" data-setting="fontScale">文字大小</button>
+            <button class="btn ghost mini display-control" data-action="display-setting" data-setting="mapScale">地图放大</button>
             <button class="btn ghost mini audio-toggle" data-action="mute" title="开关音效与背景音乐">${isMuted() ? '音效 关' : '音效 开'}</button>
           </div>
           ${statusHtml}${carryStatus}${huntPlanHtml}
