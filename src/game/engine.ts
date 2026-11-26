@@ -752,6 +752,7 @@ function killPerson(state: GameState, person: Person): void {
   if (seenBy.length) {
     addWanted(state, person.role === 'target' ? 2 : 1);
   } else {
+    state.huntStats.quietKills += 1;
     log(state, '屋里没有人看见这一幕。');
   }
   log(
@@ -1044,6 +1045,7 @@ function checkCond(state: GameState, cond: Cond): boolean {
 /* ==================================================================== */
 
 export function runOps(state: GameState, ops: Op[]): void {
+  const phoneWasCut = state.phoneCut;
   executeOps(state, ops, {
     selectPeople, log, damagePerson, canExecuteNow, executePerson, killPerson,
     addWanted, addAlarm, resolveDest, movePersonTo, markExplored,
@@ -1054,6 +1056,7 @@ export function runOps(state: GameState, ops: Op[]): void {
     scoutRoom, npcs, peopleInRoom, standing, nextStepToward,
     healPerson, rescuePerson, checkCond,
   });
+  if (!phoneWasCut && state.phoneCut) state.huntStats.environmentActions += 1;
 }
 
 function movePersonTo(state: GameState, person: Person, room: RoomId, clearAlert = false): void {
@@ -1661,7 +1664,7 @@ function actByArchetype(state: GameState, person: Person): void {
 
 /** 尾随不是自动挂机：每次点击能力都要花 1 AP，并承担被目标察觉的风险。 */
 
-function triggerBearTrapForPerson(state: GameState, person: Person): void {
+export function triggerBearTrapForPerson(state: GameState, person: Person): void {
   if (person.role === 'police' || person.hp <= 0) return;
   const trap = state.bearTraps.find((item) => item.armed && item.room === person.room);
   if (!trap) return;
@@ -1680,6 +1683,7 @@ function triggerBearTrapForPerson(state: GameState, person: Person): void {
   }
   trap.armed = false;
   trap.triggeredBy = person.id;
+  state.huntStats.trapTriggers += 1;
   person.hp = Math.max(0, person.hp - 1);
   person.alert = 100;
   person.awareness = 3;
@@ -2700,6 +2704,9 @@ export function attack(state: GameState, targetId?: string): boolean {
   damagePerson(state, target, noedActive || (heavy && state.killer === '迈克尔·迈尔斯')
     ? SURVIVOR_MAX_HP
     : heavy || nightfallKill || ambushStrike ? 2 : 1);
+  if (heavy && state.killer === '迈克尔·迈尔斯' && target.hp < hpBeforeHit) {
+    state.huntStats.myersBurstHits += 1;
+  }
   if (ambushStrike) {
     state.ambushTurn = 0;
     log(state, `致命窗口：${target.name} 独自一人且尚未察觉，你的伏击造成重创（2 点伤害）。`);
@@ -2815,6 +2822,7 @@ export function recordRoutineObservation(state: GameState, room: RoomId): number
       log(state, `你记下了${person.name}在${roomName(room)}的行动习惯；再观察一次就能确认他的常去路线。`);
     }
   }
+  if (discovered > 0) state.huntStats.routineInsights += discovered;
   return discovered;
 }
 
@@ -3053,6 +3061,7 @@ export function togglePowerCircuit(state: GameState, circuitId?: string): boolea
   );
   if (!circuit) return false;
   state.energy -= BREAKER_SWITCH_COST;
+  state.huntStats.environmentActions += 1;
   circuit.enabled = circuit.enabled === false;
   addDisturbance(state, state.playerRoom);
   addAlarm(state, 1);
@@ -3094,6 +3103,7 @@ export function sabotageSiteItem(state: GameState): boolean {
   );
   if (!circuit && !item) return false;
   state.energy -= SABOTAGE_COST;
+  state.huntStats.environmentActions += 1;
   if (state.hexRuinActive && !state.hexRuinUsed) {
     state.hexRuinUsed = true;
     reduceTeamProgress(state, 10);
@@ -3179,6 +3189,7 @@ export function blinkPlayer(state: GameState, room: RoomId): boolean {
   state.nurseFollowUp = true;
   state.nurseFatiguePending = true;
   state.cooldowns.nurse_blink = 1;
+  state.huntStats.nurseBlinks += 1;
   state.attackReady = true;
   log(state, `护士穿过墙壁与房门，闪现到${roomName(room)}。你可以立即攻击或抓取同屋目标；下一次行动后将进入疲惫。`);
   return true;
@@ -3192,6 +3203,7 @@ export function nurseGrabPerson(state: GameState, targetId: string): boolean {
     return false;
   }
   state.energy -= 1;
+  state.huntStats.nurseGrabs += 1;
   damagePerson(state, target, 1, true);
   state.nurseFollowUp = false;
   state.nurseFatiguePending = false;
@@ -3211,6 +3223,7 @@ export function throwHuntressHatchet(state: GameState, targetId: string): boolea
   }
   state.energy -= 1;
   state.hatchets -= 1;
+  state.huntStats.hatchetHits += 1;
   state.huntressAiming = false;
   log(state, `女猎手掷出狩猎飞斧，命中${target.name}（剩余飞斧 ${state.hatchets}/3）。`);
   damagePerson(state, target, 1);
@@ -3434,10 +3447,53 @@ function checkImmediateWin(state: GameState): void {
   if (tasks.length > 0 && tasks.every((task) => missionTaskProgress(state, task) >= task.target)) finish(state, 'win');
 }
 
+export function calculateHuntStyleRating(state: GameState, result: ResultKind): {
+  score: number;
+  rank: 'S' | 'A' | 'B' | 'C';
+  bonus: number;
+  breakdown: ScoreLine[];
+} {
+  const stats = state.huntStats;
+  const planning = Math.min(30, stats.routineInsights * 8 + stats.environmentActions * 5 + stats.trapTriggers * 8 + stats.nurseBlinks * 2);
+  const precision = Math.min(25, stats.hatchetHits * 6 + stats.nurseGrabs * 8 + stats.myersBurstHits * 8 + (state.specialExecutionBonus > 0 ? 8 : 0));
+  const stealth = Math.min(20, (state.npcAlarmed ? 0 : 10) + Math.max(0, 10 - Math.floor(state.alarm / 10)));
+  const efficiency = result === 'win' ? Math.min(15, Math.max(0, state.mission.turns - state.turn) * 2) : 0;
+  const styleTypes = [
+    stats.routineInsights > 0,
+    stats.environmentActions > 0,
+    stats.trapTriggers > 0,
+    stats.hatchetHits > 0,
+    stats.nurseBlinks > 0,
+    stats.nurseGrabs > 0,
+    stats.myersBurstHits > 0,
+    stats.quietKills > 0,
+  ].filter(Boolean).length;
+  const versatility = Math.min(10, styleTypes * 2);
+  const quiet = Math.min(10, stats.quietKills * 3);
+  const breakdown: ScoreLine[] = [
+    { label: '猎杀基础', value: 10 },
+    { label: '计划布置 · 习惯、环境与陷阱', value: planning },
+    { label: '精准猎杀 · 专属能力与地形处决', value: precision },
+    { label: '隐蔽控制 · 警报与暴露度', value: stealth },
+    { label: '行动效率 · 剩余回合', value: efficiency },
+    { label: '策略多样性', value: versatility },
+    { label: '无目击猎杀', value: quiet },
+  ];
+  const score = Math.min(100, breakdown.reduce((sum, line) => sum + line.value, 0));
+  const rank: 'S' | 'A' | 'B' | 'C' = score >= 85 ? 'S' : score >= 70 ? 'A' : score >= 50 ? 'B' : 'C';
+  const bonus = result !== 'win' ? 0 : rank === 'S' ? 40 : rank === 'A' ? 25 : rank === 'B' ? 12 : 0;
+  return { score, rank, bonus, breakdown };
+}
+
 function finish(state: GameState, result: ResultKind): void {
   if (state.result) return;
   state.result = result;
   state.phase = 'gameover';
+  const style = calculateHuntStyleRating(state, result);
+  state.huntStyleScore = style.score;
+  state.huntStyleRank = style.rank;
+  state.huntStyleBonus = style.bonus;
+  state.huntStyleBreakdown = style.breakdown;
 
   const lines: ScoreLine[] = [{ label: `契约基础分 · ${state.mission.title}`, value: state.mission.reward }];
   if (state.specialExecutionBonus > 0) lines.push({ label: '地形处决奖励', value: state.specialExecutionBonus });

@@ -302,6 +302,20 @@ export interface ScoreLine {
   value: number;
 }
 
+/** 本局计划与专属能力使用记录，用于猎杀风格评价。 */
+export interface HuntStyleStats {
+  routineInsights: number;
+  environmentActions: number;
+  trapTriggers: number;
+  hatchetHits: number;
+  nurseBlinks: number;
+  nurseGrabs: number;
+  myersBurstHits: number;
+  quietKills: number;
+}
+
+export type HuntStyleRank = 'S' | 'A' | 'B' | 'C';
+
 export type GamePhase = 'menu' | 'setup' | 'playing' | 'gameover';
 
 export type ResultKind = 'win' | 'caught' | 'timeout' | 'failed';
@@ -398,6 +412,12 @@ export interface GameState {
   score: number;
   /** 结算面板的加分/扣分明细，由 finish() 生成 */
   scoreBreakdown: ScoreLine[];
+  /** 猎杀风格评价独立于契约总分；高评价会带来额外血点。 */
+  huntStats: HuntStyleStats;
+  huntStyleScore: number;
+  huntStyleRank: HuntStyleRank;
+  huntStyleBonus: number;
+  huntStyleBreakdown: ScoreLine[];
   rewardCards: string[];
 
   phoneCut: boolean;

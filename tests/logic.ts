@@ -25,6 +25,8 @@ import {
   SABOTAGE_COST,
   addAlarm,
   currentScore,
+  calculateHuntStyleRating,
+  triggerBearTrapForPerson,
   sabotageSiteItem,
   togglePowerCircuit,
   breakerBlockReason,
@@ -131,7 +133,7 @@ function caseRoutineHuntOpportunities(): void {
   s.turn += 1;
   const second = recordRoutineObservation(s, person.room);
   check('日常习惯：跨回合观察两次后确认路线',
-    second === 1 && person.routineObserved === true && person.routineSightings === 2);
+    second === 1 && person.routineObserved === true && person.routineSightings === 2 && s.huntStats.routineInsights === 1);
   const otherRoom: RoomId = person.room === 'garage' ? 'attic' : 'garage';
   s.people.filter((item) => item.id !== person.id).forEach((item) => { item.room = otherRoom; });
   person.alert = 0;
@@ -167,9 +169,9 @@ function caseGeneratorBreakerNetwork(): void {
   const before = s.energy;
   const pulled = togglePowerCircuit(s, circuit.id);
   check('电闸：拉闸消耗 1 AP 并关闭所属区域照明',
-    pulled && s.energy === before - BREAKER_SWITCH_COST && !isRoomLit(s, room));
+    pulled && s.energy === before - BREAKER_SWITCH_COST && !isRoomLit(s, room) && s.huntStats.environmentActions === 1);
   const closed = togglePowerCircuit(s, circuit.id);
-  check('电闸：合闸恢复照明', closed && isRoomLit(s, room));
+  check('电闸：合闸恢复照明', closed && isRoomLit(s, room) && s.huntStats.environmentActions === 2);
   if (source) {
     source.jammedTurns = 1;
     check('发电机：停机时其供电区域自动熄灭', !isRoomLit(s, room));
@@ -392,13 +394,14 @@ function caseMyersStalkingAndFearRadius(): void {
   check('迈尔斯：尾随值满后同一按钮发动恶魔附身，发动后保留 80 点爆发能量',
     usePower(myersBurst, 'myers_gaze') && myersBurst.possessed && myersBurst.stalkMeter === 80);
   check('迈尔斯：恶魔附身挥刀可直接击倒健康目标',
-    attack(myersBurst, burstTarget.id) && burstTarget.hp === 0 && myersBurst.possessed,
+    attack(myersBurst, burstTarget.id) && burstTarget.hp === 0 && myersBurst.possessed && myersBurst.huntStats.myersBurstHits === 1,
     `hp=${burstTarget.hp} stalk=${myersBurst.stalkMeter}`);
 
   const trapper = createGame(STARTING_DECK, undefined, '设陷者');
   const trapRoom = ROOMS.find((room) =>
     room.id !== trapper.playerRoom && room.id !== 'garden' && room.id !== 'garage' &&
-    !trapper.objectiveRooms.includes(room.id) && room.neighbors.length >= 2,
+    !trapper.objectiveRooms.includes(room.id) && room.neighbors.length >= 2 &&
+    !trapper.people.some((person) => person.role !== 'police' && person.hp > 0 && person.room === room.id),
   )?.id ?? openNeighbor(trapper.playerRoom);
   trapper.playerRoom = trapRoom;
   trapper.energy = 4;
@@ -407,6 +410,14 @@ function caseMyersStalkingAndFearRadius(): void {
     trapper.bearTraps.some((trap) => trap.room === trapRoom && trap.armed));
   check('设陷者：地图随机生成额外捕兽夹补给点',
     trapper.trapCaches.length === 2, `caches=${trapper.trapCaches.length}`);
+  const trappedPerson = player(trapper);
+  trappedPerson.room = trapRoom;
+  trappedPerson.hp = 4;
+  trappedPerson.alert = 0;
+  triggerBearTrapForPerson(trapper, trappedPerson);
+  check('设陷者：捕兽夹触发后造成伤害、限制移动并记录猎杀风格',
+    trappedPerson.hp === 3 && trappedPerson.blockedTurns === 1 &&
+    trapper.huntStats.trapTriggers === 1 && !trapper.bearTraps[0].armed);
   if (trapper.trapCaches.length) {
     trapper.playerRoom = trapper.trapCaches[0];
     trapper.energy = 4;
@@ -427,7 +438,7 @@ function caseMyersStalkingAndFearRadius(): void {
     blinkPlayer(nurse, blinkRoom) && nurse.playerRoom === blinkRoom && nurse.nurseFollowUp && nurse.nurseFatiguePending && nurse.energy === 3);
   check('护士：闪现后抓取会打断目标并施加疲惫',
     nurseGrabPerson(nurse, nurseTarget.id) && nurseTarget.hp === 3 && nurseTarget.blockedTurns === 1 &&
-    nurse.stunTurns === 1 && !nurse.nurseFollowUp && !nurse.nurseFatiguePending);
+    nurse.huntStats.nurseBlinks === 1 && nurse.huntStats.nurseGrabs === 1 && nurse.stunTurns === 1 && !nurse.nurseFollowUp && !nurse.nurseFatiguePending);
 
   const huntress = createGame(STARTING_DECK, undefined, '女猎手');
   const hatchetTarget = player(huntress);
@@ -437,13 +448,38 @@ function caseMyersStalkingAndFearRadius(): void {
   check('女猎手：开局携带 3 把飞斧并可进入瞄准状态',
     huntress.hatchets === 3 && usePower(huntress, 'huntress_axe') && huntress.huntressAiming);
   check('女猎手：投掷飞斧消耗 1 把并对选中目标造成 1 点伤害',
-    throwHuntressHatchet(huntress, hatchetTarget.id) && huntress.hatchets === 2 && hatchetTarget.hp === 3);
+    throwHuntressHatchet(huntress, hatchetTarget.id) && huntress.hatchets === 2 && hatchetTarget.hp === 3 && huntress.huntStats.hatchetHits === 1);
   huntress.playerRoom = CABINET_ROOMS[0];
   huntress.hatchets = 1;
   huntress.energy = 4;
   check('女猎手：在柜子处可以将飞斧补充至 3 把',
     refillHuntressHatchets(huntress) && huntress.hatchets === 3);
   
+  const styleGame = createGame(STARTING_DECK, undefined, '设陷者');
+  styleGame.turn = 5;
+  const baseStyle = calculateHuntStyleRating(styleGame, 'win');
+  check('猎杀风格：普通完成任务有基础评级，但不发额外风格血点',
+    baseStyle.rank === 'C' && baseStyle.bonus === 0 && baseStyle.score >= 40,
+    `rank=${baseStyle.rank} score=${baseStyle.score} bonus=${baseStyle.bonus}`);
+  styleGame.huntStats = {
+    routineInsights: 3,
+    environmentActions: 3,
+    trapTriggers: 2,
+    hatchetHits: 2,
+    nurseBlinks: 2,
+    nurseGrabs: 2,
+    myersBurstHits: 2,
+    quietKills: 3,
+  };
+  styleGame.specialExecutionBonus = 35;
+  const highStyle = calculateHuntStyleRating(styleGame, 'win');
+  check('猎杀风格：多样化计划与专属能力可达到 S 级并获得 40 血点奖励',
+    highStyle.rank === 'S' && highStyle.score === 100 && highStyle.bonus === 40 &&
+    highStyle.breakdown.length >= 6);
+  const failedStyle = calculateHuntStyleRating(styleGame, 'failed');
+  check('猎杀风格：失败任务仍显示行动评价，但不发胜利奖励',
+    failedStyle.score > 0 && failedStyle.bonus === 0);
+
   check('卡牌图标：新版初始卡和迈尔斯专属卡都有可用白色图案资源',
     ['unbreakable','hex_huntress','hex_noed','scourge_shrine','distressing','hell','iron_grasp','deerstalker','hex_ruin','bitter_murmur','sloppy_butcher','insidious','myers_eclipse_light','myers_last_best','myers_plaything'].every((id) => !!cardImage(id) && cardImage(id)!.includes('assets/dbd/perks/')));
   const normal = createGame(['silent_step'], undefined, '设陷者');

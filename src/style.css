@@ -2935,3 +2935,30 @@ button, .room-hit, .hand-row { touch-action: manipulation; }
 .status-badge.blink-mode { border-color: #739bb8; color: #c9e2f2; background: #13232d; }
 .status-badge.hatchet-mode { border-color: #a17b49; color: #e8c58e; background: #261b11; }
 .btn.power.possessed-ready { border-color: #a43e37; color: #f0b0a6; box-shadow: inset 0 0 0 1px #a43e3744, 0 0 12px #9b332c55; }
+
+
+/* 结算中的猎杀风格评价：与契约总分分开呈现，强调玩家采用的策略。 */
+.hunt-style-card {
+  display: grid; gap: 10px; margin: 14px 0; padding: 13px 15px;
+  border: 1px solid #554b39; background: linear-gradient(110deg, #171713, #111313);
+}
+.hunt-style-heading { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 12px; }
+.hunt-style-heading > div { display: grid; gap: 3px; }
+.hunt-style-heading small { color: #b4a27f; font-size: 11px; letter-spacing: .08em; }
+.hunt-style-heading > div b { color: #e8dcc3; font-size: 14px; }
+.hunt-style-rank { min-width: 42px; text-align: center; font-size: 30px; line-height: 1; color: #d5c19b; }
+.hunt-style-rank.rank-s { color: #e8c66f; text-shadow: 0 0 12px #b98b3b66; }
+.hunt-style-rank.rank-a { color: #b9c9cf; }
+.hunt-style-rank.rank-b { color: #c6a77d; }
+.hunt-style-rank.rank-c { color: #9d9b94; }
+.hunt-style-score { color: #d8c8a7; font-size: 13px; font-weight: 700; }
+.hunt-style-breakdown { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 5px 14px; }
+.style-score-line { display: flex; justify-content: space-between; gap: 8px; color: #aaa294; font-size: 11px; }
+.style-score-line b { color: #d5c49e; font-variant-numeric: tabular-nums; }
+.hunt-style-reward { margin: 0; color: #e0c27e; font-size: 12px; }
+.hunt-style-reward.muted { color: #8d897f; }
+@media (max-width: 600px) {
+  .hunt-style-heading { grid-template-columns: 1fr auto; }
+  .hunt-style-score { grid-column: 1 / -1; }
+  .hunt-style-breakdown { grid-template-columns: 1fr; }
+}
