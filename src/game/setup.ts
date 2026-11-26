@@ -196,10 +196,11 @@ export function createGame(
     .filter((p) => p.role !== 'police')
     .forEach((p) => {
       const roll = random();
-      if (roll < 0.26) p.goal = 'supply';
-      else if (roll < 0.46) p.goal = 'generator';
-      else if (roll < 0.68) p.goal = 'objective';
-      else if (roll < 0.8) p.goal = 'key';
+      if (roll < 0.18) p.goal = 'supply';
+      else if (roll < 0.34) p.goal = 'generator';
+      else if (roll < 0.50) p.goal = 'objective';
+      else if (roll < 0.60) p.goal = 'key';
+      else if (roll < 0.80) p.goal = 'routine';
     });
   drawCards(state, 5);
   log(state, `契约已接取：${mission.title}`);
