@@ -5,24 +5,26 @@ import type { Mission, MissionKind, MissionTask, RoomId } from './types';
 const pick = <T,>(arr: T[]): T => arr[Math.floor(random() * arr.length)];
 
 function makeTasks(): MissionTask[] {
-  const pool: MissionTask[] = [
-    { id: 'kill-count', kind: 'kill_count', label: '击杀幸存者', target: 3 },
-    { id: 'marked-kill', kind: 'marked_kill', label: '击杀指定幸存者', target: 1 },
-    { id: 'execution', kind: 'execute', label: '进行处决', target: 1 },
-    { id: 'no-alarm', kind: 'no_alarm', label: '阻止幸存者成功报警', target: 1 },
-    { id: 'breaker', kind: 'break_circuit', label: '破坏一个区域电闸', target: 1 },
+  // 核心目标直接鼓励连续猎杀；其余是额外风格挑战，不再成为拖慢通关的前置手续。
+  const bonusPool: MissionTask[] = [
+    { id: 'execution', kind: 'execute', label: '完成一次处决（额外奖励）', target: 1, optional: true },
+    { id: 'special-execution', kind: 'special_execute', label: '完成一次特殊处决（额外奖励）', target: 1, optional: true },
+    { id: 'breaker', kind: 'break_circuit', label: '破坏一个区域电闸（额外奖励）', target: 1, optional: true },
+    { id: 'no-alarm', kind: 'no_alarm', label: '整场不触发报警（额外奖励）', target: 1, optional: true },
   ];
-  const selected: MissionTask[] = [];
-  while (selected.length < 3 && pool.length) {
-    const index = Math.floor(random() * pool.length);
-    selected.push(pool.splice(index, 1)[0]);
+  const selected: MissionTask[] = [
+    { id: 'kill-count', kind: 'kill_count', label: '猎杀三名幸存者', target: 3 },
+  ];
+  while (selected.length < 3 && bonusPool.length) {
+    const index = Math.floor(random() * bonusPool.length);
+    selected.push(bonusPool.splice(index, 1)[0]);
   }
   return selected;
 }
 
 /** 每局随机生成三个组合目标；所有目标都完成才算契约成功。 */
 export function generateMission(unlockedKinds: MissionKind[] = [
-  'assassinate', 'bodyCount', 'evidence', 'escape',
+  'assassinate', 'bodyCount', 'escape',
 ]): Mission {
   const kind = pick(unlockedKinds);
   const count = 3;
@@ -33,17 +35,15 @@ export function generateMission(unlockedKinds: MissionKind[] = [
     tasks,
     turns: 22,
     targetCount: count,
-    objective: '完成本局列出的全部契约目标',
-    successText: '所有子目标全部完成',
-    failText: '超时 · 幸存者全逃 · 暴露度满（被捕 / 被驱散）',
+    objective: '猎杀三名幸存者；额外挑战只影响奖励，不会阻止通关。',
+    successText: '完成核心猎杀目标即可通关，额外挑战增加结算奖励',
+    failText: '所有幸存者逃离，或杀手被击败。',
   };
   switch (kind) {
     case 'assassinate':
       return { ...base, title: '血色清单', desc: '完成全部契约目标。', reward: 160 };
     case 'bodyCount':
       return { ...base, title: '无声收割', desc: '完成全部契约目标。', reward: 150 };
-    case 'evidence':
-      return { ...base, title: '证据销毁', desc: '完成全部契约目标。', reward: 170 };
     case 'escape':
       return { ...base, title: '替身游戏', desc: '完成全部契约目标。', reward: 180 };
   }

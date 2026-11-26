@@ -255,11 +255,7 @@ export interface Disturbance {
   label: string;
 }
 
-export type MissionKind =
-  | 'assassinate'
-  | 'bodyCount'
-  | 'evidence'
-  | 'escape';
+export type MissionKind = 'assassinate' | 'bodyCount' | 'escape';
 
 export type MissionTaskKind = 'kill_count' | 'marked_kill' | 'execute' | 'special_execute' | 'no_alarm' | 'break_circuit';
 
@@ -268,6 +264,8 @@ export interface MissionTask {
   kind: MissionTaskKind;
   label: string;
   target: number;
+  /** optional 仅提供额外奖励，不阻止核心任务通关。 */
+  optional?: boolean;
 }
 
 export interface Mission {
@@ -400,7 +398,8 @@ export interface GameState {
   executionMethodsUsed: string[];
   npcAlarmed: boolean;
   carryPersonId: string | null;
-  evidence: number;
+  /** 当前搬运已走过的房间数；普通杀手最多两格。 */
+  carryDistance: number;
   markedKilled: number;
   decoyRoom: RoomId | null;
   /** 房间锁：房间 -> 还锁着几回合。NPC 与警察都不能进入或离开该房间 */
@@ -492,8 +491,6 @@ export interface GameState {
   /** 连续追同一名幸存者的回合数：其他人干活效率随之提高 */
   chaseTargetId: string | null;
   chaseTurns: number;
-  /** 连续站在倒地者房间结束回合（守尸）的回合数 */
-  guardingTurns: number;
   /** 鬼面夜幕是否正在监视 */
   nightfallActive: boolean;
   /** 上一次被玩家砍中的人：同屋目击者要反应，但他本人不重复行动 */
