@@ -3274,11 +3274,11 @@ export function togglePowerCircuit(state: GameState, circuitId?: string): boolea
 
 /** 统一破坏入口：相邻门锁、电话线、无线电、电闸、发电机与道具箱。 */
 function sabotageTarget(state: GameState): { kind: 'door'; room: RoomId } | { kind: 'phone' | 'radio' } | { kind: 'facility' } | null {
-  if (PHONE_ROOMS.includes(state.playerRoom) && !state.phoneCut) return { kind: 'phone' };
-  if (RADIO_ROOMS.includes(state.playerRoom) && !state.sabotage.includes('radio')) return { kind: 'radio' };
   const breaker = state.powerCircuits.some((c) => c.breakerRoom === state.playerRoom && !c.broken);
   const item = state.siteItems.some((i) => i.room === state.playerRoom && !i.broken && (i.kind !== 'itemBox' || i.charges > 0));
   if (breaker || item) return { kind: 'facility' };
+  if (PHONE_ROOMS.includes(state.playerRoom) && !state.phoneCut) return { kind: 'phone' };
+  if (RADIO_ROOMS.includes(state.playerRoom) && !state.sabotage.includes('radio')) return { kind: 'radio' };
   const lockedNeighbor = ROOM_MAP[state.playerRoom].neighbors.find((room) => isLocked(state, room));
   return lockedNeighbor ? { kind: 'door', room: lockedNeighbor } : null;
 }
