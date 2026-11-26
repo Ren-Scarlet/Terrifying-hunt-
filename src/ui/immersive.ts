@@ -14,6 +14,7 @@ let previousFrameTime = 0;
 let taskDrawerOpen = false;
 let intelDrawerOpen = false;
 let hudHidden = false;
+let handOpen = true;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
@@ -91,6 +92,7 @@ export function syncImmersiveCamera(nextRoot: HTMLElement): void {
   const intel = root.querySelector<HTMLDetailsElement>('.intel-drawer');
   if (intel) intel.open = intelDrawerOpen;
   root.classList.toggle('hud-hidden', hudHidden);
+  root.classList.toggle('hand-collapsed', !handOpen);
   if (!frame) frame = window.requestAnimationFrame(loop);
   applyTransform();
 }
@@ -153,6 +155,17 @@ export function handleImmersiveAction(action: string | undefined): boolean {
     root?.classList.toggle('hud-hidden', hudHidden);
     return true;
   }
+  if (action === 'toggle-hand') {
+    handOpen = !handOpen;
+    root?.classList.toggle('hand-collapsed', !handOpen);
+    const toggle = root?.querySelector<HTMLButtonElement>('[data-action="toggle-hand"]');
+    if (toggle) {
+      toggle.textContent = handOpen ? '⌄' : '⌃';
+      toggle.setAttribute('aria-expanded', String(handOpen));
+      toggle.setAttribute('aria-label', handOpen ? '收起手牌' : '展开手牌');
+    }
+    return true;
+  }
   return false;
 }
 
@@ -171,6 +184,7 @@ export function installImmersiveKeys(): void {
     else if (key === '0') { event.preventDefault(); handleImmersiveAction('camera-global'); }
     else if (key === 'f') { event.preventDefault(); handleImmersiveAction('camera-follow'); }
     else if (key === 't') { event.preventDefault(); handleImmersiveAction('toggle-task-drawer'); }
+    else if (key === 'h') { event.preventDefault(); handleImmersiveAction('toggle-game-hud'); }
     else if (key === 'e') { event.preventDefault(); root?.querySelector<HTMLButtonElement>('.person-world-actions button:not(:disabled), .map-world-actions button:not(:disabled)')?.click(); }
     else if (key === 'g') { event.preventDefault(); root?.querySelector<HTMLButtonElement>('[data-action="drop-carried"]:not(:disabled)')?.click(); }
     else if (/^[1-6]$/.test(key)) { event.preventDefault(); root?.querySelectorAll<HTMLButtonElement>('.hand-row [data-action="play"]')[Number(key) - 1]?.click(); }
@@ -178,8 +192,8 @@ export function installImmersiveKeys(): void {
     else if (key === 'escape') {
       const task = root?.querySelector<HTMLElement>('.task-detail-drawer');
       const intel = root?.querySelector<HTMLDetailsElement>('.intel-drawer');
-      if (task?.classList.contains('open')) task.classList.remove('open');
-      else if (intel?.open) intel.open = false;
+      if (task?.classList.contains('open')) { task.classList.remove('open'); taskDrawerOpen = false; }
+      else if (intel?.open) { intel.open = false; intelDrawerOpen = false; }
     } else if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
       event.preventDefault();
       const amount = 54;
