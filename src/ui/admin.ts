@@ -1,7 +1,7 @@
 import { CARDS } from '../game/data/cards';
 import { ACTIVE_KILLERS } from '../game/data/killers';
 import type { Op } from '../game/effect';
-import { exportTuning, hasTuning } from '../game/tuning';
+import { exportTuning, hasTuning, createCustomCard, duplicateCard, deleteCard } from '../game/tuning';
 import { isCloudSignedIn } from '../game/cloud';
 import { DEST_OPTIONS, EFFECT_OPS, FLAG_OPTIONS, SABOTAGE_OPTIONS, STATUS_OPTIONS, WHO_OPTIONS, type EffectFieldType } from '../game/effectCatalog';
 import { PERK_RARITY_BG, cardImage } from '../game/assetMap';
@@ -86,12 +86,18 @@ function cardBlock(): string {
         </span>
         <b>${escape(card.name)}</b>
         <label class="tune-cost">费 <input type="number" min="0" max="6" data-tune="card|${card.id}|cost" value="${card.cost}"></label>
+        <button type="button" class="btn mini ghost" data-action="admin-card-copy" data-card="${card.id}">复制</button>
+        <button type="button" class="btn mini ghost" data-action="admin-card-delete" data-card="${card.id}">删除</button>
       </div>
+      <label class="tune-description">卡牌名称<input type="text" maxlength="60" data-tune="card|${card.id}|name" value="${escape(card.name)}"></label>
+      <label class="tune-description">卡牌类型<select data-tune="card|${card.id}|type">${options([['attack','攻击'],['skill','技能'],['tactic','战术'],['setup','布置']], card.type)}</select></label>
       <label class="tune-description">卡牌描述<textarea rows="3" data-tune="card|${card.id}|desc">${escape(card.desc)}</textarea></label>
+      <label class="tune-description">风味文字<input type="text" maxlength="160" data-tune="card|${card.id}|flavor" value="${escape(card.flavor)}"></label>
       <label class="tune-no-action"><input type="checkbox" data-tune="card|${card.id}|noAction" ${card.noAction ? 'checked' : ''}> 不推进幸存者行动（不消耗世界行动）</label>
       <div class="tune-ops">${opsHtml(card.ops, `card|${card.id}|`, card.id)}</div>
       <div class="tune-add-row"><select aria-label="选择要添加的效果" id="addEffect-${card.id}">${effectOptionsHtml()}</select><button type="button" class="btn mini" data-action="admin-op-add" data-card="${card.id}">＋ 添加效果</button></div>
-      ${card.precheck ? `<div class="tune-pre">前置：${escape(card.precheck.hint)}</div>` : ''}
+      <label class="tune-description">出牌条件<select data-tune="card|${card.id}|precheck">${options([['none','无条件'],['victimHere','当前房间有可攻击目标'],['downedHere','当前房间有倒地目标'],['injuredHere','当前房间有受伤目标'],['targetAway','有目标在其他房间'],['visibleSurvivor','视野内有存活幸存者']], card.precheck?.cond.c ?? 'none')}</select></label>
+      ${card.precheck ? `<div class="tune-pre">条件提示：${escape(card.precheck.hint)}</div>` : ''}
     </div>`;
   }).join('');
 }
@@ -148,7 +154,9 @@ export function renderAdmin(): string {
         </div>
         <div class="admin-sections">
           <section>
-            <h2>卡牌 <small>${CARDS.length} 张 · 费用、描述、行动规则与效果参数</small></h2>
+            <h2>卡牌 <small>${CARDS.length} 张 · 可新建、复制、删除并编辑完整效果</small></h2>
+            <p class="admin-lead">新卡默认加入通用卡池。攻击步骤可设置命中后流血次数和状态持续次数；0 表示不施加。</p>
+            <button type="button" class="btn primary" data-action="admin-card-new">＋ 新建卡牌</button>
             <div class="admin-grid">${cardBlock()}</div>
           </section>
           <section>

@@ -1,6 +1,7 @@
 import { CARDS, CARD_MAP } from './data/cards';
 import { KILLERS, KILLER_MAP } from './data/killers';
 import type { Op } from './effect';
+import type { CardDef, CardType, Precheck } from './types';
 import { EFFECT_OPS, type EffectFieldType } from './effectCatalog';
 
 /**
@@ -23,10 +24,8 @@ import { EFFECT_OPS, type EffectFieldType } from './effectCatalog';
 const KEY = 'night-hunt-tuning-v2';
 
 export interface CardTune {
-  cost?: number;
-  desc?: string;
-  noAction?: boolean;
-  ops?: Op[];
+  name?: string; type?: CardType; flavor?: string; precheck?: Precheck | null;
+  cost?: number; desc?: string; noAction?: boolean; ops?: Op[];
 }
 
 export interface PowerTune {
@@ -35,14 +34,16 @@ export interface PowerTune {
 }
 
 export interface TuningData {
-  cards: Record<string, CardTune>;
-  powers: Record<string, PowerTune>;
+  cards: Record<string, CardTune>; powers: Record<string, PowerTune>;
+  customCards: CardDef[]; deletedCards: string[];
 }
 
 const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 
 /** 原始定义：用于「恢复默认」 */
+const BASELINE_CARD_DEFS = clone(CARDS);
 const BASELINE_CARDS = clone(CARDS.map((c) => ({ id: c.id, cost: c.cost, desc: c.desc, noAction: !!c.noAction, ops: c.ops })));
+const emptyTuning = (): TuningData => ({ cards: {}, powers: {}, customCards: [], deletedCards: [] });
 const BASELINE_POWERS = clone(
   KILLERS.flatMap((k) =>
     k.powers.map((p) => ({ owner: k.owner, id: p.id, cooldown: p.cooldown, ops: p.ops })),
@@ -52,9 +53,10 @@ const BASELINE_POWERS = clone(
 function load(): TuningData {
   try {
     const raw = localStorage.getItem(KEY);
-    if (!raw) return { cards: {}, powers: {} };
+    if (!raw) return emptyTuning();
     const parsed: unknown = JSON.parse(raw);
-    return validateTuning(parsed) ? clone(parsed) : { cards: {}, powers: {} };
+    if (isRecord(parsed)) { parsed.customCards ??= []; parsed.deletedCards ??= []; }
+    return validateTuning(parsed) ? clone(parsed) : emptyTuning();
   } catch {
     return { cards: {}, powers: {} };
   }
@@ -73,10 +75,22 @@ function persist(): void {
 const powerKey = (owner: string, powerId: string) => `${owner}::${powerId}`;
 
 /** 把已保存的覆盖应用到运行中的数据表 */
+function rebuildCardRegistry(): void {
+  CARDS.splice(0, CARDS.length);
+  Object.keys(CARD_MAP).forEach((id) => delete CARD_MAP[id]);
+  const deleted = new Set(data.deletedCards ?? []);
+  [...clone(BASELINE_CARD_DEFS), ...clone(data.customCards ?? [])].filter((card) => !deleted.has(card.id)).forEach((card) => { CARDS.push(card); CARD_MAP[card.id] = card; });
+}
+
 export function applyTuning(): void {
+  rebuildCardRegistry();
   Object.entries(data.cards).forEach(([id, tune]) => {
     const card = CARD_MAP[id];
     if (!card) return;
+    if (typeof tune.name === 'string') card.name = tune.name;
+    if (typeof tune.type === 'string') card.type = tune.type;
+    if (typeof tune.flavor === 'string') card.flavor = tune.flavor;
+    if ('precheck' in tune) card.precheck = tune.precheck ? clone(tune.precheck) : undefined;
     if (typeof tune.cost === 'number') card.cost = tune.cost;
     if (typeof tune.desc === 'string') card.desc = tune.desc;
     if (typeof tune.noAction === 'boolean') card.noAction = tune.noAction;
@@ -105,7 +119,7 @@ export function isPowerTuned(owner: string, powerId: string): boolean {
 }
 
 export function hasTuning(): boolean {
-  return Object.keys(data.cards).length > 0 || Object.keys(data.powers).length > 0;
+  return Object.keys(data.cards).length > 0 || Object.keys(data.powers).length > 0 || data.customCards.length > 0 || data.deletedCards.length > 0;
 }
 
 /** 路径：`0.amount` 或 `0.then.1.turns`，指向一条指令上的字段 */
@@ -129,7 +143,7 @@ function writePath(ops: Op[], path: string, value: number | string | boolean): b
 function recordCard(id: string): void {
   const card = CARD_MAP[id];
   if (!card) return;
-  data.cards[id] = { cost: card.cost, desc: card.desc, noAction: !!card.noAction, ops: clone(card.ops) };
+  data.cards[id] = { name: card.name, type: card.type, flavor: card.flavor, precheck: card.precheck ? clone(card.precheck) : null, cost: card.cost, desc: card.desc, noAction: !!card.noAction, ops: clone(card.ops) };
   persist();
 }
 
@@ -141,6 +155,36 @@ function recordPower(owner: string, powerId: string): void {
 }
 
 /** 卡牌：费用 */
+export function setCardName(id: string, name: string): void { const card = CARD_MAP[id]; if (!card) return; card.name = name.slice(0, 60).trim() || '未命名卡牌'; recordCard(id); }
+export function setCardType(id: string, type: CardType): void { const card = CARD_MAP[id]; if (!card || !['attack', 'skill', 'tactic', 'setup'].includes(type)) return; card.type = type; recordCard(id); }
+export function setCardFlavor(id: string, flavor: string): void { const card = CARD_MAP[id]; if (!card) return; card.flavor = flavor.slice(0, 160); recordCard(id); }
+export function setCardPrecheck(id: string, condition: string): void {
+  const card = CARD_MAP[id]; if (!card) return;
+  const presets: Record<string, Precheck | null> = { none: null, victimHere: { cond: { c: 'victimHere' }, hint: '当前房间没有可以攻击的目标。' }, downedHere: { cond: { c: 'downedHere' }, hint: '当前房间没有倒地的人。' }, injuredHere: { cond: { c: 'injuredHere' }, hint: '当前房间没有受伤的人。' }, targetAway: { cond: { c: 'targetAway' }, hint: '场上没有远离你的目标。' }, visibleSurvivor: { cond: { c: 'visibleSurvivor' }, hint: '视野内没有存活的幸存者。' } };
+  if (!(condition in presets)) return; card.precheck = presets[condition] ? clone(presets[condition]!) : undefined; recordCard(id);
+}
+function nextCustomId(): string {
+  let n = 1; while (CARD_MAP[`custom_card_${n}`] || data.customCards.some((c) => c.id === `custom_card_${n}`)) n += 1;
+  return `custom_card_${n}`;
+}
+export function createCustomCard(): string {
+  const id = nextCustomId();
+  const card: CardDef = { id, name: '新卡牌', cost: 1, type: 'skill', desc: '写下这张卡牌的效果。', flavor: '', sourceSkill: '自定义卡牌', unlocked: true, pool: 'initial', ops: [] };
+  data.customCards.push(card); applyTuning(); persist(); return id;
+}
+export function duplicateCard(id: string): string | null {
+  const source = CARD_MAP[id]; if (!source) return null;
+  const nextId = nextCustomId(); const copy = clone(source); copy.id = nextId; copy.name = `${source.name}（复制）`; copy.sourceSkill = '自定义卡牌';
+  copy.pool = 'initial'; delete copy.killerOnly; copy.unlocked = true;
+  data.customCards.push(copy); applyTuning(); persist(); return nextId;
+}
+export function deleteCard(id: string): boolean {
+  if (!CARD_MAP[id]) return false;
+  data.customCards = data.customCards.filter((card) => card.id !== id);
+  if (BASELINE_CARD_DEFS.some((card) => card.id === id) && !data.deletedCards.includes(id)) data.deletedCards.push(id);
+  delete data.cards[id]; applyTuning(); persist(); return true;
+}
+
 export function setCardDesc(id: string, desc: string): void {
   const card = CARD_MAP[id];
   if (!card) return;
@@ -177,6 +221,7 @@ function defaultEffectOp(name: string): Op | null {
   const result: Record<string, unknown> = { op: name };
   for (const [field, type] of meta.fields) {
     if (['maxHp', 'clearAlert', 'to', 'all', 'adj', 'value'].includes(field) && !(name === 'scout' && field === 'turns')) continue;
+    if (name === 'attack' && ['bleedTurns', 'statusTurns'].includes(field)) { result[field] = 0; continue; }
     if (type === 'who') result[field] = 'victim';
     else if (type === 'dest') result[field] = 'here';
     else if (type === 'flag') result[field] = 'phoneCut';
@@ -228,7 +273,8 @@ export function setPowerOpValue(
 }
 
 export function resetTuning(): void {
-  data = { cards: {}, powers: {} };
+  data = emptyTuning();
+  rebuildCardRegistry();
   BASELINE_CARDS.forEach((base) => {
     const card = CARD_MAP[base.id];
     if (!card) return;
@@ -312,6 +358,7 @@ function validateOptionalField(op: string, field: string, value: unknown): boole
 }
 
 const REQUIRED_OP_FIELDS: Record<string, string[]> = {
+  attack: ['who', 'bleedTurns', 'status', 'statusTurns'],
   damage: ['who', 'amount'], down: ['who'], execute: ['who'], kill: ['who'], wanted: ['amount'],
   alert: ['who', 'amount'], block: ['who', 'turns'], status: ['who', 'status', 'turns'], pin: ['who'],
   move: ['who', 'to'], teleportPlayer: ['to'], lockRoom: ['room', 'turns'], track: ['who', 'turns'],
@@ -399,11 +446,22 @@ function validateOps(value: unknown, _baseline?: Op[]): value is Op[] {
 }
 function validateTuning(value: unknown): value is TuningData {
   if (!isRecord(value) || !isRecord(value.cards) || !isRecord(value.powers)) return false;
-  if (Object.keys(value).some((key) => key !== 'cards' && key !== 'powers')) return false;
+  if (Object.keys(value).some((key) => !['cards', 'powers', 'customCards', 'deletedCards'].includes(key))) return false;
+  const customCards = value.customCards ?? []; const deletedCards = value.deletedCards ?? [];
+  if (!Array.isArray(customCards) || customCards.length > 200 || !Array.isArray(deletedCards) || deletedCards.some((id) => typeof id !== 'string' || !BASELINE_CARDS.some((card) => card.id === id))) return false;
+  const customIds = new Set<string>();
+  for (const raw of customCards) {
+    if (!isRecord(raw) || typeof raw.id !== 'string' || !/^custom_card_[0-9]+$/.test(raw.id) || customIds.has(raw.id) || typeof raw.name !== 'string' || !raw.name.trim() || raw.name.length > 60 || typeof raw.desc !== 'string' || raw.desc.length > 500 || typeof raw.flavor !== 'string' || raw.flavor.length > 160 || typeof raw.cost !== 'number' || !Number.isInteger(raw.cost) || raw.cost < 0 || raw.cost > 6 || !['attack', 'skill', 'tactic', 'setup'].includes(String(raw.type)) || !Array.isArray(raw.ops) || !validateOps(raw.ops) || typeof raw.unlocked !== 'boolean' || typeof raw.sourceSkill !== 'string') return false;
+    customIds.add(raw.id);
+  }
 
   for (const [id, tune] of Object.entries(value.cards)) {
     const base = BASELINE_CARDS.find((item) => item.id === id);
-    if (!base || !isRecord(tune) || Object.keys(tune).some((key) => key !== 'cost' && key !== 'desc' && key !== 'noAction' && key !== 'ops')) return false;
+    if ((!base && !customIds.has(id)) || !isRecord(tune) || Object.keys(tune).some((key) => !['name', 'type', 'flavor', 'precheck', 'cost', 'desc', 'noAction', 'ops'].includes(key))) return false;
+    if ('name' in tune && (typeof tune.name !== 'string' || tune.name.length > 60)) return false;
+    if ('type' in tune && !['attack', 'skill', 'tactic', 'setup'].includes(String(tune.type))) return false;
+    if ('flavor' in tune && (typeof tune.flavor !== 'string' || tune.flavor.length > 160)) return false;
+    if ('precheck' in tune && tune.precheck !== null && (!isRecord(tune.precheck) || typeof tune.precheck.hint !== 'string' || tune.precheck.hint.length > 200 || !validateDynamicCondition(tune.precheck.cond))) return false;
     if ('cost' in tune && (typeof tune.cost !== 'number' || !Number.isInteger(tune.cost) || tune.cost < 0 || tune.cost > 6)) return false;
     if ('desc' in tune && (typeof tune.desc !== 'string' || tune.desc.length > 500)) return false;
     if ('noAction' in tune && typeof tune.noAction !== 'boolean') return false;
@@ -432,7 +490,9 @@ export function importTuning(raw: string): boolean {
   if (!validateTuning(parsed)) return false;
 
   // 校验完整通过后才改运行时数据，错误文件不会污染当前平衡配置。
-  data = clone(parsed);
+  const normalized = { ...(parsed as TuningData), customCards: (parsed as TuningData).customCards ?? [], deletedCards: (parsed as TuningData).deletedCards ?? [] };
+  data = clone(normalized);
+  rebuildCardRegistry();
   BASELINE_CARDS.forEach((base) => {
     const card = CARD_MAP[base.id];
     if (!card) return;

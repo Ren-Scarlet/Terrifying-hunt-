@@ -2743,7 +2743,7 @@ export function playCard(state: GameState, cardUid: string): boolean {
     log(state, blocked);
     return false;
   }
-  if (state.attackBlockedTurn === state.turn && (card.defId === 'myers_eclipse_light' || def.ops.some((op) => ['damage', 'down', 'execute', 'kill'].includes(op.op)))) {
+  if (state.attackBlockedTurn === state.turn && (card.defId === 'myers_eclipse_light' || def.ops.some((op) => ['attack', 'damage', 'down', 'execute', 'kill'].includes(op.op)))) {
     log(state, '戏耍食物生效中：本回合不能打出造成伤害或处决的卡牌。');
     return false;
   }
@@ -2770,22 +2770,16 @@ export function playCard(state: GameState, cardUid: string): boolean {
     return false;
   }
 
-  // 辣手屠夫：卡牌本身就是一次攻击，费用只扣一次；命中时附带流血。
-  if (card.defId === 'sloppy_butcher' || card.defId === 'shuriken') {
-    const victim = findVictim(state, state.playerRoom);
-    if (!victim) {
-      log(state, '辣手屠夫：当前房间没有可以攻击的站立幸存者。');
-      return false;
-    }
+  // 所有卡牌都可通过 DSL 的 attack 步骤发动真正攻击，并配置命中后效果。
+  const attackOp = def.ops.find((op) => op.op === 'attack');
+  if (attackOp && attackOp.op === 'attack') {
+    const victim = selectPeople(state, attackOp.who)[0];
+    if (!victim) { log(state, '当前目标范围内没有可以攻击的站立幸存者。'); return false; }
     const reason = attackBlockReason(state, victim.id, cost);
-    if (reason) {
-      log(state, `辣手屠夫：${reason}。`);
-      return false;
-    }
-    state.hand.splice(index, 1);
-    state.discardPile.push(card);
-    log(state, `你打出「${def.name}」，对当前房间的 ${victim.name} 发动攻击。`);
-    return attack(state, victim.id, { costOverride: cost, bleedOnHit: true });
+    if (reason) { log(state, reason); return false; }
+    state.hand.splice(index, 1); state.discardPile.push(card);
+    log(state, `你打出「${def.name}」，对 ${victim.name} 发动攻击。`);
+    return attack(state, victim.id, { costOverride: cost, bleedTurns: attackOp.bleedTurns, hitStatus: attackOp.statusTurns > 0 ? attackOp.status : undefined, hitStatusTurns: attackOp.statusTurns });
   }
 
   state.energy -= cost;
@@ -2917,7 +2911,7 @@ export function executeDownedPerson(state: GameState, targetId?: string): boolea
  * 所以「一刀接一刀」不是按得快就行，中间得有一次追逐或一次控制。
  * 传入 targetId 时只砍那个人——点房间里的谁，就砍谁。
  */
-export function attack(state: GameState, targetId?: string, options: { costOverride?: number; bleedOnHit?: boolean } = {}): boolean {
+export function attack(state: GameState, targetId?: string, options: { costOverride?: number; bleedOnHit?: boolean; bleedTurns?: number; hitStatus?: 'blind' | 'undetectable' | 'danger' | 'deepWound' | 'oblivious' | 'incurable' | 'cursed'; hitStatusTurns?: number } = {}): boolean {
   if (state.phase !== 'playing') return false;
   const attackCost = options.costOverride ?? ATTACK_COST;
   const reason = attackBlockReason(state, targetId, attackCost);
@@ -2998,9 +2992,13 @@ export function attack(state: GameState, targetId?: string, options: { costOverr
   } else {
     damagePerson(state, target, baseDamage + comboDamage);
   }
-  if (options.bleedOnHit && target.role !== 'police' && state.people.some((person) => person.id === target.id) && target.hp < hpBeforeHit) {
-    target.bleed = Math.max(target.bleed, 2);
-    log(state, `辣手屠夫：${target.name}的伤口开始持续流血，移动时会留下血迹。`);
+  const bleedTurns = options.bleedTurns ?? (options.bleedOnHit ? 2 : 0);
+  if (bleedTurns > 0 && target.role !== 'police' && state.people.some((person) => person.id === target.id) && target.hp < hpBeforeHit) {
+    target.bleed = Math.max(target.bleed, bleedTurns); log(state, `${target.name}开始流血 ${bleedTurns} 次结算，移动时会留下血迹。`);
+  }
+  if (options.hitStatus && (options.hitStatusTurns ?? 0) > 0 && target.role !== 'police' && state.people.some((person) => person.id === target.id) && target.hp < hpBeforeHit) {
+    target.statusEffects ??= {}; target.statusEffects[options.hitStatus] = Math.max(target.statusEffects[options.hitStatus] ?? 0, (options.hitStatusTurns ?? 0) + 1);
+    log(state, `${target.name}命中后获得状态：${options.hitStatus}（${options.hitStatusTurns} 次结算）。`);
   }
   if (state.bleedNextHit && target.role !== 'police' && state.people.some((person) => person.id === target.id) && target.hp > 0) {
     target.bleed = Math.max(target.bleed, 2);

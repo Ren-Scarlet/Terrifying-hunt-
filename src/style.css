@@ -3556,3 +3556,22 @@ button, .room-hit, .hand-row { touch-action: manipulation; }
 .admin-cloud-actions { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
 .admin-cloud-actions input { flex:1 1 220px; }
 .admin-cloud p { font-size:14px; }
+
+
+/* 卡牌制作工作台：优先保证字段与效果步骤可读、可操作 */
+.admin-modal { width: min(1440px, 98vw); }
+.admin-lead { font-size: 13px; line-height: 1.75; }
+.tune-card { padding: 12px; }
+.tune-head b { font-size: 14px; }
+.tune-cost, .tune-pre, .tune-empty, .tune-text { font-size: 12px; }
+.tune-op { gap: 8px; padding: 5px 0; }
+.tune-op-name { min-width: 130px; font-size: 12px; }
+.tune-op select, .tune-op input, .tune-cost input { font-size: 12px; padding: 6px 8px; min-height: 32px; }
+.tune-op select { max-width: 180px; }
+.tune-op input[type='number'] { width: 72px; }
+.tune-cost input { width: 54px; }
+.tune-description { display: flex; flex-direction: column; gap: 5px; margin: 8px 0; font-size: 12px; color: #9b9488; }
+.tune-description input, .tune-description textarea, .tune-description select { width: 100%; box-sizing: border-box; background: #08090a; border: 1px solid #30343a; color: #e0d8ca; padding: 8px; font: inherit; font-size: 13px; }
+.tune-no-action { font-size: 12px; }
+.tune-op-editor { padding: 5px 8px; border: 1px solid #292d31; background: #0b0d0f; }
+@media (max-width: 720px) { .tune-op-name { min-width: 100%; } .tune-op select { max-width: 100%; } }

@@ -42,6 +42,7 @@ export const SABOTAGE_OPTIONS = [
 
 /** DSL 指令的编辑器描述集中维护，避免新增指令时 UI 字段配置散落。 */
 export const EFFECT_OPS: Record<Op['op'], EffectOpMeta> = {
+  attack: { label: '发动攻击（命中后效果）', fields: [['who', 'who'], ['bleedTurns', 'num'], ['status', 'status'], ['statusTurns', 'num']] },
   damage: { label: '伤害', fields: [['who', 'who'], ['amount', 'num'], ['maxHp', 'num']] },
   down: { label: '击倒', fields: [['who', 'who']] },
   execute: { label: '处决', fields: [['who', 'who']] },

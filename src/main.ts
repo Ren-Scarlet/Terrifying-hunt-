@@ -41,6 +41,13 @@ import {
   resetTuning,
   setCardCost,
   setCardDesc,
+  setCardName,
+  setCardType,
+  setCardFlavor,
+  setCardPrecheck,
+  createCustomCard,
+  duplicateCard,
+  deleteCard,
   setCardNoAction,
   addCardOp,
   removeCardOp,
@@ -389,6 +396,14 @@ app.addEventListener('click', (event) => {
     adminOpen = false;
     render();
     return;
+  }
+
+  if (action === 'admin-card-new') { createCustomCard(); render(); return; }
+  if (action === 'admin-card-copy' || action === 'admin-card-delete') {
+    const id = target.dataset.card; if (!id) return;
+    if (action === 'admin-card-copy') duplicateCard(id);
+    else if (window.confirm('删除这张卡牌？删除后会从卡池和编辑器中移除。')) deleteCard(id);
+    render(); return;
   }
 
   if (action === 'admin-op-add') {
@@ -878,7 +893,11 @@ app.addEventListener('change', (event) => {
   if (parts[0] === 'card' && parts.length >= 3) {
     const id = parts[1];
     const path = parts[2];
-    if (path === 'cost') {
+    if (path === 'name') { setCardName(id, String(value)); ok = true;
+    } else if (path === 'type') { setCardType(id, String(value) as 'attack' | 'skill' | 'tactic' | 'setup'); ok = true;
+    } else if (path === 'flavor') { setCardFlavor(id, String(value)); ok = true;
+    } else if (path === 'precheck') { setCardPrecheck(id, String(value)); ok = true;
+    } else if (path === 'cost') {
       setCardCost(id, Number(value));
       ok = true;
     } else if (path === 'desc') {

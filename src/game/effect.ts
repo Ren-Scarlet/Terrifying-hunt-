@@ -169,6 +169,8 @@ export type Cond =
 
 export type Op =
   | { op: 'damage'; who: Who; amount: number; maxHp?: number }
+  /** 发动一次真正的攻击；仅命中时施加流血 / 状态。 */
+  | { op: 'attack'; who: Who; bleedTurns: number; status: 'blind' | 'undetectable' | 'danger' | 'deepWound' | 'oblivious' | 'incurable' | 'cursed'; statusTurns: number }
   /** 把受伤的人击倒；对健康的人无效 */
   | { op: 'down'; who: Who }
   /** 处决倒地的人 */

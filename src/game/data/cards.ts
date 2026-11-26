@@ -40,7 +40,7 @@ export const CARDS: CardDef[] = [
     sourceSkill: 'Sloppy Butcher',
     sourceText: '普通攻击命中后使逃生者出血、重伤。',
     unlocked: true,
-    ops: [],
+    ops: [{ op: 'attack', who: 'victim', bleedTurns: 2, status: 'deepWound', statusTurns: 0 }],
   },
   {
     id: 'choke',
