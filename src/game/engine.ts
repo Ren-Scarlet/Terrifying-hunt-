@@ -139,6 +139,13 @@ const MEDKIT_TURNS = 2;
 const STARTER_ITEM_RATE = 0.32;
 const STARTER_ITEMS: SurvivorItem[] = ['medkit', 'toolbox', 'flashlight', 'smoke', 'flare'];
 
+/** 各场地的藏身空间；巴德姆幼儿园额外开放玩具仓库、值班室和幼儿教室。 */
+function cabinetRoomsFor(state: GameState): RoomId[] {
+  return state.mapId === 'badham'
+    ? [...CABINET_ROOMS, 'nursery', 'storage', 'guestroom']
+    : CABINET_ROOMS;
+}
+
 /** 同伴一个个倒下，剩下的人会红着眼拼命：击杀数与场上倒地者都会催他们干活更快 */
 function workPressure(state: GameState): number {
   const downed = state.people.some((p) => p.role !== 'police' && p.hp <= 0);
@@ -1573,7 +1580,7 @@ function actByArchetype(state: GameState, person: Person): void {
         person.activity = '缩在柜子里，不敢出声';
         return;
       }
-      if (CABINET_ROOMS.includes(person.room)) {
+      if (cabinetRoomsFor(state).includes(person.room)) {
         person.hidden = true;
         person.intent = 'hide';
         person.activity = '钻进了柜子';
@@ -1582,7 +1589,7 @@ function actByArchetype(state: GameState, person: Person): void {
       }
       const cabinet = nearestOf(
         person.room,
-        CABINET_ROOMS.filter((r) => !isLocked(state, r)),
+        cabinetRoomsFor(state).filter((r) => !isLocked(state, r)),
       );
       const step = nextStepToward(state, person.room, cabinet, [state.playerRoom]);
       if (step) {
@@ -1964,7 +1971,7 @@ function npcTurn(state: GameState): void {
                   : person.goal === 'hide'
                     ? CABINET_ROOMS
                     : person.goal === 'help'
-                      ? [nearestOf(person.room, CABINET_ROOMS)]
+                      ? [nearestOf(person.room, cabinetRoomsFor(state))]
                       : person.goal === 'exit' || person.goal === 'panic'
                         ? ESCAPE_ROOMS
                         : [person.room];
@@ -2846,7 +2853,7 @@ export function searchRoom(state: GameState): boolean {
   state.energy -= SEARCH_COST;
   const here = peopleInRoom(state, state.playerRoom).filter((p) => p.role !== 'police');
   const found = here.filter((p) => p.hidden);
-  const hasCabinet = CABINET_ROOMS.includes(state.playerRoom) || (state.mapId === 'badham' && ['nursery', 'storage', 'guestroom'].includes(state.playerRoom));
+  const hasCabinet = cabinetRoomsFor(state).includes(state.playerRoom) || (state.mapId === 'badham' && ['nursery', 'storage', 'guestroom'].includes(state.playerRoom));
   log(state, `你翻查${roomName(state.playerRoom)}（消耗 ${SEARCH_COST} 点行动点）。`);
   // 先无条件把藏着的人揪出来：卡牌可能把人挪到没有柜子的房间，不能让他白藏
   found.forEach((p) => {
@@ -3507,7 +3514,7 @@ function finish(state: GameState, result: ResultKind): void {
   if (state.alarm >= 60) lines.push({ label: `暴露度 ${state.alarm} 的代价`, value: -Math.round(state.alarm / 5) });
 
   if (result === 'win') {
-    const bonus = (state.mission.turns - state.turn) * 5;
+    const bonus = state.mission.mode === 'free' ? 0 : (state.mission.turns - state.turn) * 5;
     if (bonus > 0) lines.push({ label: `猎杀效率 · 剩余 ${state.mission.turns - state.turn} 回合`, value: bonus });
     state.rewardCards = state.mission.mode === 'free' ? [] : [UNLOCK_REWARDS[state.mission.kind]].filter(Boolean);
   } else if (result === 'caught') {
