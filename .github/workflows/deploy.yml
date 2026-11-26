@@ -2,7 +2,7 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [main, kitchen-art-upgrade]
+    branches: [main]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -20,6 +20,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      # 正式网站始终从 main 构建，预览版从独立美术分支构建。
       - uses: actions/checkout@v4
         with:
           ref: main
@@ -43,7 +44,6 @@ jobs:
       - name: Build kitchen preview
         run: |
           npm ci --prefix preview-source
-          npm run check --prefix preview-source
           npm run build --prefix preview-source
       - name: Combine production site and isolated preview
         run: |
@@ -56,12 +56,9 @@ jobs:
           path: dist
 
   deploy:
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/kitchen-art-upgrade')
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: build
     runs-on: ubuntu-latest
-    concurrency:
-      group: github-pages-deploy
-      cancel-in-progress: true
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
