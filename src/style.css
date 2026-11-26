@@ -3066,3 +3066,116 @@ button, .room-hit, .hand-row { touch-action: manipulation; }
   padding-top: 0;
   background: none;
 }
+
+
+/* ==========================================================================
+   暗夜杀机：地图优先的上下分区布局（第三轮）
+   地图独占第一行；人物详情、行动区、现场情报移到地图下方。
+   这样地图不再被左右栏挤窄，底部面板也不会覆盖地图。
+   ========================================================================== */
+@media (min-width: 1201px) {
+  #app .layout.hunt-layout {
+    display: grid;
+    grid-template-columns: minmax(220px, .78fr) minmax(520px, 1.8fr) minmax(280px, .92fr);
+    grid-template-rows: auto auto;
+    align-items: start;
+    column-gap: 12px;
+    row-gap: 12px;
+  }
+
+  /* 让地图与底部操作区成为外层网格项目，地图独占整行。 */
+  #app .hunt-layout > .main-column { display: contents; }
+  #app .hunt-layout > .main-column > .map-panel {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    width: 100%;
+    min-width: 0;
+  }
+  #app .hunt-layout > .main-column > .bottom-dock {
+    grid-column: 2;
+    grid-row: 2;
+    min-width: 0;
+    align-self: start;
+  }
+
+  #app .hunt-sidebar-left {
+    grid-column: 1;
+    grid-row: 2;
+    min-width: 0;
+    max-height: 620px;
+    overflow: auto;
+  }
+  #app .hunt-sidebar-right {
+    grid-column: 3;
+    grid-row: 2;
+    min-width: 0;
+    max-height: 620px;
+    overflow: auto;
+  }
+
+  /* 底部详情可滚动，但不再挤占地图的宽度或高度。 */
+  #app .person-dossier-panel .person-detail-view .detail-body {
+    max-height: 430px;
+    min-height: 150px;
+    overflow-y: auto;
+  }
+  #app .hunt-sidebar-right .intel-drawer { margin: 0; }
+  #app .hunt-sidebar-right .intel-grid {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 0 7px 8px;
+    gap: 8px;
+  }
+  #app .hunt-sidebar-right .intel-log-panel { grid-column: auto; }
+  #app .hunt-sidebar-right .intel-grid .roster {
+    grid-template-columns: minmax(0, 1fr);
+    max-height: 260px;
+    overflow-y: auto;
+  }
+  #app .hunt-sidebar-right .panel { padding: 9px; }
+  #app .hunt-sidebar-right .panel-heading { gap: 5px; flex-wrap: wrap; }
+  #app .hunt-sidebar-right .panel-heading span { flex-basis: 100%; }
+  #app .hunt-sidebar-right .facility-row { grid-template-columns: 22px minmax(0, 1fr); }
+  #app .hunt-sidebar-right .facility-row > .btn,
+  #app .hunt-sidebar-right .facility-state { grid-column: 2; justify-self: start; }
+  #app .hunt-sidebar-right .log { max-height: 180px; overflow-y: auto; }
+
+  /* 地图按可用宽度完整展开，不设置内部高度裁切或滚动。 */
+  #app .map-panel,
+  #app .map-viewport { overflow: visible; max-height: none; }
+  #app .map-viewport {
+    display: flex;
+    width: 100%;
+    min-width: 0;
+    padding: 2px 0 8px;
+  }
+  #app .map-viewport .floorplan {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    height: auto;
+    margin-inline: auto;
+  }
+}
+
+@media (max-width: 1200px) {
+  #app .layout.hunt-layout { display: flex; flex-direction: column; }
+  #app .hunt-layout > .main-column {
+    display: flex;
+    flex-direction: column;
+    order: 0;
+    width: 100%;
+  }
+  #app .hunt-layout > .main-column > .map-panel { order: 0; width: 100%; }
+  #app .hunt-layout > .main-column > .bottom-dock { order: 1; width: 100%; }
+  #app .hunt-sidebar-left { order: 2; width: 100%; max-height: none; overflow: visible; }
+  #app .hunt-sidebar-right { order: 3; width: 100%; max-height: none; overflow: visible; }
+}
+
+/* 手牌区保持普通文档流；任何屏幕尺寸都不能吸附覆盖地图。 */
+#app .bottom-dock,
+#app .panel.hand,
+#app .resource-bar {
+  position: static !important;
+  inset: auto !important;
+  z-index: auto !important;
+}
