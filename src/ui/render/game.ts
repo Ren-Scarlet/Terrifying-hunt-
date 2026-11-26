@@ -741,10 +741,6 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
               ${trailOverlay(state)}
               ${playerMarker}
               ${mapEventFeedHtml(state)}
-              <div class="panel intel-log-panel">
-        <div class="panel-heading"><h2>完整行动记录</h2><span>最新记录在最上方</span></div>
-        <div class="log">${state.log.slice(0, 30).map((line) => `<div>${escape(line)}</div>`).join('')}</div>
-            </div>
           </div>
           <div class="map-legend">
             <span>${icon('escape', 'ui-icon tiny')} 逃生点（第4阶段开启）</span>
@@ -763,7 +759,10 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
           </div>
         </div>
 
-
+        <div class="panel intel-log-panel">
+          <div class="panel-heading"><h2>完整行动记录</h2><span>最新记录在最上方</span></div>
+          <div class="log">${state.log.slice(0, 30).map((line) => `<div>${escape(line)}</div>`).join('')}</div>
+        </div>
 
         <div class="bottom-dock">
         <div class="panel resource-bar">
