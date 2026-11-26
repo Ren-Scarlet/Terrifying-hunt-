@@ -17,6 +17,7 @@ const DEFAULT_SAVE: SaveData = {
   credits: 60,
   darkCells: 3,
   unlockedKillers: [...STARTER_KILLERS],
+  executionRecords: [],
   version: SAVE_VERSION,
 };
 
@@ -76,6 +77,9 @@ export function loadSave(): SaveData {
       credits: toInt(parsed.credits, DEFAULT_SAVE.credits),
       darkCells: toInt(parsed.darkCells, DEFAULT_SAVE.darkCells),
       unlockedKillers,
+      executionRecords: Array.isArray(parsed.executionRecords)
+        ? [...new Set(parsed.executionRecords.filter((id): id is string => typeof id === 'string'))]
+        : [],
       version: SAVE_VERSION,
     };
   } catch {
