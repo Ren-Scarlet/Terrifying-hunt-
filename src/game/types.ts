@@ -368,8 +368,22 @@ export interface GameState {
   trailRevealActions: number;
   /** 当前被猎鹿者显现的脚印 */
   highlightedTrail: Trail | null;
+  /** 当前回合是否禁止攻击（戏耍食物） */
+  attackBlockedTurn: number;
+  /** 玩家正在为恶灵低语选择目标房间 */
+  auraTargeting: boolean;
   /** 静止隐身剩余行动次数 */
   stealthActions: number;
+  /** 辣手屠夫：下一次命中附加流血 */
+  bleedNextHit: boolean;
+  /** 苦涩低语：下一次击杀后显露幸存者 */
+  bitterMurmurReady: boolean;
+  /** 鬼魔神龛所在房间 */
+  scourgeShrineRoom: RoomId | null;
+  /** 放置神龛时已在房间内的人 */
+  scourgeShrineOccupants: string[];
+  /** 通用卡牌额外得分 */
+  cardBonusScore: number;
   /** 这一次挥刀是否已经收回来：砍完必须再做一件事才能砍第二刀 */
   attackReady: boolean;
   /** 玩家已经做了几次行动：痕迹按这个计数衰减，而不是按回合 */
