@@ -1018,6 +1018,19 @@ export function carryPerson(state: GameState, personId: string): boolean {
   return true;
 }
 
+
+export function dropCarriedPerson(state: GameState): boolean {
+  if (state.phase !== 'playing' || !state.carryPersonId || state.energy < 1) return false;
+  const person = state.people.find((candidate) => candidate.id === state.carryPersonId);
+  if (!person || person.hp > 0) return false;
+  state.energy -= 1;
+  state.carryPersonId = null;
+  state.carryDistance = 0;
+  person.activity = '被杀手放下';
+  log(state, `你放下了${person.name}。`);
+  afterPlayerAction(state);
+  return true;
+}
 export function executeCarriedPerson(state: GameState, methodId: ExecutionMethodId): boolean {
   if (!state.carryPersonId || state.phase !== 'playing' || state.attackBlockedTurn === state.turn) return false;
   const person = state.people.find((p) => p.id === state.carryPersonId);
