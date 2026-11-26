@@ -732,6 +732,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
       <button class="tool" data-action="toggle-game-hud" aria-label="隐藏界面"><span>◉</span><em>隐藏界面 · H</em></button>
     </div>
     <div class="task-pop task-detail-drawer">
+      <button class="close" data-action="toggle-task-drawer" aria-label="关闭任务详情">×</button>
       <h3>当前任务 / OBJECTIVE</h3>
       <p><b>${escape(m.objective ?? m.title)}</b></p>
       <p>${escape(m.successText ?? '达成主目标')}<br>失败条件：${escape(m.failText ?? '超时或被捕')}</p>
@@ -801,6 +802,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
           <div class="play-status"><b>${escape(guidanceTitle)}</b><span> · ${escape(guidanceDetail)}</span></div>
         </div>
 
+        <div class="hint">W A S D 房间移动　E 交互　G 放下<br>方向键镜头　F 跟随　0 全局　＋ / − 缩放　T 任务　H 隐藏界面</div>
         <div class="bottom-hud" id="bottomHud">
           <div class="action-pill">
             <div class="hand-actions">
