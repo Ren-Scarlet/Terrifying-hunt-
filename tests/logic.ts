@@ -196,11 +196,11 @@ function caseMyersStalkingAndFearRadius(): void {
     usePower(stalking, 'myers_gaze') && stalking.myersStalking && stalking.stalkMeter === stalkStart + 15 && stalking.energy === 4,
     `stalk=${stalking.stalkMeter} AP=${stalking.energy}`);
   check('迈尔斯：第二次点击继续消耗行动并使目标开始起疑',
-    usePower(stalking, 'myers_gaze') && stalking.stalkMeter === stalkStart + 23 && stalking.energy === 3 && stalking.stalkPressure === 40 && prey.awareness >= 1,
+    usePower(stalking, 'myers_gaze') && stalking.stalkMeter === stalkStart + 30 && stalking.energy === 3 && stalking.stalkPressure === 40 && prey.awareness >= 1,
     `stalk=${stalking.stalkMeter} pressure=${stalking.stalkPressure} awareness=${prey.awareness}`);
   const thirdStalk = withRandomSource(() => 0.99, () => usePower(stalking, 'myers_gaze'));
   check('迈尔斯：持续盯梢第三次时目标逃离，不能稳定刷同一人',
-    thirdStalk && stalking.stalkMeter === stalkStart + 31 && stalking.stalkPressure === 0 && prey.intent === 'flee',
+    thirdStalk && stalking.stalkMeter === stalkStart + 38 && stalking.stalkPressure === 0 && prey.intent === 'flee',
     `stalk=${stalking.stalkMeter} intent=${prey.intent}`);
 
   const noPrey = newGame();
