@@ -60,7 +60,7 @@ export function renderMenu(save: SaveData): string {
         <div class="killer-picker">${picker}</div>
         <div class="detail-wrap">${detailCardHtml(
           killer.owner,
-          `${killer.title} / ${killer.school === 'supernatural' ? '灵异系' : '现实系'} · 两个能力分开冷却`,
+          `${killer.title} / ${killer.school === 'supernatural' ? '灵异系' : '现实系'} · 一项专属力量，围绕猎杀计划使用`,
           '力量',
           [
             ...(killer.passive ? [`被动 · ${killer.passive.name}：${killer.passive.short}`] : []),
