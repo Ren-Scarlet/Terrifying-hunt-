@@ -1588,15 +1588,16 @@ function caseContractsPowerAndCarry(): void {
   let route: RoomId[] = []; const seen = new Set<RoomId>([carry.playerRoom]);
   while (frontier.length && !route.length) {
     const current = frontier.shift()!;
-    if (current.path.length === 3) { route = current.path; break; }
+    if (current.path.length === 4) { route = current.path; break; }
     for (const next of ROOM_MAP[current.room].neighbors) if (!seen.has(next)) { seen.add(next); frontier.push({ room: next, path: [...current.path, next] }); }
   }
-  carry.freeMove = true; for (const room of route) movePlayer(carry, room);
-  const carryBlocked = route.length === 3 && carry.playerRoom === route[1] && carry.carryDistance === 2;
-  check('AB 搬运两格后必须就近处置或放下目标',
-    carryBlocked && carry.carryPersonId === victim.id && victim.hp === 0 &&
-    victim.room === route[1],
-    'route=' + route.length + ' distance=' + carry.carryDistance + ' carried=' + (carry.carryPersonId === victim.id));
+  carry.freeMove = true;
+  for (const room of route.slice(0, 3)) movePlayer(carry, room);
+  const safeCarry = route.length === 4 && carry.playerRoom === route[2] && carry.carryDistance === 3;
+  const failedCheck = route.length === 4 && withRandomSource(() => 0, () => movePlayer(carry, route[3]));
+  check('AB 搬运前三格安全，第四格检定失败会挣脱并恢复受伤状态',
+    safeCarry && !failedCheck && carry.carryPersonId === null && victim.hp === 2 && victim.intent === 'flee',
+    'route=' + route.length + ' distance=' + carry.carryDistance + ' hp=' + victim.hp + ' carried=' + (carry.carryPersonId === victim.id));
   const special = newGame();
   special.people = special.people.filter((p) => p.role !== 'police').slice(0, 1);
   const target = special.people[0]; target.room = 'kitchen'; target.hp = 0; target.downedTurns = 0;
