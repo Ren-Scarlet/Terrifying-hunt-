@@ -29,9 +29,9 @@ export function renderMenu(save: SaveData): string {
       <div class="modal menu-modal">
         <div class="menu-hero">
           <div>
-            <div class="subtitle">A SOLO DECKBUILDING HUNT</div>
-            <h1>夜猎<span>档案</span></h1>
-            <p class="hero-copy">你不是逃脱者。你是那扇门后不该存在的东西——<br>接下契约，布置现场，然后在警察赶到前完成它。</p>
+            <div class="subtitle">A SOLO SLASHER STRATEGY GAME</div>
+            <h1>暗夜<span>杀机</span></h1>
+            <p class="hero-copy">你不是逃脱者。你是黑暗中精心策划猎杀的人——<br>观察、布局、切断退路，等待猎物走进致命窗口。</p>
             <div class="hero-rule" aria-hidden="true"></div>
             <div class="resource-bar">
               <span>${icon('bloodPoint')} <b>${save.credits}</b> 血点</span>
