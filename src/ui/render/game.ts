@@ -123,6 +123,21 @@ function doorMarkersHtml(state: GameState): string {
   })).join('');
 }
 
+/** 把最近发生的关键行动投射到地图上；完整记录仍保留在情报抽屉。 */
+function mapEventFeedHtml(state: GameState): string {
+  const important = /没能再起来|停止了呼吸|处决了|处决成功|砸毁了|砸烂了|你砸了|立即断电|电话线被剪断|封锁了|陷阱触发|报警成功|逃出了房子|翻出了后院|被警察逮捕/;
+  const recent = state.log.filter((line) => {
+    const match = line.match(/^\\[第 (\\d+) 回合\\]/);
+    const turn = match ? Number(match[1]) : state.turn;
+    return state.turn - turn <= 1 && important.test(line);
+  }).slice(0, 3).reverse();
+  if (!recent.length) return '';
+  return `<div class="map-event-feed" aria-live="polite">
+    <span class="map-event-feed-title">现场动态</span>
+    ${recent.map((line, index) => `<div class="map-event ${index === recent.length - 1 ? 'latest' : ''}">${escape(line.replace(/^\\[第 \\d+ 回合\\]\\s*/, ''))}</div>`).join('')}
+  </div>`;
+}
+
 function powerButtonHtml(state: GameState, killer: KillerProfile): string {
   return killer.powers
     .map((p) => {
@@ -454,6 +469,24 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
       statusBits.push(`<span class="status-badge downed">${escape(p.name)} 倒地 · ${p.downedTurns >= DOWNED_LOCK_TURNS ? '现在可以补刀处决' : `还要等 ${DOWNED_LOCK_TURNS - p.downedTurns} 回合才能补刀`} · 可能被同伴救起</span>`);
     });
   const statusHtml = statusBits.length ? `<div class="status-strip">${statusBits.join('')}</div>` : '';
+  const standingHere = here.filter((person) => person.hp > 0);
+  const nextTask = tasks.find((task) => missionTaskProgress(state, task) < task.target);
+  const preparations: string[] = [];
+  if (state.phoneCut) preparations.push('通讯已切断');
+  const darkCircuits = state.powerCircuits.filter((circuit) => circuit.broken).length;
+  if (darkCircuits) preparations.push(`照明区域已切断 ${darkCircuits} 处`);
+  if (state.barricades.length || state.exitBlockedTurns > 0) preparations.push('退路受到控制');
+  if (state.bonusDamage > 0) preparations.push(`下一刀伤害 +${state.bonusDamage}`);
+  if (state.ambushTurn === state.turn) preparations.push('伏击状态就绪');
+  if (isMyers && state.stalkMeter > 0) preparations.push(`尾随值 ${state.stalkMeter}/100`);
+  const lethalWindow = state.ambushTurn === state.turn && standingHere.length === 1 && standingHere[0].alert < 100;
+  const huntPhase = lethalWindow ? '致命窗口' : standingHere.length ? '目标接触' : preparations.length ? '猎场布置' : '观察与部署';
+  const huntFocus = nextTask ? nextTask.label : (m.objective ?? m.title);
+  const huntPlanHtml = `<div class="hunt-plan ${lethalWindow ? 'lethal-ready' : ''}">
+    <div class="hunt-plan-heading"><b>猎杀计划</b><span>${huntPhase}</span></div>
+    <div class="hunt-plan-focus"><small>当前重点</small><strong>${escape(huntFocus)}</strong></div>
+    <div class="hunt-plan-prep"><small>已完成准备</small><span>${preparations.length ? preparations.map(escape).join(' · ') : '尚未布置：可先切断通讯、照明或控制退路'}</span></div>
+  </div>`;
 
   const atkOk = canAttack(state);
   const atkReason = attackBlockReason(state);
@@ -508,7 +541,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
   return `
     <div class="topbar">
       <div class="topbar-identity">
-        <div class="brand">夜猎<span>档案</span></div>
+        <div class="brand">暗夜<span>杀机</span><small>NIGHTFALL · THE HUNT BEGINS</small></div>
         <div class="killer-chip">
           ${killerFaceHtml(killer, 'chip')}
           <span>${escape(killer.owner)} · ${escape(killer.title)}</span>
@@ -541,7 +574,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
             <button class="btn ghost mini" data-action="guide">玩法指引</button>
             <button class="btn ghost mini audio-toggle" data-action="mute" title="开关音效与背景音乐">${isMuted() ? '音效 关' : '音效 开'}</button>
           </div>
-          ${statusHtml}${carryStatus}
+          ${statusHtml}${carryStatus}${huntPlanHtml}
           ${state.lookingAround ? '<div class="look-prompt" role="status"><b>选择要查看的房间</b><span>地图上亮起边框的房间都与当前位置相邻。点击其中一个，消耗 1 点行动点查看。</span><button class="btn ghost mini" data-action="look-cancel">取消</button></div>' : ''}
           <div class="map-viewport">
             <div class="floorplan" style="--ar:${layoutAspectNum().toFixed(4)};aspect-ratio:${layoutAspect()}">
@@ -549,6 +582,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
               ${doorMarkersHtml(state)}
               ${trailOverlay(state)}
               ${playerMarker}
+              ${mapEventFeedHtml(state)}
             </div>
           </div>
           <div class="map-legend">
@@ -604,48 +638,55 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
             <button class="btn primary end-turn" data-action="end-turn" ${selectingDiscards ? 'disabled' : ''}>结束回合</button>
             <button class="btn ghost" data-action="give-up">放弃任务</button>
           </div>
+          <div class="card-detail-inline">
+            <div class="card-detail-label">卡牌 / 人物详情 · 悬停手牌或点击人物查看</div>
+            <div id="cardDetail" class="detail-wrap">${defaultDetailHtml()}</div>
+          </div>
           <div class="hand-count">手牌 ${state.hand.length}/${HAND_LIMIT}</div>
           <div class="hand-row">${hand || '<div style="color:var(--muted);font-size:13px">手牌已空，可花行动点主动抽牌。</div>'}</div>
         </div>
         </div>
       </div>
 
-      <div class="side-column">
-        <div class="panel">
-          <h2>信息面板</h2>
-          <div id="cardDetail" class="detail-wrap">${defaultDetailHtml()}</div>
-        </div>
-        <div class="panel roster-panel">
-          <div class="panel-heading"><h2>在场人物</h2><span>${here.length} 人在你的房间${policeHere ? ' · 警察也在' : ''}</span></div>
-          <div class="roster">${roster || '<div class="roster-empty">还没有确认任何人的位置。走进房间，或者用侦查卡。</div>'}</div>
-          ${unknownCount > 0 ? `<div class="roster-unknown">还有 ${unknownCount} 个人没有被确认</div>` : ''}
-        </div>
-        <div class="panel facility-panel">
-          <div class="panel-heading"><h2>现场设施</h2><span>他们能用 · 你只能砸</span></div>
-          <div class="facility-list">
-            ${state.siteItems.map((i) => {
-              const status = i.kind === 'itemBox'
-                ? i.broken ? '已被砸烂 · 不再发道具' : `还能翻 ${i.charges} 件道具`
-                : i.jammedTurns > 0 ? `停机 ${i.jammedTurns} 回合` : i.charged ? '已通电 · 进度已计入' : `修复 ${i.progress}%`;
-              const cls = i.broken ? 'broken' : i.jammedTurns > 0 ? 'jammed' : '';
-              const canSmash = i.room === state.playerRoom && !i.broken && (i.kind === 'itemBox' ? i.charges > 0 : true) && !sabotageReason;
-              return `<div class="facility-row ${i.kind} ${cls}">
-                <img class="facility-icon" src="${uiIcon(i.kind === 'itemBox' ? 'itemBox' : 'generator')}" alt="" onerror="this.style.display='none'">
-                <div class="facility-info"><b>${SITE_ITEM_LABEL[i.kind]}</b><small>${escape(roomName(i.room))} · ${status}</small></div>
-                ${canSmash ? `<button class="btn mini" data-action="sabotage" title="花 ${SABOTAGE_COST} 点行动点砸掉">砸掉</button>` : ''}
-              </div>`;
-            }).join('')}
+      <details class="intel-drawer">
+        <summary>
+          <span>现场情报</span>
+          <small>${known.length} 人已确认 · ${state.siteItems.length} 处设施 · ${state.log.length} 条记录</small>
+          <em>展开 / 收起</em>
+        </summary>
+        <div class="intel-grid">
+          <div class="panel roster-panel">
+            <div class="panel-heading"><h2>幸存者档案</h2><span>${here.length} 人在你的房间${policeHere ? ' · 警察也在' : ''}</span></div>
+            <div class="roster">${roster || '<div class="roster-empty">还没有确认任何人的位置。走进房间，或者用侦查卡。</div>'}</div>
+            ${unknownCount > 0 ? `<div class="roster-unknown">还有 ${unknownCount} 个人没有被确认</div>` : ''}
+          </div>
+          <div class="panel facility-panel">
+            <div class="panel-heading"><h2>现场设施</h2><span>通讯 / 照明 / 补给</span></div>
+            <div class="facility-list">
+              ${state.siteItems.map((i) => {
+                const status = i.kind === 'itemBox'
+                  ? i.broken ? '已被砸烂 · 不再发道具' : `还能翻 ${i.charges} 件道具`
+                  : i.jammedTurns > 0 ? `停机 ${i.jammedTurns} 回合` : i.charged ? '已通电 · 进度已计入' : `修复 ${i.progress}%`;
+                const cls = i.broken ? 'broken' : i.jammedTurns > 0 ? 'jammed' : '';
+                const canSmash = i.room === state.playerRoom && !i.broken && (i.kind === 'itemBox' ? i.charges > 0 : true) && !sabotageReason;
+                return `<div class="facility-row ${i.kind} ${cls}">
+                  <img class="facility-icon" src="${uiIcon(i.kind === 'itemBox' ? 'itemBox' : 'generator')}" alt="" onerror="this.style.display='none'">
+                  <div class="facility-info"><b>${SITE_ITEM_LABEL[i.kind]}</b><small>${escape(roomName(i.room))} · ${status}</small></div>
+                  ${canSmash ? `<button class="btn mini" data-action="sabotage" title="花 ${SABOTAGE_COST} 点行动点砸掉">砸掉</button>` : ''}
+                </div>`;
+              }).join('')}
+            </div>
+          </div>
+          <div class="panel threat-panel">
+            <div class="panel-heading"><h2>幸存者威胁</h2><span>他们正在做什么 · 怎么反制</span></div>
+            ${threatRowsHtml(state)}
+          </div>
+          <div class="panel intel-log-panel">
+            <div class="panel-heading"><h2>完整行动记录</h2><span>最新记录在最上方</span></div>
+            <div class="log">${state.log.slice(0, 30).map((line) => `<div>${escape(line)}</div>`).join('')}</div>
           </div>
         </div>
-        <div class="panel threat-panel">
-          <div class="panel-heading"><h2>威胁</h2><span>他们正在做什么 · 怎么反制</span></div>
-          ${threatRowsHtml(state)}
-        </div>
-        <div class="panel">
-          <h2>行动日志</h2>
-          <div class="log">${state.log.slice(0, 10).map((line) => `<div>${escape(line)}</div>`).join('')}</div>
-        </div>
-      </div>
+      </details>
     </div>
   `;
 }
