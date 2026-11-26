@@ -8,7 +8,7 @@ import { KILLERS, type KillerProfile } from '../../game/killers';
 import { roomName } from '../../game/missions';
 import { getPersonProfile, type PersonProfile } from '../../game/people';
 import { SURVIVOR_MAP } from '../../game/survivors';
-import { awarenessLabel } from '../../game/npc/awareness';
+import { awarenessLabel, awarenessStage } from '../../game/npc/awareness';
 import type { GameState, Person, SaveData } from '../../game/types';
 
 export const escape = (s: string) =>
@@ -141,11 +141,11 @@ export function personChip(person: Person, attackable = false, carryable = false
     : '';
   const sacrificeMark = person.bloodSacrifice ? '<span class="chip-sacrifice" title="本局血祭品">🩸</span>' : '';
   // 头顶上的警戒值：不用再翻日志判断这个人现在有多怕
-  const alertLevel = person.alert >= 70 ? 'high' : person.alert >= 35 ? 'mid' : 'low';
+  const alertLevel = (['low', 'mid', 'panic', 'high'] as const)[awarenessStage(person.alert)];
   const alertMark =
     person.role === 'police'
       ? ''
-      : `<span class="chip-alert ${alertLevel}" title="警觉 ${person.alert}/100：越高越可能立刻逃跑">${person.alert}</span>`;
+      : `<span class="chip-alert ${alertLevel}" title="${awarenessLabel(person.alert)} ${person.alert}/100：越高越可能立刻逃跑">${person.alert}</span>`;
   const bleedLeft = Math.max(0, BLEEDOUT_TURNS - person.downedTurns);
   const lockLeft = Math.max(0, DOWNED_LOCK_TURNS - person.downedTurns);
   const stateMark =
