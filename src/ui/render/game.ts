@@ -557,7 +557,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
                 </div>`;
               }).join('')}
               ${state.powerCircuits.map((c) => '<div class="facility-row breaker ' + (c.broken ? 'broken' : '') + '"><span class="facility-symbol">⚡</span><div class="facility-info"><b>' + escape(c.name) + ' · 电闸</b><small>' + escape(roomName(c.breakerRoom)) + ' · ' + (c.broken ? '已断电' : '供电中') + ' · 影响 ' + c.affectedRooms.length + ' 个房间</small></div><span class="facility-state">' + (c.broken ? '断电' : '正常') + '</span></div>').join('')}
-              ${(['study', 'hall'] as RoomId[]).map((room) => '<div class="facility-row telephone ' + (state.phoneCut ? 'broken' : '') + '"><span class="facility-symbol">☎</span><div class="facility-info"><b>' + escape(roomName(room)) + ' · 电话线路</b><small>' + (state.phoneCut ? '主电话线路已剪断；求救者需要寻找其他通讯方式' : '线路正常 · 可用于对外求救') + '</small></div><span class="facility-state">' + (state.phoneCut ? '中断' : '正常') + '</span></div>').join('')}
+              ${(['study', 'hall'] as RoomId[]).map((room) => '<div class="facility-row telephone ' + (state.phoneCut ? 'broken' : '') + '"><span class="facility-symbol">☎</span><div class="facility-info"><b>' + escape(roomName(room)) + ' · 电话线路</b><small>' + (state.phoneCut ? '电话已中断 · 跨区域救援协调受限' + (state.sabotage.includes('radio') ? ' · 无线电也已破坏' : ' · 无线电仍可有限协调') : '线路正常 · 可对外求救与远程协调') + '</small></div><span class="facility-state">' + (state.phoneCut ? '中断' : '正常') + '</span></div>').join('')}
             </div>
           </div>
           <div class="panel threat-panel">

@@ -1398,12 +1398,23 @@ function tryRescue(state: GameState, person: Person): boolean {
   return false;
 }
 
+/**
+ * 电话线路承担跨区域求救协调。
+ * 线路正常时，幸存者能远程得知倒地同伴的位置；剪断后只能依靠无线电有限协调，
+ * 无线电也被破坏时，就只能响应同屋或相邻房间的呼救。
+ */
+export function canCoordinateRescue(state: GameState, fromRoom: RoomId, downedRoom: RoomId): boolean {
+  if (!state.phoneCut) return true;
+  const range = state.sabotage.includes('radio') ? 1 : 3;
+  return roomDistance(fromRoom, downedRoom) <= range;
+}
+
 /** 有人倒地时，幸存者会主动赶过去：救援优先于日常目标，但没人敢闯玩家守着的房间 */
 function tryAidRun(state: GameState, person: Person): boolean {
   if (person.hidden || person.blockedTurns > 0) return false;
   if (random() > RESCUE_EAGERNESS[person.archetype] * AID_RUN_RATE) return false;
   const downed = npcs(state)
-    .filter((p) => p.hp <= 0 && p.room !== state.playerRoom)
+    .filter((p) => p.hp <= 0 && p.room !== state.playerRoom && canCoordinateRescue(state, person.room, p.room))
     .sort((a, b) => roomDistance(person.room, a.room) - roomDistance(person.room, b.room))[0];
   if (!downed || downed.room === person.room) return false;
   const step = nextStepToward(state, person.room, downed.room, [state.playerRoom]);
