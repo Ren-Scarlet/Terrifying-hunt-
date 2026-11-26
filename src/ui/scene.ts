@@ -432,7 +432,7 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
     c.clearRect(0, 0, w, h);
 
     // 墙顶：比地面亮一点点的暖灰。墙体如果跟背景一样黑，就只剩"缝隙"没有"墙"
-    c.fillStyle = '#342e26';
+    c.fillStyle = '#293844';
     c.fill(mass);
 
     // 墙面材质（只铺在墙体上）
@@ -447,7 +447,7 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
     c.save();
     c.clip(mass);
     c.globalAlpha = 0.05;
-    c.fillStyle = '#d8d2c4';
+    c.fillStyle = '#b7c9d9';
     c.fillRect(0, 0, w, h);
     c.restore();
 
