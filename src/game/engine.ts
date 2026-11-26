@@ -1109,6 +1109,7 @@ export function runOps(state: GameState, ops: Op[]): void {
     },
     scoutRoom, npcs, peopleInRoom, standing, nextStepToward,
     healPerson, rescuePerson, checkCond,
+    sabotageContext: (current) => sabotageSiteItem(current, { free: true, suppressAfterAction: true }),
   });
   if (!phoneWasCut && state.phoneCut) state.huntStats.environmentActions += 1;
 }
@@ -3321,15 +3322,17 @@ export function sabotageBlockReason(state: GameState): string | null {
   return sabotageTarget(state) ? null : '附近没有可破坏的门锁、通讯设施或现场设施。';
 }
 
-export function sabotageSiteItem(state: GameState): boolean {
-  const reason = sabotageBlockReason(state);
+export function sabotageSiteItem(state: GameState, options: { free?: boolean; suppressAfterAction?: boolean } = {}): boolean {
+  const reason = options.free
+    ? (state.phase !== 'playing' ? '这一局已经结束了。' : sabotageTarget(state) ? null : '附近没有可破坏的门锁、通讯设施或现场设施。')
+    : sabotageBlockReason(state);
   if (reason) {
     log(state, reason);
     return false;
   }
   const target = sabotageTarget(state);
   if (!target) return false;
-  state.energy -= SABOTAGE_COST;
+  if (!options.free) state.energy -= SABOTAGE_COST;
   state.huntStats.environmentActions += 1;
   if (target.kind === 'door') {
     state.roomLocks[target.room] = 0;
@@ -3351,7 +3354,6 @@ export function sabotageSiteItem(state: GameState): boolean {
     const circuit = state.powerCircuits.find((c) => c.breakerRoom === state.playerRoom && !c.broken);
     const item = state.siteItems.find((i) => i.room === state.playerRoom && !i.broken && (i.kind === 'itemBox' ? i.charges > 0 : true));
     if (!circuit && !item) return false;
-  state.huntStats.environmentActions += 1;
   if (state.hexRuinActive && !state.hexRuinUsed) {
     state.hexRuinUsed = true;
     reduceTeamProgress(state, 10);
@@ -3386,8 +3388,10 @@ export function sabotageSiteItem(state: GameState): boolean {
   if (target.kind === 'facility') addAlarm(state, 3);
   // 砸东西也算「做了一件事」，刀可以收回来
   state.attackReady = true;
-  afterPlayerAction(state);
-  checkImmediateWin(state);
+  if (!options.suppressAfterAction) {
+    afterPlayerAction(state);
+    checkImmediateWin(state);
+  }
   return true;
 }
 
