@@ -513,14 +513,24 @@ app.addEventListener('click', (event) => {
   if (action === 'person') {
     const personId = target.dataset.personId;
     if (personId && game && screen === 'game') {
-      selectedPersonId = personId;
-      // 点击人物只打开档案，不再把「查看」误触成攻击。
       const panel = document.getElementById('cardDetail');
-      if (panel) {
-        panel.innerHTML = personDetailHtml(game, personId);
-        detailCardUid = null;
+      if (selectedPersonId === personId) {
+        selectedPersonId = null;
+        if (panel) panel.innerHTML = defaultDetailHtml();
+      } else {
+        selectedPersonId = personId;
+        if (panel) panel.innerHTML = personDetailHtml(game, personId);
       }
+      detailCardUid = null;
     }
+    return;
+  }
+
+  if (action === 'close-person-detail') {
+    selectedPersonId = null;
+    detailCardUid = null;
+    const panel = document.getElementById('cardDetail');
+    if (panel) panel.innerHTML = defaultDetailHtml();
     return;
   }
 
