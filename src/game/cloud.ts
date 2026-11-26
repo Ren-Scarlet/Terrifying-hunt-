@@ -30,11 +30,6 @@ export async function verifyGitHubToken(token: string): Promise<string> {
   return user.login;
 }
 
-function decodeBase64Utf8(value: string): string {
-  const binary = atob(value.replace(/\\s/g, ''));
-  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
-  return new TextDecoder().decode(bytes);
-}
 function encodeBase64Utf8(value: string): string {
   const bytes = new TextEncoder().encode(value);
   let binary = '';
@@ -67,7 +62,7 @@ export async function saveCloudConfig(config: CloudConfig): Promise<void> {
   }
   const body: Record<string, string> = {
     message: 'Update game balance configuration',
-    content: encodeBase64Utf8(JSON.stringify(config, null, 2) + '\'),
+    content: encodeBase64Utf8(JSON.stringify(config, null, 2)),
     branch: BRANCH,
   };
   if (sha) body.sha = sha;
