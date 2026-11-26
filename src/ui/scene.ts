@@ -818,6 +818,24 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
     ctx.clearRect(0, 0, w, h);
     ctx.drawImage(refs.staticCv, 0, 0, w, h);
 
+    // 全室内冷色调：对每个房间整体着色，家具、地板和室内细节统一进入冷蓝灰色
+    ctx.save();
+    for (const room of ROOMS) {
+      const r = rectOf(room.id, view);
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(r.x, r.y, r.w, r.h);
+      ctx.clip();
+      ctx.globalCompositeOperation = 'multiply';
+      ctx.fillStyle = 'rgba(92,132,184,.48)';
+      ctx.fillRect(r.x, r.y, r.w, r.h);
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.fillStyle = 'rgba(82,118,164,.10)';
+      ctx.fillRect(r.x, r.y, r.w, r.h);
+      ctx.restore();
+    }
+    ctx.restore();
+
     /* —— 黑暗层：整体压暗，再把有光的地方挖空 —— */
     const d = refs.darkCtx;
     d.globalCompositeOperation = 'source-over';
@@ -894,10 +912,11 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
     cc.rect(pr.x + 1, pr.y + 1, pr.w - 2, pr.h - 2);
     cc.clip();
     const rg = cc.createRadialGradient(px, py, 0, px, py, coneLen);
-    rg.addColorStop(0, 'rgba(255,244,214,1)');
-    rg.addColorStop(0.22, 'rgba(255,238,204,.92)');
-    rg.addColorStop(0.55, 'rgba(255,230,192,.5)');
-    rg.addColorStop(1, 'rgba(255,226,188,0)');
+    // 暗红手电筒：保留原有光锥形状，只改变光色
+    rg.addColorStop(0, 'rgba(255,54,66,1)');
+    rg.addColorStop(0.22, 'rgba(238,32,48,.96)');
+    rg.addColorStop(0.55, 'rgba(190,20,38,.62)');
+    rg.addColorStop(1, 'rgba(150,12,28,0)');
     cc.fillStyle = rg;
     cc.fillRect(px - coneLen, py - coneLen, coneLen * 2, coneLen * 2);
     cc.restore();
@@ -1004,8 +1023,8 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
       }
     }
 
-    // 手电筒暖白：复用同一张光锥图
-    ctx.globalAlpha = 0.34;
+    // 手电筒暗红光束：复用同一张光锥图，让红色在冷色室内明显可见
+    ctx.globalAlpha = 0.82;
     ctx.drawImage(refs.coneCv, 0, 0, w, h);
     ctx.globalAlpha = 1;
 
