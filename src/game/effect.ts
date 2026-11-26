@@ -203,7 +203,6 @@ export type Op =
   | { op: 'steps'; amount: number }
   /** 玩家下回合少走几步（反抗型 NPC 的反击也用这条） */
   | { op: 'stun'; amount: number }
-  | { op: 'evidence'; amount: number }
   /** 本回合后续卡牌费用减少 */
   | { op: 'discount'; amount: number }
   /** 本回合下次攻击的额外伤害 */
