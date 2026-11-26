@@ -33,8 +33,8 @@ export function renderMenu(save: SaveData): string {
           <img src="${mapArtSrc(map)}" alt="今夜的猎场" loading="lazy">
           <div class="menu-map-copy">
             <small>TONIGHT'S HUNTING GROUND</small>
-            <b>今夜的猎场 · ${map.sector}</b>
-            <span>你在这里。每一局，房子都会换一副样子。</span>
+            <b>今夜的猎场 · ${map.name}</b>
+            <span>${escape(map.description)}</span>
           </div>
         </div>
         <div class="menu-hero">
