@@ -1,5 +1,5 @@
 import { isLocked, isRoomExplored } from '../game/engine';
-import { ROOMS, ROOM_MAP } from '../game/rooms';
+import { ROOMS, ROOM_MAP, ROOM_EDGE_GAP_TOLERANCE } from '../game/rooms';
 import { BULBS, PROPS, ROOM_AMBIENT, ROOM_MATERIAL, ROOM_TINT, WINDOWS, type Bulb, type MatKind, type Prop, type WindowLight } from './scene/config';
 import type { GameState, RoomId } from '../game/types';
 
@@ -86,7 +86,8 @@ function sideTo(id: RoomId, nid: RoomId): Door | null {
   const overlapY = Math.min(bottom, otherBottom) - Math.max(r.top, nr.top);
   // 房间尺寸不再相同，不能再用中心点方向猜门在哪一面。
   // 直接判断矩形是否真实共边（布局会在两边之间留一条窄墙缝）。
-  const edgeTolerance = 1;
+  // 房间矩形之间保留了 0.72 个网格单位的墙缝，不能用 1% 的容差判断共边。
+  const edgeTolerance = ROOM_EDGE_GAP_TOLERANCE;
   if (Math.abs(right - nr.left) <= edgeTolerance && overlapY > 0) {
     const p = ((Math.max(r.top, nr.top) + Math.min(bottom, otherBottom)) / 2 - r.top) / r.height;
     return { side: 'right', p: clamp(p, 0.12, 0.88) };
