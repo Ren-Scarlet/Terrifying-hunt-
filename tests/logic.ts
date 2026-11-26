@@ -335,7 +335,7 @@ function caseDrawAndDiscardRules(): void {
   shuffle.discardPile = [{ uid: 'reshuffle-test', defId: 'silent_step' }];
   const progress = shuffle.teamProgress;
   drawCardAction(shuffle);
-  check('抽牌规则：牌库耗尽洗回弃牌堆并推进团队进度', shuffle.teamProgress >= progress + 5 && shuffle.hand.some((c) => c.uid === 'reshuffle-test'), `team=${progress}→${shuffle.teamProgress}`);
+  check('抽牌规则：洗牌正常进行且不再推进废弃的团队进度', shuffle.teamProgress === progress && shuffle.hand.some((c) => c.uid === 'reshuffle-test'));
 
   const flee = newGame();
   const victim = player(flee);
@@ -1138,20 +1138,41 @@ function caseDisturbance(): void {
   check('R 有人跑过会留下动静提示', visibleDisturbances(s).length > 0, `${visibleDisturbances(s).length} 处`);
 }
 
-/** S：他们的团队目标做满，玩家直接失败 */
+/** S：警报阈值开放逃生点，警报满值进入最终阶段。 */
 function caseTeamGoal(): void {
   const s = newGame();
-  s.teamStage = TEAM_STAGE_COUNT - 1;
-  s.teamProgress = 90;
-  const worker = s.people.find((p) => p.role !== 'police')!;
-  worker.room = openNeighbor(s.playerRoom);
-  worker.item = 'key';
-  worker.itemUses = 1;
-  worker.alert = 100;
-  worker.hidden = false;
-  endTurn(s);
-  check('S 第四阶段完成后出现两个逃生点', s.teamStage === 4 && s.escapeRooms.length === 2, `stage=${s.teamStage} exits=${s.escapeRooms.join(',')}`);
-  check('S 第四阶段不会立刻判负', s.result !== 'failed', s.resultReason);
+  s.alarm = 50;
+  addAlarm(s, 10);
+  check('S 警报值达到 60 后开放两个动态逃生点', s.escapeRooms.length === 2 && !s.emergencyActive);
+  addAlarm(s, -15);
+  check('S 警报值可以下降', s.alarm === 45 && s.escapeRooms.length === 2);
+  const solid = newGame();
+  solid.alarm = 99;
+  addAlarm(solid, 1);
+  check('S 普通杀手警报满值进入警察最终阶段而非立即结算',
+    solid.emergencyActive && solid.result === null && solid.people.filter((p) => p.role === 'police').length >= 4);
+  const ghost = createGame(['silent_step'], undefined, '贞子');
+  ghost.alarm = 99;
+  addAlarm(ghost, 1);
+  check('S 灵异杀手警报满值让所有幸存者逃亡且不召来警察',
+    ghost.emergencyActive && ghost.people.every((p) => p.role !== 'police' && p.intent === 'escape'));
+}
+
+/** 恐惧满值后再次受到攻击会直接倒地；警戒与恐惧保持独立。 */
+function caseFearSystem(): void {
+  const s = newGame();
+  const victim = s.people.find((p) => p.role !== 'police')!;
+  victim.room = s.playerRoom;
+  victim.hp = 4;
+  victim.fear = 80;
+  victim.alert = 12;
+  victim.hidden = false;
+  s.people.filter((p) => p.id !== victim.id && p.role !== 'police').forEach((p) => { p.room = 'attic'; p.hidden = true; });
+  s.energy = 4;
+  s.attackReady = true;
+  const ok = attack(s, victim.id);
+  check('恐惧系统：受击使恐惧值达到上限后直接倒地', ok && victim.hp === 0 && victim.fear === 100);
+  check('恐惧系统：警戒值不与恐惧值混用', victim.alert === 12 && victim.fear === 100);
 }
 
 /** T：动静和脚印一样是短线索，不会一直挂在地图上 */
@@ -1284,14 +1305,9 @@ function caseSiteItems(): void {
   const teamBefore = s.teamProgress;
   const ok2 = sabotageSiteItem(s);
   check(
-    'X 砸发电机扣进度 + 停机 + 团队进度倒退',
-    ok2 &&
-      gen.progress === 35 &&
-      gen.jammedTurns === GENERATOR_JAM_TURNS &&
-      !gen.charged &&
-      // 破坏后同屋目击者可能趁乱再推 3 点，所以看「至少倒退 10」而不是卡死 28
-      s.teamProgress <= teamBefore - 10,
-    `progress=${gen.progress} jam=${gen.jammedTurns} team=${s.teamProgress}`,
+    'X 砸发电机只影响设施本身，不再修改团队进度',
+    ok2 && gen.progress === 35 && gen.jammedTurns === GENERATOR_JAM_TURNS && !gen.charged && s.teamProgress === teamBefore,
+    `progress=${gen.progress} jam=${gen.jammedTurns}`,
   );
 }
 
@@ -1336,7 +1352,7 @@ function caseSurvivorItems(): void {
   s3.playerRoom = 'hall';
   const before = s3.teamProgress;
   endTurn(s3);
-  check('Y 幸存者道具能推进团队进度', s3.teamProgress > before, `${before} → ${s3.teamProgress}`);
+  check('Y 钥匙道具不再推进已废弃的团队进度', s3.teamProgress === before, `${before} → ${s3.teamProgress}`);
 }
 
 /** 本轮：擦刀 / 同屋目击者 / 袭警 / 道具次数 / 拉扯型 */
@@ -1446,20 +1462,16 @@ function caseMergeAndMissions(): void {
   attack(s, cop.id);
   check('Z 袭警推高同一条暴露度', s.alarm >= before + 60 && s.wanted >= 6, `alarm ${before}→${s.alarm} wanted=${s.wanted}`);
 
-  // 满值判负：实体杀手被捕，灵异鬼怪被驱散（贞子不该「被警察抓捕」）
+  // 警报满值不再瞬间判负，而是启动最终逃亡阶段。
   const solid = newGame();
   solid.alarm = 99;
   addAlarm(solid, 5);
-  check('Z 暴露度满 → 实体杀手被警察抓捕', solid.result === 'caught' && solid.resultReason.includes('警察'));
+  check('Z 警报满 → 普通杀手进入警察围捕阶段', solid.emergencyActive && solid.result === null);
 
   const ghost = createGame(['silent_step', 'sprint'], undefined, '贞子');
   ghost.alarm = 99;
   addAlarm(ghost, 5);
-  check(
-    'Z 暴露度满 → 贞子被驱散不提警察',
-    ghost.result === 'failed' && !ghost.resultReason.includes('警察') && ghost.resultReason.includes('黑暗'),
-    ghost.resultReason,
-  );
+  check('Z 警报满 → 灵异杀手进入全员逃亡阶段', ghost.emergencyActive && ghost.result === null && ghost.people.every((p) => p.role !== 'police'));
 
   // 每逃走一个幸存者扣 15 分（全逃才判负，不再有硬阈值）
   const sc = newGame();
@@ -1469,6 +1481,7 @@ function caseMergeAndMissions(): void {
 }
 
 caseMyersStalkingAndFearRadius();
+caseFearSystem();
 caseNavigationUtilities();
 caseMergeAndMissions();
 caseEnvironmentalEvents();
