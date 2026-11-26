@@ -177,6 +177,46 @@ export function layoutAspectNum(): number {
   return GRID_COLS / GRID_ROWS;
 }
 
+/** 房间之间留有 0.72 个网格单位的墙缝；门位判断必须把这段设计间距算作共边。 */
+export const ROOM_EDGE_GAP_TOLERANCE = 6.25;
+
+export interface DoorMarkerPosition {
+  left: number;
+  top: number;
+  orientation: 'vertical' | 'horizontal';
+}
+
+/** 返回两个真实相邻房间之间门洞的中心点（平面图百分比坐标）。 */
+export function doorMarkerPosition(fromId: RoomId, toId: RoomId): DoorMarkerPosition | null {
+  const a = ROOM_MAP[fromId].rect;
+  const b = ROOM_MAP[toId].rect;
+  const aRight = a.left + a.width;
+  const bRight = b.left + b.width;
+  const aBottom = a.top + a.height;
+  const bBottom = b.top + b.height;
+  const overlapX = Math.min(aRight, bRight) - Math.max(a.left, b.left);
+  const overlapY = Math.min(aBottom, bBottom) - Math.max(a.top, b.top);
+  const verticalGap = Math.min(Math.abs(aRight - b.left), Math.abs(a.left - bRight));
+  if (verticalGap <= ROOM_EDGE_GAP_TOLERANCE && overlapY > 0.01) {
+    const aOnRight = Math.abs(aRight - b.left) <= Math.abs(a.left - bRight);
+    return {
+      left: ((aOnRight ? aRight : a.left) + (aOnRight ? b.left : bRight)) / 2,
+      top: (Math.max(a.top, b.top) + Math.min(aBottom, bBottom)) / 2,
+      orientation: 'vertical',
+    };
+  }
+  const horizontalGap = Math.min(Math.abs(aBottom - b.top), Math.abs(a.top - bBottom));
+  if (horizontalGap <= ROOM_EDGE_GAP_TOLERANCE && overlapX > 0.01) {
+    const aOnBottom = Math.abs(aBottom - b.top) <= Math.abs(a.top - bBottom);
+    return {
+      left: (Math.max(a.left, b.left) + Math.min(aRight, bRight)) / 2,
+      top: ((aOnBottom ? aBottom : a.top) + (aOnBottom ? b.top : bBottom)) / 2,
+      orientation: 'horizontal',
+    };
+  }
+  return null;
+}
+
 /**
  * 每局重新切分整张平面图。
  * 邻接关系由矩形真实共边计算，随后只在这些真实门位中选出连通的门网。
