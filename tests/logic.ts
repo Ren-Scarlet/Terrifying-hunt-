@@ -1911,11 +1911,11 @@ function caseNewPerkSystem(): void {
   check('恐惧释放：相邻房间人类恐惧 +25 且显露气场',
     fearPlayed && fearTarget.fear === 25 && (fearTarget.revealedActions ?? 0) > 0);
 
-  const sloppy = createGame(['shuriken'], undefined, '迈克尔·迈尔斯');
+  const sloppy = createGame(['sloppy_butcher'], undefined, '迈克尔·迈尔斯');
   const sloppyTarget = sloppy.people.find((person) => person.role !== 'police')!;
   sloppyTarget.room = sloppy.playerRoom;
   sloppyTarget.hp = 4;
-  sloppy.hand = [{ uid: 'test-sloppy', defId: 'shuriken' }];
+  sloppy.hand = [{ uid: 'test-sloppy', defId: 'sloppy_butcher' }];
   sloppy.energy = 6;
   const sloppyPlayed = playCard(sloppy, 'test-sloppy');
   sloppy.energy = 6;
