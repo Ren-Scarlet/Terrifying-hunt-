@@ -28,6 +28,34 @@ function makeTasks(): MissionTask[] {
   return selected;
 }
 
+
+/** 每局从多种猎杀方式中抽取核心目标，并混入可选挑战。 */
+export function generateMission(unlockedKinds: MissionKind[] = [
+  'assassinate', 'bodyCount', 'escape',
+]): Mission {
+  const kind = pick(unlockedKinds);
+  const tasks = makeTasks();
+  const base = {
+    id: `mission-${Date.now()}-${Math.floor(random() * 100000)}`,
+    kind,
+    tasks,
+    turns: 22,
+    reward: 160,
+    targetCount: 2,
+    objective: '完成本局随机组合契约；注意限时猎杀目标。',
+    successText: '完成本局全部核心契约目标；额外挑战增加结算奖励',
+    failText: '指定目标逃离、限时核心目标失败、所有幸存者逃离，或杀手被击败。',
+  };
+  switch (kind) {
+    case 'assassinate':
+      return { ...base, title: '血色清单', desc: '锁定名单目标，并完成随机组合猎杀契约。', reward: 160 };
+    case 'bodyCount':
+      return { ...base, title: '无声收割', desc: '按本局契约连续猎杀，注意额外限时挑战。', reward: 150 };
+    case 'escape':
+      return { ...base, title: '替身游戏', desc: '在猎场失控前完成指定猎杀与处决条件。', reward: 180 };
+  }
+}
+
 /** 自由猎杀：没有指定目标和强制契约，三项挑战只提供方向，不阻止玩家自行发挥。 */
 export function generateFreeHunt(): Mission {
   return {
