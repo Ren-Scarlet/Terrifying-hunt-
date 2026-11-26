@@ -600,6 +600,7 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
     for (const hole of doorHoles(view)) {
       const verticalWall = hole.side === 'left' || hole.side === 'right';
       const locked = isLocked(state, hole.room) || isLocked(state, hole.other);
+      const barricaded = state.barricades.includes(hole.room) || state.barricades.includes(hole.other);
       const from = Math.min(hole.from, hole.to);
       const to = Math.max(hole.from, hole.to);
       c.save();
@@ -635,6 +636,25 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
         sh.addColorStop(1, 'rgba(0,0,0,0)');
         c.fillStyle = sh;
         c.fillRect(hole.center - hole.gap / 2 + 2, from, hole.gap - 4, (to - from) * 0.55);
+      }
+      if (barricaded && !locked) {
+        // 木板封门：直接画在门洞上，不再悬浮显示一个独立门图标。
+        c.fillStyle = 'rgba(54,39,27,.98)';
+        c.strokeStyle = 'rgba(126,91,58,.82)';
+        c.lineWidth = 1.4;
+        if (verticalWall) {
+          for (const offset of [-0.23, 0, 0.23]) {
+            const y = hole.center + hole.gap * offset;
+            c.fillRect(from + 1, y - 2.4, Math.max(2, to - from - 2), 4.8);
+            c.strokeRect(from + 1, y - 2.4, Math.max(2, to - from - 2), 4.8);
+          }
+        } else {
+          for (const offset of [-0.23, 0, 0.23]) {
+            const x = hole.center + hole.gap * offset;
+            c.fillRect(x - 2.4, from + 1, 4.8, Math.max(2, to - from - 2));
+            c.strokeRect(x - 2.4, from + 1, 4.8, Math.max(2, to - from - 2));
+          }
+        }
       }
       if (locked) {
         // 被封的门：两道交叉的铁条
