@@ -128,7 +128,7 @@ body.immersive-hunt { overflow: hidden; min-height: 100dvh; }
 #app.immersive-game .intel-grid { display: grid; gap: 8px; padding: 0 9px 9px; max-height: 60vh; overflow: auto; }
 #app.immersive-game .intel-grid .panel { background: rgba(12,18,22,.72); border-color: rgba(205,222,231,.12); }
 #app.immersive-game .statusline {
-  position: fixed; z-index: 18; left: 22px; bottom: 20px; max-width: min(52vw, 760px);
+  position: fixed; z-index: 18; left: 22px; bottom: 20px; max-width: min(20vw, 280px);
   display: flex; flex-direction: column; gap: 5px; color: #aebbc1; font-size: 10px;
   text-shadow: 0 2px 8px #000; pointer-events: none;
 }
@@ -152,11 +152,11 @@ body.immersive-hunt { overflow: hidden; min-height: 100dvh; }
 #app.immersive-game .bottom-hud {
   position: fixed; z-index: 24; left: 50%; bottom: 18px; transform: translateX(-50%);
   display: flex; align-items: flex-end; gap: 12px; width: max-content;
-  max-width: calc(100vw - 150px); pointer-events: none;
+  max-width: 76vw; pointer-events: none;
 }
 #app.immersive-game .bottom-hud > * { pointer-events: auto; }
 #app.immersive-game .action-pill {
-  display: flex; align-items: flex-end; gap: 6px; margin-bottom: 2px; max-width: min(38vw, 560px);
+  display: flex; align-items: flex-end; gap: 6px; margin-bottom: 2px; max-width: min(30vw, 560px);
   padding: 7px; border: 1px solid rgba(205,222,231,.18); border-radius: 7px;
   background: rgba(8,14,18,.72); box-shadow: 0 9px 25px #0008;
   backdrop-filter: blur(13px); overflow: hidden;
@@ -175,7 +175,7 @@ body.immersive-hunt { overflow: hidden; min-height: 100dvh; }
 #app.immersive-game .hand-actions .power-row { display: flex; flex: 0 0 auto; align-items: center; gap: 4px; }
 #app.immersive-game .hand-actions .btn.power { min-width: 100px; padding: 3px 6px; }
 #app.immersive-game .hand {
-  display: flex; align-items: flex-end; gap: 7px; max-width: min(48vw, 720px);
+  display: flex; align-items: flex-end; gap: 7px; max-width: min(38vw, 720px);
   padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none;
 }
 #app.immersive-game .hand-row {
@@ -231,8 +231,8 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
     left: 50%; bottom: 8px; max-width: calc(100vw - 20px); width: calc(100vw - 20px);
     gap: 6px; align-items: flex-end;
   }
-  #app.immersive-game .action-pill { max-width: 42vw; padding: 5px; }
-  #app.immersive-game .hand { max-width: calc(58vw - 54px); min-width: 0; }
+  #app.immersive-game .action-pill { max-width: 30vw; padding: 5px; }
+  #app.immersive-game .hand { max-width: calc(46vw - 54px); min-width: 0; }
   #app.immersive-game .hand-row .card { flex-basis: 60px; width: 60px; min-height: 84px; padding: 6px; }
   #app.immersive-game .hand-actions .btn { min-height: 30px; padding: 0 7px; font-size: 9px; }
 }
@@ -248,8 +248,8 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
   #app.immersive-game .left-hud .portrait { width: 43px; height: 43px; }
   #app.immersive-game .right-tools { right: 8px; }
   #app.immersive-game .bottom-hud { bottom: 7px; }
-  #app.immersive-game .action-pill { max-width: 39vw; }
-  #app.immersive-game .hand { max-width: calc(61vw - 45px); }
+  #app.immersive-game .action-pill { max-width: 29vw; }
+  #app.immersive-game .hand { max-width: calc(47vw - 45px); }
   #app.immersive-game .hand-row .card { flex-basis: 55px; width: 55px; min-height: 78px; }
   #app.immersive-game .resource-bar .stat { min-width: 36px; padding: 0 4px; }
   #app.immersive-game .resource-bar .stat b { font-size: 10px; }
