@@ -2918,3 +2918,20 @@ button, .room-hit, .hand-row { touch-action: manipulation; }
   #app[data-interface-scale="xlarge"] .room-people .person-chip { min-height: 64px; }
   #app[data-interface-scale="xlarge"] .room-people .person-chip img { width: 60px; height: 60px; }
 }
+
+
+/* 首发杀手专属能力：选点、瞄准和陷阱状态必须在地图上清晰可辨。 */
+.room.blink-target { outline: 2px solid #7fa8c7; outline-offset: -3px; box-shadow: inset 0 0 0 2px #7fa8c733, 0 0 16px #7fa8c755; }
+.room-hit.blink-hit {
+  display: grid; place-items: center; z-index: 4; color: #e7f3ff;
+  background: #25435dbb; border: 2px dashed #8db5d5; font-size: 15px; font-weight: 800;
+}
+.person-chip.targeting-hatchet { border: 2px solid #d4a35c; box-shadow: 0 0 0 2px #d4a35c55, 0 0 14px #d4a35c88; cursor: crosshair; }
+.person-chip.targeting-nurse-grab { border: 2px solid #8eb7d2; box-shadow: 0 0 0 2px #8eb7d255, 0 0 14px #8eb7d288; cursor: grab; }
+.room-feature.bear-trap { border-color: #a76b50; color: #e4b58c; }
+.room-feature.bear-trap.armed { background: #251713ef; }
+.room-feature.bear-trap.spent { border-color: #69635b; color: #a9a197; opacity: .8; }
+.room-feature.trap-cache { border-color: #a58a55; color: #e3cf91; }
+.status-badge.blink-mode { border-color: #739bb8; color: #c9e2f2; background: #13232d; }
+.status-badge.hatchet-mode { border-color: #a17b49; color: #e8c58e; background: #261b11; }
+.btn.power.possessed-ready { border-color: #a43e37; color: #f0b0a6; box-shadow: inset 0 0 0 1px #a43e3744, 0 0 12px #9b332c55; }

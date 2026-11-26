@@ -49,6 +49,7 @@ import {
   isRoomLit,
   getHuntOpportunities,
 } from '../../game/engine';
+import { roomDistance } from '../../game/navigation';
 import { KILLERS, type KillerProfile } from '../../game/killers';
 import { roomName } from '../../game/missions';
 import {
@@ -111,6 +112,14 @@ function roomFeatures(state: GameState, roomId: RoomId): string {
     const status = circuitAt.broken ? '控制箱损坏' : circuitAt.enabled === false ? '已拉闸' : sourceOffline ? '发电机停机' : '供电正常';
     parts.push(`<span class="room-feature breaker ${circuitAt.broken || circuitAt.enabled === false || sourceOffline ? 'broken' : ''}" title="${escape(circuitAt.name)}：${status}，影响 ${circuitAt.affectedRooms.map(roomName).join('、')}">⚡<b>电闸</b></span>`);
   }
+  const placedTrap = state.bearTraps.find((trap) => trap.room === roomId);
+  if (placedTrap) {
+    const trapStatus = placedTrap.armed ? (placedTrap.discovered ? '已被幸存者发现，可能被拆除' : '已布设，等待触发') : '已触发或拆除，可由设陷者回收';
+    parts.push(`<span class="room-feature bear-trap ${placedTrap.armed ? 'armed' : 'spent'}" title="捕兽夹：${trapStatus}">⚒<b>捕兽夹</b></span>`);
+  }
+  if (state.trapCaches.includes(roomId)) {
+    parts.push('<span class="room-feature trap-cache" title="捕兽夹补给：设陷者可在此收集额外捕兽夹">＋<b>陷阱补给</b></span>');
+  }
   if (PHONE_ROOMS.includes(roomId)) {
     parts.push(`<span class="room-feature telephone ${state.phoneCut ? 'broken' : 'on'}" title="电话：${state.phoneCut ? '线路已中断，跨区域协调受限' : '线路正常，可进行远程求救协调'}">☎<b>电话</b></span>`);
   }
@@ -165,31 +174,39 @@ function mapEventFeedHtml(state: GameState): string {
 }
 
 function powerButtonHtml(state: GameState, killer: KillerProfile): string {
-  return killer.powers
-    .map((p) => {
-      const cd = powerCooldown(state, p.id);
-      const ok = canUsePower(state, p.id);
-      const reason = powerBlockReason(state, p.id);
-      const total = Math.max(1, p.cooldown);
-      const actionHint = p.id === 'myers_gaze' ? (!ok && reason ? reason : '观察 · 1 AP / 最多 +15') : (cd > 0 ? '冷却 ' + cd + ' 回合' : reason || (p.ultimate ? '可以发动' : '可以使用'));
-      const pips = Array.from({ length: total }, (_, i) => {
-        const filled = i < cd;
-        return `<i class="${filled ? 'on' : ''}"></i>`;
-      }).join('');
-      return `<button class="btn power ${p.ultimate ? 'ultimate' : 'main'} ${ok ? '' : 'cooling'}"
-        data-action="power" data-power="${p.id}" ${ok ? '' : 'disabled'}
-        title="${escape(p.desc)}${reason ? ` · ${escape(reason)}` : ''}">
-        <span class="power-art"><img class="power-glyph" src="${killer.icon}" alt="" onerror="this.style.display='none'"></span>
-        <span class="power-body">
-          <b>${escape(p.name)}${p.ultimate ? '<em>大招</em>' : ''}</b>
-          <small>${escape(actionHint)}</small>
-        </span>
-        <span class="power-pips">${pips}</span>
-      </button>`;
-    })
-    .join('') + (killer.owner === '迈克尔·迈尔斯' && state.myersStalking
-      ? '<button class="btn ghost mini" data-action="power" data-power="myers_gaze_exit" title="退出尾随姿态，恢复恐惧范围与正常移动速度">退出尾随</button>'
-      : '');
+  return killer.powers.map((power) => {
+    const cd = powerCooldown(state, power.id);
+    const ok = canUsePower(state, power.id);
+    const reason = powerBlockReason(state, power.id);
+    const total = Math.max(1, power.cooldown);
+    let label = power.name;
+    let actionHint = cd > 0 ? '冷却 ' + cd + ' 回合' : reason || (power.ultimate ? '可以发动' : '可以使用');
+    if (power.id === 'trap_set') {
+      label = '布设捕兽夹';
+      actionHint = reason || `携带 ${state.trapInventory}/4 · 当前房间布设（1 AP）`;
+    } else if (power.id === 'nurse_blink') {
+      label = state.nurseBlinkTargeting ? '取消闪现选点' : '斯宾塞的濒死之息';
+      actionHint = state.nurseBlinkTargeting ? '点击地图 1–3 间房距离内的位置' : state.nurseFollowUp ? '闪现抓取窗口可用' : reason || '穿墙闪现 · 1 AP';
+    } else if (power.id === 'huntress_axe') {
+      label = state.huntressAiming ? '取消飞斧瞄准' : '狩猎飞斧';
+      actionHint = state.huntressAiming ? '点击直线视野内的幸存者' : reason || `飞斧 ${state.hatchets}/3 · 选择目标投掷（1 AP）`;
+    } else if (power.id === 'myers_gaze') {
+      label = state.possessed ? '恶魔附身中' : state.stalkMeter >= 100 ? '恶魔附身' : '尾随';
+      actionHint = state.possessed
+        ? `爆发中 · 尾随值 ${state.stalkMeter}/100`
+        : state.stalkMeter >= 100
+          ? '尾随值已满 · 再次使用发动爆发'
+          : reason || `观察视野内所有幸存者 · 当前 ${state.stalkMeter}/100`;
+    }
+    const pips = Array.from({ length: total }, (_, index) => `<i class="${index < cd ? 'on' : ''}"></i>`).join('');
+    return `<button class="btn power ${power.ultimate ? 'ultimate' : 'main'} ${ok ? '' : 'cooling'} ${power.id === 'myers_gaze' && state.stalkMeter >= 100 ? 'possessed-ready' : ''}"
+      data-action="power" data-power="${power.id}" ${ok ? '' : 'disabled'}
+      title="${escape(power.desc)}${reason ? ` · ${escape(reason)}` : ''}">
+      <span class="power-art"><img class="power-glyph" src="${killer.icon}" alt="" onerror="this.style.display='none'"></span>
+      <span class="power-body"><b>${escape(label)}</b><small>${escape(actionHint)}</small></span>
+      <span class="power-pips">${pips}</span>
+    </button>`;
+  }).join('');
 }
 
 /**
@@ -216,6 +233,11 @@ function facilityOverviewHtml(state: GameState): string {
     )),
   ).length;
   const radioBroken = state.sabotage.includes('radio');
+  const killerSupplies = state.killer === '设陷者'
+    ? `<span class="facility-pill"><i>⚒</i><b>捕兽夹</b><strong>${state.trapInventory}/4 携带 · ${state.bearTraps.filter((trap) => trap.armed).length} 已布设 · ${state.trapCaches.length} 补给点</strong></span>`
+    : state.killer === '女猎手'
+      ? `<span class="facility-pill"><i>➶</i><b>狩猎飞斧</b><strong>${state.hatchets}/3</strong></span>`
+      : '';
   return `<section class="facility-overview" aria-label="现场设施状态">
     <div class="facility-overview-heading"><b>现场设施</b><small>地图标记与当前状态</small></div>
     <div class="facility-overview-items">
@@ -224,6 +246,7 @@ function facilityOverviewHtml(state: GameState): string {
       <span class="facility-pill"><i>⚡</i><b>电闸</b><strong>${darkCircuits} 组断电</strong></span>
       <span class="facility-pill ${state.phoneCut ? 'offline' : ''}"><i>☎</i><b>电话线</b><strong>${state.phoneCut ? '中断' : '正常'}</strong></span>
       <span class="facility-pill ${radioBroken ? 'offline' : ''}"><i>▤</i><b>备用无线电</b><strong>${radioBroken ? '已破坏' : '可用'}</strong></span>
+      ${killerSupplies}
     </div>
   </section>`;
 }
@@ -341,6 +364,8 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
       : [];
     const isPlayer = state.playerRoom === room.id;
     const reachable = canMoveTo(state, room.id);
+    const blinkDistance = roomDistance(state.playerRoom, room.id);
+    const blinkSelectable = state.nurseBlinkTargeting && room.id !== state.playerRoom && blinkDistance >= 1 && blinkDistance <= 3;
     const locked = isLocked(state, room.id);
     const barricaded = state.barricades.includes(room.id);
     const cost = moveCost(state, room.id);
@@ -357,15 +382,17 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
     const r = room.rect;
     const style = `left:${r.left}%;top:${r.top}%;width:${r.width}%;height:${r.height}%`;
     return `
-      <div class="room ${isPlayer ? 'current' : ''} ${reachable ? 'reachable' : 'disabled'} ${adjacent ? 'adjacent' : ''} ${state.lookingAround && adjacent ? 'look-target' : ''} ${obstacleOpen ? 'obstacle' : ''} ${isObjective ? 'objective' : ''} ${darkRoom ? 'dark-room' : 'lit-room'} ${room.id === 'garden' ? 'outdoor' : ''} room-size-${room.size} ${locked ? 'locked' : ''} ${barricaded ? 'barricaded' : ''} ${explored ? 'explored' : 'unexplored'} ${visible ? 'in-sight' : 'fogged'}"
+      <div class="room ${isPlayer ? 'current' : ''} ${reachable ? 'reachable' : 'disabled'} ${adjacent ? 'adjacent' : ''} ${state.lookingAround && adjacent ? 'look-target' : ''} ${blinkSelectable ? 'blink-target' : ''} ${obstacleOpen ? 'obstacle' : ''} ${isObjective ? 'objective' : ''} ${darkRoom ? 'dark-room' : 'lit-room'} ${room.id === 'garden' ? 'outdoor' : ''} room-size-${room.size} ${locked ? 'locked' : ''} ${barricaded ? 'barricaded' : ''} ${explored ? 'explored' : 'unexplored'} ${visible ? 'in-sight' : 'fogged'}"
         style="${style}" data-room="${room.id}" title="${escape(room.name)}${explored ? `：${escape(room.desc)}` : '：还没进去过'}${isObjective ? ' · 他们的目标点' : ''}">
-        ${state.lookingAround && adjacent
-          ? `<button type="button" class="room-hit look-hit" data-action="look-select" data-room="${room.id}"
-              aria-label="查看${escape(room.name)}，消耗 ${LOOK_COST} 点行动点">查看这里</button>`
-          : !state.lookingAround && reachable
-            ? `<button type="button" class="room-hit" data-action="move" data-room="${room.id}"
-                aria-label="移动到${escape(room.name)}（需 ${cost} 点行动点）"></button>`
-            : ''}
+        ${state.nurseBlinkTargeting
+          ? blinkSelectable
+            ? `<button type="button" class="room-hit blink-hit" data-action="blink-select" data-room="${room.id}" aria-label="闪现到${escape(room.name)}（距离 ${blinkDistance} 间房）">闪现</button>`
+            : ''
+          : state.lookingAround && adjacent
+            ? `<button type="button" class="room-hit look-hit" data-action="look-select" data-room="${room.id}" aria-label="查看${escape(room.name)}，消耗 ${LOOK_COST} 点行动点">查看这里</button>`
+            : !state.lookingAround && !state.huntressAiming && reachable
+              ? `<button type="button" class="room-hit" data-action="move" data-room="${room.id}" aria-label="移动到${escape(room.name)}（需 ${cost} 点行动点）"></button>`
+              : ''}
         <div class="room-head">
           <span class="room-name">${explored ? escape(room.name) : '？？？'}</span>
           ${noise ? `<span class="room-tag noise" title="${escape(noise.label)}">${icon('crow', 'crow-icon tiny')}动静</span>` : ''}
@@ -390,7 +417,12 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
           : `<div class="room-unknown">未探索</div>
              <div class="room-features">${roomFeatures(state, room.id)}</div>`}
         <div class="room-people">
-          ${people.map((p) => personChip(p)).join('')}
+          ${people.map((p) => personChip(
+            p,
+            false,
+            false,
+            state.huntressAiming ? 'hatchet' : state.nurseFollowUp && p.hp > 0 && p.room === state.playerRoom ? 'nurse-grab' : undefined,
+          )).join('')}
           ${police ? personChip(police) : ''}
           ${ghosts.map(() => '<span class="ghost-chip" title="最后确认位置：人可能已经走了">?</span>').join('')}
         </div>
@@ -489,6 +521,9 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
     .forEach((p) => {
       statusBits.push(`<span class="status-badge downed">${escape(p.name)} 倒地 · 可立即处决 · 同伴仍可能救起</span>`);
     });
+  if (state.nurseBlinkTargeting) statusBits.push('<span class="status-badge blink-mode">护士闪现选点中 · 选择 1–3 间房距离内的位置</span>');
+  if (state.nurseFollowUp) statusBits.push('<span class="status-badge blink-mode">濒死之息 · 现在可攻击或抓取同屋幸存者；下一次行动后疲惫</span>');
+  if (state.huntressAiming) statusBits.push('<span class="status-badge hatchet-mode">狩猎飞斧瞄准中 · 点击地图上的直线视野目标</span>');
   const statusHtml = statusBits.length ? `<div class="status-strip">${statusBits.join('')}</div>` : '';
   const standingHere = here.filter((person) => person.hp > 0);
   const nextTask = tasks.find((task) => missionTaskProgress(state, task) < task.target);
@@ -554,6 +589,15 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
     ? `<button class="btn execution" data-action="execute-fridge">冰箱处决 · +35</button><button class="btn execution" data-action="execute-microwave">微波炉处决 · +35</button>`
     : '';
   const carryStatus = carried ? `<div class="status-badge carrying">抱着 ${escape(carried.name)} · 已搬运 ${state.carryDistance}/3 间房</div>` : '';
+  const trapCacheBtn = state.killer === '设陷者' && state.trapCaches.includes(state.playerRoom)
+    ? `<button class="btn search" data-action="collect-trap" ${state.energy < 1 || state.trapInventory >= 4 ? 'disabled' : ''}>收集捕兽夹补给 · +1</button>`
+    : '';
+  const trapRecoverBtn = state.killer === '设陷者' && state.bearTraps.some((trap) => trap.room === state.playerRoom && !trap.armed)
+    ? `<button class="btn search" data-action="recover-trap" ${state.energy < 1 || state.trapInventory >= 4 ? 'disabled' : ''}>回收已触发捕兽夹</button>`
+    : '';
+  const hatchetRefillBtn = state.killer === '女猎手' && CABINET_ROOMS.includes(state.playerRoom)
+    ? `<button class="btn search" data-action="refill-hatchets" ${state.energy < 1 || state.hatchets >= 3 ? 'disabled' : ''}>柜子补充飞斧 · ${state.hatchets}/3</button>`
+    : '';
   const searchBtn = `<button class="btn search" data-action="search" ${searchOk ? '' : 'disabled'}
       title="${escape(searchOk ? (cabinetHere ? `搜索这间屋子的柜子：消耗 ${SEARCH_COST} 点行动点，把藏起来的人翻出来。` : `搜索这间屋子：消耗 ${SEARCH_COST} 点行动点。`) : '行动点不足')}">
       <span class="atk-name">搜索</span>
@@ -675,6 +719,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
             <span>${icon('obstacle', 'ui-icon tiny')} 障碍物</span>
             <span>⚡ 电闸 / 💡 照明</span>
             <span>☎ 电话 / ▣ 无线电</span>
+            <span>⚒ 捕兽夹 / ＋ 陷阱补给（设陷者）</span>
             <span class="legend-intent"><i class="intent-dot i-flee"></i> 逃跑中 <i class="intent-dot i-call"></i> 打电话 <i class="intent-dot i-escape"></i> 翻篱笆 <i class="intent-dot i-rescue"></i> 救援</span>
             <span class="legend-fog">？ 最后确认位置</span>
             <span class="legend-trail"><i class="legend-claw"></i> 鞋印：只看得见当前房间，跟丢了就断</span>
@@ -723,6 +768,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
             ${searchBtn}
             ${lookBtn}
             ${sabotageBtn}${specialExecution}
+            ${trapCacheBtn}${trapRecoverBtn}${hatchetRefillBtn}
             <div class="power-row">${powerButtonHtml(state, killer)}</div>
             <button class="btn primary end-turn" data-action="end-turn" ${selectingDiscards ? 'disabled' : ''}>结束回合</button>
             <button class="btn ghost" data-action="give-up">放弃任务</button>

@@ -47,25 +47,10 @@ export const KILLERS: KillerProfile[] = [
     powers: [
       {
         id: 'trap_set',
-        name: '布设捕兽夹',
-        desc: '在当前房间和相邻一个房间布下夹子：逃亡者无法穿过这两个房间 2 回合。',
-        cooldown: 1,
-        ops: [
-          { op: 'lockRoom', room: 'here', turns: 2 },
-          { op: 'lockRoom', room: 'adjacent', turns: 2 },
-          { op: 'log', text: '你把夹子按下，弹簧的响声被地毯吞掉了。' },
-        ],
-      },
-      {
-        id: 'trap_lockdown',
-        name: '整层封锁',
-        desc: '所有人的腿都被夹住：全场 NPC 2 回合无法移动。',
-        cooldown: 3,
-        ultimate: true,
-        ops: [
-          { op: 'block', who: 'allAny', turns: 2 },
-          { op: 'log', text: '地板下传来一连串金属咬合的声音，再没有人敢迈步。' },
-        ],
+        name: '捕兽夹',
+        desc: '开局携带 2 个捕兽夹。在当前房间布设一只：进入该房间的幸存者会受到 1 点伤害并被困 1 回合；高警觉者可能发现并拆除。地图中还有 2 个随机补给点。',
+        cooldown: 0,
+        ops: [],
       },
     ],
   },
@@ -114,26 +99,10 @@ export const KILLERS: KillerProfile[] = [
     powers: [
       {
         id: 'nurse_blink',
-        name: '瞬步',
-        desc: '本回合行动点 +2，移动时不会惊动目击者。',
+        name: '斯宾塞的濒死之息',
+        desc: '选择地图上 1–3 间房距离内的位置闪现，可穿过墙壁与房门。闪现后获得一次立即攻击或抓取同屋幸存者的窗口；完成下一次行动后疲惫，下回合少 1 点行动点。',
         cooldown: 1,
-        ops: [
-          { op: 'steps', amount: 2 },
-          { op: 'flag', key: 'noAlarm' },
-          { op: 'log', text: '地板在你脚下缩短了一截。' },
-        ],
-      },
-      {
-        id: 'nurse_breath',
-        name: '窒息之息',
-        desc: '当前房间所有人受 1 点伤害，并被压在原地 1 回合；累计伤害达到 2 点才会受伤。',
-        cooldown: 3,
-        ultimate: true,
-        ops: [
-          { op: 'damage', who: 'allHere', amount: 1 },
-          { op: 'block', who: 'allHere', turns: 1 },
-          { op: 'log', text: '空气突然变得很重，他们连喊都喊不出来。' },
-        ],
+        ops: [],
       },
     ],
   },
@@ -146,25 +115,10 @@ export const KILLERS: KillerProfile[] = [
     powers: [
       {
         id: 'huntress_axe',
-        name: '投斧',
-        desc: '对全场警觉最高的人造成 1 点伤害，不论他躲在哪个房间；可与其他伤害效果叠加。',
-        cooldown: 1,
-        ops: [
-          { op: 'damage', who: 'highestAlert', amount: 1 },
-          { op: 'log', text: '斧头穿过走廊，钉在了某扇门框上——后面有人在喘气。' },
-        ],
-      },
-      {
-        id: 'huntress_volley',
-        name: '连投',
-        desc: '对全场警觉最高的人造成 2 点伤害（健康者受伤、受伤者倒地），再对另一人造成 1 点。',
-        cooldown: 3,
-        ultimate: true,
-        ops: [
-          { op: 'damage', who: 'highestAlert', amount: 2 },
-          { op: 'damage', who: 'randomAny', amount: 1 },
-          { op: 'log', text: '一把接一把，房子里的每一道门都成了靶子。' },
-        ],
+        name: '狩猎飞斧',
+        desc: '开局携带 3 把飞斧。进入瞄准状态后，选择直线视野内的幸存者投掷，消耗 1 把飞斧并造成 1 点伤害；可在柜子处补充至 3 把。',
+        cooldown: 0,
+        ops: [],
       },
     ],
   },
@@ -211,28 +165,16 @@ export const KILLERS: KillerProfile[] = [
     fearRadius: 1,
     passive: {
       name: '尾随者',
-      short: '观察视野内的幸存者积累尾随值；观察本身不会惊动目标。特定配件可重新启用尾随姿态。',
+      short: '观察视野内所有存活幸存者积累尾随值；落单目标提供额外收益。尾随值满后，同一个能力按钮变为恶魔附身。',
     },
     sourceNote: NOTE,
     powers: [
       {
         id: 'myers_gaze',
-        name: '尾随者',
-        desc: '每次观察消耗 1 点行动点，对当前视野内任一存活幸存者积累尾随值：未发觉 +15、怀疑 +8、恐慌 +3、警觉 +0。观察不会增加目标警觉、改变其行为，也不会自动进入尾随姿态。特定配件可重新启用旧版尾随姿态。',
+        name: '尾随 / 恶魔附身',
+        desc: '消耗 1 点行动点，观察视野内所有存活幸存者并累积尾随值；落单者额外提供尾随值。尾随值达到 100 后，再次使用同一按钮进入恶魔附身，期间每次行动消耗 20 点尾随值，挥刀可直接击倒站立目标；结束后不附加虚弱。',
         cooldown: 0,
         ops: [],
-      },
-      {
-        id: 'myers_possess',
-        name: '恶魔附身',
-        desc: '尾随值达到 100 后解锁。开启后每次行动消耗 20 点尾随值，归零时退出；附身期间每次挥刀都能直接击倒一名站立的幸存者。',
-        cooldown: 3,
-        ultimate: true,
-        requires: [{ c: 'stalk', gte: 100 }],
-        ops: [
-          { op: 'flag', key: 'possessReady' },
-          { op: 'log', text: '面具合上了。尾随积攒的恶意终于找到了出口。' },
-        ],
       },
     ],
   },
@@ -480,7 +422,7 @@ export const KILLER_MAP: Record<string, KillerProfile> = KILLERS.reduce(
 );
 
 /** 当前正式开放的初期角色。其余资料保留在数据库中，待机制实装后再开放。 */
-export const ACTIVE_KILLER_NAMES = ['设陷者', '护士', '迈克尔·迈尔斯'] as const;
+export const ACTIVE_KILLER_NAMES = ['设陷者', '护士', '女猎手', '迈克尔·迈尔斯'] as const;
 export const ACTIVE_KILLERS = ACTIVE_KILLER_NAMES.map((name) => KILLER_MAP[name]);
 /** 初始解锁名单与当前开放名单保持一致。 */
 export const STARTER_KILLERS: string[] = [...ACTIVE_KILLER_NAMES];

@@ -632,7 +632,16 @@ function rememberVisible(state: GameState): void {
 /** 玩家每一个动作结束后的统一收尾：世界动一下，视野记一下，胜负判一下 */
 function afterPlayerAction(state: GameState): void {
   if (state.result) return;
+  const beforeReaction = snapshotRooms(state);
   npcReact(state);
+  resolveTrapEntries(state, beforeReaction);
+  if (state.result) return;
+  if (state.nurseFatiguePending) {
+    state.nurseFatiguePending = false;
+    state.nurseFollowUp = false;
+    state.stunTurns = Math.max(state.stunTurns, 1);
+    log(state, '闪现后的疲惫袭来：下回合行动点减少 1。');
+  }
   state.revealAuraActions = Math.max(0, state.revealAuraActions - 1);
   state.trailRevealActions = Math.max(0, state.trailRevealActions - 1);
   state.stealthActions = Math.max(0, state.stealthActions - 1);
@@ -764,7 +773,7 @@ function killPerson(state: GameState, person: Person): void {
 }
 
 /** 受到伤害：只能推进一档，倒地的人再挨一下才会死 */
-function damagePerson(state: GameState, person: Person, amount: number): void {
+function damagePerson(state: GameState, person: Person, amount: number, suppressFlee = false): void {
   if (!state.people.some((p) => p.id === person.id)) return;
   const dmg = Math.max(0, amount + state.bonusDamage);
   state.bonusDamage = 0;
@@ -816,6 +825,13 @@ function damagePerson(state: GameState, person: Person, amount: number): void {
       p.alert = clamp(p.alert + 18, 0, 100);
     });
   addAlarm(state, 3);
+  if (suppressFlee) {
+    person.blockedTurns = 1;
+    person.intent = 'stunned';
+    person.activity = '被护士闪现后的抓取打断，短暂无法行动';
+    log(state, `${person.name} 被护士抓住，挣扎被强行打断。`);
+    return;
+  }
   // 一刀下去他会连着跑两间屋，地板上留下一道血痕：
   // 「砍一刀、他挪一格、我跟上去」那种没有张力的追逐到此为止。
   for (let i = 0; i < PANIC_HOPS_ON_HIT; i++) {
@@ -1046,6 +1062,7 @@ function movePersonTo(state: GameState, person: Person, room: RoomId, clearAlert
   person.room = room;
   if (clearAlert) person.alert = 0;
   log(state, `${person.name} 从${from}移动到${roomName(room)}。`);
+  triggerBearTrapForPerson(state, person);
 }
 
 /* ==================================================================== */
@@ -1104,9 +1121,11 @@ function fleeAway(state: GameState, person: Person, quiet = false): boolean {
   // 逃跑路线始终留下脚印；潜行者只是不制造额外声响。
   pushTrail(state, fromId, person.room, person.hp <= SURVIVOR_INJURED_HP);
   if (!isQuietMove(state, person)) addDisturbance(state, person.room);
-  if (quiet) return true;
-  log(state, `${person.name} 从${from}逃向${roomName(person.room)}。`);
-  shout(state, person, 14);
+  if (!quiet) {
+    log(state, `${person.name} 从${from}逃向${roomName(person.room)}。`);
+    shout(state, person, 14);
+  }
+  triggerBearTrapForPerson(state, person);
   return true;
 }
 
@@ -1642,6 +1661,52 @@ function actByArchetype(state: GameState, person: Person): void {
 
 /** 尾随不是自动挂机：每次点击能力都要花 1 AP，并承担被目标察觉的风险。 */
 
+function triggerBearTrapForPerson(state: GameState, person: Person): void {
+  if (person.role === 'police' || person.hp <= 0) return;
+  const trap = state.bearTraps.find((item) => item.armed && item.room === person.room);
+  if (!trap) return;
+  if (trap.discovered) {
+    trap.armed = false;
+    log(state, `${person.name} 发现并拆除了${roomName(person.room)}的捕兽夹。`);
+    return;
+  }
+  if (person.alert >= 40 && random() < 0.4) {
+    trap.discovered = true;
+    person.awareness = Math.max(person.awareness, 2);
+    person.intent = 'wary';
+    person.activity = '发现地上的捕兽夹，正小心观察';
+    log(state, `${person.name} 在${roomName(person.room)}发现了捕兽夹，暂时没有踩上去。`);
+    return;
+  }
+  trap.armed = false;
+  trap.triggeredBy = person.id;
+  person.hp = Math.max(0, person.hp - 1);
+  person.alert = 100;
+  person.awareness = 3;
+  person.blockedTurns = 1;
+  person.intent = 'stunned';
+  if (person.hp <= 0) {
+    person.hp = 0;
+    person.downedTurns = 0;
+    person.activity = '被捕兽夹击倒，倒在地上';
+    log(state, `${person.name} 踩中捕兽夹，受到 1 点伤害并被击倒！`);
+  } else {
+    person.activity = '脚踝被捕兽夹咬住，暂时无法移动';
+    log(state, `${person.name} 踩中捕兽夹，受到 1 点伤害并被困住 1 回合！`);
+  }
+  addAlarm(state, 2);
+  npcs(state).filter((other) => other.id !== person.id && other.room === person.room)
+    .forEach((other) => { other.alert = clamp(other.alert + 15, 0, 100); });
+}
+
+function resolveTrapEntries(state: GameState, before: Map<string, RoomId>): void {
+  for (const person of npcs(state)) {
+    const previousRoom = before.get(person.id);
+    if (previousRoom === undefined || previousRoom === person.room) continue;
+    triggerBearTrapForPerson(state, person);
+  }
+}
+
 /** 回合结束时 NPC 的一轮行动 */
 function npcTurn(state: GameState): void {
   const before = snapshotRooms(state);
@@ -1652,6 +1717,13 @@ function npcTurn(state: GameState): void {
     if (totemIndex >= 0 && person.hp > 0 && person.awareness >= 1 && random() < 0.18) {
       state.totems.splice(totemIndex, 1);
       log(state, `${person.name} 在${roomName(person.room)}发现并破坏了图腾。`);
+    }
+
+    // 已被发现的捕兽夹可以被幸存者拆除，避免陷阱成为永久封路工具。
+    const spottedTrap = state.bearTraps.find((trap) => trap.armed && trap.discovered && trap.room === person.room);
+    if (spottedTrap && person.hp > 0 && person.awareness >= 1) {
+      spottedTrap.armed = false;
+      log(state, `${person.name} 发现并拆除了${roomName(person.room)}的捕兽夹。`);
     }
 
     // 即时警觉值可以下降，但已经确认的危险不会被忘记。
@@ -1951,6 +2023,8 @@ function npcTurn(state: GameState): void {
       }
     }
   }
+  // 结算 NPC 本轮移动进入的陷阱；即时反应与直接移动也由统一入口处理。
+  resolveTrapEntries(state, before);
   updateNpcDialogue(state);
   recordTrails(state, before);
 }
@@ -3067,15 +3141,147 @@ function visibleMyersStalkTargets(state: GameState) {
   return npcs(state).filter((person) => person.hp > 0 && !person.hidden && person.role !== 'police' && isPersonVisible(state, person));
 }
 
+function trapPlacementBlockReason(state: GameState): string | null {
+  if (state.killer !== '设陷者') return '只有设陷者可以布设捕兽夹。';
+  if (state.trapInventory <= 0) return '没有可用的捕兽夹；寻找地图上的补给点。';
+  if (state.energy < 1) return '行动点不足：布设捕兽夹需要 1 点。';
+  if ([ENTRY_ROOM, EXIT_ROOM, 'garden'].includes(state.playerRoom)) return '这里是出入口或室外通道，不适合布设捕兽夹。';
+  if (ROOM_MAP[state.playerRoom].neighbors.length < 2) return '这里是死路或单一通道，不能布设捕兽夹。';
+  if (state.objectiveRooms.includes(state.playerRoom)) return '幸存者团队目标点不能布设捕兽夹。';
+  if (state.bearTraps.some((trap) => trap.room === state.playerRoom && trap.armed)) return '这个房间已经有一只有效捕兽夹。';
+  if (state.bearTraps.some((trap) => trap.armed && roomDistance(trap.room, state.playerRoom) <= 1)) return '附近已有捕兽夹；陷阱之间至少间隔一间房。';
+  return null;
+}
+
+function huntressTargetable(state: GameState, person: Person): boolean {
+  if (person.role === 'police' || person.hp <= 0 || person.hidden || !isPersonVisible(state, person)) return false;
+  if (person.room === state.playerRoom) return true;
+  return forwardRoom(state) === person.room;
+}
+
+export function blinkPlayer(state: GameState, room: RoomId): boolean {
+  if (state.killer !== '护士' || !state.nurseBlinkTargeting) return false;
+  const distance = roomDistance(state.playerRoom, room);
+  if (room === state.playerRoom || distance < 1 || distance > 3 || state.energy < 1) {
+    log(state, '闪现目标必须在 1–3 间房距离内，且需要 1 点行动点。');
+    return false;
+  }
+  const from = ROOM_MAP[state.playerRoom].rect;
+  const to = ROOM_MAP[room].rect;
+  const dx = to.left + to.width / 2 - (from.left + from.width / 2);
+  const dy = to.top + to.height / 2 - (from.top + from.height / 2);
+  const length = Math.hypot(dx, dy) || 1;
+  state.playerFacing = { x: dx / length, y: dy / length };
+  state.energy -= 1;
+  state.playerRoom = room;
+  markExplored(state, room);
+  state.nurseBlinkTargeting = false;
+  state.nurseFollowUp = true;
+  state.nurseFatiguePending = true;
+  state.cooldowns.nurse_blink = 1;
+  state.attackReady = true;
+  log(state, `护士穿过墙壁与房门，闪现到${roomName(room)}。你可以立即攻击或抓取同屋目标；下一次行动后将进入疲惫。`);
+  return true;
+}
+
+export function nurseGrabPerson(state: GameState, targetId: string): boolean {
+  if (state.killer !== '护士' || !state.nurseFollowUp || state.energy < 1) return false;
+  const target = state.people.find((person) => person.id === targetId);
+  if (!target || target.role === 'police' || target.hp <= 0 || target.room !== state.playerRoom) {
+    log(state, '闪现抓取只能选择当前房间内站立的幸存者。');
+    return false;
+  }
+  state.energy -= 1;
+  damagePerson(state, target, 1, true);
+  state.nurseFollowUp = false;
+  state.nurseFatiguePending = false;
+  state.stunTurns = Math.max(state.stunTurns, 1);
+  state.attackReady = true;
+  afterPlayerAction(state);
+  checkImmediateWin(state);
+  return true;
+}
+
+export function throwHuntressHatchet(state: GameState, targetId: string): boolean {
+  if (state.killer !== '女猎手' || !state.huntressAiming || state.hatchets <= 0 || state.energy < 1) return false;
+  const target = state.people.find((person) => person.id === targetId);
+  if (!target || !huntressTargetable(state, target)) {
+    log(state, '飞斧只能投向直线视野内可见的站立幸存者。');
+    return false;
+  }
+  state.energy -= 1;
+  state.hatchets -= 1;
+  state.huntressAiming = false;
+  log(state, `女猎手掷出狩猎飞斧，命中${target.name}（剩余飞斧 ${state.hatchets}/3）。`);
+  damagePerson(state, target, 1);
+  state.attackReady = true;
+  afterPlayerAction(state);
+  checkImmediateWin(state);
+  return true;
+}
+
+export function refillHuntressHatchets(state: GameState): boolean {
+  if (state.killer !== '女猎手' || !CABINET_ROOMS.includes(state.playerRoom) || state.hatchets >= 3 || state.energy < 1) {
+    log(state, '只有在柜子房间内、行动点充足且飞斧未满时才能补充。');
+    return false;
+  }
+  state.energy -= 1;
+  const restored = 3 - state.hatchets;
+  state.hatchets = 3;
+  log(state, `你从柜子里取出 ${restored} 把飞斧，补充至 3/3。`);
+  afterPlayerAction(state);
+  return true;
+}
+
+export function collectTrapCache(state: GameState): boolean {
+  if (state.killer !== '设陷者' || !state.trapCaches.includes(state.playerRoom) || state.trapInventory >= 4 || state.energy < 1) {
+    log(state, '这里没有可收集的捕兽夹补给，或携带数量已达上限。');
+    return false;
+  }
+  state.energy -= 1;
+  state.trapCaches = state.trapCaches.filter((room) => room !== state.playerRoom);
+  state.trapInventory += 1;
+  log(state, `你从补给点收集到 1 个捕兽夹（携带 ${state.trapInventory}/4）。`);
+  afterPlayerAction(state);
+  return true;
+}
+
+export function recoverBearTrap(state: GameState): boolean {
+  const trap = state.bearTraps.find((item) => item.room === state.playerRoom && !item.armed);
+  if (state.killer !== '设陷者' || !trap || state.energy < 1 || state.trapInventory >= 4) {
+    log(state, '当前没有可回收的捕兽夹，或携带数量已达上限。');
+    return false;
+  }
+  state.energy -= 1;
+  state.bearTraps = state.bearTraps.filter((item) => item.id !== trap.id);
+  state.trapInventory += 1;
+  log(state, `你回收了${roomName(state.playerRoom)}的捕兽夹（携带 ${state.trapInventory}/4）。`);
+  afterPlayerAction(state);
+  return true;
+}
+
 export function canUsePower(state: GameState, powerId: string): boolean {
   if (state.phase !== 'playing') return false;
   const killer = KILLER_MAP[state.killer];
   const power = killer?.powers.find((p) => p.id === powerId);
   if (!power) return false;
   if (powerCooldown(state, powerId) > 0) return false;
+  if (powerId === 'trap_set') return trapPlacementBlockReason(state) === null;
+  if (powerId === 'nurse_blink') {
+    if (state.killer !== '护士') return false;
+    if (state.nurseBlinkTargeting) return true;
+    if (state.nurseFollowUp || state.energy < 1) return false;
+    return ROOMS.some((room) => room.id !== state.playerRoom && roomDistance(state.playerRoom, room.id) <= 3);
+  }
+  if (powerId === 'huntress_axe') {
+    if (state.killer !== '女猎手' || state.energy < 1) return false;
+    if (state.huntressAiming) return true;
+    return state.hatchets > 0 && visibleMyersStalkTargets(state).some((person) => huntressTargetable(state, person));
+  }
   if (powerId === 'myers_gaze') {
     if (state.killer !== '迈克尔·迈尔斯' || state.possessed || state.energy < 1) return false;
-    return visibleMyersStalkTargets(state).length > 0;
+    if (state.stalkMeter >= 100) return true;
+    return visibleMyersStalkTargets(state).some((person) => myersStalkGain(person.alert) > 0);
   }
   if (power.requires && !power.requires.every((c) => checkCond(state, c))) return false;
   return true;
@@ -3088,10 +3294,25 @@ export function powerBlockReason(state: GameState, powerId: string): string {
   if (!power) return '';
   const cd = powerCooldown(state, powerId);
   if (cd > 0) return `冷却中，还要 ${cd} 回合`;
-  if (powerId === 'myers_gaze') {
-    if (state.possessed) return '恶魔附身期间不能尾随';
+  if (powerId === 'trap_set') return trapPlacementBlockReason(state) ?? '';
+  if (powerId === 'nurse_blink') {
+    if (state.nurseBlinkTargeting) return '再次点击可取消闪现选点';
+    if (state.nurseFollowUp) return '闪现后的抓取窗口尚未结束';
     if (state.energy < 1) return '至少需要 1 点行动点';
-    if (!visibleMyersStalkTargets(state).length) return '视野内没有可观察的存活幸存者';
+    return '';
+  }
+  if (powerId === 'huntress_axe') {
+    if (state.huntressAiming) return '再次点击可取消瞄准';
+    if (state.hatchets <= 0) return '飞斧耗尽：请前往柜子补充';
+    if (state.energy < 1) return '至少需要 1 点行动点';
+    if (!visibleMyersStalkTargets(state).some((person) => huntressTargetable(state, person))) return '视野内没有直线可命中的站立幸存者';
+    return '';
+  }
+  if (powerId === 'myers_gaze') {
+    if (state.possessed) return '恶魔附身期间不能再次尾随';
+    if (state.energy < 1) return '至少需要 1 点行动点';
+    if (state.stalkMeter >= 100) return '';
+    if (!visibleMyersStalkTargets(state).some((person) => myersStalkGain(person.alert) > 0)) return '视野内没有可继续积累尾随值的幸存者';
   }
   if (power.requires && !power.requires.every((c) => checkCond(state, c))) {
     const need = power.requires.find((c) => !checkCond(state, c));
@@ -3104,32 +3325,71 @@ export function powerBlockReason(state: GameState, powerId: string): string {
 }
 
 export function usePower(state: GameState, powerId: string): boolean {
-  if (powerId === 'myers_gaze_exit') {
-    if (state.killer !== '迈克尔·迈尔斯' || !state.myersStalking) return false;
-    state.myersStalking = false;
-    state.stalkTargetId = null;
-    state.stalkPressure = 0;
-    log(state, '你收起目光，离开尾随姿态；恐惧范围恢复，移动不再迟缓。');
+  if (powerId === 'trap_set') {
+    const reason = trapPlacementBlockReason(state);
+    if (reason) { log(state, reason); return false; }
+    state.energy -= 1;
+    state.trapInventory -= 1;
+    state.bearTraps.push({
+      id: `bear-trap-${state.turn}-${state.trailClock}-${state.bearTraps.length}`,
+      room: state.playerRoom,
+      armed: true,
+      discovered: false,
+    });
+    log(state, `你在${roomName(state.playerRoom)}布设了一只捕兽夹。这里不是单一必经通道，且附近没有其他陷阱。`);
     state.attackReady = true;
     afterPlayerAction(state);
     checkImmediateWin(state);
     return true;
   }
+  if (powerId === 'nurse_blink') {
+    if (state.nurseBlinkTargeting) {
+      state.nurseBlinkTargeting = false;
+      log(state, '已取消闪现选点。');
+      return true;
+    }
+    if (!canUsePower(state, powerId)) { log(state, powerBlockReason(state, powerId) || '当前无法闪现。'); return false; }
+    state.nurseBlinkTargeting = true;
+    log(state, '选择地图上 1–3 间房距离内的目标位置；闪现后可立即攻击或抓取同屋幸存者。');
+    return true;
+  }
+  if (powerId === 'huntress_axe') {
+    if (state.huntressAiming) {
+      state.huntressAiming = false;
+      log(state, '已取消飞斧瞄准。');
+      return true;
+    }
+    if (!canUsePower(state, powerId)) { log(state, powerBlockReason(state, powerId) || '当前无法投掷飞斧。'); return false; }
+    state.huntressAiming = true;
+    log(state, '狩猎飞斧已举起：点击地图中直线视野内的站立幸存者进行投掷。');
+    return true;
+  }
   if (powerId === 'myers_gaze') {
-    if (!canUsePower(state, powerId)) {
-      log(state, powerBlockReason(state, powerId) || '当前无法尾随。');
-      return false;
+    if (!canUsePower(state, powerId)) { log(state, powerBlockReason(state, powerId) || '当前无法尾随。'); return false; }
+    if (state.stalkMeter >= 100) {
+      state.energy -= 1;
+      state.possessed = true;
+      log(state, '恶魔附身：尾随值已满，迈克尔释放积攒的恶意。接下来每次行动消耗 20 点尾随值，强化挥刀可直接击倒站立目标；结束后不会陷入虚弱。');
+      state.attackReady = true;
+      afterPlayerAction(state);
+      checkImmediateWin(state);
+      return true;
     }
-    const visible = visibleMyersStalkTargets(state);
-    const target = visible.find((p) => p.id === state.stalkTargetId) ?? visible[0];
-    if (!target) {
-      log(state, '前方已经没有可尾随的猎物。');
-      return false;
-    }
+    const visible = visibleMyersStalkTargets(state).filter((person) => myersStalkGain(person.alert) > 0);
+    if (!visible.length) { log(state, '视野内没有可继续积累尾随值的幸存者。'); return false; }
     state.energy -= 1;
-    const stalkGain = myersStalkGain(target.alert);
-    state.stalkMeter = Math.min(100, state.stalkMeter + stalkGain);
-    log(state, '你花费 1 点行动点暗中观察 ' + target.name + '：尾随值 +' + stalkGain + '（' + state.stalkMeter + '/100）。');
+    let totalGain = 0;
+    const names: string[] = [];
+    for (const person of visible) {
+      const isolated = !npcs(state).some((other) =>
+        other.id !== person.id && other.hp > 0 && other.role !== 'police' && !other.hidden && other.room === person.room,
+      );
+      const gain = myersStalkGain(person.alert) + (isolated ? 5 : 0);
+      totalGain += gain;
+      names.push(`${person.name} +${gain}${isolated ? '（落单）' : ''}`);
+    }
+    state.stalkMeter = Math.min(100, state.stalkMeter + totalGain);
+    log(state, `你观察视野内 ${visible.length} 名幸存者：${names.join('、')}；尾随值 +${totalGain}（${state.stalkMeter}/100）。`);
     state.attackReady = true;
     afterPlayerAction(state);
     checkImmediateWin(state);
@@ -3262,6 +3522,12 @@ export function endTurn(state: GameState): void {
   if (state.phase !== 'playing') return;
 
   const m = state.mission;
+  if (state.nurseFatiguePending) {
+    state.nurseFatiguePending = false;
+    state.nurseFollowUp = false;
+    state.stunTurns = Math.max(state.stunTurns, 1);
+    log(state, '你没有利用闪现后的攻击窗口，护士仍因濒死之息进入疲惫：下回合行动点减少 1。');
+  }
   checkImmediateWin(state);
   if (state.result) return;
 

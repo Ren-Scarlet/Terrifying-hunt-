@@ -145,6 +145,15 @@ export interface SiteItem {
   jammedTurns: number;
 }
 
+/** 设陷者放置的捕兽夹；触发或被幸存者拆除后会变成未武装状态。 */
+export interface BearTrap {
+  id: string;
+  room: RoomId;
+  armed: boolean;
+  discovered: boolean;
+  triggeredBy?: string;
+}
+
 /** 健康 / 受伤 / 倒地。死亡等于从 people 里移除，所以没有第四态。 */
 export type Health = 'healthy' | 'injured' | 'downed';
 
@@ -392,6 +401,17 @@ export interface GameState {
   rewardCards: string[];
 
   phoneCut: boolean;
+  /** 设陷者的可布设捕兽夹、携带数量与地图补给点。 */
+  bearTraps: BearTrap[];
+  trapInventory: number;
+  trapCaches: RoomId[];
+  /** 女猎手瞄准状态与当前剩余飞斧。 */
+  huntressAiming: boolean;
+  hatchets: number;
+  /** 护士闪现选点、闪现后的抓取窗口与待结算疲惫。 */
+  nurseBlinkTargeting: boolean;
+  nurseFollowUp: boolean;
+  nurseFatiguePending: boolean;
   wiretap: boolean;
   poltergeist: boolean;
   policeBlocked: boolean;

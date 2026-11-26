@@ -3,6 +3,12 @@ import { CARD_MAP, deckCardsForKiller, STARTING_DECK } from './game/cards';
 import {
   attack,
   carryPerson,
+  blinkPlayer,
+  collectTrapCache,
+  nurseGrabPerson,
+  recoverBearTrap,
+  refillHuntressHatchets,
+  throwHuntressHatchet,
   executeCarriedPerson,
   executeDownedPerson,
   createGame,
@@ -495,6 +501,11 @@ app.addEventListener('click', (event) => {
   if (game && screen === 'game' && game.hand.length > 6 && action !== 'discard' && action !== 'mute') {
     return;
   }
+  // 目标选择模式期间锁定其他操作，避免闪现/瞄准时误触移动或卡牌。
+  if (game && screen === 'game' && game.nurseBlinkTargeting &&
+      !['blink-select', 'power', 'mute', 'guide'].includes(action ?? '')) return;
+  if (game && screen === 'game' && game.huntressAiming &&
+      !['hatchet-target', 'power', 'mute', 'guide'].includes(action ?? '')) return;
   // 查看选房期间只接受选房或取消，避免误触卡牌、移动等其他行动。
   if (game && screen === 'game' && game.lookingAround &&
       !['look-select', 'look-cancel', 'mute', 'guide'].includes(action ?? '')) return;
@@ -551,6 +562,52 @@ app.addEventListener('click', (event) => {
     if (!game || screen !== 'game') return;
     const powerId = target.dataset.power;
     if (powerId) usePower(game, powerId);
+    afterAction();
+    return;
+  }
+
+  if (action === 'blink-select') {
+    if (!game || screen !== 'game') return;
+    const room = target.dataset.room as RoomId | undefined;
+    if (room) blinkPlayer(game, room);
+    playSfx('step');
+    afterAction();
+    return;
+  }
+
+  if (action === 'hatchet-target') {
+    if (!game || screen !== 'game') return;
+    const personId = target.dataset.personId;
+    if (personId && throwHuntressHatchet(game, personId)) playSfx('attack');
+    afterAction();
+    return;
+  }
+
+  if (action === 'nurse-grab-target') {
+    if (!game || screen !== 'game') return;
+    const personId = target.dataset.personId;
+    if (personId && nurseGrabPerson(game, personId)) playSfx('attack');
+    afterAction();
+    return;
+  }
+
+  if (action === 'collect-trap') {
+    if (!game || screen !== 'game') return;
+    collectTrapCache(game);
+    afterAction();
+    return;
+  }
+
+  if (action === 'recover-trap') {
+    if (!game || screen !== 'game') return;
+    recoverBearTrap(game);
+    afterAction();
+    return;
+  }
+
+  if (action === 'refill-hatchets') {
+    if (!game || screen !== 'game') return;
+    refillHuntressHatchets(game);
     afterAction();
     return;
   }
