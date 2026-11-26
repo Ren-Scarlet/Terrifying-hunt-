@@ -54,6 +54,7 @@ import {
   lookAround,
   lookAtRoom,
   cancelLookSelection,
+  selectAuraRoom,
   isLocked,
   isRoomExplored,
   isSensing,
@@ -1810,51 +1811,37 @@ function caseNewPerkSystem(): void {
   check('其他杀手构筑池不会出现迈尔斯专属卡', !deckCardsForKiller('设陷者').some((card) => card.killerOnly === '迈克尔·迈尔斯'));
 
   const lastBest = createGame(['myers_last_best'], undefined, '迈克尔·迈尔斯');
+  const lastHuman = lastBest.people.find((person) => person.role !== 'police')!;
+  lastBest.people = lastBest.people.filter((person) => person.role === 'police' || person.id === lastHuman.id);
   lastBest.hand = [{ uid: 'test-last-best', defId: 'myers_last_best' }];
   lastBest.energy = 6;
-  check('把最好的留在最后可以启用被动', playCard(lastBest, 'test-last-best') && lastBest.myersLastBestActive);
-  const prey = lastBest.people.find((person) => person.role !== 'police')!;
-  prey.room = lastBest.playerRoom;
-  prey.hp = 4;
-  prey.bloodSacrifice = false;
-  lastBest.energy = 6;
-  lastBest.attackReady = true;
-  check('把最好的留在最后：攻击非血祭品获得独立印记', attack(lastBest, prey.id) && lastBest.myersLastBestMarks === 1);
-  const beforeWipe = lastBest.energy;
-  const wiped = wipeBlade(lastBest);
-  check('擦刀移除两枚以内的终局印记，擦刀本身只消耗正常行动点', wiped && lastBest.myersLastBestMarks === 0 && lastBest.energy === beforeWipe - 1);
+  check('把最好的留在最后：只剩一名人类时显示其气场',
+    playCard(lastBest, 'test-last-best') && (lastHuman.revealedActions ?? 0) > 0);
 
   const eclipse = createGame(['myers_eclipse_light'], undefined, '迈克尔·迈尔斯');
   const downed = eclipse.people.find((person) => person.role !== 'police')!;
   downed.room = eclipse.playerRoom;
   downed.hp = 1;
-  downed.bloodSacrifice = false;
+  downed.bloodSacrifice = true;
   eclipse.energy = 6;
   eclipse.attackReady = true;
   attack(eclipse, downed.id);
   eclipse.hand = [{ uid: 'test-eclipse', defId: 'myers_eclipse_light' }];
   eclipse.energy = 6;
-  check('湮灭之光只能在击倒非血祭品后获得印记', playCard(eclipse, 'test-eclipse') && eclipse.myersEclipseMarks === 1);
+  const fearBeforeEclipse = eclipse.people.filter((person) => person.role !== 'police' && person.id !== downed.id).map((person) => person.fear);
+  const eclipsePlayed = playCard(eclipse, 'test-eclipse');
+  const remainingAfterEclipse = eclipse.people.filter((person) => person.role !== 'police' && person.hp > 0);
+  check('湮灭之光：处决刚击倒的人类，若为血祭品则全体人类恐惧 +35',
+    eclipsePlayed && !eclipse.people.some((person) => person.id === downed.id) &&
+    remainingAfterEclipse.every((person, index) => person.fear >= fearBeforeEclipse[index] + 35));
 
   const food = createGame(['myers_plaything'], undefined, '迈克尔·迈尔斯');
-  const sacrifice = food.people.find((person) => person.bloodSacrifice)!;
-  sacrifice.room = food.playerRoom;
-  // 固定清除开局随机的追踪状态，避免把「已被追踪」误判为仍处于玩家直接视野。
-  sacrifice.trackedTurns = 0;
-  sacrifice.revealedActions = 0;
-  sacrifice.hidden = false;
-  sacrifice.lastSeenTurn = 0;
-  // 阻止卡牌结算后的 NPC 自主行动干扰「立即离开视线」的断言；
-  // 卡牌自身仍会直接把血祭品移动到迷雾房间。
-  sacrifice.blockedTurns = 2;
-  food.energy = 6;
-  food.hand = [{ uid: 'test-food-1', defId: 'myers_plaything' }];
-  const firstFoodPlayed = withRandomSource(() => 0.99, () => playCard(food, 'test-food-1'));
-  check('戏耍食物要求视野内有血祭品、获得印记并将其送出视线', firstFoodPlayed && food.myersFoodMarks === 1 && !isPersonVisible(food, sacrifice), `played=${firstFoodPlayed} marks=${food.myersFoodMarks} room=${sacrifice.room} player=${food.playerRoom} visible=${isPersonVisible(food, sacrifice)} blocked=${sacrifice.blockedTurns}`);
-  sacrifice.room = food.playerRoom;
-  food.hand = [{ uid: 'test-food-2', defId: 'myers_plaything' }];
-  const energyBeforeSecondFood = food.energy;
-  check('戏耍食物每两枚印记增加 1 点行动点', playCard(food, 'test-food-2') && food.myersFoodMarks === 2 && food.energy === energyBeforeSecondFood);
+  food.hand = [{ uid: 'test-food', defId: 'myers_plaything' }];
+  food.energy = 1;
+  const foodPlayed = playCard(food, 'test-food');
+  check('戏耍食物：获得 2 AP 并禁止本回合攻击',
+    foodPlayed && food.energy === 2 && food.attackBlockedTurn === food.turn &&
+    attackBlockReason(food).includes('不能攻击'));
 
   const hex = createGame(['hex_huntress'], undefined, '迈克尔·迈尔斯');
   hex.hand = [{ uid: 'test-hex', defId: 'hex_huntress' }];
@@ -1862,51 +1849,88 @@ function caseNewPerkSystem(): void {
   playCard(hex, 'test-hex');
   const hexVictim = hex.people.find((person) => person.role !== 'police')!;
   hexVictim.room = hex.playerRoom;
-  hexVictim.hp = 4;
+  hexVictim.hp = 1;
   hexVictim.bloodSacrifice = false;
   hex.energy = 6;
   hex.attackReady = true;
   attack(hex, hexVictim.id);
-  check('猎杀戾气：首次伤害幸存者后生成地图图腾', hex.hexHuntressUsed && hex.totems.length === 1);
-
+  hex.energy = 6;
+  executeDownedPerson(hex, hexVictim.id);
+  check('猎杀戾气：下一次击杀人类额外获得 50 分',
+    hex.hexHuntressUsed && hex.cardBonusScore === 50);
 
   const noed = createGame(['hex_noed'], undefined, '迈克尔·迈尔斯');
-  noed.emergencyActive = false;
-  noed.alarm = 99;
-  noed.totems = ['attic'];
   noed.people.forEach((person) => { person.room = 'bedroom'; person.alert = 0; person.awareness = 0; });
   noed.hand = [{ uid: 'test-noed', defId: 'hex_noed' }];
   noed.energy = 6;
-  const noedEnergy = noed.energy;
-  playCard(noed, 'test-noed');
-  noed.hexNoedActive = true;
-  addAlarm(noed, 1);
+  const noedPlayed = playCard(noed, 'test-noed');
   const noedTarget = noed.people.find((person) => person.role !== 'police')!;
   noedTarget.room = noed.playerRoom;
   noedTarget.hp = 4;
-  noed.energy = Math.max(noed.energy, 2);
+  noed.alarm = 99;
+  addAlarm(noed, 1);
+  noed.energy = 6;
   noed.attackReady = true;
   const noedAttack = attack(noed, noedTarget.id);
-  check('难逃一死：警报最终阶段且图腾存留时获得行动并一刀击倒', noed.hexNoedBonusGranted && noedTarget.hp === 0 && noed.energy >= noedEnergy - 2, `attack=${noedAttack} block=${attackBlockReason(noed, noedTarget.id)} active=${noed.hexNoedActive} bonus=${noed.hexNoedBonusGranted} hp=${noedTarget.hp} energy=${noed.energy} emergency=${noed.emergencyActive}`);
+  check('难逃一死：全局警报满值后无需图腾，一刀处决当前房间人类',
+    noedPlayed && noedAttack && noed.emergencyActive && !noed.people.some((person) => person.id === noedTarget.id));
 
   const bitter = createGame(['bitter_murmur'], undefined, '迈克尔·迈尔斯');
-  const worker = bitter.people.find((person) => person.role !== 'police')!;
-  const fogRoom = (Object.keys(ROOM_MAP) as Array<keyof typeof ROOM_MAP>).find((room) => room !== bitter.playerRoom && !ROOM_MAP[bitter.playerRoom].neighbors.includes(room))!;
-  worker.room = fogRoom;
-  worker.intent = 'work';
-  worker.goal = 'objective';
-  worker.hidden = false;
-  worker.trackedTurns = 0;
-  worker.lastSeenTurn = 0;
+  const bitterTarget = bitter.people.find((person) => person.role !== 'police')!;
+  bitterTarget.room = bitter.playerRoom;
+  bitterTarget.hp = 0;
   bitter.hand = [{ uid: 'test-bitter', defId: 'bitter_murmur' }];
   bitter.energy = 6;
+  const otherHumans = bitter.people.filter((person) => person.role !== 'police' && person.id !== bitterTarget.id && person.hp > 0);
   playCard(bitter, 'test-bitter');
-  check('苦涩低语显示工作者两次行动但不泄露身份', (worker.revealedActions ?? 0) > 0 && !isPersonVisible(bitter, worker), `revealed=${worker.revealedActions ?? 0} visible=${isPersonVisible(bitter, worker)} room=${worker.room} player=${bitter.playerRoom}`);
+  bitter.energy = 6;
+  const bitterExecuted = executeDownedPerson(bitter, bitterTarget.id);
+  check('苦涩低语：下一次击杀后，其他存活人类气场显现',
+    bitterExecuted && !bitter.bitterMurmurReady && otherHumans.length > 0 &&
+    otherHumans.every((person) => (person.revealedActions ?? 0) > 0));
 
   const reveal = createGame(['hell'], undefined, '迈克尔·迈尔斯');
+  const revealTarget = reveal.people.find((person) => person.role !== 'police')!;
+  const revealRoom = (Object.keys(ROOM_MAP) as RoomId[]).find((room) => room !== reveal.playerRoom)!;
+  revealTarget.room = revealRoom;
   reveal.hand = [{ uid: 'test-hell', defId: 'hell' }];
   reveal.energy = 6;
-  check('恶灵地狱启动周围一格的限时轮廓', playCard(reveal, 'test-hell') && reveal.revealAuraActions > 0);
+  const revealPlayed = playCard(reveal, 'test-hell');
+  const auraSelected = selectAuraRoom(reveal, revealRoom);
+  check('恶灵低语：打出后可选任意房间，并显示该房间人类气场',
+    revealPlayed && auraSelected && !reveal.auraTargeting && (revealTarget.revealedActions ?? 0) > 0);
+
+  const fear = createGame(['distressing'], undefined, '迈克尔·迈尔斯');
+  const adjacentRoom = ROOM_MAP[fear.playerRoom].neighbors[0];
+  const fearTarget = fear.people.find((person) => person.role !== 'police')!;
+  fearTarget.room = adjacentRoom;
+  fearTarget.fear = 0;
+  fear.hand = [{ uid: 'test-distressing', defId: 'distressing' }];
+  fear.energy = 6;
+  const fearPlayed = playCard(fear, 'test-distressing');
+  check('恐惧释放：相邻房间人类恐惧 +25 且显露气场',
+    fearPlayed && fearTarget.fear === 25 && (fearTarget.revealedActions ?? 0) > 0);
+
+  const sloppy = createGame(['shuriken'], undefined, '迈克尔·迈尔斯');
+  const sloppyTarget = sloppy.people.find((person) => person.role !== 'police')!;
+  sloppyTarget.room = sloppy.playerRoom;
+  sloppyTarget.hp = 4;
+  sloppy.hand = [{ uid: 'test-sloppy', defId: 'shuriken' }];
+  sloppy.energy = 6;
+  const sloppyPlayed = playCard(sloppy, 'test-sloppy');
+  sloppy.energy = 6;
+  sloppy.attackReady = true;
+  const sloppyHit = attack(sloppy, sloppyTarget.id);
+  check('辣手屠夫：下一刀命中后造成持续流血',
+    sloppyPlayed && sloppyHit && sloppyTarget.bleed === 2);
+
+  const stealth = createGame(['insidious'], undefined, '迈克尔·迈尔斯');
+  stealth.hand = [{ uid: 'test-stealth', defId: 'insidious' }];
+  stealth.energy = 6;
+  const stealthPlayed = playCard(stealth, 'test-stealth');
+  check('静止隐身：出牌后仍保留两次完整的无法侦测行动',
+    stealthPlayed && stealth.stealthActions === 2);
+
 }
 const lookTest = newGame();
 const lookNeighbors = [...ROOM_MAP[lookTest.playerRoom].neighbors];
