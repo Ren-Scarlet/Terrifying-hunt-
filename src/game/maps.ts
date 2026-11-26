@@ -8,6 +8,7 @@ export interface HuntingGround {
   id: HuntingGroundId;
   name: string;
   file: string;
+  layoutStyle: 'tall' | 'wide' | 'branching' | 'compact';
   description: string;
   ruleName: string;
   ruleDescription: string;
@@ -21,6 +22,7 @@ export const HUNTING_GROUNDS: HuntingGround[] = [
     id: 'midwich',
     name: '米德维奇小学',
     file: '320px-IconMap_QuiLevel01.webp',
+    layoutStyle: 'tall',
     description: '封闭的教学楼、漫长走廊与地下区域。铃声会让整栋学校重新活过来。',
     ruleName: '课间铃声',
     ruleDescription: '学校广播每隔数回合响起，走廊附近的幸存者会改变路线并向公共区域移动。',
@@ -54,6 +56,7 @@ export const HUNTING_GROUNDS: HuntingGround[] = [
     id: 'ormond',
     name: '奥蒙德山度假村',
     file: '320px-IconMap_Wal_Level01.webp',
+    layoutStyle: 'wide',
     description: '暴风雪包围山间木屋，室内温暖与室外严寒形成鲜明对比。',
     ruleName: '暴风雪',
     ruleDescription: '室外活动留下的踪迹更明显；暴风雪会短暂压低远距离视野。',
@@ -87,6 +90,7 @@ export const HUNTING_GROUNDS: HuntingGround[] = [
     id: 'badham',
     name: '巴德姆幼儿园',
     file: '320px-IconMap_Eng_Elmstreet.webp',
+    layoutStyle: 'branching',
     description: '幼儿园与相邻住宅连成一片，地上活动区和地下通道交错。',
     ruleName: '地下通道',
     ruleDescription: '地下区域适合躲藏与绕行，但入口位置会成为争夺的关键。',
@@ -120,6 +124,7 @@ export const HUNTING_GROUNDS: HuntingGround[] = [
     id: 'asylum',
     name: '精神病院',
     file: '320px-IconMap_Brl_MadHouse.webp',
+    layoutStyle: 'compact',
     description: '封闭病区、治疗设施和地下设备层构成复杂的医疗建筑。',
     ruleName: '病区警报',
     ruleDescription: '异常声响会触发病区警报，使附近幸存者警觉并重新选择行动路线。',
@@ -153,6 +158,7 @@ export const HUNTING_GROUNDS: HuntingGround[] = [
     id: 'lampkin',
     name: '兰普金街',
     file: '320px-IconMap_Sub_Street.webp',
+    layoutStyle: 'wide',
     description: '万圣节夜晚的住宅街区，独栋住宅、车库与庭院组成猎场。',
     ruleName: '邻里警觉',
     ruleDescription: '住宅之间的异常会相互传播；街区幸存者可能向邻居求助或转移。',
