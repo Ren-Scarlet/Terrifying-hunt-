@@ -1,4 +1,5 @@
 import type { Op, Precheck } from './effect';
+import type { HuntingGroundId } from './maps';
 
 export type RoomId =
   | 'hall'
@@ -260,7 +261,7 @@ export type MissionKind =
   | 'evidence'
   | 'escape';
 
-export type MissionTaskKind = 'kill_count' | 'marked_kill' | 'execute' | 'no_alarm' | 'break_circuit';
+export type MissionTaskKind = 'kill_count' | 'marked_kill' | 'execute' | 'special_execute' | 'no_alarm' | 'break_circuit';
 
 export interface MissionTask {
   id: string;
@@ -271,6 +272,8 @@ export interface MissionTask {
 
 export interface Mission {
   id: string;
+  /** contract = 契约模式；free = 玩家自主选择猎物与结束时机。 */
+  mode?: 'contract' | 'free';
   kind: MissionKind;
   title: string;
   desc: string;
@@ -336,6 +339,8 @@ export interface PowerCircuit {
 
 export interface GameState {
   phase: GamePhase;
+  /** 本局实际使用的主题猎场，与主菜单展示插画保持一致。 */
+  mapId: HuntingGroundId;
   killer: string;
   killerRuntime: KillerRuntime;
   arrestThreshold: number;

@@ -51,6 +51,7 @@ import {
 } from '../../game/engine';
 import { roomDistance } from '../../game/navigation';
 import { executionMethodsAtRoom } from '../../game/executions';
+import { getHuntingGround } from '../../game/maps';
 import { KILLERS, type KillerProfile } from '../../game/killers';
 import { roomName } from '../../game/missions';
 import {
@@ -135,7 +136,7 @@ function roomFeatures(state: GameState, roomId: RoomId): string {
   if (TOTEM_ROOMS.includes(roomId)) parts.push(`<span class="room-feature totem" title="图腾：在此结束回合，下回合 +1 行动点">${icon('totem', 'ui-icon tiny')}<b>图腾</b></span>`);
   if (state.totems.includes(roomId)) parts.push(`<span class="room-feature totem cursed" title="厄咒图腾：支撑难逃一死；幸存者可能发现并破坏">${icon('totem', 'ui-icon tiny')}<b>厄咒</b></span>`);
   if (state.trailRevealActions > 0 && state.highlightedTrail && (state.highlightedTrail.room === roomId || state.highlightedTrail.to === roomId)) parts.push('<span class="room-feature trail-highlight" title="猎鹿者显现的最近脚印路线">👣</span>');
-  if (CABINET_ROOMS.includes(roomId)) parts.push(`<span class="room-feature cabinet" title="柜子：藏身者不会被引诱类卡牌锁定">${icon('cabinet', 'ui-icon tiny')}<b>柜子</b></span>`);
+  if (CABINET_ROOMS.includes(roomId) || (state.mapId === 'badham' && ['nursery', 'storage', 'guestroom'].includes(roomId))) parts.push(`<span class="room-feature cabinet" title="柜子：藏身者不会被引诱类卡牌锁定">${icon('cabinet', 'ui-icon tiny')}<b>柜子</b></span>`);
   if (OBSTACLE_ROOMS.includes(roomId) && !cleared) parts.push(`<span class="room-feature obstacle" title="障碍：进入多花 1 点行动点；破门能力可以直接清掉">${icon('obstacle', 'ui-icon tiny')}<b>障碍</b></span>`);
   return parts.join('');
 }
@@ -323,6 +324,7 @@ function trailOverlay(state: GameState): string {
 
 export function renderGame(state: GameState, killer: KillerProfile): string {
   const m = state.mission;
+  const ground = getHuntingGround(state.mapId);
   const here = state.people.filter((p) => p.room === state.playerRoom && p.role !== 'police');
   const policeHere = state.people.some((p) => p.room === state.playerRoom && p.role === 'police');
   const isMyers = killer.owner === '迈克尔·迈尔斯';
@@ -627,7 +629,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
       <span class="atk-meta">${wipeReason ? escape(wipeReason) : `${WIPE_COST} 点 · 收回刀锋`}</span>
     </button>`;
   const searchOk = state.phase === 'playing' && state.energy >= SEARCH_COST;
-  const cabinetHere = CABINET_ROOMS.includes(state.playerRoom);
+  const cabinetHere = CABINET_ROOMS.includes(state.playerRoom) || (state.mapId === 'badham' && ['nursery', 'storage', 'guestroom'].includes(state.playerRoom));
   const hiddenHere = state.people.some((p) => p.room === state.playerRoom && p.hidden);
   const carried = state.carryPersonId ? state.people.find((p) => p.id === state.carryPersonId) : null;
   const specialExecution = carried && carried.hp <= 0
@@ -642,7 +644,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
   const trapRecoverBtn = state.killer === '设陷者' && state.bearTraps.some((trap) => trap.room === state.playerRoom && !trap.armed)
     ? `<button class="btn search" data-action="recover-trap" ${state.energy < 1 || state.trapInventory >= 4 ? 'disabled' : ''}>回收已触发捕兽夹</button>`
     : '';
-  const hatchetRefillBtn = state.killer === '女猎手' && CABINET_ROOMS.includes(state.playerRoom)
+  const hatchetRefillBtn = state.killer === '女猎手' && (CABINET_ROOMS.includes(state.playerRoom) || (state.mapId === 'badham' && ['nursery', 'storage', 'guestroom'].includes(state.playerRoom)))
     ? `<button class="btn search" data-action="refill-hatchets" ${state.energy < 1 || state.hatchets >= 3 ? 'disabled' : ''}>柜子补充飞斧 · ${state.hatchets}/3</button>`
     : '';
   const searchBtn = `<button class="btn search" data-action="search" ${searchOk ? '' : 'disabled'}
@@ -673,9 +675,10 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
       <div class="mission-strip ${urgent ? 'urgent' : ''}">
         <div class="mission-icon">${icon('missionTarget', 'ui-icon')}</div>
         <div class="mission-content">
-          <div class="mission-title">${escape(m.title)}<em>奖励 ${m.reward}</em></div>
-          <div class="mission-objective"><b>全部完成</b><div class="mission-task-list">${progress}</div></div>
+          <div class="mission-title">${escape(m.title)}<em>${escape(ground.name)}</em><em>奖励 ${m.reward}</em></div>
+          <div class="mission-objective"><b>${m.mode === 'free' ? '自主挑战（不强制）' : '全部完成'}</b><div class="mission-task-list">${progress}</div></div>
           <div class="mission-rules">
+            <span class="mission-ok">猎场规则：${escape(ground.ruleName)} · ${escape(ground.ruleDescription)}</span>
             <span class="mission-ok">✓ 成功：${escape(m.successText ?? '达成主目标')}</span>
             <span class="mission-fail">✕ 失败：${escape(m.failText ?? '超时或被捕')}</span>
           </div>
@@ -773,7 +776,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
             ${trapCacheBtn}${trapRecoverBtn}${hatchetRefillBtn}
             <div class="power-row">${powerButtonHtml(state, killer)}</div>
             <button class="btn primary end-turn" data-action="end-turn" ${selectingDiscards ? 'disabled' : ''}>结束回合</button>
-            <button class="btn ghost" data-action="give-up">放弃任务</button>
+            <button class="btn ghost" data-action="${m.mode === 'free' ? 'finish-free-hunt' : 'give-up'}">${m.mode === 'free' ? '结束猎杀' : '放弃任务'}</button>
           </div>
           <div class="hand-count">手牌 ${state.hand.length}/${HAND_LIMIT}</div>
           <div class="hand-row">${hand || '<div style="color:var(--muted);font-size:13px">手牌已空，可花行动点主动抽牌。</div>'}</div>

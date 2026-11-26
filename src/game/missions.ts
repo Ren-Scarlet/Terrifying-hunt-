@@ -49,6 +49,28 @@ export function generateMission(unlockedKinds: MissionKind[] = [
   }
 }
 
+/** 自由猎杀：没有指定目标和强制契约，三项挑战只提供方向，不阻止玩家自行发挥。 */
+export function generateFreeHunt(): Mission {
+  return {
+    id: `free-hunt-${Date.now()}`,
+    mode: 'free',
+    kind: 'bodyCount',
+    title: '自由猎杀',
+    desc: '没有指定猎物，也没有强制任务。选择自己的猎杀目标与方式，随时可以结束本局。',
+    turns: 99,
+    reward: 0,
+    targetCount: 0,
+    objective: '自主选择猎物与猎杀方式；地图、环境和幸存者都由你决定如何利用。',
+    successText: '由你决定何时结束猎杀；自主挑战仅用于记录本局表现。',
+    failText: '被捕或所有幸存者逃离仍会结束猎杀。',
+    tasks: [
+      { id: 'free-kills', kind: 'kill_count', label: '猎杀任意幸存者', target: 3 },
+      { id: 'free-executions', kind: 'execute', label: '完成处决', target: 2 },
+      { id: 'free-signature', kind: 'special_execute', label: '尝试特殊处决', target: 1 },
+    ],
+  };
+}
+
 export function roomName(id: RoomId): string {
   return ROOM_MAP[id]?.name ?? id;
 }

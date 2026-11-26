@@ -139,6 +139,13 @@ const MEDKIT_TURNS = 2;
 const STARTER_ITEM_RATE = 0.32;
 const STARTER_ITEMS: SurvivorItem[] = ['medkit', 'toolbox', 'flashlight', 'smoke', 'flare'];
 
+/** 各场地的藏身空间；巴德姆幼儿园额外开放玩具仓库、值班室和幼儿教室。 */
+function cabinetRoomsFor(state: GameState): RoomId[] {
+  return state.mapId === 'badham'
+    ? [...CABINET_ROOMS, 'nursery', 'storage', 'guestroom']
+    : CABINET_ROOMS;
+}
+
 /** 同伴一个个倒下，剩下的人会红着眼拼命：击杀数与场上倒地者都会催他们干活更快 */
 function workPressure(state: GameState): number {
   const downed = state.people.some((p) => p.role !== 'police' && p.hp <= 0);
@@ -522,8 +529,12 @@ function snapshotRooms(state: GameState): Map<string, RoomId> {
   return new Map(npcs(state).map((p) => [p.id, p.room]));
 }
 
+function trailActionWindow(state: GameState): number {
+  return TRAIL_ACTION_WINDOW + (state.mapId === 'ormond' ? 3 : 0);
+}
+
 function pruneTrails(state: GameState): void {
-  state.trails = state.trails.filter((t) => state.trailClock - t.clock <= TRAIL_ACTION_WINDOW);
+  state.trails = state.trails.filter((t) => state.trailClock - t.clock <= trailActionWindow(state));
 }
 
 function pruneDisturbances(state: GameState): void {
@@ -539,7 +550,7 @@ function pruneDisturbances(state: GameState): void {
  * 房间里叫什么仍然不知道，但地板上那道划痕指向哪里，你看得见。
  */
 export function visibleTrails(state: GameState): Trail[] {
-  return state.trails.filter((t) => state.trailClock - t.clock <= TRAIL_ACTION_WINDOW);
+  return state.trails.filter((t) => state.trailClock - t.clock <= trailActionWindow(state));
 }
 
 /** 感知：这一回合地图上浮着全场红色人影（只有影子，不告诉你那是谁） */
@@ -765,8 +776,9 @@ function killPerson(state: GameState, person: Person): void {
   let stirred = 0;
   npcs(state).forEach((other) => {
     // 尸体不会让整栋房子瞬间获知消息；只有同屋或相邻房间的人先察觉。
-    if (other.alert < 36 && roomDistance(other.room, person.room) <= 1) {
-      other.alert = clamp(other.alert + (other.room === person.room ? 18 : 8), 0, 100);
+    const discoveryRadius = state.mapId === 'lampkin' ? 2 : 1;
+    if (other.alert < 36 && roomDistance(other.room, person.room) <= discoveryRadius) {
+      other.alert = clamp(other.alert + (other.room === person.room ? 18 : state.mapId === 'lampkin' ? 12 : 8), 0, 100);
       stirred += 1;
     }
   });
@@ -1568,7 +1580,7 @@ function actByArchetype(state: GameState, person: Person): void {
         person.activity = '缩在柜子里，不敢出声';
         return;
       }
-      if (CABINET_ROOMS.includes(person.room)) {
+      if (cabinetRoomsFor(state).includes(person.room)) {
         person.hidden = true;
         person.intent = 'hide';
         person.activity = '钻进了柜子';
@@ -1577,7 +1589,7 @@ function actByArchetype(state: GameState, person: Person): void {
       }
       const cabinet = nearestOf(
         person.room,
-        CABINET_ROOMS.filter((r) => !isLocked(state, r)),
+        cabinetRoomsFor(state).filter((r) => !isLocked(state, r)),
       );
       const step = nextStepToward(state, person.room, cabinet, [state.playerRoom]);
       if (step) {
@@ -1893,7 +1905,7 @@ function npcTurn(state: GameState): void {
       person.alert = Math.max(0, person.alert - 30);
       person.intent = 'wary';
       person.activity = '跑不动了，蹲在原地喘气';
-      if (CABINET_ROOMS.includes(person.room) && random() < 0.55) {
+      if (cabinetRoomsFor(state).includes(person.room) && random() < 0.55) {
         person.hidden = true;
         person.activity = '钻进柜子，屏住呼吸';
         log(state, `${person.name} 躲进了${roomName(person.room)}的柜子——地板上的痕迹到这里就断了。`);
@@ -1957,9 +1969,9 @@ function npcTurn(state: GameState): void {
                 : person.goal === 'weapon' || person.goal === 'gather'
                   ? WEAPON_ROOMS
                   : person.goal === 'hide'
-                    ? CABINET_ROOMS
+                    ? cabinetRoomsFor(state)
                     : person.goal === 'help'
-                      ? [nearestOf(person.room, CABINET_ROOMS)]
+                      ? [nearestOf(person.room, cabinetRoomsFor(state))]
                       : person.goal === 'exit' || person.goal === 'panic'
                         ? ESCAPE_ROOMS
                         : [person.room];
@@ -2313,7 +2325,7 @@ function useSurvivorItem(state: GameState, person: Person): boolean {
       if (person.alert < 18) return false;
       consumeItem(state, person);
       person.alert = Math.max(0, person.alert - 35);
-      if (CABINET_ROOMS.includes(person.room) && random() < 0.6) person.hidden = true;
+      if (cabinetRoomsFor(state).includes(person.room) && random() < 0.6) person.hidden = true;
       state.trails = state.trails.filter((t) => t.room !== person.room);
       person.activity = '丢出烟雾弹，从视线里消失了';
       log(state, `${person.name} 丢了烟雾弹，脚印和视线一起断在这里。`);
@@ -2841,7 +2853,7 @@ export function searchRoom(state: GameState): boolean {
   state.energy -= SEARCH_COST;
   const here = peopleInRoom(state, state.playerRoom).filter((p) => p.role !== 'police');
   const found = here.filter((p) => p.hidden);
-  const hasCabinet = CABINET_ROOMS.includes(state.playerRoom);
+  const hasCabinet = cabinetRoomsFor(state).includes(state.playerRoom) || (state.mapId === 'badham' && ['nursery', 'storage', 'guestroom'].includes(state.playerRoom));
   log(state, `你翻查${roomName(state.playerRoom)}（消耗 ${SEARCH_COST} 点行动点）。`);
   // 先无条件把藏着的人揪出来：卡牌可能把人挪到没有柜子的房间，不能让他白藏
   found.forEach((p) => {
@@ -2950,7 +2962,26 @@ export function isRoomLit(state: GameState, room: RoomId): boolean {
  */
 function triggerEnvironmentalEvent(state: GameState): void {
   if (state.turn % 3 !== 0) return;
-  const event = randomOf(['storm', 'flicker', 'phone', 'glass'] as const);
+  if (state.mapId === 'midwich') {
+    const room = randomOf(['corridor', 'library', 'nursery'] as RoomId[]);
+    const affected = npcs(state).filter((person) =>
+      person.hp > 0 && !person.hidden && roomDistance(person.room, room) <= 1,
+    );
+    affected.forEach((person) => {
+      person.alert = clamp(person.alert + 12, 0, 100);
+      person.awareness = Math.max(person.awareness, 1);
+      if (person.alert >= 45) person.intent = 'wary';
+      person.activity = '被课间铃声惊动，正在寻找声音来源';
+    });
+    state.disturbances.push({ room, turn: state.turn, clock: state.trailClock, label: '课间铃声' });
+    if (state.disturbances.length > 24) state.disturbances.splice(0, state.disturbances.length - 24);
+    log(state, `【米德维奇 · 课间铃声】${roomName(room)}附近响起刺耳铃声，${affected.length ? affected.map((person) => person.name).join('、') + '被惊动' : '走廊里空无一人'}。`);
+    return;
+  }
+  const eventPool = state.mapId === 'asylum'
+    ? ['flicker', 'flicker', 'phone', 'glass'] as const
+    : ['storm', 'flicker', 'phone', 'glass'] as const;
+  const event = randomOf(eventPool);
 
   if (event === 'storm') {
     state.alarm = Math.max(0, state.alarm - 4);
@@ -3214,7 +3245,7 @@ export function throwHuntressHatchet(state: GameState, targetId: string): boolea
 }
 
 export function refillHuntressHatchets(state: GameState): boolean {
-  if (state.killer !== '女猎手' || !CABINET_ROOMS.includes(state.playerRoom) || state.hatchets >= 3 || state.energy < 1) {
+  if (state.killer !== '女猎手' || !cabinetRoomsFor(state).includes(state.playerRoom) || state.hatchets >= 3 || state.energy < 1) {
     log(state, '只有在柜子房间内、行动点充足且飞斧未满时才能补充。');
     return false;
   }
@@ -3416,13 +3447,14 @@ export function missionTaskProgress(state: GameState, task: MissionTask): number
     case 'kill_count': return state.survivorKills;
     case 'marked_kill': return state.markedKilled;
     case 'execute': return state.executions;
+    case 'special_execute': return state.executionMethodsUsed.length;
     case 'no_alarm': return state.npcAlarmed ? 0 : 1;
     case 'break_circuit': return state.powerCircuits.filter((c) => c.broken).length;
   }
 }
 
 function checkImmediateWin(state: GameState): void {
-  if (state.result) return;
+  if (state.result || state.mission.mode === 'free') return;
   const tasks = state.mission.tasks ?? [];
   if (tasks.length > 0 && tasks.every((task) => missionTaskProgress(state, task) >= task.target)) finish(state, 'win');
 }
@@ -3482,9 +3514,9 @@ function finish(state: GameState, result: ResultKind): void {
   if (state.alarm >= 60) lines.push({ label: `暴露度 ${state.alarm} 的代价`, value: -Math.round(state.alarm / 5) });
 
   if (result === 'win') {
-    const bonus = (state.mission.turns - state.turn) * 5;
+    const bonus = state.mission.mode === 'free' ? 0 : (state.mission.turns - state.turn) * 5;
     if (bonus > 0) lines.push({ label: `猎杀效率 · 剩余 ${state.mission.turns - state.turn} 回合`, value: bonus });
-    state.rewardCards = [UNLOCK_REWARDS[state.mission.kind]].filter(Boolean);
+    state.rewardCards = state.mission.mode === 'free' ? [] : [UNLOCK_REWARDS[state.mission.kind]].filter(Boolean);
   } else if (result === 'caught') {
     lines.push({ label: '被警察当场抓捕', value: -80 });
   } else if (result === 'timeout') {
@@ -3711,8 +3743,19 @@ export function endTurn(state: GameState): void {
   log(state, `新回合开始，行动点恢复${frenzyBonus ? `（杀戮 +${frenzyBonus}）` : ''}。`);
 }
 
+export function finishFreeHunt(state: GameState): boolean {
+  if (state.phase !== 'playing' || state.mission.mode !== 'free') return false;
+  if (state.survivorKills <= 0) {
+    log(state, '至少完成一次猎杀后，才能主动结束自由猎杀。');
+    return false;
+  }
+  state.resultReason = '你主动结束了这场猎杀。';
+  finish(state, 'win');
+  return true;
+}
+
 export function giveUp(state: GameState): void {
-  state.resultReason = '你主动放弃了契约。';
+  state.resultReason = state.mission.mode === 'free' ? '你放弃了这场自由猎杀。' : '你主动放弃了契约。';
   finish(state, 'failed');
 }
 

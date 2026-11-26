@@ -16,6 +16,7 @@ import {
   drawCardAction,
   endTurn,
   giveUp,
+  finishFreeHunt,
   lookAround,
   lookAtRoom,
   cancelLookSelection,
@@ -28,6 +29,7 @@ import {
   wipeBlade,
 } from './game/engine';
 import { loadSave, writeSave } from './game/save';
+import { generateFreeHunt } from './game/missions';
 import { STARTER_KILLERS } from './game/killers';
 import {
   applyTuning,
@@ -59,7 +61,7 @@ import { renderAdmin } from './ui/admin';
 import { mountFloorplanScene, type SceneHandle } from './ui/scene';
 import { playSfx, playSfxRepeat, setMusic, toggleMute, unlockAudio } from './ui/audio';
 import type { SfxName } from './ui/audio';
-import { rollMenuMap } from './ui/mapArt';
+import { currentMenuMap, rollMenuMap } from './ui/mapArt';
 
 type Screen = 'menu' | 'game' | 'result';
 
@@ -286,9 +288,9 @@ function afterAction(): void {
   render();
 }
 
-function startGame(): void {
+function startGame(freeHunt = false): void {
   selectedPersonId = null;
-  game = createGame(save.deck, undefined, save.killer ?? '迈克尔·迈尔斯');
+  game = createGame(save.deck, freeHunt ? generateFreeHunt() : undefined, save.killer ?? '迈克尔·迈尔斯', currentMenuMap().id);
   screen = 'game';
   lastKills = game.kills;
   lastWanted = game.wanted;
@@ -336,12 +338,12 @@ app.addEventListener('click', (event) => {
     return;
   }
 
-  if (action === 'start' || action === 'again') {
+  if (action === 'start' || action === 'again' || action === 'free-hunt') {
     // 三段串起来，避免同时响糊成一团：点击准备完成 → 进入地图 → 游戏开始
     playSfx('ready');
     window.setTimeout(() => playSfx('enterMap'), 190);
     window.setTimeout(() => playSfx('start'), 430);
-    startGame();
+    startGame(action === 'free-hunt');
     return;
   }
 
@@ -741,6 +743,13 @@ app.addEventListener('click', (event) => {
   if (action === 'end-turn') {
     endTurn(game);
     playSfx('endturn');
+    afterAction();
+    return;
+  }
+
+  if (action === 'finish-free-hunt') {
+    if (!game || screen !== 'game') return;
+    if (finishFreeHunt(game)) playSfx('win');
     afterAction();
     return;
   }
