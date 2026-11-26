@@ -211,7 +211,7 @@
 (function(){
 const viewport=document.getElementById('viewport'),world=document.getElementById('world'),killer=document.getElementById('killer');
 const $=id=>document.getElementById(id);
-let player={x:800,y:610},target={x:800,y:610},zoom=1,mode='B',globalView=false,carrying=false,selected=null,handOpen=true,uiHidden=false,moveKeys={},last=0;
+let player={x:800,y:610},target={x:800,y:610},moveTarget=null,zoom=1,mode='B',globalView=false,carrying=false,selected=null,handOpen=true,uiHidden=false,moveKeys={},last=0;
 const objects={human:{x:1180,y:730,el:$('npc-down')},human2:{x:870,y:210,el:$('npc-standing')},fridge:{x:268,y:345,el:$('fridge')},door:{x:603,y:265}};
 function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
 function distance(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
@@ -241,7 +241,7 @@ function render(){
  const screen=project({x:player.x+100,y:player.y-20});$('light').style.background='radial-gradient(ellipse 290px 210px at '+screen.x+'px '+screen.y+'px,rgba(218,38,51,.25),rgba(112,12,24,.10) 45%,transparent 78%)';
  updatePrompts();
 }
-function move(dx,dy){if(globalView)return;player.x=clamp(player.x+dx,205,1390);player.y=clamp(player.y+dy,125,875);if(mode==='A'){target.x=player.x;target.y=player.y}}
+function move(dx,dy){if(globalView)return;moveTarget=null;player.x=clamp(player.x+dx,205,1390);player.y=clamp(player.y+dy,125,875);if(mode==='A'){target.x=player.x;target.y=player.y}}
 function selectObject(name){selected=name;const o=objects[name];if(o){notify(({human:'发现倒地的幸存者',human2:'发现活动中的幸存者',fridge:'冰箱：靠近后可查看特殊处决',door:'木门：靠近后可进行交互'})[name]||'已选中目标');if(distance(player,o)<220){}else{notify('已选中目标 · 靠近后显示可用操作')}}}
 function interact(){if(carrying){drop();return}if(!selected){notify('先点击地图中的人物或物件');return}const o=objects[selected];if(!o){return}if(distance(player,o)>220){notify('目标距离较远，请先移动靠近');return}if(selected==='human'){carry();return}if(selected==='human2'){notify('目标正在活动：此原型暂用作选中状态演示');return}if(selected==='fridge'){notify('特殊处决条件满足 · 可执行');$('fridgeAction').classList.add('show');return}if(selected==='door'){notify('木门已被破坏，通道开放');return}}
 function carry(){carrying=true;selected=null;$('npc-down').style.opacity='.22';notify('已抱起幸存者 · 按 G 或点击放下');}
@@ -259,10 +259,10 @@ $('handToggle').onclick=()=>{handOpen=!handOpen;$('hand').style.display=handOpen
 $('interactBtn').onclick=interact;$('endTurn').onclick=()=>notify('回合结束（原型演示）');
 document.querySelectorAll('.card').forEach(c=>c.addEventListener('click',()=>{document.querySelectorAll('.card').forEach(x=>x.classList.remove('selected'));c.classList.add('selected');notify('已选择卡牌：'+c.querySelector('b').textContent)}));
 document.querySelectorAll('[data-object]').forEach(el=>el.addEventListener('click',e=>{e.stopPropagation();selectObject(el.dataset.object)}));
-viewport.addEventListener('click',e=>{if(e.target.closest('button')||e.target.closest('.map-action')||e.target.closest('.task-pop')||e.target.closest('.drawer'))return;const r=viewport.getBoundingClientRect();let wx,wy;if(globalView){wx=(e.clientX-(r.width-1600*zoom)/2)/zoom;wy=(e.clientY-(r.height-1000*zoom)/2)/zoom}else{wx=(e.clientX-r.width/2)/zoom+player.x;wy=(e.clientY-r.height/2)/zoom+player.y}if(wx>180&&wx<1420&&wy>100&&wy<900){target={x:wx,y:wy};const dx=wx-player.x,dy=wy-player.y,len=Math.hypot(dx,dy)||1;move(dx/len*Math.min(100,len),dy/len*Math.min(100,len));notify('屠夫正在移动');}});
+viewport.addEventListener('click',e=>{if(e.target.closest('button')||e.target.closest('.map-action')||e.target.closest('.task-pop')||e.target.closest('.drawer'))return;const r=viewport.getBoundingClientRect();let wx,wy;if(globalView){wx=(e.clientX-(r.width-1600*zoom)/2)/zoom;wy=(e.clientY-(r.height-1000*zoom)/2)/zoom}else{wx=(e.clientX-r.width/2)/zoom+player.x;wy=(e.clientY-r.height/2)/zoom+player.y}if(wx>180&&wx<1420&&wy>100&&wy<900){moveTarget={x:clamp(wx,205,1390),y:clamp(wy,125,875)};notify('屠夫正在前往指定位置');}});
 window.addEventListener('keydown',e=>{if(['INPUT','TEXTAREA'].includes(document.activeElement.tagName))return;const k=e.key.toLowerCase();if(k==='w'||k==='a'||k==='s'||k==='d'){moveKeys[k]=true;e.preventDefault()}if(k==='e')interact();if(k==='g')drop();if(k==='f')center();if(k==='0')global();if(k==='+'||k==='=')setZoom(zoom+.12);if(k==='-')setZoom(zoom-.12);if(k==='t')$('taskPop').classList.toggle('open');if(k==='escape'){$('taskPop').classList.remove('open');$('intelPop').classList.remove('open')}});
 window.addEventListener('keyup',e=>{moveKeys[e.key.toLowerCase()]=false});
-function loop(t){const dt=Math.min((t-last)/16.67||1,2);last=t;let dx=0,dy=0;if(moveKeys.w)dy-=1;if(moveKeys.s)dy+=1;if(moveKeys.a)dx-=1;if(moveKeys.d)dx+=1;if(dx||dy){const n=Math.hypot(dx,dy);move(dx/n*3.1*dt,dy/n*3.1*dt)}render();requestAnimationFrame(loop)}
+function loop(t){const dt=Math.min((t-last)/16.67||1,2);last=t;let dx=0,dy=0;if(moveKeys.w)dy-=1;if(moveKeys.s)dy+=1;if(moveKeys.a)dx-=1;if(moveKeys.d)dx+=1;if(dx||dy){const n=Math.hypot(dx,dy);move(dx/n*3.1*dt,dy/n*3.1*dt)}else if(moveTarget&&!globalView){const vx=moveTarget.x-player.x,vy=moveTarget.y-player.y,d=Math.hypot(vx,vy);if(d<7){player.x=moveTarget.x;player.y=moveTarget.y;moveTarget=null}else{const step=Math.min(3.1*dt,d);player.x+=vx/d*step;player.y+=vy/d*step;if(mode==='A'){target.x=player.x;target.y=player.y}}}render();requestAnimationFrame(loop)}
 window.addEventListener('resize',()=>{if(globalView)global()});render();requestAnimationFrame(loop);
 })();
 </script>
