@@ -44,6 +44,8 @@ export const ASSET_PATHS: AssetPaths = {
     toolbox: 'assets/ui/toolbox.webp',
     medkit: 'assets/ui/medkit.webp',
     flashlight: 'assets/ui/flashlight.webp',
+    bearTrap: 'assets/ui/bear-trap.webp',
+    window: 'assets/ui/window.webp',
   },
 };
 

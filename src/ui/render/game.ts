@@ -115,7 +115,7 @@ function roomFeatures(state: GameState, roomId: RoomId): string {
   const placedTrap = state.bearTraps.find((trap) => trap.room === roomId);
   if (placedTrap) {
     const trapStatus = placedTrap.armed ? (placedTrap.discovered ? '已被幸存者发现，可能被拆除' : '已布设，等待触发') : '已触发或拆除，可由设陷者回收';
-    parts.push(`<span class="room-feature bear-trap ${placedTrap.armed ? 'armed' : 'spent'}" title="捕兽夹：${trapStatus}">⚒<b>捕兽夹</b></span>`);
+    parts.push(`<span class="room-feature bear-trap ${placedTrap.armed ? 'armed' : 'spent'}" title="捕兽夹：${trapStatus}>${icon('bearTrap', 'ui-icon tiny')}<b>捕兽夹</b></span>`);
   }
   if (state.trapCaches.includes(roomId)) {
     parts.push('<span class="room-feature trap-cache" title="捕兽夹补给：设陷者可在此收集额外捕兽夹">＋<b>陷阱补给</b></span>');
