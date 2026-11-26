@@ -20,6 +20,7 @@ import {
   lookAround,
   lookAtRoom,
   cancelLookSelection,
+  selectAuraRoom,
   movePlayer,
   playCard,
   searchRoom,
@@ -729,6 +730,14 @@ app.addEventListener('click', (event) => {
     if (room) lookAtRoom(game, room);
     playSfx('click');
     afterAction();
+    return;
+  }
+
+  if (action === 'aura-select') {
+    const room = target.dataset.room as RoomId | undefined;
+    if (room) selectAuraRoom(game, room);
+    playSfx('click');
+    render();
     return;
   }
 

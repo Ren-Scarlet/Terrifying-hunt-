@@ -26,6 +26,9 @@ export const FLAG_OPTIONS = [
   ['phoneCut', '剪断电话'], ['wiretap', '窃听'], ['poltergeist', '灵异'],
   ['policeBlocked', '警察停步'], ['noAlarm', '目击无效'], ['exitBlocked', '封锁逃生点'],
   ['clearBarricade', '拆除堵门'], ['freeMove', '无视相邻'], ['possessReady', '附身就绪'],
+  ['hexHuntress', '猎杀戾气'], ['hexNoed', '难逃一死'], ['scourgeShrine', '鬼魔神龛'],
+  ['distressing', '恐惧释放'], ['revealAura', '恶灵低语选房'], ['revealNearestTrail', '猎鹿者脚印'],
+  ['bitterMurmur', '苦涩低语'], ['bleedNextHit', '辣手屠夫流血'], ['noAttackTurn', '本回合禁攻'],
 ] as const;
 
 export const SABOTAGE_OPTIONS = [
@@ -53,6 +56,7 @@ export const EFFECT_OPS: Record<Op['op'], EffectOpMeta> = {
   lure: { label: '制造噪声', fields: [['to', 'dest'], ['count', 'num']] },
   alarm: { label: '暴露度', fields: [['amount', 'num']] },
   sabotage: { label: '破坏设施', fields: [['key', 'sabotage']] },
+  contextSabotage: { label: '当前环境破坏', fields: [] },
   draw: { label: '抽牌', fields: [['amount', 'num']] },
   energy: { label: '行动点', fields: [['amount', 'num']] },
   steps: { label: '行动点（原步数）', fields: [['amount', 'num']] },

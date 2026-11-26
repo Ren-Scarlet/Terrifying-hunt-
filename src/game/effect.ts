@@ -127,7 +127,10 @@ export type FlagKey =
   | 'revealAura'
   | 'revealNearestTrail'
   | 'revealWorkers'
-  | 'myersLastBest';
+  | 'myersLastBest'
+  | 'bitterMurmur'
+  | 'bleedNextHit'
+  | 'noAttackTurn';
 
 export type SabotageKey = 'phone' | 'exit' | 'radio' | 'lights';
 
@@ -198,6 +201,7 @@ export type Op =
   | { op: 'alarm'; amount: number }
   /** 破坏设施 */
   | { op: 'sabotage'; key: SabotageKey }
+  | { op: 'contextSabotage' }
   | { op: 'draw'; amount: number }
   | { op: 'energy'; amount: number }
   | { op: 'steps'; amount: number }
