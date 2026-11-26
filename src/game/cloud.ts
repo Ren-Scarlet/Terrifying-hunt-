@@ -67,7 +67,7 @@ export async function saveCloudConfig(config: CloudConfig): Promise<void> {
   }
   const body: Record<string, string> = {
     message: 'Update game balance configuration',
-    content: encodeBase64Utf8(JSON.stringify(config, null, 2) + '\\n'),
+    content: encodeBase64Utf8(JSON.stringify(config, null, 2) + '\'),
     branch: BRANCH,
   };
   if (sha) body.sha = sha;
