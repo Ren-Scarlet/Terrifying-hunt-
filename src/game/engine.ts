@@ -2523,9 +2523,7 @@ export function executeDownedPerson(state: GameState, targetId?: string): boolea
   return true;
 }
 
-export function canAttack(state: GameState, targetId?: string): boolean {
-  return attackBlockReason(state, targetId) === '';
-}
+
 
 /**
  * 普通攻击：只针对站立目标，健康 → 受伤，受伤 → 倒地；倒地后使用独立处决动作。
