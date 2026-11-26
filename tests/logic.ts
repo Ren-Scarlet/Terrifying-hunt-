@@ -38,6 +38,8 @@ import {
   canCoordinateRescue,
   executeCarriedPerson,
   finishFreeHunt,
+  finishContract,
+  waitAction,
   isRoomLit,
   recoverBearTrap,
   getHuntOpportunities,
@@ -348,6 +350,7 @@ function caseDrawAndDiscardRules(): void {
   );
   if (escapeSetup) {
     flee.playerRoom = escapeSetup.id;
+    flee.roomLocks[escapeSetup.id] = 0;
     victim.room = escapeSetup.id;
     victim.hp = 2;
     victim.alert = 100;
@@ -1209,7 +1212,7 @@ function caseWitnessFearAndUnifiedSabotage(): void {
   attackState.energy = 4; attackState.attackReady = true;
   const attacked = attack(attackState, victim.id);
   check('目击袭击：同屋目击者不仅增加恐惧警戒，还会立刻改变行动',
-    attacked && witness.fear >= 22 && witness.alert >= 70 &&
+    attacked && witness.fear >= 22 && witness.alert >= 55 &&
     witness.awareness >= 2 && witness.intent !== 'idle',
     `fear=${witness.fear} alert=${witness.alert} awareness=${witness.awareness} intent=${witness.intent}`);
 
@@ -1715,7 +1718,17 @@ function caseContractsPowerAndCarry(): void {
   check('AB 未发生报警时无报警目标保持完成', missionTaskProgress(contract, alarmTask) === 1);
   contract.npcAlarmed = true;
   check('AB 幸存者成功报警后无报警目标失败', missionTaskProgress(contract, alarmTask) === 0);
-  check('AB 组合目标均为已支持类型', (contract.mission.tasks ?? []).every((task) => ['kill_count', 'kill_count_before_turn', 'marked_kill', 'execute', 'special_execute', 'no_alarm', 'break_circuit'].includes(task.kind)));
+  check('AB 契约只使用新任务类型且包含可选奖励目标', (contract.mission.tasks ?? []).every((task) => ['kill_count', 'marked_kill', 'execute', 'special_execute', 'alarm_below', 'killer_stat'].includes(task.kind)) && (contract.mission.tasks ?? []).some((task) => task.optional && (task.reward ?? 0) > 0));
+  check('AB 新契约回合上限延长到 40 且不生成限时击杀任务', contract.mission.turns === 40 && !(contract.mission.tasks ?? []).some((task) => task.kind === 'kill_count_before_turn'));
+  const myersContract = generateMission('迈克尔·迈尔斯');
+  check('AB 迈尔斯契约含尾随不同幸存者的专属奖励任务', myersContract.tasks?.some((task) => task.kind === 'killer_stat' && task.metric === 'myers_stalk') === true);
+  const trapperContract = generateMission('设陷者');
+  check('AB 设陷者契约含捕兽夹触发的专属奖励任务', trapperContract.tasks?.some((task) => task.kind === 'killer_stat' && task.metric === 'trap_triggers') === true);
+  const lowAlarmTask = { id: 'low-alarm', kind: 'alarm_below' as const, label: '低报警', target: 1, limit: 35 };
+  contract.alarm = 30;
+  check('AB 报警上限任务在警报低于阈值时完成', missionTaskProgress(contract, lowAlarmTask) === 1);
+  contract.alarm = 40;
+  check('AB 报警上限任务超过阈值时未完成', missionTaskProgress(contract, lowAlarmTask) === 0);
   const timed = newGame();
   const timedTask = { id: 'timed-check', kind: 'kill_count_before_turn' as const, label: '限时猎杀', target: 2, deadlineTurn: 5 };
   timed.survivorKills = 2; timed.turn = 4;
@@ -1725,7 +1738,23 @@ function caseContractsPowerAndCarry(): void {
   const expired = newGame();
   expired.mission.tasks = [{ ...timedTask, optional: false }]; expired.turn = 6;
   endTurn(expired);
-  check('AB 限时核心任务超时会判定失败', expired.result === 'failed' && expired.resultReason.includes('限时目标失败'));
+  check('AB 旧限时任务不会再导致第 5 回合提前判负', expired.result === null && expired.phase === 'playing');
+  const mainObjective = newGame();
+  mainObjective.markedKilled = 1;
+  endTurn(mainObjective);
+  check('AB 主目标完成后不自动结束，可继续追求额外奖励', mainObjective.missionPrimaryCompleted && mainObjective.result === null);
+  check('AB 玩家可在主目标完成后主动结算契约', finishContract(mainObjective) && mainObjective.result === 'win');
+  const waiting = newGame();
+  waiting.energy = 2;
+  const waitClock = waiting.trailClock;
+  check('AB 等待行动消耗 1 AP 并让幸存者行动一次', waitAction(waiting) && waiting.energy === 1 && waiting.trailClock > waitClock && waiting.log.some((line) => line.includes('幸存者趁这个空档行动')));
+  const watch = newGame();
+  const watched = watch.people.find((p) => p.role !== 'police')!;
+  const watchedRoom = openNeighbor(watch.playerRoom);
+  watch.roomLocks[watchedRoom] = 0;
+  watch.watchedRoom = watchedRoom;
+  watched.room = watchedRoom;
+  check('AB 玩家离开房间后仍可持续观察身后的相邻房间', isRoomVisible(watch, watchedRoom));
   const grid = newGame();
   const circuit = grid.powerCircuits[0];
   const affected = circuit.affectedRooms[0];

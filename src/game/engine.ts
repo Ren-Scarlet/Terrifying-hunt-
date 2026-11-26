@@ -3439,7 +3439,7 @@ export function togglePowerCircuit(state: GameState, circuitId?: string): boolea
   addAlarm(state, 1);
   log(state, circuit.enabled
     ? `你合上了${circuit.name}电闸，供电恢复。`
-    : `你拉下了${circuit.name}电闸，${circuit.affectedRooms.map(roomName).join('、')}陷入黑暗。`);
+    : `你拉下了${circuit.name}电闸，${circuit.affectedRooms.map(roomName).join('、')}陷入黑暗，受影响房间的电子门锁失效。`);
   state.attackReady = true;
   afterPlayerAction(state);
   checkImmediateWin(state);
