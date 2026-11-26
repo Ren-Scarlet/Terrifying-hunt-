@@ -117,6 +117,8 @@ let scene: SceneHandle | null = null;
 /** 上一次的击杀数与暴露度：用来判断这一手是得手还是暴露了 */
 let lastKills = 0;
 let lastWanted = 0;
+/** 成功攻击后由下一次 render 消费，纯表现层，不进入存档或战斗状态。 */
+let pendingMapAttackTarget: string | null = null;
 
 const app = document.getElementById('app')!;
 
@@ -188,6 +190,24 @@ function render(): void {
   }
   if (guideOpen) html += renderGuide();
   app.innerHTML = html;
+  if (pendingMapAttackTarget !== null) {
+    const targetId = pendingMapAttackTarget;
+    pendingMapAttackTarget = null;
+    app.classList.remove('map-attack');
+    app.querySelectorAll<HTMLElement>('.attack-hit').forEach((node) => node.classList.remove('attack-hit'));
+    // Reflow restarts the short animation even when two attacks happen in succession.
+    void app.offsetWidth;
+    app.classList.add('map-attack');
+    if (targetId) {
+      app.querySelectorAll<HTMLElement>('[data-person-id]').forEach((node) => {
+        if (node.dataset.personId === targetId) node.classList.add('attack-hit');
+      });
+    }
+    window.setTimeout(() => {
+      app.classList.remove('map-attack');
+      app.querySelectorAll<HTMLElement>('.attack-hit').forEach((node) => node.classList.remove('attack-hit'));
+    }, 620);
+  }
   const immersiveActive = Boolean(game && screen === 'game');
   app.classList.toggle('immersive-game', immersiveActive);
   document.body.classList.toggle('immersive-hunt', immersiveActive);
@@ -667,7 +687,8 @@ app.addEventListener('click', (event) => {
     const personId = target.dataset.personId;
     if (personId) {
       const killsBefore = game.kills;
-      attack(game, personId);
+      const hit = attack(game, personId);
+      if (hit) pendingMapAttackTarget = personId;
       playSfx('attack');
       if (game.kills > killsBefore) playSfx('kill');
       lastLogHead = game.log[0] ?? '';
@@ -793,7 +814,8 @@ app.addEventListener('click', (event) => {
 
   if (action === 'attack') {
     const kills = game.kills;
-    attack(game);
+    const hit = attack(game);
+    if (hit) pendingMapAttackTarget = game.lastAttackedId ?? null;
     playSfx('attack');
     if (game.kills > kills) playSfx('kill');
     lastLogHead = game.log[0] ?? '';
