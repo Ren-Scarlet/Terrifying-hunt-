@@ -70,6 +70,7 @@ import {
 } from '../src/game/engine';
 import { CABINET_ROOMS, OBSTACLE_ROOMS, ROOM_MAP, ROOMS, buildLayout, doorMarkerPosition } from '../src/game/rooms';
 import { cardImage } from '../src/game/assetMap';
+import { readdirSync } from 'node:fs';
 import { personChip, personDetailHtml } from '../src/ui/render/shared';
 import { SURVIVOR_MAP } from '../src/game/survivors';
 import { generateMission } from '../src/game/missions';
@@ -481,8 +482,12 @@ function caseMyersStalkingAndFearRadius(): void {
   check('猎杀风格：失败任务仍显示行动评价，但不发胜利奖励',
     failedStyle.score > 0 && failedStyle.bonus === 0);
 
-  check('卡牌图标：新版初始卡和迈尔斯专属卡都有可用白色图案资源',
-    ['unbreakable','hex_huntress','hex_noed','scourge_shrine','distressing','hell','iron_grasp','deerstalker','hex_ruin','bitter_murmur','sloppy_butcher','insidious','myers_eclipse_light','myers_last_best','myers_plaything'].every((id) => !!cardImage(id) && cardImage(id)!.includes('assets/dbd/perks/')));
+  check('卡牌图标：每张卡都有图标文件，且直接使用以卡牌 id 命名的专属图标（不借用其他卡牌图案）',
+    (() => {
+      const files = new Set(readdirSync('public/assets/dbd/perks'));
+      return Object.keys(CARD_MAP).every((id) =>
+        files.has(`${id}.png`) && (cardImage(id)?.endsWith(`/${id}.png`) ?? false));
+    })());
   const normal = createGame(['silent_step'], undefined, '设陷者');
   check('恐惧范围：其他杀手仍保持默认 1', normal.fearRadius === 1);
 }
@@ -1660,10 +1665,10 @@ function caseNewPerkSystem(): void {
   );
   check('不屈不挠：免费擦刀同样移除至多两枚终局印记', freeWipe.myersLastBestMarks === 1, `攻击获得 1 枚后移除 2 枚，剩余=${freeWipe.myersLastBestMarks}`);
 
-  check('天灾：鬼魔神龛使用钩子图案而非恩赐解脱图案', cardImage('scourge_shrine')?.endsWith('/lure.png') ?? false, cardImage('scourge_shrine') ?? '无图标');
-  check('猎杀戾气使用血腥/利爪图案', cardImage('hex_huntress')?.endsWith('/harvest.png') ?? false);
-  check('粉碎希望使用诅咒/灵异图案', cardImage('hex_ruin')?.endsWith('/poltergeist.png') ?? false);
-  check('苦涩低语使用聆听/耳语图案', cardImage('bitter_murmur')?.endsWith('/wiretap.png') ?? false);
+  check('天灾：鬼魔神龛使用「天灾钩子：鬼魔神龛」的钩子图案', cardImage('scourge_shrine')?.endsWith('/scourge_shrine.png') ?? false, cardImage('scourge_shrine') ?? '无图标');
+  check('猎杀戾气使用「厄咒：猎杀戾气」的图腾图案', cardImage('hex_huntress')?.endsWith('/hex_huntress.png') ?? false);
+  check('粉碎希望使用「Shattered Hope」的碎裂图案', cardImage('hex_ruin')?.endsWith('/hex_ruin.png') ?? false);
+  check('苦涩低语使用「Bitter Murmur」的耳朵图案', cardImage('bitter_murmur')?.endsWith('/bitter_murmur.png') ?? false);
 
   const pool = deckCardsForKiller('迈克尔·迈尔斯');
   check('新版通用初始卡池恰好 12 张', pool.filter((card) => card.pool === 'initial').length === 12);
