@@ -53,7 +53,7 @@ import {
   nextStepToward,
   updateNpcDialogue,
 } from '../src/game/engine';
-import { OBSTACLE_ROOMS, ROOM_MAP, ROOMS, buildLayout } from '../src/game/rooms';
+import { OBSTACLE_ROOMS, ROOM_MAP, ROOMS, buildLayout, doorMarkerPosition } from '../src/game/rooms';
 import { cardImage } from '../src/game/assetMap';
 import { personChip } from '../src/ui/render/shared';
 import { SURVIVOR_MAP } from '../src/game/survivors';
@@ -191,17 +191,28 @@ function caseMyersStalkingAndFearRadius(): void {
   prey.intent = 'idle';
   prey.hp = 4;
   stalking.energy = 5;
+  stalking.fearRadius = 0;
   const stalkStart = stalking.stalkMeter;
   check('迈尔斯：未发觉目标首次尾随增加 15 点尾随值',
-    usePower(stalking, 'myers_gaze') && stalking.myersStalking && stalking.stalkMeter === stalkStart + 15 && stalking.energy === 4,
+    usePower(stalking, 'myers_gaze') && !stalking.myersStalking && stalking.stalkMeter === stalkStart + 15 && stalking.energy === 4 && stalking.stalkPressure === 0 && prey.alert === 0 && prey.intent === 'idle',
     `stalk=${stalking.stalkMeter} AP=${stalking.energy}`);
-  check('迈尔斯：第二次点击继续消耗行动并使目标开始起疑',
-    usePower(stalking, 'myers_gaze') && stalking.stalkMeter === stalkStart + 30 && stalking.energy === 3 && stalking.stalkPressure === 40 && prey.awareness >= 1,
-    `stalk=${stalking.stalkMeter} pressure=${stalking.stalkPressure} awareness=${prey.awareness}`);
-  const thirdStalk = withRandomSource(() => 0.99, () => usePower(stalking, 'myers_gaze'));
-  check('迈尔斯：持续盯梢第三次时目标逃离，不能稳定刷同一人',
-    thirdStalk && stalking.stalkMeter === stalkStart + 38 && stalking.stalkPressure === 0 && prey.intent === 'flee',
+  check('迈尔斯：重复观察只增加尾随值，不累积压力或惊动目标',
+    usePower(stalking, 'myers_gaze') && stalking.stalkMeter === stalkStart + 30 && stalking.energy === 3 && stalking.stalkPressure === 0 && !stalking.myersStalking && prey.alert === 0 && prey.intent === 'idle' && prey.awareness === 0,
+    `stalk=${stalking.stalkMeter} pressure=${stalking.stalkPressure} intent=${prey.intent}`);
+  const thirdStalk = usePower(stalking, 'myers_gaze');
+  check('迈尔斯：第三次观察仍然保持被动，不进入尾随姿态',
+    thirdStalk && stalking.stalkMeter === stalkStart + 45 && stalking.stalkPressure === 0 && !stalking.myersStalking && prey.intent === 'idle',
     `stalk=${stalking.stalkMeter} intent=${prey.intent}`);
+
+  const fleeingVisible = newGame();
+  const fleeingTarget = player(fleeingVisible);
+  fleeingTarget.room = fleeingVisible.playerRoom;
+  fleeingTarget.intent = 'flee';
+  fleeingTarget.movesThisTurn = 2;
+  fleeingVisible.fearRadius = 0;
+  fleeingVisible.energy = 2;
+  check('迈尔斯：视野内正在逃跑的 NPC 仍可被观察',
+    usePower(fleeingVisible, 'myers_gaze') && fleeingVisible.stalkMeter > 0 && fleeingVisible.energy === 1);
 
   const noPrey = newGame();
   const hiddenRoom = (Object.keys(ROOM_MAP) as RoomId[]).find((room) =>
@@ -1428,6 +1439,7 @@ let layoutAdjacencyFailures = 0;
 let layoutConnectivityFailures = 0;
 let layoutGardenFailures = 0;
 let layoutSizeVarietyFailures = 0;
+let layoutDoorMarkerFailures = 0;
 for (let seed = 1; seed <= 40; seed += 1) {
   withRandomSource(createSeededRandom(seed), () => buildLayout());
   const rects = ROOMS.map((room) => room.rect);
@@ -1442,6 +1454,7 @@ for (let seed = 1; seed <= 40; seed += 1) {
   }
   for (const room of ROOMS) {
     for (const neighborId of room.neighbors) {
+      if (!doorMarkerPosition(room.id, neighborId)) layoutDoorMarkerFailures += 1;
       const a = room.rect;
       const b = ROOM_MAP[neighborId].rect;
       const vertical = (
@@ -1471,6 +1484,7 @@ for (let seed = 1; seed <= 40; seed += 1) {
 buildLayout();
 check('不规则地图：40 组随机布局无房间重叠', layoutOverlapFailures === 0, `overlap=${layoutOverlapFailures}`);
 check('不规则地图：所有门都位于真实共边处', layoutAdjacencyFailures === 0, `invalid doors=${layoutAdjacencyFailures}`);
+check('不规则地图：每条可通行邻接边都有门形标记位置', layoutDoorMarkerFailures === 0, `missing door markers=${layoutDoorMarkerFailures}`);
 check('不规则地图：每局 23 个房间保持全图连通', layoutConnectivityFailures === 0, `disconnected maps=${layoutConnectivityFailures}`);
 check('不规则地图：后院始终只有车库一个入口', layoutGardenFailures === 0, `invalid garden exits=${layoutGardenFailures}`);
 check('不规则地图：每局至少出现三种房间尺寸', layoutSizeVarietyFailures === 0, `low-variety maps=${layoutSizeVarietyFailures}`);
