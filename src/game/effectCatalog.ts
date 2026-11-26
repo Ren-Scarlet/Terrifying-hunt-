@@ -45,6 +45,7 @@ export const EFFECT_OPS: Record<Op['op'], EffectOpMeta> = {
   wantedHalf: { label: '暴露度减半', fields: [] },
   alert: { label: '警觉', fields: [['who', 'who'], ['amount', 'num']] },
   block: { label: '定身', fields: [['who', 'who'], ['turns', 'num']] },
+  status: { label: '施加状态', fields: [['who', 'who'], ['status', 'text'], ['turns', 'num']] },
   pin: { label: '钉住', fields: [['who', 'who']] },
   move: { label: '强制移动', fields: [['who', 'who'], ['to', 'dest']] },
   teleportPlayer: { label: '自己移动', fields: [['to', 'dest']] },
