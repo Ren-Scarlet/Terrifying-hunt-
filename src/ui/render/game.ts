@@ -470,7 +470,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
   state.people
     .filter((p) => p.role !== 'police' && p.hp <= 0)
     .forEach((p) => {
-      statusBits.push(`<span class="status-badge downed">${escape(p.name)} 倒地 · ${p.downedTurns >= DOWNED_LOCK_TURNS ? '现在可以补刀处决' : `还要等 ${DOWNED_LOCK_TURNS - p.downedTurns} 回合才能补刀`} · 可能被同伴救起</span>`);
+      statusBits.push(`<span class="status-badge downed">${escape(p.name)} 倒地 · 可立即处决 · 同伴仍可能救起</span>`);
     });
   const statusHtml = statusBits.length ? `<div class="status-strip">${statusBits.join('')}</div>` : '';
   const standingHere = here.filter((person) => person.hp > 0);
@@ -558,8 +558,6 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
           ${killerFaceHtml(killer, 'chip')}
           <span>${escape(killer.owner)} · ${escape(killer.title)}</span>
         </div>
-        ${meter}
-        ${myersMarks}
       </div>
       <div class="mission-strip ${urgent ? 'urgent' : ''}">
         <div class="mission-icon">${icon('missionTarget', 'ui-icon')}</div>
