@@ -318,7 +318,7 @@ scripts/
 
 ## 卡牌与图标对照
 
-图标来自 [dbdwiki](https://dbdwiki.com/index.html) 的杀手技能精灵图，一卡一图标、互不重复。**卡名采用图鉴技能的官方中文名，和图标严格一一对应**；具体数值与结算效果为本作按这套规则重新设计的，不是照搬原作。
+图标来自 [dbdwiki（迷雾笔记）](https://dbdwiki.com/index.html) 的杀手技能精灵图，一卡一图标。**卡名采用图鉴技能的官方中文名，图标就是卡名所指的那枚技能**（同名的两张卡共用同一枚图鉴图标，如「牢牢紧握」）；具体数值与结算效果为本作按这套规则重新设计的，不是照搬原作。
 
 | 卡牌 id | 卡牌 | 费用 | 类型 | 原技能 |
 | --- | --- | --- | --- | --- |
@@ -351,6 +351,23 @@ scripts/
 | `block_gate` | 花言巧语 | 2 | 布局 | Bamboozle |
 | `ghost_light` | 致命追踪者 | 1 | 布局 | Lethal Pursuer |
 | `false_report` | 厄咒：惩戒 | 2 | 布局 | Hex: Retribution |
+| `unbreakable` | 不屈不挠 | 0 | 技能 | Unrelenting |
+| `hex_huntress` | 厄咒：猎杀戾气 | 1 | 布局 | Hex: Thrill of the Hunt |
+| `hex_noed` | 厄咒：难逃一死 | 1 | 布局 | Hex: No One Escapes Death |
+| `scourge_shrine` | 天灾：鬼魔神龛 | 1 | 布局 | Scourge Hook: Monstrous Shrine |
+| `distressing` | 恐惧释放 | 1 | 技能 | Distressing |
+| `hell` | 恶灵地狱 | 1 | 技能 | Whispers（恶灵低语）* |
+| `iron_grasp` | 牢牢紧握 | 1 | 战术 | Iron Grasp |
+| `deerstalker` | 猎鹿者 | 1 | 技能 | Deerstalker |
+| `hex_ruin` | 粉碎希望 | 1 | 布局 | Shattered Hope |
+| `bitter_murmur` | 苦涩低语 | 1 | 技能 | Bitter Murmur |
+| `sloppy_butcher` | 辣手屠夫 | 1 | 技能 | Sloppy Butcher |
+| `insidious` | 静止隐身 | 1 | 技能 | Insidious |
+| `myers_eclipse_light` | 湮灭之光 | 1 | 技能 | Dying Light（图鉴图标现归入 Cull the Weak） |
+| `myers_last_best` | 把最好的留在最后 | 1 | 技能 | Save the Best for Last |
+| `myers_plaything` | 戏耍食物 | 1 | 战术 | Play with Your Food |
+
+\* 图鉴中没有名为「恶灵地狱」的技能，取名称与效果（感知附近逃生者）最接近的官方技能「恶灵低语 Whispers」的图标替代。
 
 图标文件名与卡牌 id 一一对应：`public/assets/dbd/perks/<id>.png`。重新生成（会打印上面这张表的实际命中结果）：
 
