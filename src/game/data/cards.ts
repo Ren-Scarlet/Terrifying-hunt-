@@ -281,15 +281,13 @@ export const CARDS: CardDef[] = [
     name: '囤积者',
     cost: 1,
     type: 'skill',
-    desc: '搜索当前房间：把躲在柜子、床底的人揪出来（他们无法再躲），证据 +1。',
+    desc: '搜索当前房间：把躲在柜子、床底的人揪出来（他们无法再躲）。'
     flavor: '每一张纸都可能是一把钥匙。',
     sourceSkill: 'Hoarder',
     sourceText: '额外生成箱子，并提示有人开箱。',
-    // 这是「证据销毁」唯一稳定的证据来源，必须起始就有
     unlocked: true,
     ops: [
       { op: 'search' },
-      { op: 'evidence', amount: 1 },
       { op: 'log', text: '你翻开每一个能藏人的角落。' },
     ],
   },
@@ -724,6 +722,5 @@ export const STARTING_DECK: string[] = [
 export const UNLOCK_REWARDS: Record<string, string> = {
   assassinate: 'harvest',
   bodyCount: 'final_blow',
-  evidence: 'search',
   escape: 'evacuate',
 };
