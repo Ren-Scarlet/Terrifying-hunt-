@@ -1978,6 +1978,11 @@ function npcTurn(state: GameState): void {
     if (person.hp <= 0 || previousRoom === undefined || previousRoom === person.room) continue;
     const trap = state.bearTraps.find((item) => item.armed && item.room === person.room);
     if (!trap) continue;
+    if (trap.discovered) {
+      trap.armed = false;
+      log(state, `${person.name} 发现并拆除了${roomName(person.room)}的捕兽夹。`);
+      continue;
+    }
     if (person.alert >= 40 && random() < 0.4) {
       trap.discovered = true;
       person.awareness = Math.max(person.awareness, 2);
@@ -3249,7 +3254,9 @@ export function canUsePower(state: GameState, powerId: string): boolean {
   if (powerCooldown(state, powerId) > 0) return false;
   if (powerId === 'trap_set') return trapPlacementBlockReason(state) === null;
   if (powerId === 'nurse_blink') {
-    if (state.killer !== '护士' || state.nurseFollowUp || state.energy < 1) return false;
+    if (state.killer !== '护士') return false;
+    if (state.nurseBlinkTargeting) return true;
+    if (state.nurseFollowUp || state.energy < 1) return false;
     return ROOMS.some((room) => room.id !== state.playerRoom && roomDistance(state.playerRoom, room.id) <= 3);
   }
   if (powerId === 'huntress_axe') {
@@ -3275,6 +3282,7 @@ export function powerBlockReason(state: GameState, powerId: string): string {
   if (cd > 0) return `冷却中，还要 ${cd} 回合`;
   if (powerId === 'trap_set') return trapPlacementBlockReason(state) ?? '';
   if (powerId === 'nurse_blink') {
+    if (state.nurseBlinkTargeting) return '再次点击可取消闪现选点';
     if (state.nurseFollowUp) return '闪现后的抓取窗口尚未结束';
     if (state.energy < 1) return '至少需要 1 点行动点';
     return '';
