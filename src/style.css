@@ -462,6 +462,7 @@ button { font-family: inherit; cursor: pointer; }
   flex: 0 0 auto;
 }
 .chip-alert.mid { background: #4b3f27; color: #e8cf9a; border-color: #6b5c38; }
+.chip-alert.panic { background: #57331e; color: #f0bd86; border-color: #8a5633; }
 .chip-alert.high { background: #6f2418; color: #ffd9cd; border-color: #9c3f2b; box-shadow: 0 0 8px #8d3a2caa; }
 .alert-tag { font-style: normal; font-size: 9px; padding: 0 4px; border-radius: 1px; background: #2c2a24; color: #8f8a7e; font-family: var(--font-num); }
 .alert-tag.mid { background: #3d3423; color: #dbc58f; }
