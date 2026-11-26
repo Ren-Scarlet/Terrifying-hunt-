@@ -12,6 +12,8 @@ let focusY = 0;
 let frame = 0;
 let previousFrameTime = 0;
 let taskDrawerOpen = false;
+let intelDrawerOpen = false;
+let hudHidden = false;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
@@ -85,6 +87,10 @@ export function syncImmersiveCamera(nextRoot: HTMLElement): void {
   root = nextRoot;
   const map = root.querySelector<HTMLElement>('.floorplan');
   if (!map) return;
+  root.querySelector<HTMLElement>('.task-detail-drawer')?.classList.toggle('open', taskDrawerOpen);
+  const intel = root.querySelector<HTMLDetailsElement>('.intel-drawer');
+  if (intel) intel.open = intelDrawerOpen;
+  root.classList.toggle('hud-hidden', hudHidden);
   if (!frame) frame = window.requestAnimationFrame(loop);
   applyTransform();
 }
@@ -139,11 +145,12 @@ export function handleImmersiveAction(action: string | undefined): boolean {
   }
   if (action === 'toggle-intel-drawer') {
     const drawer = root?.querySelector<HTMLDetailsElement>('.intel-drawer');
-    if (drawer) drawer.open = !drawer.open;
+    if (drawer) { intelDrawerOpen = !intelDrawerOpen; drawer.open = intelDrawerOpen; }
     return true;
   }
   if (action === 'toggle-game-hud') {
-    root?.classList.toggle('hud-hidden');
+    hudHidden = !hudHidden;
+    root?.classList.toggle('hud-hidden', hudHidden);
     return true;
   }
   return false;
