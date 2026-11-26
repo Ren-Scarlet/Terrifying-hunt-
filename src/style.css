@@ -3319,3 +3319,83 @@ button, .room-hit, .hand-row { touch-action: manipulation; }
   padding: 5px 2px 2px;
   box-sizing: border-box;
 }
+
+
+/* 小房间内容完整性：压缩为图标优先布局，避免设施横向溢出后被房间裁切。 */
+#app .floorplan .room.room-size-small {
+  overflow: visible;
+  z-index: 5;
+  padding: 4px 5px;
+  gap: 2px;
+}
+#app .floorplan .room.room-size-small .room-head {
+  min-width: 0;
+  gap: 2px;
+}
+#app .floorplan .room.room-size-small .room-name {
+  min-width: 0;
+  max-width: 100%;
+  font-size: 10px;
+  letter-spacing: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+#app .floorplan .room.room-size-small .room-tag {
+  max-width: 48%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 8px;
+  padding: 0 2px;
+  letter-spacing: 0;
+}
+#app .floorplan .room.room-size-small .room-features {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  max-width: 100%;
+  overflow: visible;
+}
+#app .floorplan .room.room-size-small .room-feature {
+  flex: 0 0 17px;
+  width: 17px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0;
+  gap: 0;
+}
+#app .floorplan .room.room-size-small .room-feature b { display: none; }
+#app .floorplan .room.room-size-small .room-feature .ui-icon {
+  width: 13px;
+  height: 13px;
+}
+#app .floorplan .room.room-size-small .room-people {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  width: 100%;
+  max-height: none;
+  overflow: visible;
+  margin-top: 1px;
+}
+#app .floorplan .room.room-size-small .person-chip {
+  flex: 0 1 auto;
+  min-height: 20px;
+  max-width: 100%;
+  gap: 2px;
+  padding: 0 3px 0 0;
+  font-size: 9px;
+}
+#app .floorplan .room.room-size-small .person-chip img {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+}
+#app .floorplan .room.room-size-small .person-chip span {
+  max-width: 42px;
+  font-size: 9px;
+}
+#app .floorplan .room.room-size-small .room-shadows {
+  max-width: 100%;
+}
