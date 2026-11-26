@@ -2563,12 +2563,17 @@ button, .room-hit, .hand-row { touch-action: manipulation; }
   .topbar { flex-direction: column; }
   .topbar-identity { width: 100%; }
   .mission-strip { width: 100%; }
-  .hunt-plan { grid-template-columns: 1fr 1.2fr; }
-  .hunt-plan-prep { grid-column: 1 / -1; }
+  .hunt-plan {
+    grid-template-columns: 1fr 1.2fr;
+    grid-template-areas: "heading focus" "guidance guidance" "prep prep";
+  }
 }
 @media (max-width: 700px) {
-  .hunt-plan { grid-template-columns: 1fr; gap: 7px; }
-  .hunt-plan-prep { grid-column: auto; }
+  .hunt-plan {
+    grid-template-columns: 1fr;
+    grid-template-areas: "heading" "focus" "guidance" "prep";
+    gap: 7px;
+  }
   .card-detail-inline { grid-template-columns: 1fr; gap: 4px; }
   .intel-grid, .intel-grid .roster { grid-template-columns: 1fr; }
   .intel-log-panel { grid-column: auto; }
