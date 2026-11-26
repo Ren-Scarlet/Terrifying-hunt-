@@ -281,7 +281,7 @@ export const CARDS: CardDef[] = [
     name: '囤积者',
     cost: 1,
     type: 'skill',
-    desc: '搜索当前房间：把躲在柜子、床底的人揪出来（他们无法再躲）。'
+    desc: '搜索当前房间：把躲在柜子、床底的人揪出来（他们无法再躲）。',
     flavor: '每一张纸都可能是一把钥匙。',
     sourceSkill: 'Hoarder',
     sourceText: '额外生成箱子，并提示有人开箱。',
