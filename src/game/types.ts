@@ -259,7 +259,7 @@ export interface Disturbance {
 
 export type MissionKind = 'assassinate' | 'bodyCount' | 'escape';
 
-export type MissionTaskKind = 'kill_count' | 'marked_kill' | 'execute' | 'special_execute' | 'no_alarm' | 'break_circuit';
+export type MissionTaskKind = 'kill_count' | 'kill_count_before_turn' | 'marked_kill' | 'execute' | 'special_execute' | 'no_alarm' | 'break_circuit';
 
 export interface MissionTask {
   id: string;
@@ -268,6 +268,8 @@ export interface MissionTask {
   target: number;
   /** optional 仅提供额外奖励，不阻止核心任务通关。 */
   optional?: boolean;
+  /** 限时击杀目标的最晚回合；仅 kill_count_before_turn 使用。 */
+  deadlineTurn?: number;
 }
 
 export interface Mission {
@@ -390,6 +392,8 @@ export interface GameState {
   drawPile: CardInstance[];
   discardPile: CardInstance[];
   mission: Mission;
+  /** 已在期限内完成的任务 ID，避免后续回合让限时目标倒退。 */
+  completedMissionTasks: string[];
   log: string[];
   kills: number;
   killsThisTurn: number;
