@@ -2736,7 +2736,76 @@ export function searchRoom(state: GameState): boolean {
 
 /** 为什么现在砸不了：用于按钮禁用与日志 */
 export function isRoomLit(state: GameState, room: RoomId): boolean {
-  return state.powerCircuits.some((c) => !c.broken && c.affectedRooms.includes(room));
+  return state.powerCircuits.some((c) =>
+    !c.broken && (c.flickerTurns ?? 0) <= 0 && c.affectedRooms.includes(room),
+  );
+}
+
+/**
+ * 每三回合发生一次环境事件。事件改变当前局势，而不是只弹一条装饰性文本：
+ * 雷雨暂时压低暴露度、照明故障制造黑暗、电话铃声引出求救者、玻璃碎裂制造线索。
+ */
+function triggerEnvironmentalEvent(state: GameState): void {
+  if (state.turn % 3 !== 0) return;
+  const event = randomOf(['storm', 'flicker', 'phone', 'glass'] as const);
+
+  if (event === 'storm') {
+    state.alarm = Math.max(0, state.alarm - 4);
+    syncWanted(state);
+    log(state, '【环境事件】雷雨突然压境，雨声盖住了屋内的动静。暴露度 -4。');
+    return;
+  }
+
+  if (event === 'flicker') {
+    const circuits = state.powerCircuits.filter((circuit) =>
+      !circuit.broken && (circuit.flickerTurns ?? 0) === 0,
+    );
+    if (circuits.length) {
+      const circuit = randomOf(circuits);
+      circuit.flickerTurns = 1;
+      log(state, `【环境事件】${circuit.name}的灯光突然闪烁，整片区域陷入短暂黑暗。`);
+      return;
+    }
+  }
+
+  if (event === 'phone' && !state.phoneCut) {
+    const callers = npcs(state).filter((person) =>
+      person.hp > 0 && !person.hidden && person.archetype === 'alert' && person.goal !== 'phone',
+    );
+    if (callers.length) {
+      const person = randomOf(callers);
+      person.goal = 'phone';
+      person.alert = clamp(Math.max(45, person.alert + 18), 0, 100);
+      person.awareness = Math.max(person.awareness, 2);
+      person.intent = 'call';
+      person.activity = '被突然响起的电话吸引，正赶去求救';
+      log(state, `【环境事件】电话突然响起。${person.name}听见铃声，正朝电话赶去——再不阻止，他可能会报警。`);
+      return;
+    }
+  }
+
+  // 玻璃碎裂是其他事件无法触发时的可靠兜底，也会成为短时地图线索。
+  const knownRooms = ROOMS.filter((room) => state.explored.includes(room.id) && room.id !== state.playerRoom);
+  const room = randomOf(knownRooms.length ? knownRooms : ROOM_MAP[state.playerRoom].neighbors.map((id) => ROOM_MAP[id]));
+  if (!room) {
+    log(state, '【环境事件】屋外传来一阵异响，整栋房子短暂安静下来。');
+    return;
+  }
+  state.disturbances.push({
+    room: room.id,
+    turn: state.turn,
+    clock: state.trailClock,
+    label: '玻璃碎裂声',
+  });
+  if (state.disturbances.length > 24) state.disturbances.splice(0, state.disturbances.length - 24);
+  const startled = npcs(state).filter((person) => person.hp > 0 && !person.hidden && person.room === room.id);
+  startled.forEach((person) => {
+    person.alert = clamp(person.alert + 12, 0, 100);
+    person.awareness = Math.max(person.awareness, 1);
+    person.intent = 'wary';
+    person.activity = '被玻璃碎裂声惊动，正查看四周';
+  });
+  log(state, `【环境事件】${room.name}突然传来玻璃碎裂声${startled.length ? `，${startled.map((person) => person.name).join('、')}被惊动了` : '，声音在空房间里回荡'}。`);
 }
 
 export function sabotageBlockReason(state: GameState): string | null {
@@ -3114,6 +3183,10 @@ export function endTurn(state: GameState): void {
   state.siteItems.forEach((i) => {
     if (i.jammedTurns > 0) i.jammedTurns -= 1;
   });
+  // 临时闪断只持续一个完整回合，不会把电闸永久标记为已破坏。
+  state.powerCircuits.forEach((circuit) => {
+    if ((circuit.flickerTurns ?? 0) > 0) circuit.flickerTurns = Math.max(0, (circuit.flickerTurns ?? 0) - 1);
+  });
   state.cooldowns = Object.fromEntries(
     Object.entries(state.cooldowns)
       .map(([k, v]) => [k, v - 1])
@@ -3129,6 +3202,7 @@ export function endTurn(state: GameState): void {
 
   // 手牌保留；每个新回合只补 1 张，不再整手弃掉重抽。
   state.turn += 1;
+  triggerEnvironmentalEvent(state);
   // 杀戮满值 = 移动力提升：每回合多 2 点行动点，但绝不替玩家走第二步
   const frenzyBonus = state.frenzy >= FRENZY_THRESHOLD ? FRENZY_AP_BONUS : 0;
   state.energy = Math.max(
