@@ -1,4 +1,5 @@
 import { ROOM_MAP, ROOMS } from './rooms';
+import { random } from './random';
 import type { RoomId } from './types';
 
 export type HuntingGroundId = 'midwich' | 'ormond' | 'badham' | 'asylum' | 'lampkin';
@@ -189,7 +190,7 @@ export function getHuntingGround(id?: string): HuntingGround {
 
 export function rollHuntingGround(exclude?: HuntingGroundId): HuntingGround {
   const pool = HUNTING_GROUNDS.filter((ground) => ground.id !== exclude);
-  return pool[Math.floor(Math.random() * pool.length)] ?? HUNTING_GROUNDS[0];
+  return pool[Math.floor(random() * pool.length)] ?? HUNTING_GROUNDS[0];
 }
 
 /** 切换场地时先还原基础房间，再套用该场地的房间名称与环境描述。 */
