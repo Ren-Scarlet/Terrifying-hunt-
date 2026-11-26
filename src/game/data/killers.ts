@@ -40,7 +40,7 @@ const NOTE = '力量名称与图标取自图鉴站；能力机制为本作原创
 export const KILLERS: KillerProfile[] = [
   {
     owner: '设陷者',
-    portrait: 'assets/characters/killers/设陷者.webp',
+    portrait: 'assets/characters/killers/设陷者立绘.webp',
     title: '捕兽夹',
     icon: 'assets/dbd/powers/设陷者.png',
     school: 'grounded',
@@ -93,7 +93,7 @@ export const KILLERS: KillerProfile[] = [
   },
   {
     owner: '护士',
-    portrait: 'assets/characters/killers/护士.webp',
+    portrait: 'assets/characters/killers/护士立绘.webp',
     title: '斯宾塞的濒死之息',
     icon: 'assets/dbd/powers/护士.png',
     school: 'supernatural',
@@ -110,7 +110,7 @@ export const KILLERS: KillerProfile[] = [
   },
   {
     owner: '女猎手',
-    portrait: 'assets/characters/killers/女猎手.webp',
+    portrait: 'assets/characters/killers/女猎手立绘.webp',
     title: '狩猎飞斧',
     icon: 'assets/dbd/powers/女猎手.png',
     school: 'grounded',
