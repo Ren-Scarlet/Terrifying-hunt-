@@ -565,7 +565,7 @@ export const CARDS: CardDef[] = [
   },
   {
     id: 'hell',
-    name: '恶灵地狱',
+    name: '恶灵低语',
     cost: 1,
     type: 'skill',
     desc: '选择地图上的任意一个房间；若房间内有人，显示其中所有人类的气场 2 次后续行动。',
@@ -586,7 +586,7 @@ export const CARDS: CardDef[] = [
     unlocked: true,
     pool: 'initial',
     precheck: { cond: { c: 'victimHere' }, hint: '当前房间没有可以按住的幸存者。' },
-    ops: [{ op: 'pin', who: 'victim' }],
+    ops: [{ op: 'block', who: 'victim', turns: 1 }],
   },
   {
     id: 'deerstalker',
