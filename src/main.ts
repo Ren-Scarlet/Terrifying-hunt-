@@ -17,6 +17,8 @@ import {
   endTurn,
   giveUp,
   finishFreeHunt,
+  finishContract,
+  waitAction,
   lookAround,
   lookAtRoom,
   cancelLookSelection,
@@ -237,7 +239,7 @@ function sfxFromLogs(): void {
   else if (/发电机重新亮了起来|用钥匙捅开|联系上了外面|修发电机/.test(head)) playSfx('objective');
   else if (/地图出现两个逃生点|第四阶段完成/.test(head)) playSfx('gate');
   else if (/幸存者团队完成第/.test(head)) playSfx('stage');
-  else if (/红色人影|显形|监视值满了/.test(head)) playSfxRepeat('heartbeat', 3);
+  else if (/发现了捕兽夹|发现并拆除了|忽然抬头|猛一回头|察觉到异常/.test(head)) playVoice(head, 'Startle');
   else if (/恶魔附身：/.test(head)) playSfx('possess');
   else if (/打倒在地上|受到 \d+ 点伤害/.test(head)) playVoice(head, 'Hit');
   else if (/受伤了（|在流血/.test(head)) playVoice(head, 'Hurt');
@@ -620,7 +622,9 @@ app.addEventListener('click', (event) => {
   if (action === 'power') {
     if (!game || screen !== 'game') return;
     const powerId = target.dataset.power;
+    const wasPossessed = game.possessed;
     if (powerId) usePower(game, powerId);
+    if (!wasPossessed && game.possessed && game.killer === '迈克尔·迈尔斯') playSfx('possess');
     afterAction();
     return;
   }
@@ -763,6 +767,9 @@ app.addEventListener('click', (event) => {
     afterAction();
     return;
   }
+
+  if (action === 'wait') { waitAction(game); afterAction(); return; }
+  if (action === 'finish-contract') { finishContract(game); afterAction(); return; }
 
   if (action === 'end-turn') {
     endTurn(game);

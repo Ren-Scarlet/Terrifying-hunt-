@@ -281,7 +281,8 @@ export interface Disturbance {
 
 export type MissionKind = 'assassinate' | 'bodyCount' | 'escape';
 
-export type MissionTaskKind = 'kill_count' | 'kill_count_before_turn' | 'marked_kill' | 'execute' | 'special_execute' | 'no_alarm' | 'break_circuit';
+export type MissionTaskKind = 'kill_count' | 'kill_count_before_turn' | 'marked_kill' | 'execute' | 'special_execute' | 'no_alarm' | 'break_circuit' | 'alarm_below' | 'killer_stat';
+export type MissionTaskMetric = 'myers_stalk' | 'trap_triggers' | 'nurse_grabs';
 
 export interface MissionTask {
   id: string;
@@ -292,6 +293,9 @@ export interface MissionTask {
   optional?: boolean;
   /** 限时击杀目标的最晚回合；仅 kill_count_before_turn 使用。 */
   deadlineTurn?: number;
+  limit?: number;
+  metric?: MissionTaskMetric;
+  reward?: number;
 }
 
 export interface Mission {
@@ -428,7 +432,10 @@ export interface GameState {
   drawPile: CardInstance[];
   discardPile: CardInstance[];
   mission: Mission;
-  /** 已在期限内完成的任务 ID，避免后续回合让限时目标倒退。 */
+  missionPrimaryCompleted: boolean;
+  myersStalkedIds: string[];
+  watchedRoom: RoomId | null;
+  /** 已在期限内完成的任务 ID，兼容旧任务结构。 */
   completedMissionTasks: string[];
   log: string[];
   kills: number;

@@ -25,7 +25,7 @@ function log(state: GameState, message: string): void {
 
 export function createGame(
   deckIds: string[],
-  mission = generateMission(),
+  mission: Mission | undefined = undefined,
   killer = '迈克尔·迈尔斯',
   mapId: HuntingGroundId = 'lampkin',
 ): GameState {
@@ -34,12 +34,13 @@ export function createGame(
   buildLayout(ground.layoutStyle);
   applyHuntingGround(ground.id);
 
+  const killerId = KILLER_MAP[killer] ? killer : '迈克尔·迈尔斯';
+  const activeMission = mission ?? generateMission(killerId);
+  const people = createPeople(activeMission).filter((person) => KILLER_MAP[killerId].school !== 'supernatural' || person.role !== 'police');
   const pile = shuffle(deckIds.filter((id) => CARD_MAP[id])).map<CardInstance>((defId) => ({
     uid: uid('card'),
     defId,
   }));
-  const killerId = KILLER_MAP[killer] ? killer : '迈克尔·迈尔斯';
-  const people = createPeople(mission);
   const sacrifice = randomOf(people.filter((person) => person.role !== 'police'));
   if (sacrifice) sacrifice.bloodSacrifice = true;
   const state: GameState = {
@@ -48,7 +49,7 @@ export function createGame(
     killer: killerId,
     killerRuntime: { killUsed: false, moveUsed: false, attackUsed: false, witnessUsed: false },
     // 逮捕阈值已废弃（警戒与逮捕合并），保留字段只为兼容旧存档
-    arrestThreshold: 5 + (mission.targetCount ?? 1),
+    arrestThreshold: 5 + (activeMission.targetCount ?? 1),
     turn: 1,
     // 走路 / 砍人 / 打牌 / 搜索共用这一个池子，原来「能量 + 步数」两套资源合并
     energy: BASE_AP,
@@ -82,7 +83,10 @@ export function createGame(
     hand: [],
     drawPile: pile,
     discardPile: [],
-    mission,
+    mission: activeMission,
+    missionPrimaryCompleted: false,
+    myersStalkedIds: [],
+    watchedRoom: null,
     completedMissionTasks: [],
     log: [],
     kills: 0,
@@ -200,6 +204,11 @@ export function createGame(
     (id) => id !== ENTRY_ROOM && id !== EXIT_ROOM && !ESCAPE_ROOMS.includes(id) && !OBSTACLE_ROOMS.includes(id),
   );
   state.objectiveRooms = shuffle(objPool).slice(0, 3);
+  // 少数幸存者开局会躲在上锁房间；断开对应区域电力可令电子门锁失效。
+  const lockedHomes = shuffle([...new Set(state.people.filter((person) => person.role !== 'police').map((person) => person.room))])
+    .filter((room) => ROOM_MAP[room].neighbors.length >= 2 && state.powerCircuits.some((circuit) => circuit.affectedRooms.includes(room) && !circuit.broken))
+    .slice(0, 2);
+  lockedHomes.forEach((room) => { state.roomLocks[room] = state.mission.turns; });
   state.teamGoalLabel = '';
 
   // 场地物品：道具箱固定 2 个，发电机随机 1~2 台，撒在能走的房间里。
@@ -250,7 +259,8 @@ export function createGame(
     });
   drawCards(state, 5);
   log(state, `猎场：${ground.name} · ${ground.ruleName}：${ground.ruleDescription}`);
-  log(state, `契约已接取：${mission.title}`);
+  log(state, `契约已接取：${activeMission.title}`);
+  if (lockedHomes.length) log(state, `有 ${lockedHomes.length} 间住屋从内部上锁。封锁房门会阻挡通行与视线；切断对应区域电力可使电子门锁失效，或在门外强行破门。`);
   if (sacrifice) log(state, `血祭品已标记：${sacrifice.name}。此标记本身没有额外效果。`);
   log(state, `你以「${killerId}」的身份行动。每回合 ${BASE_AP} 点行动点：走路、挥刀、出牌、搜索柜子都从这里扣。`);
   log(state, '留意每个人的恐惧值与警戒值：恐惧会使人崩溃，警戒会促使人报警或逃跑。');

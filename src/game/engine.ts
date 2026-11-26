@@ -111,7 +111,6 @@ const OBJECTIVE_GAIN = 5;
 /** 擦刀：原地花 1 点收回刀锋，但这一次动作幸存者也会跟着动 */
 export const WIPE_COST = 1;
 /** 每多追同一名幸存者一回合，其他人的工作效率 +25%，最多翻倍 */
-const CHASE_WORK_BONUS = 0.25;
 /** 同屋有倒地同伴时，各原型把人拉起来的意愿（0~1）：人人都可能救，只是有人更奋不顾身 */
 const RESCUE_EAGERNESS: Record<Archetype, number> = {
   rescuer: 1,
@@ -163,7 +162,7 @@ function scaleSurvivorProgress(state: GameState, person: Person, amount: number)
 
 function teamWorkGain(state: GameState, person: Person): number {
   const base = Math.round(
-    OBJECTIVE_GAIN * (1 + Math.min(1, state.chaseTurns * CHASE_WORK_BONUS) + workPressure(state)),
+    OBJECTIVE_GAIN * (1 + workPressure(state)),
   );
   return scaleSurvivorProgress(state, person, base);
 }
@@ -196,7 +195,7 @@ function clamp(value: number, min: number, max: number): number {
 
 function log(state: GameState, text: string): void {
   state.log.unshift(`[第 ${state.turn} 回合] ${text}`);
-  if (state.log.length > 60) state.log.length = 60;
+  if (state.log.length > 500) state.log.length = 500;
 }
 
 /** 按实际步行路径计算地图上距离最远的一对房间。 */
@@ -284,7 +283,7 @@ function findVictim(
 }
 
 export function isLocked(state: GameState, room: RoomId): boolean {
-  return (state.roomLocks[room] ?? 0) > 0;
+  return (state.roomLocks[room] ?? 0) > 0 && isRoomLit(state, room);
 }
 
 export function lockedRoomsOf(state: GameState): RoomId[] {
@@ -411,6 +410,7 @@ function forwardRoom(state: GameState): RoomId | null {
   let bestDot = 0.35;
 
   for (const neighborId of current.neighbors) {
+    if (isLocked(state, current.id) || isLocked(state, neighborId)) continue;
     const neighbor = ROOM_MAP[neighborId];
     const dx = neighbor.rect.left + neighbor.rect.width / 2 - cx;
     const dy = neighbor.rect.top + neighbor.rect.height / 2 - cy;
@@ -432,6 +432,7 @@ function forwardRoom(state: GameState): RoomId | null {
  */
 export function isRoomVisible(state: GameState, room: RoomId): boolean {
   if (room === state.playerRoom || room === forwardRoom(state)) return true;
+  if (room === state.watchedRoom && ROOM_MAP[state.playerRoom].neighbors.includes(room) && !isLocked(state, room) && !isLocked(state, state.playerRoom)) return true;
   return (state.scouted[room] ?? 0) > 0;
 }
 
@@ -1508,14 +1509,17 @@ function interruptPlayer(state: GameState, reason: string, actorId: string): voi
 function survivorsActOnce(state: GameState, actorId: string): void {
   const before = snapshotRooms(state);
   for (const p of npcs(state)) {
-    if (p.hp <= 0 || p.hidden) continue;
-    if (p.room === state.playerRoom && p.movesThisTurn < REACT_MOVE_CAP) {
-      fleeAway(state, p);
-      p.movesThisTurn += 1;
-    } else if (state.teamProgress < TEAM_GOAL_MAX) {
-      addTeamProgress(state, scaleSurvivorProgress(state, p, 2));
+    if (p.hp <= 0 || p.hidden || p.blockedTurns > 0 || p.movesThisTurn >= REACT_MOVE_CAP) continue;
+    const from = p.room;
+    if (p.room === state.playerRoom) { if (p.awareness >= 2 || p.alert >= 40) fleeAway(state, p); }
+    else if (p.awareness >= 2 || p.alert >= 40 || ['flee', 'escape', 'call', 'heal', 'rescue'].includes(p.intent)) actByArchetype(state, p);
+    else if (random() < 0.35) {
+      const options = ROOM_MAP[p.room].neighbors.filter((room) => room !== state.playerRoom && !isLocked(state, room));
+      if (options.length) { const next = randomOf(options); p.room = next; p.activity = `趁你等待时移动到${roomName(next)}`; }
     }
+    if (p.room !== from) p.movesThisTurn += 1;
   }
+  resolveTrapEntries(state, before);
   void actorId;
   recordTrails(state, before);
 }
@@ -2322,8 +2326,8 @@ function escapePhase(state: GameState): void {
     // 不再用「逃够 N 个就立刻输」的硬阈值——那会让幸存者的个人目标失去博弈空间。
     const remainingHumans = state.people.filter((p) => p.role !== 'police').length;
     if (remainingHumans === 0 && state.escaped > 0) {
-      state.resultReason = `最后一名幸存者也成功逃离，房子里再没有活人——契约作废（逃走 ${state.escaped} 人）。`;
-      finish(state, 'failed');
+      state.resultReason = `最后一名幸存者也成功逃离，房子里再没有活人（逃走 ${state.escaped} 人）。`;
+      finish(state, state.missionPrimaryCompleted ? 'win' : 'failed');
     }
   }
 }
@@ -2344,6 +2348,7 @@ function policeNextStep(state: GameState, police: Person): RoomId {
 }
 
 function policePhase(state: GameState): void {
+  if (KILLER_MAP[state.killer]?.school === 'supernatural') return;
   const officers = state.people.filter((p) => p.role === 'police');
   if (!officers.length) return;
   let reachedPlayer = false;
@@ -2571,7 +2576,8 @@ export function canMoveTo(state: GameState, room: RoomId): boolean {
   // freeMove 是卡牌 / 能力买来的特权：无视相邻限制，而且这一步不耗行动点
   const cost = state.freeMove ? 0 : moveCost(state, room);
   if (state.energy < cost) return false;
-  if (state.freeMove) return true;
+  if (state.freeMove) return !isLocked(state, room) && !isLocked(state, state.playerRoom);
+  if (isLocked(state, room) || isLocked(state, state.playerRoom)) return false;
   return ROOM_MAP[state.playerRoom].neighbors.includes(room);
 }
 
@@ -2605,6 +2611,18 @@ export function rollD6Check(state: GameState, label: string, successOn = 4): boo
   return success;
 }
 
+export function waitAction(state: GameState): boolean {
+  if (state.phase !== 'playing') return false;
+  if (state.energy < 1) { log(state, '行动点不足，无法等待。'); return false; }
+  state.energy -= 1;
+  state.attackReady = true;
+  log(state, '你停下脚步，屏住呼吸观察周围。幸存者趁这个空档行动。');
+  survivorsActOnce(state, 'wait');
+  afterPlayerAction(state);
+  checkImmediateWin(state);
+  return true;
+}
+
 export function movePlayer(state: GameState, room: RoomId): boolean {
   if (state.carryPersonId && state.carryDistance >= 3) {
     const carried = state.people.find((p) => p.id === state.carryPersonId);
@@ -2635,6 +2653,7 @@ export function movePlayer(state: GameState, room: RoomId): boolean {
   }
 
   const from = state.playerRoom;
+  state.watchedRoom = from;
   if (state.killer === '迈克尔·迈尔斯' && state.myersStalking) {
     state.myersMovedThisTurn = true;
     state.stalkTargetId = null;
@@ -3435,7 +3454,8 @@ function sabotageTarget(state: GameState): { kind: 'door'; room: RoomId } | { ki
   if (PHONE_ROOMS.includes(state.playerRoom) && !state.phoneCut) return { kind: 'phone' };
   if (RADIO_ROOMS.includes(state.playerRoom) && !state.sabotage.includes('radio')) return { kind: 'radio' };
   const lockedNeighbor = ROOM_MAP[state.playerRoom].neighbors.find((room) => isLocked(state, room));
-  return lockedNeighbor ? { kind: 'door', room: lockedNeighbor } : null;
+  if (lockedNeighbor) return { kind: 'door', room: lockedNeighbor };
+  return isLocked(state, state.playerRoom) ? { kind: 'door', room: state.playerRoom } : null;
 }
 
 export function sabotageBlockReason(state: GameState): string | null {
@@ -3557,6 +3577,7 @@ export function blinkPlayer(state: GameState, room: RoomId): boolean {
   const dy = to.top + to.height / 2 - (from.top + from.height / 2);
   const length = Math.hypot(dx, dy) || 1;
   state.playerFacing = { x: dx / length, y: dy / length };
+  state.watchedRoom = state.playerRoom;
   state.energy -= 1;
   state.playerRoom = room;
   markExplored(state, room);
@@ -3769,6 +3790,7 @@ export function usePower(state: GameState, powerId: string): boolean {
     let totalGain = 0;
     const names: string[] = [];
     for (const person of visible) {
+      if (!state.myersStalkedIds.includes(person.id)) state.myersStalkedIds.push(person.id);
       const isolated = !npcs(state).some((other) =>
         other.id !== person.id && other.hp > 0 && other.role !== 'police' && !other.hidden && other.room === person.room,
       );
@@ -3815,26 +3837,22 @@ export function missionTaskProgress(state: GameState, task: MissionTask): number
     case 'special_execute': return state.executionMethodsUsed.length;
     case 'no_alarm': return state.npcAlarmed ? 0 : 1;
     case 'break_circuit': return state.powerCircuits.filter((c) => c.broken).length;
+    case 'alarm_below': return state.alarm <= (task.limit ?? 35) ? 1 : 0;
+    case 'killer_stat':
+      if (task.metric === 'myers_stalk') return state.myersStalkedIds.length;
+      if (task.metric === 'trap_triggers') return state.huntStats.trapTriggers;
+      if (task.metric === 'nurse_grabs') return state.huntStats.nurseGrabs;
+      return 0;
   }
 }
 
 function checkImmediateWin(state: GameState): void {
   if (state.result || state.mission.mode === 'free') return;
-  const tasks = state.mission.tasks ?? [];
-  for (const task of tasks) {
-    if (task.kind !== 'kill_count_before_turn' || task.deadlineTurn === undefined) continue;
-    if (state.survivorKills >= task.target && state.turn <= task.deadlineTurn && !state.completedMissionTasks.includes(task.id)) {
-      state.completedMissionTasks.push(task.id);
-      log(state, `限时目标完成：${task.label}。`);
-    }
-    if (!task.optional && state.turn > task.deadlineTurn && !state.completedMissionTasks.includes(task.id)) {
-      state.resultReason = `限时目标失败：${task.label}。`;
-      finish(state, 'failed');
-      return;
-    }
+  const required = (state.mission.tasks ?? []).filter((task) => !task.optional);
+  if (required.length > 0 && required.every((task) => missionTaskProgress(state, task) >= task.target) && !state.missionPrimaryCompleted) {
+    state.missionPrimaryCompleted = true;
+    log(state, '主目标已完成！你可以立即结算，也可以继续猎杀，完成额外挑战赚取更多奖励。');
   }
-  const required = tasks.filter((task) => !task.optional);
-  if (required.length > 0 && required.every((task) => missionTaskProgress(state, task) >= task.target)) finish(state, 'win');
 }
 
 export function calculateHuntStyleRating(state: GameState, result: ResultKind): {
@@ -3887,7 +3905,8 @@ function finish(state: GameState, result: ResultKind): void {
 
   const lines: ScoreLine[] = [{ label: `契约基础分 · ${state.mission.title}`, value: state.mission.reward }];
   const bonusTasks = (state.mission.tasks ?? []).filter((task) => task.optional && missionTaskProgress(state, task) >= task.target);
-  if (bonusTasks.length) lines.push({ label: `额外挑战 · ${bonusTasks.length} 项`, value: bonusTasks.length * 25 });
+  const bonusTaskScore = bonusTasks.reduce((sum, task) => sum + (task.reward ?? 25), 0);
+  if (bonusTasks.length) lines.push({ label: `额外挑战 · ${bonusTasks.length} 项`, value: bonusTaskScore });
   if (state.specialExecutionBonus > 0) lines.push({ label: '地形处决奖励', value: state.specialExecutionBonus });
   if (state.cardBonusScore > 0) lines.push({ label: '卡牌猎杀奖励', value: state.cardBonusScore });
   lines.push({ label: `凶残 · 击杀 ${state.kills} 人`, value: state.kills * 14 });
@@ -4088,8 +4107,8 @@ export function endTurn(state: GameState): void {
   state.pinnedPeople = [];
 
   if (state.turn >= m.turns) {
-    state.resultReason = '天亮了，警察封锁了整条街。';
-    finish(state, 'timeout');
+    if (state.missionPrimaryCompleted) { state.resultReason = '主目标已经完成，猎场时间耗尽，本局按已完成契约结算。'; finish(state, 'win'); }
+    else { state.resultReason = KILLER_MAP[state.killer]?.school === 'supernatural' ? '天光刺破猎场，恶灵失去依附之所，猎杀被迫终止。' : '天亮了，警队封锁整条街，猎杀被迫终止。'; finish(state, 'timeout'); }
     return;
   }
 
@@ -4115,6 +4134,15 @@ export function endTurn(state: GameState): void {
     log(state, `当前手牌 ${state.hand.length} 张，超过上限 ${HAND_LIMIT}，请先选择弃牌。`);
   }
   log(state, `新回合开始，行动点恢复${frenzyBonus ? `（杀戮 +${frenzyBonus}）` : ''}。`);
+}
+
+export function finishContract(state: GameState): boolean {
+  if (state.phase !== 'playing' || state.mission.mode === 'free') return false;
+  checkImmediateWin(state);
+  if (!state.missionPrimaryCompleted || state.result) { log(state, '主目标尚未完成，暂时不能结算契约。'); return false; }
+  state.resultReason = '你决定结束猎杀，并带着已经完成的主目标与额外挑战离开猎场。';
+  finish(state, 'win');
+  return true;
 }
 
 export function finishFreeHunt(state: GameState): boolean {
