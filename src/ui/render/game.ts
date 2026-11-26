@@ -588,7 +588,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
   const specialExecution = carried && state.playerRoom === 'kitchen' && carried.hp <= 0
     ? `<button class="btn execution" data-action="execute-fridge">冰箱处决 · +35</button><button class="btn execution" data-action="execute-microwave">微波炉处决 · +35</button>`
     : '';
-  const carryStatus = carried ? `<div class="status-badge carrying">抱着 ${escape(carried.name)} · 已搬运 ${state.carryDistance}/3 间房</div>` : '';
+  const carryStatus = carried ? `<div class="status-badge carrying">抱着 ${escape(carried.name)} · 搬运中不会自行挣脱</div>` : '';
   const trapCacheBtn = state.killer === '设陷者' && state.trapCaches.includes(state.playerRoom)
     ? `<button class="btn search" data-action="collect-trap" ${state.energy < 1 || state.trapInventory >= 4 ? 'disabled' : ''}>收集捕兽夹补给 · +1</button>`
     : '';
