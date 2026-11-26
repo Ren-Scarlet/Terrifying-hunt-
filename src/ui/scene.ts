@@ -302,11 +302,11 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     view = { w: width, h: height, dpr };
     for (const cv of [refs.canvas, refs.staticCv, refs.structCv]) {
-      cv.width = Math.round(box.width * dpr);
-      cv.height = Math.round(box.height * dpr);
+      cv.width = Math.round(width * dpr);
+      cv.height = Math.round(height * dpr);
     }
-    refs.darkCv.width = Math.round(box.width * dpr * DARK_SCALE);
-    refs.darkCv.height = Math.round(box.height * dpr * DARK_SCALE);
+    refs.darkCv.width = Math.round(width * dpr * DARK_SCALE);
+    refs.darkCv.height = Math.round(height * dpr * DARK_SCALE);
     refs.coneCv.width = refs.darkCv.width;
     refs.coneCv.height = refs.darkCv.height;
     canvas.style.width = '100%';
