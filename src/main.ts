@@ -69,6 +69,8 @@ let resultApplied = false;
 let lastNewCard: string | null = null;
 /** 信息面板当前展示的卡牌，避免同一张牌重复重绘 */
 let detailCardUid: string | null = null;
+/** 当前锁定的人物档案；卡牌悬停结束后仍恢复显示。 */
+let selectedPersonId: string | null = null;
 /** 平面图下方的场景画布 */
 let scene: SceneHandle | null = null;
 /** 上一次的击杀数与暴露度：用来判断这一手是得手还是暴露了 */
@@ -96,6 +98,12 @@ function render(): void {
   if (guideOpen) html += renderGuide();
   app.innerHTML = html;
   detailCardUid = null;
+  if (game && screen === 'game' && selectedPersonId) {
+    const panel = document.getElementById('cardDetail');
+    if (panel) panel.innerHTML = personDetailHtml(game, selectedPersonId);
+  } else if (screen !== 'game') {
+    selectedPersonId = null;
+  }
   syncScene();
 }
 
@@ -185,6 +193,7 @@ function afterAction(): void {
 }
 
 function startGame(): void {
+  selectedPersonId = null;
   game = createGame(save.deck, undefined, save.killer ?? '迈克尔·迈尔斯');
   screen = 'game';
   lastKills = game.kills;
@@ -198,7 +207,7 @@ function showCardDetail(uid: string | null): void {
   const panel = document.getElementById('cardDetail');
   if (!panel) return;
   if (!uid) {
-    panel.innerHTML = defaultDetailHtml();
+    panel.innerHTML = selectedPersonId && game ? personDetailHtml(game, selectedPersonId) : defaultDetailHtml();
     detailCardUid = null;
     return;
   }
@@ -228,6 +237,7 @@ app.addEventListener('click', (event) => {
   }
 
   if (action === 'menu') {
+    selectedPersonId = null;
     screen = 'menu';
     game = null;
     editorOpen = false;
@@ -420,6 +430,7 @@ app.addEventListener('click', (event) => {
   if (action === 'person') {
     const personId = target.dataset.personId;
     if (personId && game && screen === 'game') {
+      selectedPersonId = personId;
       // 点击人物只打开档案，不再把「查看」误触成攻击。
       const panel = document.getElementById('cardDetail');
       if (panel) {
