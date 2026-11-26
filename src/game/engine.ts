@@ -2445,10 +2445,36 @@ function updateFrenzy(state: GameState, from: RoomId, to: RoomId): void {
   }
 }
 
+/** 通用 D6 检定：默认 4–6 成功，1–3 失败。供高风险行动与后续卡牌复用。 */
+export function rollD6Check(state: GameState, label: string, successOn = 4): boolean {
+  const die = Math.min(6, Math.max(1, Math.floor(random() * 6) + 1));
+  const success = die >= Math.min(6, Math.max(2, successOn));
+  log(state, `【D6 检定】${label}：掷出 ${die} 点，${success ? '成功' : '失败'}（需要 ${Math.min(6, Math.max(2, successOn))} 点以上）。`);
+  return success;
+}
+
 export function movePlayer(state: GameState, room: RoomId): boolean {
-  if (state.carryPersonId && state.carryDistance >= 2) {
-    log(state, '搬运距离已到极限。你必须就近处决，或放下目标后重新规划路线。');
-    return false;
+  if (state.carryPersonId && state.carryDistance >= 3) {
+    const carried = state.people.find((p) => p.id === state.carryPersonId);
+    if (!rollD6Check(state, '远距离搬运', 4)) {
+      if (carried) {
+        carried.hp = SURVIVOR_INJURED_HP;
+        carried.downedTurns = 0;
+        carried.hidden = false;
+        carried.blockedTurns = 0;
+        carried.fear = Math.min(carried.fear, 70);
+        carried.alert = 100;
+        carried.intent = 'flee';
+        carried.activity = '挣脱搬运，带伤逃跑';
+        log(state, `${carried.name} 在搬运途中猛然挣脱，恢复为受伤状态并逃走！`);
+        state.carryPersonId = null;
+        state.carryDistance = 0;
+        fleeAway(state, carried);
+      }
+      state.energy = Math.max(0, state.energy - 1);
+      afterPlayerAction(state);
+      return false;
+    }
   }
   const cost = state.freeMove ? 0 : moveCost(state, room);
   if (!canMoveTo(state, room)) {
