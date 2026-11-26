@@ -3551,3 +3551,8 @@ button, .room-hit, .hand-row { touch-action: manipulation; }
  .tune-add-row { flex-wrap:wrap; }
  .tune-add-row select { flex-basis:100%; }
 }
+
+.admin-cloud { margin:14px 0; padding:16px; border:1px solid #4b4438; background:linear-gradient(120deg,#17150f,#0d1012); }
+.admin-cloud-actions { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+.admin-cloud-actions input { flex:1 1 220px; }
+.admin-cloud p { font-size:14px; }

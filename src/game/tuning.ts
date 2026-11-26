@@ -324,8 +324,8 @@ const OPTIONAL_DYNAMIC_FIELDS: Record<string, string[]> = {
   damage: ['maxHp'], move: ['clearAlert'], scout: ['to', 'all', 'adj', 'turns'],
   pursue: ['distance'], flag: ['value'], if: ['else'],
 };
-function validField(type: EffectFieldType, value: unknown): boolean {
-  if (type === 'num') return typeof value === 'number' && Number.isFinite(value) && Math.abs(value) <= 1000;
+function validField(type: EffectFieldType, value: unknown, field: string, op: string): boolean {
+  if (type === 'num') return (op === 'flag' && field === 'value' && typeof value === 'boolean') || (typeof value === 'number' && Number.isFinite(value) && Math.abs(value) <= 1000);
   if (type === 'text') return typeof value === 'string' && value.length <= 1000;
   if (type === 'who') return typeof value === 'string' && WHO_VALUES.has(value);
   if (type === 'dest') return typeof value === 'string' && DEST_VALUES.has(value);
@@ -368,6 +368,7 @@ function validateOps(value: unknown, _baseline?: Op[]): value is Op[] {
     const meta = EFFECT_OPS[candidate.op as keyof typeof EFFECT_OPS];
     if (!meta) return false;
     const allowedFields = meta.fields.map(([field]) => field);
+    if (candidate.op === 'if') allowedFields.push('cond', 'then');
     const optional = OPTIONAL_DYNAMIC_FIELDS[candidate.op] ?? [];
     if (Object.keys(candidate).some((key) => key !== 'op' && !allowedFields.includes(key) && !optional.includes(key))) return false;
     for (const field of REQUIRED_OP_FIELDS[candidate.op] ?? []) if (!(field in candidate)) return false;
@@ -376,7 +377,7 @@ function validateOps(value: unknown, _baseline?: Op[]): value is Op[] {
         if (optional.includes(field)) continue;
         return false;
       }
-      if (!validField(type, candidate[field])) return false;
+      if (!validField(type, candidate[field], field, candidate.op)) return false;
     }
     for (const field of optional) {
       if (!(field in candidate)) continue;

@@ -2,6 +2,7 @@ import { CARDS } from '../game/data/cards';
 import { ACTIVE_KILLERS } from '../game/data/killers';
 import type { Op } from '../game/effect';
 import { exportTuning, hasTuning } from '../game/tuning';
+import { isCloudSignedIn } from '../game/cloud';
 import { DEST_OPTIONS, EFFECT_OPS, FLAG_OPTIONS, SABOTAGE_OPTIONS, STATUS_OPTIONS, WHO_OPTIONS, type EffectFieldType } from '../game/effectCatalog';
 import { PERK_RARITY_BG, cardImage } from '../game/assetMap';
 
@@ -128,7 +129,7 @@ export function renderAdmin(): string {
           <button class="btn mini ghost" data-action="admin-reset">恢复默认</button>
           <button class="btn primary" data-action="admin-close">返回菜单</button>
         </div>
-        <div class="admin-export admin-import">
+        <div class="admin-cloud"><h2>云端同步</h2><p id="cloudStatus" role="status">${isCloudSignedIn() ? "已登录管理员账号" : "尚未登录管理员账号"}</p><div class="admin-cloud-actions"><input id="cloudEmail" type="email" value="924336414@qq.com" placeholder="管理员邮箱"><button class="btn mini" data-action="cloud-login">发送登录链接</button><button class="btn mini" data-action="cloud-load">读取云端配置</button><button class="btn mini primary" data-action="cloud-save">上传当前配置</button></div><p>玩家打开游戏时会自动读取公开配置；只有管理员登录后才能上传。</p></div><div class="admin-export admin-import">
           <label for="adminImportText">导入 JSON 备份</label>
           <textarea id="adminImportText" rows="5" placeholder="把之前导出的 JSON 粘贴到这里"></textarea>
           <div class="admin-export-actions">

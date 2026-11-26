@@ -66,6 +66,7 @@ import {
   shopPrice,
 } from './ui/render';
 import { renderAdmin } from './ui/admin';
+import { initCloudAuth, loadCloudConfig, saveCloudConfig, sendCloudLogin } from './game/cloud';
 import { mountFloorplanScene, type SceneHandle } from './ui/scene';
 import { playSfx, setMusic, toggleMute, unlockAudio } from './ui/audio';
 import type { SfxName } from './ui/audio';
@@ -75,6 +76,15 @@ type Screen = 'menu' | 'game' | 'result';
 
 // 从当前浏览器读取本地卡牌覆盖；没有个人配置时仍使用仓库默认数值。
 applyTuning();
+void initCloudAuth().then(async () => {
+  try {
+    const cloud = await loadCloudConfig();
+    if (cloud) {
+      const tuningModule = await import('./game/tuning');
+      if (tuningModule.importTuning(JSON.stringify(cloud))) render();
+    }
+  } catch (error) { console.warn('云端配置暂不可用：', error); }
+});
 
 let save: SaveData = loadSave();
 let game: GameState | null = null;
@@ -390,6 +400,35 @@ app.addEventListener('click', (event) => {
     const id = target.dataset.card, index = Number(target.dataset.index);
     const ok = id && Number.isInteger(index) && (action === 'admin-op-remove' ? removeCardOp(id, index) : moveCardOp(id, index, Number(target.dataset.direction) as -1 | 1));
     if (ok) render();
+    return;
+  }
+
+  if (action === 'cloud-login') {
+    const email = (document.getElementById('cloudEmail') as HTMLInputElement | null)?.value.trim();
+    const status = document.getElementById('cloudStatus');
+    if (!email || !status) return;
+    status.textContent = '正在发送登录链接……';
+    void sendCloudLogin(email).then(() => { status.textContent = '登录邮件已发送，请打开邮件中的链接返回游戏。'; })
+      .catch((error: unknown) => { status.textContent = error instanceof Error ? error.message : '登录邮件发送失败。'; });
+    return;
+  }
+  if (action === 'cloud-load') {
+    const status = document.getElementById('cloudStatus');
+    if (status) status.textContent = '正在读取云端配置……';
+    void loadCloudConfig().then(async (config) => {
+      if (!config) throw new Error('云端还没有配置，请先上传一次。');
+      const tuningModule = await import('./game/tuning');
+      if (!tuningModule.importTuning(JSON.stringify(config))) throw new Error('云端配置结构无效，未覆盖本地配置。');
+      if (status) status.textContent = '云端配置已读取并应用。';
+      render();
+    }).catch((error: unknown) => { if (status) status.textContent = error instanceof Error ? error.message : '读取云端配置失败。'; });
+    return;
+  }
+  if (action === 'cloud-save') {
+    const status = document.getElementById('cloudStatus');
+    if (status) status.textContent = '正在上传当前配置……';
+    void saveCloudConfig(JSON.parse(exportTuning())).then(() => { if (status) status.textContent = '上传成功：其他玩家刷新游戏后会读取这份配置。'; })
+      .catch((error: unknown) => { if (status) status.textContent = error instanceof Error ? error.message : '上传失败。'; });
     return;
   }
 
