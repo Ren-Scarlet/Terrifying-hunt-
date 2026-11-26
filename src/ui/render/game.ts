@@ -7,7 +7,6 @@ import {
   ATTACK_COST,
   BASE_AP,
   BLEEDOUT_TURNS,
-  DOWNED_LOCK_TURNS,
   FRENZY_AP_BONUS,
   DRAW_CARD_COST,
   HAND_LIMIT,
@@ -20,6 +19,7 @@ import {
   SEARCH_COST,
   attackBlockReason,
   canAttack,
+  executeBlockReason,
   canMoveTo,
   canUsePower,
   conditionOf,
@@ -85,25 +85,25 @@ function roomFeatures(state: GameState, roomId: RoomId): string {
               : `修复 ${i.progress}%`;
       const down = i.broken || i.jammedTurns > 0;
       parts.push(
-        `<span class="room-feature site ${i.kind} ${down ? 'broken' : ''}" title="${label}：${status}。你用不了它，但可以花 ${SABOTAGE_COST} 点行动点砸掉">${icon(i.kind === 'itemBox' ? 'itemBox' : 'generator', 'ui-icon tiny')}</span>`,
+        `<span class="room-feature site ${i.kind} ${down ? 'broken' : ''}" title="${label}：${status}。你用不了它，但可以花 ${SABOTAGE_COST} 点行动点砸掉">${icon(i.kind === 'itemBox' ? 'itemBox' : 'generator', 'ui-icon tiny')}<b>${i.kind === 'itemBox' ? '道具箱' : '发电机'}</b></span>`,
       );
     });
   const lighting = state.powerCircuits.find((c) => c.affectedRooms.includes(roomId));
   if (lighting) {
     const flickering = !lighting.broken && (lighting.flickerTurns ?? 0) > 0;
     const lightStatus = lighting.broken ? '断电' : flickering ? '临时闪断' : '供电中';
-    parts.push(`<span class="room-feature light ${lighting.broken ? 'off' : flickering ? 'flickering' : 'on'}" title="${escape(lighting.name)}：${lightStatus}">${lighting.broken ? '☾' : flickering ? '⚡' : '💡'}</span>`);
+    parts.push(`<span class="room-feature light ${lighting.broken ? 'off' : flickering ? 'flickering' : 'on'}" title="${escape(lighting.name)}：${lightStatus}">${lighting.broken ? '☾' : flickering ? '⚡' : '💡'}<b>照明</b></span>`);
   }
   const circuitAt = state.powerCircuits.find((c) => c.breakerRoom === roomId);
-  if (circuitAt) parts.push(`<span class="room-feature breaker ${circuitAt.broken ? 'broken' : ''}" title="${escape(circuitAt.name)}：${circuitAt.broken ? '已破坏' : '可破坏；影响 ' + circuitAt.affectedRooms.map(roomName).join('、')}">⚡</span>`);
-  if (roomId === 'kitchen') parts.push('<span class="room-feature execution-site" title="特殊处决地点：冰箱 / 微波炉">☠</span>');
+  if (circuitAt) parts.push(`<span class="room-feature breaker ${circuitAt.broken ? 'broken' : ''}" title="${escape(circuitAt.name)}：${circuitAt.broken ? '已破坏' : '可破坏；影响 ' + circuitAt.affectedRooms.map(roomName).join('、')}">⚡<b>电闸</b></span>`);
+  if (roomId === 'kitchen') parts.push('<span class="room-feature execution-site" title="特殊处决地点：冰箱 / 微波炉">☠<b>处决点</b></span>');
   if (roomId === EXIT_ROOM) parts.push(`<span class="room-feature escape" title="撤离点：任务完成的撤离位置">${icon('escape', 'ui-icon tiny')}</span>`);
   if (state.escapeRooms.includes(roomId)) parts.push(`<span class="room-feature escape-npc" title="团队第4阶段开启的逃生点">${icon('escape', 'ui-icon tiny')}</span>`);
-  if (TOTEM_ROOMS.includes(roomId)) parts.push(`<span class="room-feature totem" title="图腾：在此结束回合，下回合 +1 行动点">${icon('totem', 'ui-icon tiny')}</span>`);
-  if (state.totems.includes(roomId)) parts.push(`<span class="room-feature totem cursed" title="厄咒图腾：支撑难逃一死；幸存者可能发现并破坏">${icon('totem', 'ui-icon tiny')}</span>`);
+  if (TOTEM_ROOMS.includes(roomId)) parts.push(`<span class="room-feature totem" title="图腾：在此结束回合，下回合 +1 行动点">${icon('totem', 'ui-icon tiny')}<b>图腾</b></span>`);
+  if (state.totems.includes(roomId)) parts.push(`<span class="room-feature totem cursed" title="厄咒图腾：支撑难逃一死；幸存者可能发现并破坏">${icon('totem', 'ui-icon tiny')}<b>厄咒</b></span>`);
   if (state.trailRevealActions > 0 && state.highlightedTrail && (state.highlightedTrail.room === roomId || state.highlightedTrail.to === roomId)) parts.push('<span class="room-feature trail-highlight" title="猎鹿者显现的最近脚印路线">👣</span>');
-  if (CABINET_ROOMS.includes(roomId)) parts.push(`<span class="room-feature cabinet" title="柜子：藏身者不会被引诱类卡牌锁定">${icon('cabinet', 'ui-icon tiny')}</span>`);
-  if (OBSTACLE_ROOMS.includes(roomId) && !cleared) parts.push(`<span class="room-feature obstacle" title="障碍：进入多花 1 点行动点；破门能力可以直接清掉">${icon('obstacle', 'ui-icon tiny')}</span>`);
+  if (CABINET_ROOMS.includes(roomId)) parts.push(`<span class="room-feature cabinet" title="柜子：藏身者不会被引诱类卡牌锁定">${icon('cabinet', 'ui-icon tiny')}<b>柜子</b></span>`);
+  if (OBSTACLE_ROOMS.includes(roomId) && !cleared) parts.push(`<span class="room-feature obstacle" title="障碍：进入多花 1 点行动点；破门能力可以直接清掉">${icon('obstacle', 'ui-icon tiny')}<b>障碍</b></span>`);
   return parts.join('');
 }
 
@@ -373,7 +373,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
           : `<div class="room-unknown">未探索</div>
              <div class="room-features">${roomFeatures(state, room.id)}</div>`}
         <div class="room-people">
-          ${people.map((p) => personChip(p, isPlayer && canAttack(state, p.id), isPlayer && p.hp <= 0 && !state.carryPersonId)).join('')}
+          ${people.map((p) => personChip(p)).join('')}
           ${police ? personChip(police) : ''}
           ${ghosts.map(() => '<span class="ghost-chip" title="最后确认位置：人可能已经走了">?</span>').join('')}
         </div>
@@ -436,7 +436,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
           ${p.marked ? '<small class="contract-target-tag">★ 契约指定目标</small>' : ''}
           ${p.bloodSacrifice ? '<small class="blood-sacrifice-tag">🩸 血祭品</small>' : ''}
           <small>${where} · ${HEALTH_LABEL[health]} · ${escape(intentLabel)}</small>
-          ${health === 'downed' ? `<small class="roster-bleed">倒地 · ${p.downedTurns >= DOWNED_LOCK_TURNS ? `可以补刀处决，${Math.max(0, BLEEDOUT_TURNS - p.downedTurns)} 回合后自己流干` : `还要等 ${DOWNED_LOCK_TURNS - p.downedTurns} 回合才能补刀`} · 可能被救起</small>` : ''}
+          ${health === 'downed' ? `<small class="roster-bleed">倒地 · 可立即处决 · ${Math.max(0, BLEEDOUT_TURNS - p.downedTurns)} 回合后流血死亡 · 同伴仍可能救起</small>` : ''}
           ${p.item ? `<small class="roster-item">携带 ${itemIconHtml(p.item)}${escape(SURVIVOR_ITEM_LABEL[p.item])} ×${p.itemUses}</small>` : ''}
           ${p.watchValue > 0 || p.watched ? `<small class="roster-watch">夜幕 ${p.watched ? '已锁定 · 下一刀击倒' : `监视 ${p.watchValue}/100`}</small>` : ''}</span>
       </button>`;
@@ -507,12 +507,18 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
       <span class="atk-meta">${sabotageMeta}</span>
     </button>`;
   const atkTitle = possessed
-    ? `恶魔附身（剩 ${state.possessTurns} 回合）：每一刀造成 2 点伤害，健康者受伤、受伤者倒地。消耗 ${ATTACK_COST} 点行动点。`
-    : `挥刀：消耗 ${ATTACK_COST} 点行动点，默认造成 1 点伤害；累计 2 点进入受伤，再累计 2 点倒地。倒地后要隔 ${DOWNED_LOCK_TURNS} 回合才能补刀处决。砍完要再做一件事（或花 ${WIPE_COST} 点擦刀）才能砍第二刀。`;
+    ? `恶魔附身（剩 ${state.possessTurns} 回合）：攻击站立的幸存者，每刀造成 2 点伤害。消耗 ${ATTACK_COST} 点行动点。`
+    : `攻击：只对站立的幸存者造成伤害，消耗 ${ATTACK_COST} 点行动点；倒地者请使用独立的「处决」按钮。砍完要再做一件事（或花 ${WIPE_COST} 点擦刀）才能再次攻击。`;
   const attackBtn = `<button class="btn attack ${atkOk ? '' : 'spent'} ${possessed ? 'possessed' : ''}" data-action="attack" ${atkOk ? '' : 'disabled'}
       title="${escape(atkOk ? atkTitle : atkReason)}">
-      <span class="atk-name">${possessed ? '附身 · 挥刀' : '挥刀'}</span>
-      <span class="atk-meta">${atkOk ? (possessed ? `${ATTACK_COST} 点 · 每刀 2 点伤害` : `${ATTACK_COST} 点 · 砍下去`) : escape(atkReason)}</span>
+      <span class="atk-name">${possessed ? '附身 · 攻击' : '攻击'}</span>
+      <span class="atk-meta">${atkOk ? (possessed ? `${ATTACK_COST} AP · 2 点伤害` : `${ATTACK_COST} AP · 对站立目标`) : escape(atkReason)}</span>
+    </button>`;
+  const executeReason = executeBlockReason(state);
+  const executeBtn = `<button class="btn execute-action ${executeReason ? 'spent' : ''}" data-action="execute" ${executeReason ? 'disabled' : ''}
+      title="${escape(executeReason || '处决当前房间一名倒地的幸存者，消耗 1 点行动点。若暂时放过他，同伴仍可能赶来救援。')}">
+      <span class="atk-name">处决</span>
+      <span class="atk-meta">${executeReason ? escape(executeReason) : '1 AP · 立即结束目标'}</span>
     </button>`;
   const wipeReason = wipeBlockReason(state);
   const wipeBtn = `<button class="btn wipe ${wipeReason ? 'spent' : ''}" data-action="wipe" ${wipeReason ? 'disabled' : ''}
@@ -524,7 +530,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
   const cabinetHere = CABINET_ROOMS.includes(state.playerRoom);
   const hiddenHere = state.people.some((p) => p.room === state.playerRoom && p.hidden);
   const carried = state.carryPersonId ? state.people.find((p) => p.id === state.carryPersonId) : null;
-  const specialExecution = carried && state.playerRoom === 'kitchen' && carried.downedTurns >= DOWNED_LOCK_TURNS
+  const specialExecution = carried && state.playerRoom === 'kitchen' && carried.hp <= 0
     ? `<button class="btn execution" data-action="execute-fridge">冰箱处决 · +35</button><button class="btn execution" data-action="execute-microwave">微波炉处决 · +35</button>`
     : '';
   const carryStatus = carried ? `<div class="status-badge carrying">抱着 ${escape(carried.name)} · 已搬运 ${state.carryDistance}/3 间房</div>` : '';
@@ -565,11 +571,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
             <span class="mission-fail">✕ 失败：${escape(m.failText ?? '超时或被捕')}</span>
           </div>
         </div>
-        <div class="mission-meta">
-          <span class="mission-progress ${objectiveDone ? 'done' : ''}">${progress}</span>
-          <span class="mission-clock ${urgent ? 'hot' : ''}">剩余 <b>${left}</b> 回合</span>
-          <span class="mission-team ${state.teamStage >= 3 ? 'hot' : ''}" title="${escape(state.teamGoalLabel)}：四阶段团队进度。第四阶段完成后出现两个逃生点。">团队阶段 <b>${state.teamStage}/4</b></span>
-        </div>
+
       </div>
     </div>
 
@@ -604,55 +606,6 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
             <span class="legend-sites">${icon('itemBox', 'ui-icon tiny')} 道具箱 ${icon('generator', 'ui-icon tiny')} 发电机：他们能用，你只能砸</span>
           </div>
         </div>
-
-        <div class="bottom-dock">
-        <div class="panel resource-bar">
-          <div class="stats">
-            <div class="stat"><b>${state.turn}<i>/${m.turns}</i></b><small>回合</small></div>
-            <div class="stat energy" title="走路、挥刀、出牌、搜索柜子，全都从这一个池子里扣"><b>${state.energy}<i>/${state.maxEnergy}</i></b><small>行动点</small></div>
-            <div class="stat alarm-stat ${state.alarm >= 70 ? 'hot' : state.alarm >= 40 ? 'warm' : ''}" title="暴露度：你的动作（挥刀、破坏、被目击、袭警、报警）会推高它，每回合自动回落；满 ${ALARM_MAX} 就会被捕，灵异鬼怪则是被符咒驱散。它和「他们的进度」是两回事。">
-              <b>${state.alarm}<i>/${ALARM_MAX}</i></b>
-              <div class="alarm-track"><span style="width:${state.alarm}%"></span></div>
-              <small>暴露度</small>
-            </div>
-            <div class="stat"><b>${state.kills}</b><small>击杀</small></div>
-            <div class="stat ${state.escaped > 0 ? 'escaped' : ''}" title="每逃走一人结算扣 15 分；幸存者全跑光契约作废"><b>${state.escaped}</b><small>逃走</small></div>
-            <div class="stat frenzy ${state.frenzy >= FRENZY_THRESHOLD ? 'active' : ''}" title="杀戮：严格踩着脚印连续追才涨；满 ${FRENZY_THRESHOLD} 后每回合多 ${FRENZY_AP_BONUS} 点行动点，路自己走。砍中人或被击晕清零。">
-              <b>${state.frenzy}<i>/${FRENZY_MAX}</i></b>
-              <div class="alarm-track"><span style="width:${state.frenzy}%"></span></div>
-              <small>杀戮</small>
-            </div>
-            <div class="stat team ${state.teamStage >= 3 ? 'hot' : ''}" title="幸存者团队目标：${escape(state.teamGoalLabel)}。每完成 25% 解锁一个阶段；第四阶段开启双逃生点。">
-              <b>${state.teamStage}<i>/4</i></b>
-              <div class="team-stage-track">${Array.from({ length: 4 }, (_, i) => `<span class="team-stage-segment ${state.teamStage > i ? 'done' : ''}"></span>`).join('')}</div>
-              <small>${state.teamStage >= 4 ? '逃生点已开启' : '逃生阶段'}</small>
-            </div>
-            <div class="stat score"><b>${currentScore(state)}</b><small>预计得分</small></div>
-          </div>
-        </div>
-
-        <div class="panel hand">
-          ${selectingDiscards ? `<div class="hand-limit-warning">手牌 ${state.hand.length}/${HAND_LIMIT}：请点击要弃掉的牌，直到剩余 ${HAND_LIMIT} 张。</div>` : ''}
-          <div class="hand-actions">
-            ${attackBtn}
-            <button class="btn draw-card" data-action="draw" ${state.energy < DRAW_CARD_COST || (state.drawPile.length === 0 && state.discardPile.length === 0) || selectingDiscards ? 'disabled' : ''} title="消耗 ${DRAW_CARD_COST} 点行动点，从牌库抽 1 张">${DRAW_CARD_COST} 点 · 抽 1 张</button>
-            ${wipeBtn}
-            ${searchBtn}
-            ${lookBtn}
-            ${sabotageBtn}${specialExecution}
-            <div class="power-row">${powerButtonHtml(state, killer)}</div>
-            <button class="btn primary end-turn" data-action="end-turn" ${selectingDiscards ? 'disabled' : ''}>结束回合</button>
-            <button class="btn ghost" data-action="give-up">放弃任务</button>
-          </div>
-          <div class="card-detail-inline">
-            <div class="card-detail-label">卡牌 / 人物详情 · 悬停手牌或点击人物查看</div>
-            <div id="cardDetail" class="detail-wrap">${defaultDetailHtml()}</div>
-          </div>
-          <div class="hand-count">手牌 ${state.hand.length}/${HAND_LIMIT}</div>
-          <div class="hand-row">${hand || '<div style="color:var(--muted);font-size:13px">手牌已空，可花行动点主动抽牌。</div>'}</div>
-        </div>
-        </div>
-      </div>
 
       <details class="intel-drawer">
         <summary>
@@ -693,6 +646,59 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
           </div>
         </div>
       </details>
+
+        <div class="bottom-dock">
+        <div class="panel resource-bar">
+          <div class="stats">
+            <div class="stat"><b>${state.turn}<i>/${m.turns}</i></b><small>回合</small></div>
+            <div class="stat energy" title="走路、挥刀、出牌、搜索柜子，全都从这一个池子里扣"><b>${state.energy}<i>/${state.maxEnergy}</i></b><small>行动点</small></div>
+            <div class="stat alarm-stat ${state.alarm >= 70 ? 'hot' : state.alarm >= 40 ? 'warm' : ''}" title="暴露度：你的动作（挥刀、破坏、被目击、袭警、报警）会推高它，每回合自动回落；满 ${ALARM_MAX} 就会被捕，灵异鬼怪则是被符咒驱散。它和「他们的进度」是两回事。">
+              <b>${state.alarm}<i>/${ALARM_MAX}</i></b>
+              <div class="alarm-track"><span style="width:${state.alarm}%"></span></div>
+              <small>暴露度</small>
+            </div>
+            <div class="stat"><b>${state.kills}</b><small>击杀</small></div>
+            <div class="stat ${state.escaped > 0 ? 'escaped' : ''}" title="每逃走一人结算扣 15 分；幸存者全跑光契约作废"><b>${state.escaped}</b><small>逃走</small></div>
+            <div class="stat frenzy ${state.frenzy >= FRENZY_THRESHOLD ? 'active' : ''}" title="杀戮：严格踩着脚印连续追才涨；满 ${FRENZY_THRESHOLD} 后每回合多 ${FRENZY_AP_BONUS} 点行动点，路自己走。砍中人或被击晕清零。">
+              <b>${state.frenzy}<i>/${FRENZY_MAX}</i></b>
+              <div class="alarm-track"><span style="width:${state.frenzy}%"></span></div>
+              <small>杀戮</small>
+            </div>
+            <div class="stat team ${state.teamStage >= 3 ? 'hot' : ''}" title="幸存者团队目标：${escape(state.teamGoalLabel)}。每完成 25% 解锁一个阶段；第四阶段开启双逃生点。">
+              <b>${state.teamStage}<i>/4</i></b>
+              <div class="team-stage-track">${Array.from({ length: 4 }, (_, i) => `<span class="team-stage-segment ${state.teamStage > i ? 'done' : ''}"></span>`).join('')}</div>
+              <small>${state.teamStage >= 4 ? '逃生点已开启' : '逃生阶段'}</small>
+            </div>
+            <div class="stat score"><b>${currentScore(state)}</b><small>预计得分</small></div>
+          </div>
+          ${meter || myersMarks ? `<div class="bottom-special-meters">${meter}${myersMarks}</div>` : ''}
+        </div>
+
+        <div class="panel hand">
+          ${selectingDiscards ? `<div class="hand-limit-warning">手牌 ${state.hand.length}/${HAND_LIMIT}：请点击要弃掉的牌，直到剩余 ${HAND_LIMIT} 张。</div>` : ''}
+          <div class="hand-actions">
+            ${attackBtn}
+            ${executeBtn}
+            <button class="btn draw-card" data-action="draw" ${state.energy < DRAW_CARD_COST || (state.drawPile.length === 0 && state.discardPile.length === 0) || selectingDiscards ? 'disabled' : ''} title="消耗 ${DRAW_CARD_COST} 点行动点，从牌库抽 1 张">${DRAW_CARD_COST} 点 · 抽 1 张</button>
+            ${wipeBtn}
+            ${searchBtn}
+            ${lookBtn}
+            ${sabotageBtn}${specialExecution}
+            <div class="power-row">${powerButtonHtml(state, killer)}</div>
+            <button class="btn primary end-turn" data-action="end-turn" ${selectingDiscards ? 'disabled' : ''}>结束回合</button>
+            <button class="btn ghost" data-action="give-up">放弃任务</button>
+          </div>
+          <div class="card-detail-inline">
+            <div class="card-detail-label">卡牌 / 人物详情 · 悬停手牌或点击人物查看</div>
+            <div id="cardDetail" class="detail-wrap">${defaultDetailHtml()}</div>
+          </div>
+          <div class="hand-count">手牌 ${state.hand.length}/${HAND_LIMIT}</div>
+          <div class="hand-row">${hand || '<div style="color:var(--muted);font-size:13px">手牌已空，可花行动点主动抽牌。</div>'}</div>
+        </div>
+        </div>
+      </div>
+
+
     </div>
   `;
 }
