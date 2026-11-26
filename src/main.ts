@@ -578,6 +578,7 @@ app.addEventListener('click', (event) => {
       attack(game, personId);
       playSfx('attack');
       if (game.kills > killsBefore) playSfx('kill');
+      lastLogHead = game.log[0] ?? '';
     }
     afterAction();
     return;
@@ -691,6 +692,7 @@ app.addEventListener('click', (event) => {
     attack(game);
     playSfx('attack');
     if (game.kills > kills) playSfx('kill');
+    lastLogHead = game.log[0] ?? '';
     afterAction();
     return;
   }
