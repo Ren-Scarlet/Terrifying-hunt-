@@ -138,7 +138,14 @@ function splitOptions(region: Region): SplitOption[] {
 }
 
 function splitRegion(region: Region, option: SplitOption): [Region, Region] {
-  const cut = option.min + Math.floor(random() * (option.max - option.min + 1));
+  // 切分点向区域中部收敛，避免随机切出极端细长的房间/走廊。
+  // 仍保留少量随机偏移，让每局户型不会变成整齐的棋盘格。
+  const midpoint = (option.min + option.max) / 2;
+  const variation = (option.max - option.min) * 0.22;
+  const cut = Math.max(
+    option.min,
+    Math.min(option.max, Math.round(midpoint + (random() - 0.5) * variation * 2)),
+  );
   if (option.axis === 'vertical') {
     return [
       { left: region.left, top: region.top, width: cut, height: region.height },
