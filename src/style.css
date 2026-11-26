@@ -2813,3 +2813,28 @@ button, .room-hit, .hand-row { touch-action: manipulation; }
   .room-people .person-chip img { width: 40px; height: 40px; }
   #app[data-map-scale="xlarge"] .map-viewport { max-height: 65vh; }
 }
+
+
+/* 目标习惯与猎杀机会：情报只呈现玩家已观察到或当前可见的内容。 */
+.opportunity-list { display: grid; gap: 8px; }
+.opportunity-row {
+  display: grid; gap: 5px; padding: 10px 12px;
+  border: 1px solid #514332; border-left: 3px solid #b08b52;
+  background: linear-gradient(100deg, #1c1914, #111314);
+}
+.opportunity-heading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 5px 12px; }
+.opportunity-heading b { color: #e3c68e; font-size: 13px; }
+.opportunity-heading span { color: #b8aa93; font-size: 12px; }
+.opportunity-row p { margin: 0; color: #c3baab; font-size: 12px; line-height: 1.55; }
+.opportunity-empty {
+  padding: 12px; border: 1px dashed #494239; background: #111312;
+  color: #b6ad9f; font-size: 12px; line-height: 1.6;
+}
+#app[data-font-scale="large"] .opportunity-heading b,
+#app[data-font-scale="large"] .opportunity-heading span,
+#app[data-font-scale="large"] .opportunity-row p,
+#app[data-font-scale="large"] .opportunity-empty { font-size: 14px; }
+#app[data-font-scale="xlarge"] .opportunity-heading b,
+#app[data-font-scale="xlarge"] .opportunity-heading span,
+#app[data-font-scale="xlarge"] .opportunity-row p,
+#app[data-font-scale="xlarge"] .opportunity-empty { font-size: 16px; }
