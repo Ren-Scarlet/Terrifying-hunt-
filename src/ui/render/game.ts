@@ -446,7 +446,6 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
   const playerMarker = `
     <div class="player-marker" style="${markerStyle}" title="你在这里：${escape(killer.owner)}">
       ${killerFaceHtml(killer, 'marker')}
-      ${state.frenzy > 0 ? `<span class="killer-frenzy-mark" title="杀戮值 ${state.frenzy}/100">☠ ${state.frenzy}</span>` : ''}
       <span>你</span>
     </div>
   `;
@@ -753,7 +752,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
             <div class="stat frenzy ${state.frenzy >= FRENZY_THRESHOLD ? 'active' : ''}" title="杀戮：严格踩着脚印连续追才涨；满 ${FRENZY_THRESHOLD} 后每回合多 ${FRENZY_AP_BONUS} 点行动点，路自己走。砍中人或被击晕清零。">
               <b>${state.frenzy}<i>/${FRENZY_MAX}</i></b>
               <div class="alarm-track"><span style="width:${state.frenzy}%"></span></div>
-              <small>杀戮</small>
+              <small>杀戮 <i class="frenzy-state-icon" title="杀戮状态">☠</i></small>
             </div>
             <div class="stat score"><b>${currentScore(state)}</b><small>预计得分</small></div>
           </div>

@@ -3412,3 +3412,5 @@ button, .room-hit, .hand-row { touch-action: manipulation; }
 .person-status-icon[title*="危险"]{color:#e36b5e;border-color:rgba(227,107,94,.55)}
 .person-status-icon[title*="诅咒"]{color:#b79ae0;border-color:rgba(183,154,224,.5)}
 .killer-frenzy-mark{position:absolute;left:calc(100% + 5px);top:0;padding:2px 5px;border:1px solid rgba(174,52,42,.65);border-radius:4px;background:#1b0d0d;color:#e67c6e;font-size:10px;white-space:nowrap}
+
+.frenzy-state-icon{display:inline-flex;align-items:center;justify-content:center;margin-left:4px;color:#df7669;font-style:normal;font-size:12px;vertical-align:middle}
