@@ -522,8 +522,12 @@ function snapshotRooms(state: GameState): Map<string, RoomId> {
   return new Map(npcs(state).map((p) => [p.id, p.room]));
 }
 
+function trailActionWindow(state: GameState): number {
+  return TRAIL_ACTION_WINDOW + (state.mapId === 'ormond' ? 3 : 0);
+}
+
 function pruneTrails(state: GameState): void {
-  state.trails = state.trails.filter((t) => state.trailClock - t.clock <= TRAIL_ACTION_WINDOW);
+  state.trails = state.trails.filter((t) => state.trailClock - t.clock <= trailActionWindow(state));
 }
 
 function pruneDisturbances(state: GameState): void {
@@ -539,7 +543,7 @@ function pruneDisturbances(state: GameState): void {
  * 房间里叫什么仍然不知道，但地板上那道划痕指向哪里，你看得见。
  */
 export function visibleTrails(state: GameState): Trail[] {
-  return state.trails.filter((t) => state.trailClock - t.clock <= TRAIL_ACTION_WINDOW);
+  return state.trails.filter((t) => state.trailClock - t.clock <= trailActionWindow(state));
 }
 
 /** 感知：这一回合地图上浮着全场红色人影（只有影子，不告诉你那是谁） */
@@ -765,8 +769,9 @@ function killPerson(state: GameState, person: Person): void {
   let stirred = 0;
   npcs(state).forEach((other) => {
     // 尸体不会让整栋房子瞬间获知消息；只有同屋或相邻房间的人先察觉。
-    if (other.alert < 36 && roomDistance(other.room, person.room) <= 1) {
-      other.alert = clamp(other.alert + (other.room === person.room ? 18 : 8), 0, 100);
+    const discoveryRadius = state.mapId === 'lampkin' ? 2 : 1;
+    if (other.alert < 36 && roomDistance(other.room, person.room) <= discoveryRadius) {
+      other.alert = clamp(other.alert + (other.room === person.room ? 18 : state.mapId === 'lampkin' ? 12 : 8), 0, 100);
       stirred += 1;
     }
   });
@@ -2841,7 +2846,7 @@ export function searchRoom(state: GameState): boolean {
   state.energy -= SEARCH_COST;
   const here = peopleInRoom(state, state.playerRoom).filter((p) => p.role !== 'police');
   const found = here.filter((p) => p.hidden);
-  const hasCabinet = CABINET_ROOMS.includes(state.playerRoom);
+  const hasCabinet = CABINET_ROOMS.includes(state.playerRoom) || (state.mapId === 'badham' && ['nursery', 'storage', 'guestroom'].includes(state.playerRoom));
   log(state, `你翻查${roomName(state.playerRoom)}（消耗 ${SEARCH_COST} 点行动点）。`);
   // 先无条件把藏着的人揪出来：卡牌可能把人挪到没有柜子的房间，不能让他白藏
   found.forEach((p) => {
@@ -2950,7 +2955,26 @@ export function isRoomLit(state: GameState, room: RoomId): boolean {
  */
 function triggerEnvironmentalEvent(state: GameState): void {
   if (state.turn % 3 !== 0) return;
-  const event = randomOf(['storm', 'flicker', 'phone', 'glass'] as const);
+  if (state.mapId === 'midwich') {
+    const room = randomOf(['corridor', 'library', 'nursery'] as RoomId[]);
+    const affected = npcs(state).filter((person) =>
+      person.hp > 0 && !person.hidden && roomDistance(person.room, room) <= 1,
+    );
+    affected.forEach((person) => {
+      person.alert = clamp(person.alert + 12, 0, 100);
+      person.awareness = Math.max(person.awareness, 1);
+      if (person.alert >= 45) person.intent = 'wary';
+      person.activity = '被课间铃声惊动，正在寻找声音来源';
+    });
+    state.disturbances.push({ room, turn: state.turn, clock: state.trailClock, label: '课间铃声' });
+    if (state.disturbances.length > 24) state.disturbances.splice(0, state.disturbances.length - 24);
+    log(state, `【米德维奇 · 课间铃声】${roomName(room)}附近响起刺耳铃声，${affected.length ? affected.map((person) => person.name).join('、') + '被惊动' : '走廊里空无一人'}。`);
+    return;
+  }
+  const eventPool = state.mapId === 'asylum'
+    ? ['flicker', 'flicker', 'phone', 'glass'] as const
+    : ['storm', 'flicker', 'phone', 'glass'] as const;
+  const event = randomOf(eventPool);
 
   if (event === 'storm') {
     state.alarm = Math.max(0, state.alarm - 4);
