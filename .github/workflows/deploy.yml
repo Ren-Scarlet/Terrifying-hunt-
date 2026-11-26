@@ -21,14 +21,14 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      # 正式网站始终从 main 构建，预览版从独立美术分支构建；预览资源隔离在 /preview/。
+      # 正式网站始终从 main 构建，预览版从独立 HUD 实装分支构建；预览资源隔离在 /preview/。
       - uses: actions/checkout@v4
         with:
           ref: main
           path: main-source
       - uses: actions/checkout@v4
         with:
-          ref: kitchen-art-upgrade
+          ref: feature/in-game-map-hud
           path: preview-source
       - uses: actions/setup-node@v4
         with:
@@ -42,7 +42,7 @@ jobs:
           npm ci --prefix main-source
           npm run check --prefix main-source
           npm run build --prefix main-source
-      - name: Build kitchen preview
+      - name: Build immersive HUD preview
         run: |
           npm ci --prefix preview-source
           npm run build --prefix preview-source
