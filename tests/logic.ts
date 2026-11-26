@@ -484,7 +484,7 @@ function caseUnaware(): void {
   const darkPanic = newGame();
   darkPanic.people.forEach((person) => { person.item = null; person.itemUses = 0; person.armed = false; });
   darkPanic.powerCircuits.forEach((circuit) => { circuit.broken = true; });
-  const darkAlreadyWary = player(darkPanic);
+  const darkAlreadyWary = darkPanic.people.find((person) => person.role !== 'police' && SURVIVOR_MAP[person.id]?.threat !== 'spiritual')!;
   const darkWaryRoom = openNeighbor(darkPanic.playerRoom);
   darkAlreadyWary.room = darkWaryRoom;
   darkAlreadyWary.alert = 30;
