@@ -1014,10 +1014,11 @@ function caseWorldTicks(): void {
     check('J 玩家走一步，逃跑的人也跟着动', true, '本局入口没有两跳走廊，跳过此布局');
     return;
   }
-  v.room = hop2;
+  // 把 NPC 放在玩家即将进入的房间，确保测试的是玩家行动触发反应，而非视野方向随机性。
+  v.room = hop1;
   v.alert = 100;
   v.intent = 'flee';
-  v.trackedTurns = 2;
+  v.trackedTurns = 0;
   v.movesThisTurn = 0;
 
   s.energy = 9;
