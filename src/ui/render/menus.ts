@@ -83,7 +83,8 @@ export function renderMenu(save: SaveData): string {
           <div><small>处决图鉴</small><b>${(save.executionRecords ?? []).length} / 6</b></div>
         </div>
         <div class="actions">
-          <button class="btn primary" data-action="start">开始任务</button>
+          <button class="btn primary" data-action="start">接取猎杀委托</button>
+          <button class="btn" data-action="free-hunt">自由猎杀</button>
           <button class="btn" data-action="deck">编辑牌组</button>
           <button class="btn" data-action="shop">卡牌商店</button>
           <button class="btn ghost" data-action="guide">玩法指引</button>
