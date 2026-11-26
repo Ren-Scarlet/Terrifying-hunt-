@@ -34,6 +34,16 @@ export const ROOM_MATERIAL: Record<RoomId, MatKind> = {
   stairwell: 'woodV',
   chapel: 'wood',
   balcony: 'tile',
+  pantry: 'wood',
+  servants_quarters: 'carpet',
+  guest_bath: 'tile',
+  infirmary: 'tile',
+  archives: 'wood',
+  cold_storage: 'concrete',
+  greenhouse_annex: 'tile',
+  loading_dock: 'concrete',
+  billiard_room: 'wood',
+  observatory: 'concrete',
 };
 
 /** 每个房间的环境色（正片叠底），决定这个空间是暖木、冷瓷砖还是湿水泥 */
@@ -61,6 +71,16 @@ export const ROOM_TINT: Record<RoomId, string> = {
   stairwell: 'rgba(62,58,52,.58)',
   chapel: 'rgba(72,56,40,.6)',
   balcony: 'rgba(52,66,74,.56)',
+  pantry: 'rgba(66,54,36,.58)',
+  servants_quarters: 'rgba(70,48,50,.58)',
+  guest_bath: 'rgba(48,66,76,.58)',
+  infirmary: 'rgba(58,66,70,.58)',
+  archives: 'rgba(66,52,40,.58)',
+  cold_storage: 'rgba(38,54,66,.62)',
+  greenhouse_annex: 'rgba(44,70,48,.58)',
+  loading_dock: 'rgba(50,54,58,.6)',
+  billiard_room: 'rgba(72,48,38,.58)',
+  observatory: 'rgba(42,52,66,.58)',
 };
 
 export interface Bulb {
@@ -148,6 +168,16 @@ export const ROOM_AMBIENT: Record<RoomId, number> = {
   stairwell: 0.22,
   chapel: 0.26,
   balcony: 0.38,
+  pantry: 0.28,
+  servants_quarters: 0.24,
+  guest_bath: 0.26,
+  infirmary: 0.3,
+  archives: 0.24,
+  cold_storage: 0.18,
+  greenhouse_annex: 0.34,
+  loading_dock: 0.26,
+  billiard_room: 0.3,
+  observatory: 0.22,
 };
 
 /* ------------------------------------------------------------------ */
@@ -324,6 +354,60 @@ export const PROPS: Record<RoomId, Prop[]> = {
   stairwell: [],
   chapel: [],
   balcony: [],
+  pantry: [
+    { k: 'shelf', x: 0.22, y: 0.3, w: 0.34, h: 0.5 },
+    { k: 'shelf', x: 0.78, y: 0.3, w: 0.28, h: 0.48 },
+    { k: 'crate', x: 0.5, y: 0.72, w: 0.26, h: 0.22 },
+  ],
+  servants_quarters: [
+    { k: 'bed', x: 0.34, y: 0.34, w: 0.46, h: 0.34 },
+    { k: 'wardrobe', x: 0.82, y: 0.25, w: 0.18, h: 0.34 },
+    { k: 'chair', x: 0.72, y: 0.72, w: 0.14, h: 0.14 },
+  ],
+  guest_bath: [
+    { k: 'counter', x: 0.5, y: 0.18, w: 0.62, h: 0.18 },
+    { k: 'puddle', x: 0.46, y: 0.66, w: 0.48, h: 0.3 },
+    { k: 'sheet', x: 0.88, y: 0.58, w: 0.14, h: 0.42 },
+  ],
+  infirmary: [
+    { k: 'bed', x: 0.5, y: 0.42, w: 0.58, h: 0.34 },
+    { k: 'counter', x: 0.18, y: 0.2, w: 0.24, h: 0.2 },
+    { k: 'shelf', x: 0.84, y: 0.34, w: 0.16, h: 0.46 },
+  ],
+  archives: [
+    { k: 'shelf', x: 0.16, y: 0.46, w: 0.18, h: 0.72 },
+    { k: 'shelf', x: 0.84, y: 0.46, w: 0.18, h: 0.72 },
+    { k: 'desk', x: 0.5, y: 0.3, w: 0.42, h: 0.22 },
+    { k: 'crate', x: 0.5, y: 0.76, w: 0.26, h: 0.2 },
+  ],
+  cold_storage: [
+    { k: 'fridge', x: 0.22, y: 0.34, w: 0.26, h: 0.44 },
+    { k: 'fridge', x: 0.78, y: 0.34, w: 0.26, h: 0.44 },
+    { k: 'crate', x: 0.5, y: 0.76, w: 0.28, h: 0.2 },
+  ],
+  greenhouse_annex: [
+    { k: 'plant', x: 0.2, y: 0.34, w: 0.26, h: 0.34 },
+    { k: 'plant', x: 0.78, y: 0.34, w: 0.26, h: 0.34 },
+    { k: 'bench', x: 0.5, y: 0.78, w: 0.4, h: 0.14 },
+    { k: 'puddle', x: 0.5, y: 0.5, w: 0.3, h: 0.2 },
+  ],
+  loading_dock: [
+    { k: 'crate', x: 0.24, y: 0.28, w: 0.3, h: 0.26, rot: -5 },
+    { k: 'crate', x: 0.72, y: 0.3, w: 0.3, h: 0.26, rot: 7 },
+    { k: 'tires', x: 0.82, y: 0.76, w: 0.18, h: 0.26 },
+    { k: 'clutter', x: 0.36, y: 0.74, w: 0.24, h: 0.18 },
+  ],
+  billiard_room: [
+    { k: 'table', x: 0.5, y: 0.48, w: 0.62, h: 0.42 },
+    { k: 'chair', x: 0.18, y: 0.76, w: 0.14, h: 0.14 },
+    { k: 'lamp', x: 0.5, y: 0.18, w: 0.1, h: 0.1 },
+  ],
+  observatory: [
+    { k: 'desk', x: 0.5, y: 0.72, w: 0.42, h: 0.22 },
+    { k: 'lamp', x: 0.5, y: 0.62, w: 0.09, h: 0.09 },
+    { k: 'shelf', x: 0.18, y: 0.34, w: 0.16, h: 0.5 },
+    { k: 'clutter', x: 0.82, y: 0.36, w: 0.2, h: 0.18 },
+  ],
   garden: [
     { k: 'tree', x: 0.12, y: 0.4, w: 0.24, h: 0.46 },
     { k: 'tree', x: 0.86, y: 0.62, w: 0.2, h: 0.4 },
