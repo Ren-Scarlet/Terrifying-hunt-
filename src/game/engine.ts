@@ -305,7 +305,7 @@ function alarmSuppressed(state: GameState): boolean {
 }
 
 function playerIsHidden(state: GameState): boolean {
-  return alarmSuppressed(state);
+  return alarmSuppressed(state) || state.stealthActions > 0;
 }
 
 /** 尾随者模式会把迈尔斯的实际恐惧范围压到 0。 */
@@ -348,11 +348,6 @@ function activateEmergency(state: GameState): void {
     person.goal = 'exit';
     person.escapeProgress = 0;
     person.activity = '警报全面爆发，正在逃离猎场';
-  }
-  if (state.hexNoedActive && state.totems.length > 0 && !state.hexNoedBonusGranted) {
-    state.energy += 2;
-    state.hexNoedBonusGranted = true;
-    log(state, '难逃一死生效：警报进入最终阶段，图腾仍然存留，你获得 2 点额外行动点。');
   }
   if (!supernatural) {
     const police = state.people.find((p) => p.role === 'police');
@@ -538,7 +533,7 @@ function recordTrails(state: GameState, before: Map<string, RoomId>): void {
     const from = before.get(p.id);
     if (!from || from === p.room) return;
     // 所有实际移动都会留下可追踪的脚印；潜行只压低声音，不再让路线凭空消失。
-    pushTrail(state, from, p.room, p.hp <= SURVIVOR_INJURED_HP);
+    pushTrail(state, from, p.room, p.hp <= SURVIVOR_INJURED_HP || p.bleed > 0);
     if (!isQuietMove(state, p)) addDisturbance(state, p.room);
   });
 }
@@ -664,6 +659,22 @@ function afterPlayerAction(state: GameState): void {
   if (state.result) return;
   const beforeReaction = snapshotRooms(state);
   npcReact(state);
+  if (state.scourgeShrineRoom) {
+    const present = state.people.filter((person) => person.role !== 'police' && person.hp > 0 && !person.hidden && person.room === state.scourgeShrineRoom);
+    const newcomer = present.find((person) => !state.scourgeShrineOccupants.includes(person.id));
+    if (newcomer) {
+      newcomer.fear = clamp(newcomer.fear + 35, 0, 100);
+      newcomer.alert = clamp(newcomer.alert + 12, 0, 100);
+      newcomer.awareness = Math.max(newcomer.awareness, 2);
+      newcomer.revealedActions = Math.max(newcomer.revealedActions ?? 0, 3);
+      newcomer.intent = 'wary';
+      log(state, `鬼魔神龛触发：${newcomer.name}踏入神龛所在房间，受到惊吓并暴露气场！`);
+      state.scourgeShrineRoom = null;
+      state.scourgeShrineOccupants = [];
+    } else {
+      state.scourgeShrineOccupants = present.map((person) => person.id);
+    }
+  }
   resolveTrapEntries(state, beforeReaction);
   if (state.result) return;
   if (state.nurseFatiguePending) {
@@ -768,6 +779,19 @@ function killPerson(state: GameState, person: Person): void {
   if (!state.people.some((p) => p.id === person.id)) return;
   state.people = state.people.filter((p) => p.id !== person.id);
   state.pinnedPeople = state.pinnedPeople.filter((id) => id !== person.id);
+  if (state.bitterMurmurReady && person.role !== 'police') {
+    state.bitterMurmurReady = false;
+    const remaining = state.people.filter((p) => p.role !== 'police' && p.hp > 0 && !p.hidden);
+    remaining.forEach((other) => { other.revealedActions = Math.max(other.revealedActions ?? 0, 3); });
+    log(state, remaining.length
+      ? `苦涩低语：${person.name}倒下的回声传遍猎场，另外 ${remaining.length} 名人类的气场显现。`
+      : '苦涩低语：最后的回声沉入空屋。');
+  }
+  if (state.hexHuntressActive && !state.hexHuntressUsed && person.role !== 'police') {
+    state.hexHuntressUsed = true;
+    state.cardBonusScore += 50;
+    log(state, '厄咒：猎杀戾气触发：这次击杀额外获得 50 点猎杀评分。');
+  }
   state.kills += 1;
   if (person.role !== 'police') state.survivorKills += 1;
   state.killsThisTurn += 1;
@@ -2733,7 +2757,7 @@ export function attack(state: GameState, targetId?: string): boolean {
     person.id === target.id || person.room !== state.playerRoom || person.hp <= 0,
   );
   const ambushStrike = ambushActive(state) && target.role !== 'police' && target.alert < 100 && alone;
-  const noedActive = state.hexNoedActive && state.emergencyActive && state.totems.length > 0;
+  const noedActive = state.hexNoedActive && state.emergencyActive;
   // 带手电筒的人可能从隔壁冲进来照你：这一刀落空，两个人都趁机跑掉
   const flasher = npcs(state).find(
     (p) =>
@@ -2794,7 +2818,19 @@ export function attack(state: GameState, targetId?: string): boolean {
     ? SURVIVOR_MAX_HP
     : heavy || nightfallKill || ambushStrike ? 2 : 1;
   const comboDamage = controlCombo && baseDamage < SURVIVOR_MAX_HP ? 1 : 0;
-  damagePerson(state, target, baseDamage + comboDamage);
+  if (noedActive && target.role !== 'police') {
+    target.hp = 0;
+    state.executions += 1;
+    log(state, `难逃一死：全局警报已满，你一刀处决了 ${target.name}！`);
+    killPerson(state, target);
+  } else {
+    damagePerson(state, target, baseDamage + comboDamage);
+  }
+  if (state.bleedNextHit && target.role !== 'police' && state.people.some((person) => person.id === target.id) && target.hp > 0) {
+    target.bleed = Math.max(target.bleed, 2);
+    state.bleedNextHit = false;
+    log(state, `辣手屠夫：${target.name}的伤口开始持续流血，移动时会留下血迹。`);
+  }
   if (heavy && state.killer === '迈克尔·迈尔斯' && target.hp < hpBeforeHit) {
     state.huntStats.myersBurstHits += 1;
   }
@@ -2810,18 +2846,6 @@ export function attack(state: GameState, targetId?: string): boolean {
     }
   }
   if (target.role !== 'police' && target.hp < hpBeforeHit) {
-    if (state.hexHuntressActive && !state.hexHuntressUsed) {
-      state.hexHuntressUsed = true;
-      const totemCandidates = ROOMS.map((room) => room.id).filter((room) => room !== state.playerRoom && !OBSTACLE_ROOMS.includes(room));
-      const totemRoom = randomOf(totemCandidates);
-      if (totemRoom && !state.totems.includes(totemRoom)) state.totems.push(totemRoom);
-      log(state, `厄咒：猎杀戾气触发，${roomName(totemRoom ?? state.playerRoom)}生成了一个图腾。幸存者可能会将其破坏。`);
-      if (state.hexNoedActive && state.emergencyActive && !state.hexNoedBonusGranted) {
-        state.energy += 2;
-        state.hexNoedBonusGranted = true;
-        log(state, '难逃一死生效：图腾仍然存留，你获得 2 点额外行动点。');
-      }
-    }
     if (state.killer === '迈克尔·迈尔斯' && state.myersLastBestActive && !target.bloodSacrifice) {
       state.myersLastBestMarks = Math.min(8, state.myersLastBestMarks + 1);
       log(state, `把最好的留在最后印记 +1（${state.myersLastBestMarks}/8）。`);
@@ -3731,6 +3755,7 @@ function finish(state: GameState, result: ResultKind): void {
   const bonusTasks = (state.mission.tasks ?? []).filter((task) => task.optional && missionTaskProgress(state, task) >= task.target);
   if (bonusTasks.length) lines.push({ label: `额外挑战 · ${bonusTasks.length} 项`, value: bonusTasks.length * 25 });
   if (state.specialExecutionBonus > 0) lines.push({ label: '地形处决奖励', value: state.specialExecutionBonus });
+  if (state.cardBonusScore > 0) lines.push({ label: '卡牌猎杀奖励', value: state.cardBonusScore });
   lines.push({ label: `凶残 · 击杀 ${state.kills} 人`, value: state.kills * 14 });
   if (state.escaped > 0) lines.push({ label: `逃走 ${state.escaped} 人的失分（每人 -15）`, value: -state.escaped * 15 });
   if (state.alarm >= 60) lines.push({ label: `暴露度 ${state.alarm} 的代价`, value: -Math.round(state.alarm / 5) });
