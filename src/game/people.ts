@@ -11,7 +11,7 @@ export interface PersonProfile {
   id: string;
   name: string;
   role: PersonRole;
-  age: number;
+  age?: number;
   occupation: string;
   portrait?: string;
   tags: string[];
@@ -38,6 +38,22 @@ const POLICE_PROFILE: PersonProfile = {
   secret: '他申请调离这里三次，每次都被驳回。',
 };
 
+const OCCUPATIONS: Record<string, string> = {
+  S01: '团队协调员', S02: '短跑运动员', S03: '植物学爱好者', S04: '野外生存者',
+  S05: '涂鸦艺术家', S06: '学生', S07: '职业赌徒', S08: '退伍军人',
+  S09: '职业电竞选手', S10: '橄榄球运动员', S11: '学生', S12: '警探',
+  S13: '歌手', S14: '教师', S15: '平面设计师', S16: '电视主持人',
+  S17: '机械师', S18: '学生记者', S19: '学生', S20: '拳击手',
+  S21: '纪录片导演', S22: '灵异事件幸存者', S23: '建筑师', S24: '冒险者',
+  S25: '音乐制作人', S26: '特种警员', S27: '警察新人', S28: '恐怖故事作家',
+  S29: '数学研究者', S30: '灵异事件研究者', S31: '超自然调查员', S32: '特工',
+  S33: '医疗兵', S34: '历史学者', S35: '舞者', S36: '舞者',
+  S37: '士兵', S38: '演员', S39: '星际货船军官', S40: '作家',
+  S41: '灵异仪式参与者', S42: '马戏团演员', S43: '考古学家', S44: '恶魔猎人',
+  S45: '灵异研究者', S46: '医护人员', S47: '警长', S48: '剑士',
+  S49: '住客', S50: '无线电爱好者', S51: '实验体', S52: '游戏参与者',
+};
+
 const fallbackProfile = (id: string): PersonProfile => ({
   id,
   name: '陌生住客',
@@ -56,7 +72,6 @@ export function getPersonProfile(id: string, role: PersonRole = 'civilian'): Per
   const survivor = SURVIVOR_MAP[id];
   if (!survivor) return fallbackProfile(id);
 
-  const serial = Number(id.slice(1)) || 0;
   const tags = survivor.threat
     ? [THREAT_LABEL[survivor.threat], survivor.franchise ?? '知名角色']
     : ['住户', survivor.franchise ?? '普通住客'];
@@ -67,8 +82,7 @@ export function getPersonProfile(id: string, role: PersonRole = 'civilian'): Per
     id,
     name: survivor.name,
     role,
-    age: 24 + (serial % 25),
-    occupation: survivor.franchise ?? '住户',
+    occupation: OCCUPATIONS[id] ?? '住户',
     portrait: survivorPortrait(id),
     tags,
     bio,
