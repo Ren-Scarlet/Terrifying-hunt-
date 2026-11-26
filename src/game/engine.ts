@@ -231,20 +231,14 @@ function completeTeamStage(state: GameState): void {
 
 /** 团队进度跨过 25% 里程碑时完成阶段；已完成阶段不会倒退。 */
 function addTeamProgress(state: GameState, amount: number): void {
-  if (amount <= 0 || state.teamStage >= TEAM_STAGE_COUNT) return;
-  state.teamProgress = Math.min(TEAM_GOAL_MAX, state.teamProgress + amount);
-  while (state.teamStage < TEAM_STAGE_COUNT && state.teamProgress >= (state.teamStage + 1) * TEAM_STAGE_SIZE) completeTeamStage(state);
-  if (state.hexNoedActive && state.teamStage >= 4 && state.totems.length > 0 && !state.hexNoedBonusGranted) {
-    state.energy += 2;
-    state.hexNoedBonusGranted = true;
-    log(state, '难逃一死生效：图腾仍然存留，你获得 2 点额外行动点。');
-  }
+  // 旧团队进度系统已废弃；保留空函数以兼容尚未改版的卡牌脚本。
+  void state; void amount;
 }
 
 /** 破坏设施只能拖慢当前阶段，不能抹掉已经完成的阶段。 */
 function reduceTeamProgress(state: GameState, amount: number): void {
-  if (amount <= 0 || state.teamStage >= TEAM_STAGE_COUNT) return;
-  state.teamProgress = Math.max(state.teamStage * TEAM_STAGE_SIZE, state.teamProgress - amount);
+  // 旧团队进度系统已废弃。
+  void state; void amount;
 }
 
 /** 健康 / 受伤 / 倒地，由血量推导，不单独存一份避免不同步 */
@@ -357,17 +351,53 @@ function addWanted(state: GameState, amount: number): void {
 }
 
 /** 暴露度：满 100 玩家被捕 / 被驱散。由玩家的动作推高，每回合自动回落。 */
+function activateEmergency(state: GameState): void {
+  if (state.emergencyActive || state.result) return;
+  state.emergencyActive = true;
+  const supernatural = KILLER_MAP[state.killer]?.school === 'supernatural';
+  if (state.escapeRooms.length !== 2) state.escapeRooms = farthestRoomPair();
+  for (const person of npcs(state)) {
+    if (person.hp <= 0) continue;
+    person.alert = Math.max(person.alert, 85);
+    person.intent = 'escape';
+    person.goal = 'exit';
+    person.escapeProgress = 0;
+    person.activity = '警报全面爆发，正在逃离猎场';
+  }
+  if (!supernatural) {
+    const police = state.people.find((p) => p.role === 'police');
+    if (police) {
+      for (let i = 0; i < 3; i += 1) {
+        state.people.push({
+          ...police,
+          id: `emergency-police-${i + 1}`,
+          name: ['增援警员 A', '增援警员 B', '增援警员 C'][i],
+          room: POLICE_START,
+          hp: 4,
+          alert: 100,
+          fear: 0,
+          escapeProgress: 0,
+          movesThisTurn: 0,
+        });
+      }
+    }
+    log(state, '【警报满值】警笛声撕开夜色！多支警队冲入猎场，所有人开始逃亡，警察将主动追捕你！');
+  } else {
+    state.people = state.people.filter((p) => p.role !== 'police');
+    log(state, '【灵异警报满值】猎场中的人终于意识到自己面对的不是人类。所有幸存者开始不顾一切地逃亡！');
+  }
+}
+
 export function addAlarm(state: GameState, amount: number): void {
+  if (state.result || amount === 0) return;
+  const before = state.alarm;
   state.alarm = clamp(state.alarm + amount, 0, ALARM_MAX);
   syncWanted(state);
-  if (state.alarm >= ALARM_MAX && !state.result) {
-    // 灵异鬼怪不该「被警察抓捕」：换成被恐惧反噬、逐回黑暗，代入感才成立。
-    const supernatural = KILLER_MAP[state.killer]?.school === 'supernatural';
-    state.resultReason = supernatural
-      ? '你的形体被彻底看穿：活人的恐惧凝成符咒，把你逐回黑暗——这一夜的猎场不再容你。'
-      : '整栋房子的证词终于拼成一张完整的脸：警察破门而入，当场把你按倒。';
-    finish(state, supernatural ? 'failed' : 'caught');
+  if (before < 60 && state.alarm >= 60 && state.escapeRooms.length === 0) {
+    state.escapeRooms = farthestRoomPair();
+    log(state, `警报升高！猎场出现逃生点：${state.escapeRooms.map(roomName).join('、')}。高度警戒的人开始寻找出口。`);
   }
+  if (state.alarm >= ALARM_MAX && !state.emergencyActive) activateEmergency(state);
 }
 
 /** 布局牌对报警暴露度的削弱 */
@@ -775,8 +805,10 @@ function killPerson(state: GameState, person: Person): void {
   npcs(state).forEach((other) => {
     // 尸体不会让整栋房子瞬间获知消息；只有同屋或相邻房间的人先察觉。
     const discoveryRadius = state.mapId === 'lampkin' ? 2 : 1;
-    if (other.alert < 36 && roomDistance(other.room, person.room) <= discoveryRadius) {
-      other.alert = clamp(other.alert + (other.room === person.room ? 18 : state.mapId === 'lampkin' ? 12 : 8), 0, 100);
+    if (roomDistance(other.room, person.room) <= discoveryRadius) {
+      const nearby = other.room === person.room;
+      other.fear = clamp(other.fear + (nearby ? 32 : 18), 0, 100);
+      other.alert = clamp(other.alert + (nearby ? 18 : 10), 0, 100);
       stirred += 1;
     }
   });
@@ -794,6 +826,8 @@ function damagePerson(state: GameState, person: Person, amount: number, suppress
   state.frenzy = 0;
 
   const before = person.hp;
+  person.fear = clamp(person.fear + Math.max(28, dmg * 24), 0, 100);
+  if (person.fear >= 100) dmg = Math.max(dmg, before);
   person.hidden = false;
   person.blockedTurns = 0;
 
@@ -1092,13 +1126,13 @@ function wantsToLeave(state: GameState, person: Person): boolean {
  * 这时候只留地面上的痕迹，让玩家自己看地板。
  */
 function fleeAway(state: GameState, person: Person, quiet = false): boolean {
-  if (state.pinnedPeople.includes(person.id) || person.blockedTurns > 0 || person.hp <= 0) return false;
+  if (state.pinnedPeople.includes(person.id) || person.blockedTurns > 0 || person.hp <= 0 || person.fear >= 100) return false;
   // 房门封锁会把房间内的人也困住，不能从锁住的房间直接跑出去。
   if (isLocked(state, person.room)) return false;
   // 后院是出口：只有本来就打算离开、或者已经吓破胆的人才会往外跑。
   // 否则「被追」等于「自动逃生」，玩家把人逼到院子里反而在帮对手。
   const mayExit =
-    person.goal === 'exit' || person.goal === 'panic' || person.alert >= 75 || person.hp <= SURVIVOR_INJURED_HP;
+    person.goal === 'exit' || person.goal === 'panic' || person.alert >= 75 || person.hp <= SURVIVOR_INJURED_HP || state.emergencyActive;
   const options = ROOM_MAP[person.room].neighbors.filter(
     (r) =>
       r !== state.playerRoom &&
@@ -2088,7 +2122,7 @@ function callPhase(state: GameState): void {
  * 或者警觉够高），就当他开始翻篱笆。
  */
 function escapePhase(state: GameState): void {
-  if (state.teamStage < TEAM_STAGE_COUNT || state.escapeRooms.length !== 2) return;
+  if (state.escapeRooms.length !== 2) return;
   for (const person of [...npcs(state)]) {
     if (person.hp <= 0) continue;
     if (!state.escapeRooms.includes(person.room)) {
@@ -2118,7 +2152,12 @@ function escapePhase(state: GameState): void {
     state.escaped += 1;
     addAlarm(state, 10);
     log(state, `${person.name} 成功逃离。`);
-    if (person.marked) log(state, `名单上少了一个人：${person.name} 已经不在房子里了。`);
+    if (person.marked) {
+      log(state, `任务目标 ${person.name} 已经逃离，契约立即失败。`);
+      state.resultReason = `任务目标 ${person.name} 成功逃离猎场。`;
+      finish(state, 'failed');
+      return;
+    }
 
     // 有人跑掉，剩下的人胆子会变大
     npcs(state).forEach((p) => {
@@ -2127,7 +2166,8 @@ function escapePhase(state: GameState): void {
 
     // 每逃一个人都在结算里扣 15 分；直到最后一个幸存者也翻出篱笆，契约才作废。
     // 不再用「逃够 N 个就立刻输」的硬阈值——那会让幸存者的个人目标失去博弈空间。
-    if (state.escaped >= state.survivorTotal && state.survivorTotal > 0) {
+    const remainingHumans = state.people.filter((p) => p.role !== 'police').length;
+    if (remainingHumans === 0 && state.escaped > 0) {
       state.resultReason = `最后一名幸存者也成功逃离，房子里再没有活人——契约作废（逃走 ${state.escaped} 人）。`;
       finish(state, 'failed');
     }
@@ -2656,7 +2696,7 @@ export function attack(state: GameState, targetId?: string): boolean {
     person.id === target.id || person.room !== state.playerRoom || person.hp <= 0,
   );
   const ambushStrike = ambushActive(state) && target.role !== 'police' && target.alert < 100 && alone;
-  const noedActive = state.hexNoedActive && state.teamStage >= 4 && state.totems.length > 0;
+  const noedActive = state.hexNoedActive && state.emergencyActive && state.totems.length > 0;
   // 带手电筒的人可能从隔壁冲进来照你：这一刀落空，两个人都趁机跑掉
   const flasher = npcs(state).find(
     (p) =>
@@ -3748,6 +3788,11 @@ export function endTurn(state: GameState): void {
 
   npcTurn(state);
   if (state.result) return;
+  for (const person of npcs(state)) {
+    if (person.fear > 0 && person.hp > 0 && person.alert < 70 && person.room !== state.playerRoom) {
+      person.fear = Math.max(0, person.fear - 8);
+    }
+  }
   callPhase(state);
   if (state.result) return;
 
@@ -3761,11 +3806,10 @@ export function endTurn(state: GameState): void {
   checkImmediateWin(state);
   if (state.result) return;
 
-  // 暴露度每回合自然回落：玩家安静下来，房子也会安静。
-  // 这是它和「团队进度」最大的区别——后者由幸存者干活推高，只涨不退。
-  state.alarm = Math.max(0, state.alarm - 6);
+  // 警报值可随猎场平静而下降；最终危机开始后不会撤销。
+  if (!state.emergencyActive) state.alarm = Math.max(0, state.alarm - 6);
   syncWanted(state);
-  if (state.heatTurn !== state.turn) {
+  if (!state.emergencyActive && state.heatTurn !== state.turn) {
     // 这一回合没有新的动静（没人报警、没人看见你、也没动手），注意力就散一点。
     // 这是「潜行 / 潜伏」玩法能成立的前提。
     state.alarm = Math.max(0, state.alarm - 4);
