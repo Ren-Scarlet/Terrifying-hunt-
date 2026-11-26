@@ -171,6 +171,7 @@ export function installImmersiveKeys(): void {
     else if (key === '0') { event.preventDefault(); handleImmersiveAction('camera-global'); }
     else if (key === 'f') { event.preventDefault(); handleImmersiveAction('camera-follow'); }
     else if (key === 't') { event.preventDefault(); handleImmersiveAction('toggle-task-drawer'); }
+    else if (key === 'e') { event.preventDefault(); root?.querySelector<HTMLButtonElement>('.person-world-actions button:not(:disabled), .map-world-actions button:not(:disabled)')?.click(); }
     else if (key === 'g') { event.preventDefault(); root?.querySelector<HTMLButtonElement>('[data-action="drop-carried"]:not(:disabled)')?.click(); }
     else if (/^[1-6]$/.test(key)) { event.preventDefault(); root?.querySelectorAll<HTMLButtonElement>('.hand-row [data-action="play"]')[Number(key) - 1]?.click(); }
     else if (key === ' ') { event.preventDefault(); root?.querySelector<HTMLButtonElement>('[data-action="end-turn"]:not(:disabled)')?.click(); }
@@ -179,10 +180,10 @@ export function installImmersiveKeys(): void {
       const intel = root?.querySelector<HTMLDetailsElement>('.intel-drawer');
       if (task?.classList.contains('open')) task.classList.remove('open');
       else if (intel?.open) intel.open = false;
-    } else if (['w', 'a', 's', 'd'].includes(key)) {
+    } else if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
       event.preventDefault();
       const amount = 54;
-      pan(key === 'a' ? amount : key === 'd' ? -amount : 0, key === 'w' ? amount : key === 's' ? -amount : 0);
+      pan(key === 'arrowleft' ? amount : key === 'arrowright' ? -amount : 0, key === 'arrowup' ? amount : key === 'arrowdown' ? -amount : 0);
     }
   });
   window.addEventListener('resize', () => applyTransform());
