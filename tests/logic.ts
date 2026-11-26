@@ -468,6 +468,32 @@ function caseUnaware(): void {
     darkVictim.room === darkNext && darkVictim.alert <= 12 && darkVictim.intent !== 'flee',
     `警觉=${darkVictim.alert}，意图=${darkVictim.intent}，状态=${darkVictim.activity}`);
 
+  const prePanic = newGame();
+  prePanic.people.forEach((person) => { person.item = null; person.itemUses = 0; person.armed = false; });
+  const suspiciousTarget = player(prePanic);
+  const suspiciousRoom = openNeighbor(prePanic.playerRoom);
+  suspiciousTarget.room = suspiciousRoom;
+  suspiciousTarget.alert = 30;
+  suspiciousTarget.awareness = 1;
+  suspiciousTarget.intent = 'wary';
+  movePlayer(prePanic, suspiciousRoom);
+  check('E 进门前低于恐慌的幸存者不会被瞬时警觉推成逃跑',
+    suspiciousTarget.room === suspiciousRoom && suspiciousTarget.intent !== 'flee',
+    `警觉=${suspiciousTarget.alert}，意图=${suspiciousTarget.intent}`);
+
+  const darkPanic = newGame();
+  darkPanic.people.forEach((person) => { person.item = null; person.itemUses = 0; person.armed = false; });
+  darkPanic.powerCircuits.forEach((circuit) => { circuit.broken = true; });
+  const darkAlreadyWary = player(darkPanic);
+  const darkWaryRoom = openNeighbor(darkPanic.playerRoom);
+  darkAlreadyWary.room = darkWaryRoom;
+  darkAlreadyWary.alert = 30;
+  darkAlreadyWary.awareness = 1;
+  movePlayer(darkPanic, darkWaryRoom);
+  check('E 暗处进入只增加极少警觉，低于恐慌者仍不逃跑',
+    darkAlreadyWary.room === darkWaryRoom && darkAlreadyWary.alert <= 34 && darkAlreadyWary.intent !== 'flee',
+    `警觉=${darkAlreadyWary.alert}，意图=${darkAlreadyWary.intent}`);
+
   const panic = newGame();
   const alarmed = player(panic);
   const panicNext = openNeighbor(panic.playerRoom);
