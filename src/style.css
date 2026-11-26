@@ -2723,3 +2723,93 @@ button, .room-hit, .hand-row { touch-action: manipulation; }
   .room-feature.site { min-width: 56px; }
   .room.room-size-small .room-feature { min-width: 34px; height: 30px; }
 }
+
+
+/* 暗夜杀机：可读性设置。地图尺寸独立变化，Canvas 按真实宿主尺寸重绘。 */
+#app .map-viewport {
+  display: block;
+  max-height: min(76vh, 900px);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+#app .map-viewport .floorplan {
+  width: var(--map-width, 100%);
+  max-width: none;
+  margin-inline: 0;
+}
+#app[data-map-scale="large"] { --map-width: 125%; }
+#app[data-map-scale="xlarge"] { --map-width: 150%; }
+#app[data-map-scale="standard"] { --map-width: 100%; }
+
+/* 人物头像达到接近半身头像的视觉权重；状态角标同步放大。 */
+.room-people .person-chip {
+  min-height: 50px;
+  gap: 7px;
+  padding: 2px 9px 2px 2px;
+  font-size: 14px;
+}
+.room-people .person-chip img { width: 46px; height: 46px; }
+.room-people .chip-alert { min-width: 22px; height: 22px; font-size: 12px; }
+
+/* 动态威胁面板：空闲时显示当前局势，只有真实风险出现时才增加警示行。 */
+.threat-live-summary {
+  display: grid; gap: 5px; padding: 9px 11px; margin-bottom: 8px;
+  border: 1px solid #38332a; background: linear-gradient(100deg, #171713, #101214);
+}
+.threat-live-summary b { color: #d6c4a4; font-size: 13px; }
+.threat-live-summary span { color: #c5bcae; font-size: 12px; line-height: 1.55; }
+.threat-live-summary small { color: #9c927f; font-size: 11px; line-height: 1.5; }
+.threat-clear {
+  display: grid; gap: 4px; padding: 10px; border: 1px dashed #454039;
+  color: #c5bcae; background: #111312;
+}
+.threat-clear b { font-size: 12px; }
+.threat-clear span { font-size: 11px; line-height: 1.55; color: #a9a194; }
+.facility-row.breaker, .facility-row.telephone { border-left: 2px solid #806d48; }
+.facility-row.broken .facility-state { color: #d58c7d; }
+.facility-symbol {
+  display: grid; place-items: center; width: 34px; height: 34px;
+  color: #d8c39a; font-size: 23px; background: #171613; border: 1px solid #494235;
+}
+.facility-state { color: #a9b99d; font-size: 11px; white-space: nowrap; }
+.display-control { min-height: 34px; padding-inline: 10px; white-space: nowrap; }
+
+/* 界面尺寸、文字尺寸、地图尺寸分别控制，设置保存在本机。 */
+#app[data-interface-scale="large"] .panel { padding: 16px 18px; }
+#app[data-interface-scale="xlarge"] .panel { padding: 20px 22px; }
+#app[data-interface-scale="large"] .btn { min-height: 40px; padding-inline: 13px; }
+#app[data-interface-scale="xlarge"] .btn { min-height: 46px; padding-inline: 16px; }
+#app[data-interface-scale="large"] .room-people .person-chip img { width: 50px; height: 50px; }
+#app[data-interface-scale="xlarge"] .room-people .person-chip img { width: 56px; height: 56px; }
+#app[data-font-scale="large"] .room-name { font-size: 16px; }
+#app[data-font-scale="large"] .room-desc { font-size: 13px; }
+#app[data-font-scale="large"] .person-chip { font-size: 14px; }
+#app[data-font-scale="large"] .panel h2 { font-size: 15px; }
+#app[data-font-scale="large"] .panel-heading span, #app[data-font-scale="large"] .map-legend { font-size: 13px; }
+#app[data-font-scale="large"] .threat-row .t-name, #app[data-font-scale="large"] .threat-row .t-hint { font-size: 13px; }
+#app[data-font-scale="large"] .threat-row .t-count { font-size: 16px; }
+#app[data-font-scale="large"] .facility-info b { font-size: 14px; }
+#app[data-font-scale="large"] .facility-info small { font-size: 13px; }
+#app[data-font-scale="large"] .roster-person b { font-size: 15px; }
+#app[data-font-scale="large"] .roster-person small { font-size: 13px; }
+#app[data-font-scale="large"] .stat small { font-size: 13px; }
+#app[data-font-scale="large"] .card-desc { font-size: 14px; }
+#app[data-font-scale="large"] .btn { font-size: 13px; }
+#app[data-font-scale="xlarge"] .room-name { font-size: 18px; }
+#app[data-font-scale="xlarge"] .room-desc { font-size: 15px; }
+#app[data-font-scale="xlarge"] .person-chip { font-size: 16px; }
+#app[data-font-scale="xlarge"] .panel h2 { font-size: 17px; }
+#app[data-font-scale="xlarge"] .panel-heading span, #app[data-font-scale="xlarge"] .map-legend { font-size: 15px; }
+#app[data-font-scale="xlarge"] .threat-row .t-name, #app[data-font-scale="xlarge"] .threat-row .t-hint { font-size: 15px; }
+#app[data-font-scale="xlarge"] .threat-row .t-count { font-size: 18px; }
+#app[data-font-scale="xlarge"] .facility-info b { font-size: 16px; }
+#app[data-font-scale="xlarge"] .facility-info small { font-size: 15px; }
+#app[data-font-scale="xlarge"] .roster-person b { font-size: 17px; }
+#app[data-font-scale="xlarge"] .roster-person small { font-size: 15px; }
+#app[data-font-scale="xlarge"] .stat small { font-size: 15px; }
+#app[data-font-scale="xlarge"] .card-desc { font-size: 16px; }
+#app[data-font-scale="xlarge"] .btn { font-size: 15px; }
+@media (max-width: 700px) {
+  .room-people .person-chip img { width: 40px; height: 40px; }
+  #app[data-map-scale="xlarge"] .map-viewport { max-height: 65vh; }
+}
