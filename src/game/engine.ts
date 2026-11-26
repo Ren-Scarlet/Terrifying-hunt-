@@ -3348,6 +3348,7 @@ export function sabotageSiteItem(state: GameState): boolean {
     const affected = state.powerCircuits.filter((circuit) => circuit.generatorId === item!.id).map((circuit) => circuit.name);
     log(state, `你砸了${roomName(item!.room)}的发电机，修复进度 ${before}% → ${item!.progress}%，停机 ${GENERATOR_JAM_TURNS} 回合。${affected.length ? '受其供电的 ' + affected.join('、') + ' 也随之熄灭。' : ''}`);
   }
+  }
 
   addDisturbance(state, state.playerRoom);
   if (target.kind === 'facility') addAlarm(state, 3);
