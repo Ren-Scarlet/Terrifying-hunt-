@@ -1664,7 +1664,7 @@ function actByArchetype(state: GameState, person: Person): void {
 
 /** 尾随不是自动挂机：每次点击能力都要花 1 AP，并承担被目标察觉的风险。 */
 
-function triggerBearTrapForPerson(state: GameState, person: Person): void {
+export function triggerBearTrapForPerson(state: GameState, person: Person): void {
   if (person.role === 'police' || person.hp <= 0) return;
   const trap = state.bearTraps.find((item) => item.armed && item.room === person.room);
   if (!trap) return;
