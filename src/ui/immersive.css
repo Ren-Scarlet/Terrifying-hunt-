@@ -1,4 +1,4 @@
-/* 沉浸式地图 HUD：只作用于实际对局，不影响主菜单、牌组与结算界面。 */
+/* In-game HUD: faithfully follows public/ui-prototype/index.html. */
 body.immersive-hunt { overflow: hidden; min-height: 100dvh; }
 #app.immersive-game {
   width: 100vw; max-width: none; min-height: 100dvh; height: 100dvh;
@@ -17,115 +17,107 @@ body.immersive-hunt { overflow: hidden; min-height: 100dvh; }
 #app.immersive-game .intel-log-panel { display: none !important; }
 #app.immersive-game .map-viewport {
   position: fixed; inset: 0; z-index: 0; display: block; overflow: hidden;
-  width: 100vw; height: 100dvh; margin: 0; padding: 0; background: #05090c;
+  width: 100vw; height: 100dvh; margin: 0; padding: 0; background: #080d11;
   border: 0; pointer-events: auto;
 }
 #app.immersive-game .floorplan {
   position: absolute; left: 0; top: 0; width: min(100vw, 180vh); max-width: none;
   margin: 0; border: 0; border-radius: 0; overflow: visible;
-  transform-origin: 0 0; will-change: transform;
-  box-shadow: 0 0 100px #000b;
+  transform-origin: 0 0; will-change: transform; box-shadow: 0 0 100px #000b;
 }
 #app.immersive-game .floorplan::after { opacity: .1; }
-#app.immersive-game .topbar {
-  position: fixed; z-index: 20; top: 13px; left: 18px; right: 18px;
-  display: flex; align-items: flex-start; justify-content: space-between;
-  gap: 16px; padding: 0; margin: 0; border: 0; background: transparent;
-  box-shadow: none; pointer-events: none;
-}
-#app.immersive-game .topbar > * { pointer-events: auto; }
-#app.immersive-game .topbar-identity { gap: 12px; }
-#app.immersive-game .brand { font-size: 14px; letter-spacing: 3px; text-shadow: 0 2px 12px #000; }
-#app.immersive-game .brand small { font-size: 8px; letter-spacing: 1.4px; }
-#app.immersive-game .killer-chip {
-  background: rgba(7,12,16,.58); backdrop-filter: blur(12px);
-  border-color: #aebec326; color: #d6dfe4;
-}
-#app.immersive-game .mission-strip {
-  position: fixed; top: 62px; left: 18px; width: min(330px, 38vw);
-  padding: 9px 12px; border: 1px solid #c3d0d51c; border-left: 2px solid #a33b43;
-  border-radius: 6px; background: rgba(7,12,16,.54); backdrop-filter: blur(12px);
-  box-shadow: 0 8px 24px #0005; cursor: pointer;
-}
-#app.immersive-game .mission-icon { display: none; }
-#app.immersive-game .mission-title { font-size: 12px; margin: 0 0 3px; }
-#app.immersive-game .mission-objective { font-size: 10px; color: #b9c4c9; }
-#app.immersive-game .mission-task-list { display: none; }
-#app.immersive-game .mission-rules { display: none; }
-#app.immersive-game .camera-controls {
-  position: fixed; z-index: 30; top: 14px; right: 18px; display: flex; align-items: center; gap: 6px;
-}
-#app.immersive-game .camera-controls .btn {
-  min-width: 35px; height: 34px; padding: 0 10px; border-radius: 6px;
-  border: 1px solid #c2d0d522; background: rgba(7,12,16,.65);
-  color: #d5dfe4; backdrop-filter: blur(12px); box-shadow: 0 3px 14px #0005;
-}
-#app.immersive-game .camera-controls .btn.active,
-#app.immersive-game .camera-controls .btn:hover { border-color: #c85c63; background: rgba(112,31,39,.68); }
-#app.immersive-game .camera-controls .camera-readout {
-  min-width: 42px; color: #c4d0d5; font-size: 10px; text-align: center; font-variant-numeric: tabular-nums;
-}
-#app.immersive-game .left-hud {
-  position: fixed; z-index: 18; left: 18px; top: 50%; transform: translateY(-50%);
-  display: flex; flex-direction: column; align-items: center; gap: 8px;
+#app.immersive-game .topline {
+  position: fixed; z-index: 30; top: 18px; left: 22px; right: 22px;
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
   pointer-events: none;
 }
-#app.immersive-game .left-hud .portrait {
-  width: 48px; height: 48px; border: 1px solid #c8d6dc55; border-radius: 50%;
-  background: rgba(8,13,17,.68); backdrop-filter: blur(12px); box-shadow: 0 5px 24px #0009;
+#app.immersive-game .topline > * { pointer-events: auto; }
+#app.immersive-game .brand {
+  display: flex; align-items: center; gap: 11px; color: #e4ebef;
+  font-size: 12px; font-weight: 650; letter-spacing: .22em; text-shadow: 0 2px 12px #000;
 }
-#app.immersive-game .left-hud .meter { height: 72px; }
+#app.immersive-game .brand .sigil {
+  width: 35px; height: 35px; border: 1px solid #d5e0e54d; border-radius: 50%;
+  display: grid; place-items: center; color: #f07b80; background: rgba(9,14,18,.56); font-size: 18px;
+}
+#app.immersive-game .brand strong { display: block; font-size: 12px; font-weight: 650; }
+#app.immersive-game .brand small {
+  display: block; margin-top: 4px; color: #a9b5bb; font-size: 10px;
+  font-weight: 400; letter-spacing: .12em;
+}
+#app.immersive-game .top-right { display: flex; align-items: center; gap: 7px; }
+#app.immersive-game .camera-controls { display: flex; align-items: center; gap: 7px; }
+#app.immersive-game .camera-controls .hudbtn {
+  height: 36px; min-width: 36px; padding: 0 11px; border: 1px solid rgba(205,222,231,.18);
+  border-radius: 7px; background: rgba(9,15,19,.62); color: #d9e2e7; font-size: 12px;
+  backdrop-filter: blur(13px); -webkit-backdrop-filter: blur(13px);
+}
+#app.immersive-game .camera-controls .hudbtn.icon { width: 36px; padding: 0; font-size: 17px; }
+#app.immersive-game .camera-controls .hudbtn:hover,
+#app.immersive-game .camera-controls .hudbtn.active {
+  background: rgba(132,35,43,.62); border-color: rgba(255,120,126,.5);
+}
+#app.immersive-game .camera-controls .zoomread {
+  min-width: 42px; color: #c6d0d6; font-size: 11px; text-align: center; font-variant-numeric: tabular-nums;
+}
+#app.immersive-game .objective {
+  position: fixed; z-index: 20; top: 78px; left: 23px; max-width: min(360px, calc(100vw - 100px));
+  display: flex; align-items: center; gap: 10px; color: #dce5e9; cursor: pointer;
+  text-shadow: 0 2px 8px #000; pointer-events: auto;
+}
+#app.immersive-game .objective .dot {
+  flex: 0 0 6px; width: 6px; height: 6px; border-radius: 50%;
+  background: #d65b60; box-shadow: 0 0 13px #f04d55;
+}
+#app.immersive-game .objective b { display: block; font-size: 12px; font-weight: 550; }
+#app.immersive-game .objective span { display: block; margin-top: 3px; color: #9eabb2; font-size: 10px; }
+#app.immersive-game .left-hud {
+  position: fixed; z-index: 18; left: 20px; top: 50%; transform: translateY(-50%);
+  display: flex; flex-direction: column; gap: 9px; align-items: center; pointer-events: none;
+}
+#app.immersive-game .left-hud .portrait {
+  width: 54px; height: 54px; border-radius: 50%; border: 1px solid rgba(223,232,236,.35);
+  background: radial-gradient(circle at 38% 30%,#6e7778,#252e33 48%,#090e12 75%);
+  display: grid; place-items: center; box-shadow: 0 5px 22px #0009;
+}
+#app.immersive-game .left-hud .meter { width: 4px; height: 90px; background: #29343a; border-radius: 5px; overflow: hidden; }
+#app.immersive-game .left-hud .meter i { display: block; background: linear-gradient(#e36a6e,#8d242d); border-radius: 5px; }
+#app.immersive-game .left-hud .tiny-stat {
+  color: #aab6bc; font-size: 9px; letter-spacing: .1em; writing-mode: vertical-rl;
+}
 #app.immersive-game .right-tools {
-  position: fixed; z-index: 22; right: 18px; top: 50%; transform: translateY(-50%);
+  position: fixed; z-index: 22; right: 20px; top: 50%; transform: translateY(-50%);
   display: flex; flex-direction: column; gap: 8px;
 }
 #app.immersive-game .right-tools .tool {
-  width: 39px; height: 39px; border-radius: 8px; border: 1px solid #c2d0d522;
-  background: rgba(7,12,16,.62); color: #d9e2e6; backdrop-filter: blur(12px);
+  position: relative; width: 39px; height: 39px; border: 1px solid rgba(205,222,231,.18);
+  border-radius: 8px; background: rgba(8,14,18,.6); color: #c8d4da;
+  display: grid; place-items: center; font-size: 15px; backdrop-filter: blur(13px);
 }
-#app.immersive-game .bottom-dock {
-  position: fixed; z-index: 24; left: 50%; bottom: 12px; transform: translateX(-50%);
-  width: min(1000px, calc(100vw - 150px)); max-height: 42vh; overflow: visible;
-  display: flex; flex-direction: column; gap: 6px;
+#app.immersive-game .right-tools .tool em {
+  position: absolute; right: 46px; white-space: nowrap; font-style: normal; font-size: 10px;
+  color: #c4d0d6; background: rgba(7,12,15,.78); padding: 5px 8px; border-radius: 4px;
+  opacity: 0; transition: .15s;
 }
-#app.immersive-game .resource-bar,
-#app.immersive-game .hand {
-  border: 1px solid #c5d3d91e; border-radius: 8px;
-  background: rgba(7,12,16,.68); backdrop-filter: blur(15px);
-  box-shadow: 0 10px 35px #0009; padding: 8px 10px;
+#app.immersive-game .right-tools .tool:hover,
+#app.immersive-game .right-tools .tool.active { border-color: #c15b61; background: rgba(116,35,42,.68); }
+#app.immersive-game .right-tools .tool:hover em { opacity: 1; }
+#app.immersive-game .task-pop {
+  position: fixed; z-index: 28; right: 70px; top: 75px; width: min(310px,calc(100vw - 100px));
+  padding: 17px 18px; border: 1px solid rgba(205,222,231,.18); border-radius: 9px;
+  background: rgba(9,15,19,.76); box-shadow: 0 15px 50px #0009; backdrop-filter: blur(13px);
+  display: none;
 }
-#app.immersive-game .resource-bar { display: flex; align-items: center; gap: 12px; }
-#app.immersive-game .resource-bar .stats { flex: 1; justify-content: space-around; }
-#app.immersive-game .resource-bar .stat { min-width: 52px; padding: 1px 7px; }
-#app.immersive-game .resource-bar .stat b { font-size: 13px; }
-#app.immersive-game .bottom-special-meters { display: none; }
-#app.immersive-game .hand { padding: 8px 10px 9px; }
-#app.immersive-game .hand-actions {
-  display: flex; align-items: center; justify-content: center; gap: 5px; flex-wrap: wrap;
-  max-height: 72px; overflow-y: auto; padding-bottom: 6px;
-}
-#app.immersive-game .hand-actions .btn { min-height: 29px; padding: 4px 8px; font-size: 10px; }
-#app.immersive-game .hand-actions .power-row { flex: 0 1 auto; gap: 4px; }
-#app.immersive-game .hand-actions .btn.power { min-width: 130px; padding: 3px 6px; }
-#app.immersive-game .hand-actions .power-art { width: 25px; height: 25px; }
-#app.immersive-game .hand-actions .power-glyph { width: 20px; height: 20px; }
-#app.immersive-game .hand-count { display: none; }
-#app.immersive-game .hand-row {
-  display: flex; justify-content: center; align-items: flex-end; gap: 7px;
-  overflow-x: auto; overflow-y: visible; padding: 2px 5px 4px;
-}
-#app.immersive-game .hand-row .card {
-  flex: 0 0 88px; width: 88px; min-height: 108px; padding: 8px;
-  background: linear-gradient(145deg, rgba(34,47,54,.92), rgba(7,12,16,.94));
-  border-color: #c2d0d52b; box-shadow: 0 8px 22px #0008;
-}
+#app.immersive-game .task-pop.open { display: block; }
+#app.immersive-game .task-pop h3 { margin: 0 0 12px; font-size: 13px; letter-spacing: .1em; }
+#app.immersive-game .task-pop p { margin: 0; color: #b5c1c7; font-size: 11px; line-height: 1.8; }
 #app.immersive-game .hunt-sidebar {
-  position: fixed; z-index: 26; right: 68px; top: 50%; transform: translateY(-50%);
-  width: min(350px, calc(100vw - 100px)); max-height: 72vh; overflow: auto;
+  position: fixed; z-index: 28; right: 70px; top: 50%; transform: translateY(-50%);
+  width: min(330px,calc(100vw - 100px)); max-height: 72vh; overflow: auto;
 }
 #app.immersive-game .intel-drawer {
-  border: 1px solid #c2d0d526; border-radius: 8px; background: rgba(7,12,16,.78);
-  backdrop-filter: blur(16px); box-shadow: 0 14px 45px #000a;
+  border: 1px solid rgba(205,222,231,.18); border-radius: 8px;
+  background: rgba(8,14,18,.72); box-shadow: 0 15px 50px #0009; backdrop-filter: blur(13px);
 }
 #app.immersive-game .intel-drawer > summary {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
@@ -134,16 +126,77 @@ body.immersive-hunt { overflow: hidden; min-height: 100dvh; }
 #app.immersive-game .intel-drawer > summary::-webkit-details-marker { display: none; }
 #app.immersive-game .intel-drawer:not([open]) { display: none; }
 #app.immersive-game .intel-grid { display: grid; gap: 8px; padding: 0 9px 9px; max-height: 60vh; overflow: auto; }
-#app.immersive-game .intel-grid .panel { background: rgba(12,18,22,.72); border-color: #c2d0d51b; }
-#app.immersive-game .task-detail-drawer {
-  position: fixed; z-index: 26; left: 18px; top: 115px; width: min(340px, calc(100vw - 36px));
-  max-height: 58vh; overflow: auto; display: none; padding: 14px 16px;
-  border: 1px solid #c2d0d526; border-radius: 8px; background: rgba(7,12,16,.8);
-  backdrop-filter: blur(16px); box-shadow: 0 14px 45px #000a;
+#app.immersive-game .intel-grid .panel { background: rgba(12,18,22,.72); border-color: rgba(205,222,231,.12); }
+#app.immersive-game .statusline {
+  position: fixed; z-index: 18; left: 22px; bottom: 20px; max-width: min(52vw, 760px);
+  display: flex; flex-direction: column; gap: 5px; color: #aebbc1; font-size: 10px;
+  text-shadow: 0 2px 8px #000; pointer-events: none;
 }
-#app.immersive-game .task-detail-drawer.open { display: block; }
-#app.immersive-game .task-detail-drawer h3 { margin: 0 0 8px; font-size: 12px; letter-spacing: 1px; }
-#app.immersive-game .task-detail-drawer p { margin: 6px 0; color: #b7c3c9; font-size: 10px; line-height: 1.7; }
+#app.immersive-game .resource-bar { display: flex; align-items: center; gap: 10px; }
+#app.immersive-game .resource-bar .stats { display: flex; align-items: center; gap: 0; flex-wrap: wrap; }
+#app.immersive-game .resource-bar .stat {
+  min-width: 44px; padding: 1px 7px; text-align: center;
+  border-left: 1px solid rgba(205,222,231,.16); background: none;
+}
+#app.immersive-game .resource-bar .stat:first-child { border-left: 0; }
+#app.immersive-game .resource-bar .stat b { display: block; font-size: 12px; line-height: 1.3; color: #dce5e9; }
+#app.immersive-game .resource-bar .stat small { display: block; color: #9eabb2; font-size: 8px; letter-spacing: .08em; }
+#app.immersive-game .resource-bar .stat.energy b { color: #a9cde1; }
+#app.immersive-game .resource-bar .stat.score b { color: #d8bd83; }
+#app.immersive-game .resource-bar .stat.frenzy.active b { color: #ff7a54; }
+#app.immersive-game .resource-bar .alarm-track { height: 2px; margin: 2px 0; background: #29343a; }
+#app.immersive-game .resource-bar .alarm-track span { display: block; height: 100%; background: #b94b52; }
+#app.immersive-game .bottom-special-meters { display: none; }
+#app.immersive-game .play-status { color: #9eabb2; font-size: 9px; line-height: 1.5; }
+#app.immersive-game .play-status b { color: #e3e9ec; font-weight: 550; }
+#app.immersive-game .bottom-hud {
+  position: fixed; z-index: 24; left: 50%; bottom: 18px; transform: translateX(-50%);
+  display: flex; align-items: flex-end; gap: 12px; width: max-content;
+  max-width: calc(100vw - 150px); pointer-events: none;
+}
+#app.immersive-game .bottom-hud > * { pointer-events: auto; }
+#app.immersive-game .action-pill {
+  display: flex; align-items: flex-end; gap: 6px; margin-bottom: 2px; max-width: min(38vw, 560px);
+  padding: 7px; border: 1px solid rgba(205,222,231,.18); border-radius: 7px;
+  background: rgba(8,14,18,.72); box-shadow: 0 9px 25px #0008;
+  backdrop-filter: blur(13px); overflow: hidden;
+}
+#app.immersive-game .hand-actions {
+  display: flex; align-items: center; justify-content: flex-start; flex-wrap: nowrap;
+  gap: 6px; max-width: 100%; overflow-x: auto; overflow-y: hidden; padding: 0 0 2px;
+  scrollbar-width: thin;
+}
+#app.immersive-game .hand-actions .btn {
+  flex: 0 0 auto; min-height: 34px; padding: 0 10px; border: 1px solid rgba(205,222,231,.18);
+  border-radius: 6px; background: rgba(8,14,18,.7); color: #d4dfe4; font-size: 10px; white-space: nowrap;
+}
+#app.immersive-game .hand-actions .btn.primary { background: rgba(139,38,45,.8); border-color: #bb555c; }
+#app.immersive-game .hand-actions .btn:disabled { opacity: .38; cursor: not-allowed; }
+#app.immersive-game .hand-actions .power-row { display: flex; flex: 0 0 auto; align-items: center; gap: 4px; }
+#app.immersive-game .hand-actions .btn.power { min-width: 100px; padding: 3px 6px; }
+#app.immersive-game .hand {
+  display: flex; align-items: flex-end; gap: 7px; max-width: min(48vw, 720px);
+  padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none;
+}
+#app.immersive-game .hand-row {
+  display: flex; align-items: flex-end; justify-content: flex-start; gap: 7px;
+  max-width: 100%; overflow-x: auto; overflow-y: visible; padding: 2px 5px 4px;
+}
+#app.immersive-game .hand-row .card {
+  flex: 0 0 78px; width: 78px; min-height: 105px; padding: 9px 8px;
+  border: 1px solid rgba(208,221,228,.24); border-radius: 7px;
+  background: linear-gradient(145deg,rgba(38,51,58,.9),rgba(8,14,18,.84));
+  box-shadow: 0 9px 25px #0008;
+}
+#app.immersive-game .hand-row .card:hover,
+#app.immersive-game .hand-row .card:focus-visible { transform: translateY(-9px); border-color: #dc777b; }
+#app.immersive-game .hand-toggle {
+  flex: 0 0 33px; width: 33px; height: 33px; margin-bottom: 2px; border-radius: 50%;
+  border: 1px solid rgba(205,222,231,.18); background: rgba(8,14,18,.72); color: #d8e1e5;
+}
+#app.immersive-game.hand-collapsed .hand { display: none; }
+#app.immersive-game .empty-hand { padding: 12px; color: #9eabb2; font-size: 11px; }
+#app.immersive-game .hand-limit-warning { color: #e8b8a0; font-size: 10px; padding: 4px; }
 #app.immersive-game .map-world-actions {
   position: absolute; z-index: 12; left: 50%; top: 50%; transform: translate(-50%,-150%);
   display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; width: max-content; max-width: 75%;
@@ -161,45 +214,45 @@ body.immersive-hunt { overflow: hidden; min-height: 100dvh; }
 #app.immersive-game .map-person-wrap:hover .person-world-actions,
 #app.immersive-game .map-person-wrap:focus-within .person-world-actions { display: flex; }
 #app.immersive-game .person-world-actions .btn { min-height: 24px; padding: 3px 6px; font-size: 9px; background: rgba(13,18,21,.9); }
-#app.immersive-game .statusline {
-  position: fixed; z-index: 18; left: 18px; bottom: 18px; color: #c1cbd0;
-  font-size: 10px; text-shadow: 0 2px 8px #000;
-}
-#app.immersive-game.hud-hidden .mission-strip,
+#app.immersive-game.hud-hidden .objective,
 #app.immersive-game.hud-hidden .left-hud,
 #app.immersive-game.hud-hidden .right-tools,
-#app.immersive-game.hud-hidden .bottom-dock,
+#app.immersive-game.hud-hidden .bottom-hud,
 #app.immersive-game.hud-hidden .statusline { opacity: 0; pointer-events: none; }
-@media (max-width: 720px) {
-  #app.immersive-game .topbar { top: 8px; left: 9px; right: 9px; }
-  #app.immersive-game .brand small { display: none; }
-  #app.immersive-game .killer-chip { display: none; }
-  #app.immersive-game .mission-strip { top: 53px; left: 9px; width: min(270px, 66vw); }
-  #app.immersive-game .camera-controls { top: 8px; right: 9px; gap: 3px; }
-  #app.immersive-game .camera-controls .btn { min-width: 29px; height: 30px; padding: 0 7px; font-size: 10px; }
-  #app.immersive-game .left-hud { left: 8px; }
-  #app.immersive-game .right-tools { right: 8px; }
-  #app.immersive-game .bottom-dock { width: calc(100vw - 18px); bottom: 7px; max-height: 45vh; }
-  #app.immersive-game .resource-bar { padding: 5px; }
-  #app.immersive-game .resource-bar .stat { min-width: 42px; padding: 0 3px; }
-  #app.immersive-game .resource-bar .stat b { font-size: 11px; }
-  #app.immersive-game .hand-row .card { flex-basis: 65px; width: 65px; min-height: 91px; padding: 6px; }
-  #app.immersive-game .hand-actions { max-height: 48px; }
-  #app.immersive-game .hunt-sidebar { right: 48px; width: min(290px, calc(100vw - 60px)); }
-  #app.immersive-game .task-detail-drawer { left: 9px; top: 98px; }
+#app.immersive-game::before {
+  content: ''; position: fixed; inset: 0; z-index: 5; pointer-events: none;
+  background: radial-gradient(ellipse 120% 90% at 50% 45%,transparent 38%,rgba(0,0,0,.32) 78%,rgba(0,0,0,.82) 130%);
 }
-
-body.immersive-hunt::before { z-index: 5; }
-body.immersive-hunt::after { z-index: 6; }
-#app.immersive-game .map-world-actions { left: 50%; top: 50%; }
-#app.immersive-game .mission-strip:hover { border-color: #c85c6370; }
-#app.immersive-game .person-world-actions .btn:disabled,
-#app.immersive-game .map-world-actions .btn:disabled { opacity: .42; cursor: not-allowed; }
-
 body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
-#app.immersive-game::before { content: ''; position: fixed; inset: 0; z-index: 5; pointer-events: none; background: radial-gradient(ellipse 120% 90% at 50% 45%, transparent 38%, rgba(0,0,0,.32) 78%, rgba(0,0,0,.82) 130%); }
-
-/* 底部 HUD 采用原型的悬浮排布：只保留卡牌和独立操作按钮，不再把手牌/资源包成大面板。 */
-#app.immersive-game .resource-bar, #app.immersive-game .hand { border: 0; border-radius: 0; background: transparent; backdrop-filter: none; box-shadow: none; padding: 0; }
-#app.immersive-game .resource-bar .stat b, #app.immersive-game .resource-bar .stat small { text-shadow: 0 2px 8px #000; }
-#app.immersive-game .hand-actions { padding: 0 0 5px; }
+@media (max-width: 900px) {
+  #app.immersive-game .statusline { max-width: 100vw; left: 10px; bottom: 8px; }
+  #app.immersive-game .play-status { display: none; }
+  #app.immersive-game .bottom-hud {
+    left: 50%; bottom: 8px; max-width: calc(100vw - 20px); width: calc(100vw - 20px);
+    gap: 6px; align-items: flex-end;
+  }
+  #app.immersive-game .action-pill { max-width: 42vw; padding: 5px; }
+  #app.immersive-game .hand { max-width: calc(58vw - 54px); min-width: 0; }
+  #app.immersive-game .hand-row .card { flex-basis: 60px; width: 60px; min-height: 84px; padding: 6px; }
+  #app.immersive-game .hand-actions .btn { min-height: 30px; padding: 0 7px; font-size: 9px; }
+}
+@media (max-width: 700px) {
+  #app.immersive-game .topline { top: 10px; left: 10px; right: 10px; }
+  #app.immersive-game .brand small { display: none; }
+  #app.immersive-game .brand .sigil { width: 30px; height: 30px; }
+  #app.immersive-game .camera-controls { gap: 3px; }
+  #app.immersive-game .camera-controls .hudbtn { height: 30px; min-width: 29px; padding: 0 7px; font-size: 10px; }
+  #app.immersive-game .camera-controls .hudbtn.icon { width: 29px; }
+  #app.immersive-game .objective { top: 58px; left: 12px; max-width: calc(100vw - 75px); }
+  #app.immersive-game .left-hud { left: 8px; }
+  #app.immersive-game .left-hud .portrait { width: 43px; height: 43px; }
+  #app.immersive-game .right-tools { right: 8px; }
+  #app.immersive-game .bottom-hud { bottom: 7px; }
+  #app.immersive-game .action-pill { max-width: 39vw; }
+  #app.immersive-game .hand { max-width: calc(61vw - 45px); }
+  #app.immersive-game .hand-row .card { flex-basis: 55px; width: 55px; min-height: 78px; }
+  #app.immersive-game .resource-bar .stat { min-width: 36px; padding: 0 4px; }
+  #app.immersive-game .resource-bar .stat b { font-size: 10px; }
+  #app.immersive-game .task-pop { right: 12px; top: 58px; width: min(310px,calc(100vw - 24px)); }
+  #app.immersive-game .hunt-sidebar { right: 48px; width: min(290px,calc(100vw - 60px)); }
+}
