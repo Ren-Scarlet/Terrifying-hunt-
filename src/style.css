@@ -3444,3 +3444,14 @@ button, .room-hit, .hand-row { touch-action: manipulation; }
   from { opacity: .45; transform: scale(.9); }
   to { opacity: 1; transform: scale(1.12); }
 }
+
+
+/* 头像外框必须跟随地图大头像尺寸同步放大，避免血祭品框缩成小图。 */
+.room-people .person-chip .person-avatar-wrap { flex-basis: 56px; width: 56px; height: 56px; }
+#app[data-interface-scale="large"] .room-people .person-chip .person-avatar-wrap { flex-basis: 64px; width: 64px; height: 64px; }
+#app[data-interface-scale="xlarge"] .room-people .person-chip .person-avatar-wrap { flex-basis: 72px; width: 72px; height: 72px; }
+#app .floorplan .room.room-size-small .person-chip .person-avatar-wrap { flex-basis: 18px; width: 18px; height: 18px; }
+@media (max-width: 700px) {
+  .room-people .person-chip .person-avatar-wrap { flex-basis: 44px; width: 44px; height: 44px; }
+  #app[data-interface-scale="xlarge"] .room-people .person-chip .person-avatar-wrap { flex-basis: 60px; width: 60px; height: 60px; }
+}
