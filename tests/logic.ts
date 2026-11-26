@@ -69,7 +69,7 @@ import {
   nextStepToward,
   updateNpcDialogue,
 } from '../src/game/engine';
-import { CABINET_ROOMS, OBSTACLE_ROOMS, ROOM_MAP, ROOMS, buildLayout, doorMarkerPosition } from '../src/game/rooms';
+import { CABINET_ROOMS, OBSTACLE_ROOMS, ROOM_MAP, ROOMS, buildLayout, doorMarkerPosition, layoutAspect } from '../src/game/rooms';
 import { cardImage } from '../src/game/assetMap';
 import { readdirSync } from 'node:fs';
 import { personChip, personDetailHtml } from '../src/ui/render/shared';
