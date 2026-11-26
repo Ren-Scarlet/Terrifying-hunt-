@@ -923,7 +923,7 @@ export function carryPerson(state: GameState, personId: string): boolean {
 }
 
 export function executeCarriedPerson(state: GameState, methodId: ExecutionMethodId): boolean {
-  if (!state.carryPersonId || state.phase !== 'playing') return false;
+  if (!state.carryPersonId || state.phase !== 'playing' || state.attackBlockedTurn === state.turn) return false;
   const person = state.people.find((p) => p.id === state.carryPersonId);
   if (!person || person.room !== state.playerRoom || !canExecuteNow(person)) {
     log(state, '怀里的人尚不能处决，或已经不在现场。');
@@ -2568,6 +2568,17 @@ function precheckFailed(state: GameState, defId: string): string | null {
   return checkCond(state, def.precheck.cond) ? null : def.precheck.hint;
 }
 
+export function selectAuraRoom(state: GameState, room: RoomId): boolean {
+  if (state.phase !== 'playing' || !state.auraTargeting || !ROOM_MAP[room]) return false;
+  state.auraTargeting = false;
+  const targets = state.people.filter((person) => person.role !== 'police' && person.hp > 0 && !person.hidden && person.room === room);
+  targets.forEach((person) => { person.revealedActions = Math.max(person.revealedActions ?? 0, 3); });
+  log(state, targets.length
+    ? `恶灵低语：${roomName(room)}中的 ${targets.length} 名人类气场显现。`
+    : `恶灵低语：${roomName(room)}空无一人，没有捕捉到气场。`);
+  return true;
+}
+
 export function playCard(state: GameState, cardUid: string): boolean {
   if (state.phase !== 'playing') return false;
   const index = state.hand.findIndex((c) => c.uid === cardUid);
@@ -2588,23 +2599,31 @@ export function playCard(state: GameState, cardUid: string): boolean {
     log(state, blocked);
     return false;
   }
+  if (state.attackBlockedTurn === state.turn && (card.defId === 'myers_eclipse_light' || def.ops.some((op) => ['damage', 'down', 'execute', 'kill'].includes(op.op)))) {
+    log(state, '戏耍食物生效中：本回合不能打出造成伤害或处决的卡牌。');
+    return false;
+  }
   if (def.killerOnly && def.killerOnly !== state.killer) {
     log(state, `「${def.name}」是 ${def.killerOnly} 的专属卡牌。`);
     return false;
   }
   if (card.defId === 'myers_eclipse_light') {
     const lastTarget = state.people.find((person) => person.id === state.lastAttackedId);
-    if (state.killer !== '迈克尔·迈尔斯' || !lastTarget || lastTarget.hp > 0 || lastTarget.bloodSacrifice) {
-      log(state, '湮灭之光：必须先击倒一名非血祭品幸存者才能打出。');
+    if (state.killer !== '迈克尔·迈尔斯' || !lastTarget || lastTarget.hp > 0 || lastTarget.role === 'police') {
+      log(state, '湮灭之光：必须先击倒一名人类才能打出。');
       return false;
     }
   }
-  if (card.defId === 'myers_plaything') {
-    const sacrifice = state.people.find((person) => person.bloodSacrifice && person.role !== 'police' && person.hp > 0 && isPersonVisible(state, person));
-    if (state.killer !== '迈克尔·迈尔斯' || !sacrifice) {
-      log(state, '戏耍食物：视野内没有可见的血祭品，无法打出。');
+  if (card.defId === 'myers_last_best') {
+    const remaining = state.people.filter((person) => person.role !== 'police');
+    if (state.killer !== '迈克尔·迈尔斯' || remaining.length !== 1) {
+      log(state, '把最好的留在最后：地图上必须只剩最后一名人类才能打出。');
       return false;
     }
+  }
+  if (card.defId === 'hex_ruin' && !sabotageTarget(state)) {
+    log(state, '粉碎希望：当前房间附近没有可破坏的环境目标。');
+    return false;
   }
 
   state.energy -= cost;
@@ -2613,38 +2632,25 @@ export function playCard(state: GameState, cardUid: string): boolean {
   log(state, `你打出「${def.name}」（消耗 ${cost} 点行动点）。`);
 
   if (card.defId === 'myers_eclipse_light') {
-    state.myersEclipseMarks = Math.min(5, state.myersEclipseMarks + 1);
-    log(state, `湮灭之光印记 +1（${state.myersEclipseMarks}/5）：普通幸存者推进变慢，血祭品推进变快。`);
-  } else if (card.defId === 'myers_plaything') {
-    const sacrifice = state.people.find((person) => person.bloodSacrifice && person.role !== 'police' && person.hp > 0 && isPersonVisible(state, person));
-    if (sacrifice) {
-      state.myersFoodMarks = Math.min(8, state.myersFoodMarks + 1);
-      sacrifice.alert = Math.max(sacrifice.alert, 55);
-      sacrifice.awareness = Math.max(sacrifice.awareness, 2);
-      sacrifice.intent = 'flee';
-      sacrifice.activity = '被迈尔斯戏耍，仓皇逃离视线';
-      if (sacrifice.movesThisTurn < REACT_MOVE_CAP) {
-        // 这张牌的核心承诺是「逃离你的视线」：若相邻房间恰好都在视野里，
-        // 让血祭品利用额外行动继续跑到最近的迷雾房间，而不是随机跑进另一间可见房。
-        const unseenRooms = ROOMS.map((room) => room.id).filter((room) =>
-          room !== state.playerRoom && !isRoomVisible(state, room) && canStand(state, room) && !isLocked(state, room),
-        );
-        if (unseenRooms.length) {
-          movePersonTo(state, sacrifice, nearestOf(sacrifice.room, unseenRooms));
-          sacrifice.movesThisTurn += 1;
-        } else if (fleeAway(state, sacrifice, true)) {
-          sacrifice.movesThisTurn += 1;
-        }
+    const target = state.people.find((person) => person.id === state.lastAttackedId);
+    if (target && target.hp <= 0) {
+      const sacrifice = target.bloodSacrifice;
+      state.executions += 1;
+      executePerson(state, target);
+      if (sacrifice) {
+        const survivors = state.people.filter((person) => person.role !== 'police' && person.hp > 0);
+        survivors.forEach((person) => { person.fear = clamp(person.fear + 35, 0, 100); });
+        log(state, `血祭品被湮灭之光处决：所有 ${survivors.length} 名幸存人类恐惧值 +35。`);
       }
-      if (state.myersFoodMarks % 2 === 0 && state.myersFoodMarks <= 8) {
-        state.energy += 1;
-        log(state, `戏耍食物印记达到 ${state.myersFoodMarks}/8：额外行动点 +1。`);
-      } else {
-        log(state, `戏耍食物印记 +1（${state.myersFoodMarks}/8）。`);
-      }
-      log(state, `${sacrifice.name} 获得一次额外行动并逃离你的视线。`);
+    }
+  } else if (card.defId === 'myers_last_best') {
+    const last = state.people.find((person) => person.role !== 'police');
+    if (last) {
+      last.revealedActions = Math.max(last.revealedActions ?? 0, 3);
+      log(state, `把最好的留在最后：最后一名人类 ${last.name} 的气场显现。`);
     }
   }
+
 
   runOps(state, def.ops);
   // 不屈不挠把「擦刀」作为卡牌效果免费结算：不检查也不扣行动点，
@@ -2680,6 +2686,7 @@ export function playCard(state: GameState, cardUid: string): boolean {
  */
 export function attackBlockReason(state: GameState, targetId?: string): string {
   if (state.phase !== 'playing') return '现在不能攻击';
+  if (state.attackBlockedTurn === state.turn) return '戏耍食物生效中：本回合不能攻击。';
   // 攻击只针对站立目标；倒地者有独立的处决按钮，避免两个动作混在一起。
   if (targetId) {
     const picked = state.people.find((p) => p.id === targetId);
@@ -2705,6 +2712,7 @@ export function canAttack(state: GameState, targetId?: string): boolean {
 /** 独立处决动作：倒地后立即可用，消耗 1 AP；玩家不处决时，同伴仍可在之后救援。 */
 export function executeBlockReason(state: GameState, targetId?: string): string {
   if (state.phase !== 'playing') return '现在不能处决';
+  if (state.attackBlockedTurn === state.turn) return '戏耍食物生效中：本回合不能处决。';
   const target = targetId
     ? state.people.find((person) => person.id === targetId)
     : peopleInRoom(state, state.playerRoom).find((person) => person.role !== 'police' && person.hp <= 0);
@@ -3437,7 +3445,7 @@ export function blinkPlayer(state: GameState, room: RoomId): boolean {
 }
 
 export function nurseGrabPerson(state: GameState, targetId: string): boolean {
-  if (state.killer !== '护士' || !state.nurseFollowUp || state.energy < 1) return false;
+  if (state.killer !== '护士' || !state.nurseFollowUp || state.energy < 1 || state.attackBlockedTurn === state.turn) return false;
   const target = state.people.find((person) => person.id === targetId);
   if (!target || target.role === 'police' || target.hp <= 0 || target.room !== state.playerRoom) {
     log(state, '闪现抓取只能选择当前房间内站立的幸存者。');
@@ -3456,7 +3464,7 @@ export function nurseGrabPerson(state: GameState, targetId: string): boolean {
 }
 
 export function throwHuntressHatchet(state: GameState, targetId: string): boolean {
-  if (state.killer !== '女猎手' || !state.huntressAiming || state.hatchets <= 0 || state.energy < 1) return false;
+  if (state.killer !== '女猎手' || !state.huntressAiming || state.hatchets <= 0 || state.energy < 1 || state.attackBlockedTurn === state.turn) return false;
   const target = state.people.find((person) => person.id === targetId);
   if (!target || !huntressTargetable(state, target)) {
     log(state, '飞斧只能投向直线视野内可见的站立幸存者。');
