@@ -1186,7 +1186,7 @@ function npcOnPlayerEnter(state: GameState): void {
     else if (threat === 'team') gain = 38;
     if (threat !== 'spiritual') {
       if (hidden) gain = Math.round(gain * 0.4);
-      if (darkRoom) gain = Math.round(gain * 0.35);
+      if (darkRoom) gain = Math.round(gain * 0.25);
     }
     person.alert = clamp(person.alert + gain, 0, 100);
     // 迈尔斯的尾随：盯着看得越久，越不容易被屋里的人察觉
