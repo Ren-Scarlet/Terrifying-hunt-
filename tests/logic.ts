@@ -962,6 +962,7 @@ function caseSwingGate(): void {
 function casePanicRun(): void {
   const s = newGame();
   const v = player(s);
+  s.roomLocks = {};
   v.room = s.playerRoom;
   v.hp = 3;
   v.alert = 0;
@@ -1151,7 +1152,7 @@ function caseAdjacentHidden(): void {
   v.room = front.id;
   check('P 玩家移动后能观察正前方一格房间', isRoomVisible(s, front.id) && isPersonVisible(s, v), `正前方：${front.id}`);
   v.room = from;
-  check('P 玩家身后的房间仍不可直接观察', !isRoomVisible(s, from) && !isPersonVisible(s, v), `身后：${from}`);
+  check('P 玩家移动后仍能持续观察刚离开的房间', isRoomVisible(s, from) && isPersonVisible(s, v), `身后监视：${from}`);
   check('P 相邻房间仍然算已探索（有轮廓）', isRoomExplored(s, from));
 }
 
@@ -1662,6 +1663,7 @@ function caseAidAndPressure(): void {
 
   // 主动赶路：倒地的人在另一间屋，附近的人会放下手里的活往那边走
   const b = newGame();
+  b.roomLocks = {};
   b.people.forEach((p) => { p.item = null; p.itemUses = 0; p.alert = 0; p.hidden = false; p.hp = 4; });
   const folk = b.people.filter((p) => p.role !== 'police').slice(0, 2);
   const near = ROOM_MAP[b.playerRoom].neighbors.find((r) => !OBSTACLE_ROOMS.includes(r))
@@ -1681,6 +1683,18 @@ function caseAidAndPressure(): void {
     folk[1].room === near || folk[1].intent === 'rescue' || folk[1].activity.includes('赶去'),
     `room=${folk[1].room} intent=${folk[1].intent} activity=${folk[1].activity}`,
   );
+
+  const medkitGame = newGame();
+  medkitGame.roomLocks = {};
+  const medkitPair = medkitGame.people.filter((p) => p.role !== 'police').slice(0, 2);
+  const medkitDowned = medkitPair[0];
+  const medic = medkitPair[1];
+  const medkitRoom = openNeighbor(medkitGame.playerRoom);
+  medkitDowned.room = medkitRoom; medkitDowned.hp = 0; medkitDowned.downedTurns = 0; medkitDowned.hidden = false;
+  medic.room = medkitRoom; medic.hp = 4; medic.hidden = false; medic.alert = 0; medic.awareness = 0;
+  medic.archetype = 'hider'; medic.intent = 'heal'; medic.item = 'medkit'; medic.itemUses = 2; medic.healTurns = 0;
+  withRandomSource(() => 0.99, () => { endTurn(medkitGame); endTurn(medkitGame); });
+  check('AA 医疗包会在连续两回合后救起倒地同伴', medkitDowned.hp > 0 && medkitDowned.downedTurns === 0 && medic.itemUses < 2, `hp=${medkitDowned.hp} healTurns=${medic.healTurns}`);
 
   // 击杀压力：死了 3 个人后，目标房干活一回合推进明显快于基础值 5
   let delta = 0;
