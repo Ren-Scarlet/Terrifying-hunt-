@@ -3466,3 +3466,10 @@ button, .room-hit, .hand-row { touch-action: manipulation; }
 .mission-task-reward{display:inline-block;margin-left:5px;color:var(--gold);font-size:10px;font-style:normal}
 .survivor-count small{white-space:normal;font-size:10px}
 .wait-action{border-color:#53616a!important;color:#d0d8dc!important}
+
+
+/* 卡牌描述中的机制名、状态名强调 */
+.card-keyword { color: #e8c75f; font-weight: 700; text-shadow: 0 0 5px rgba(232,199,95,.16); }
+.tune-description { display: grid; gap: 5px; margin: 8px 0; color: #cdbf9f; font-size: 11px; }
+.tune-description textarea { width: 100%; min-height: 62px; resize: vertical; padding: 7px; border: 1px solid #4a4032; background: #0b0d0e; color: #e8dfcc; font: inherit; line-height: 1.5; }
+.tune-no-action { display: flex; align-items: center; gap: 7px; margin: 7px 0; color: #e0c27e; font-size: 11px; }

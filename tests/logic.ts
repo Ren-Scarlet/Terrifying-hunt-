@@ -1984,8 +1984,9 @@ function caseNewPerkSystem(): void {
   lastBest.people = lastBest.people.filter((person) => person.role === 'police' || person.id === lastHuman.id);
   lastBest.hand = [{ uid: 'test-last-best', defId: 'myers_last_best' }];
   lastBest.energy = 6;
-  check('把最好的留在最后：只剩一名人类时显示其气场',
-    playCard(lastBest, 'test-last-best') && (lastHuman.revealedActions ?? 0) > 0);
+  const lastBestPlayed = playCard(lastBest, 'test-last-best');
+  check('把最好的留在最后：显形 5 次后续行动并提供一次免费移动',
+    lastBestPlayed && (lastHuman.revealedActions ?? 0) >= 5 && lastBest.freeMove);
 
   const eclipse = createGame(['myers_eclipse_light'], undefined, '迈克尔·迈尔斯');
   const downed = eclipse.people.find((person) => person.role !== 'police')!;
@@ -2007,9 +2008,11 @@ function caseNewPerkSystem(): void {
   const food = createGame(['myers_plaything'], undefined, '迈克尔·迈尔斯');
   food.hand = [{ uid: 'test-food', defId: 'myers_plaything' }];
   food.energy = 1;
+  const foodTarget = food.people.find((person) => person.role !== 'police')!;
+  foodTarget.room = food.playerRoom;
   const foodPlayed = playCard(food, 'test-food');
-  check('戏耍食物：获得 2 AP 并禁止本回合攻击',
-    foodPlayed && food.energy === 2 && food.attackBlockedTurn === food.turn &&
+  check('玩弄食物：0费、视野内有幸存者时获得 2 AP 并禁止本回合攻击',
+    foodPlayed && food.energy === 3 && food.attackBlockedTurn === food.turn &&
     attackBlockReason(food).includes('不能攻击'));
 
   const hex = createGame(['hex_huntress'], undefined, '迈克尔·迈尔斯');
@@ -2022,11 +2025,9 @@ function caseNewPerkSystem(): void {
   hexVictim.bloodSacrifice = false;
   hex.energy = 6;
   hex.attackReady = true;
-  attack(hex, hexVictim.id);
-  hex.energy = 6;
-  executeDownedPerson(hex, hexVictim.id);
-  check('猎杀戾气：下一次击杀人类额外获得 50 分',
-    hex.hexHuntressUsed && hex.cardBonusScore === 50);
+  const hexHit = attack(hex, hexVictim.id);
+  check('猎杀戾气：下一次攻击命中幸存者额外获得 50 分',
+    hexHit && hex.hexHuntressUsed && hex.cardBonusScore === 50);
 
   const noed = createGame(['hex_noed'], undefined, '迈克尔·迈尔斯');
   noed.people.forEach((person) => { person.room = 'bedroom'; person.alert = 0; person.awareness = 0; person.item = null; person.itemUses = 0; });
@@ -2036,14 +2037,12 @@ function caseNewPerkSystem(): void {
   const noedTarget = noed.people.find((person) => person.role !== 'police')!;
   noedTarget.room = noed.playerRoom;
   noedTarget.hp = 4;
-  noed.alarm = 99;
-  addAlarm(noed, 1);
   noed.energy = 6;
   noed.attackReady = true;
   const noedAttack = attack(noed, noedTarget.id);
-  check('难逃一死：全局警报满值后无需图腾，一刀处决当前房间人类',
-    noedPlayed && noedAttack && noed.emergencyActive && !noed.people.some((person) => person.id === noedTarget.id),
-    `played=${noedPlayed} attacked=${noedAttack} emergency=${noed.emergencyActive} targetPresent=${noed.people.some((person) => person.id === noedTarget.id)} room=${noed.playerRoom} targetRoom=${noedTarget.room} hp=${noedTarget.hp} result=${noed.result}`);
+  check('难逃一死：只要厄咒图腾仍在，攻击命中就直接击倒而非处决',
+    noedPlayed && noed.totems.length > 0 && noedAttack && noed.people.some((person) => person.id === noedTarget.id && person.hp === 0),
+    `played=${noedPlayed} attacked=${noedAttack} totems=${noed.totems.length} targetPresent=${noed.people.some((person) => person.id === noedTarget.id)} hp=${noedTarget.hp}`);
 
   const bitter = createGame(['bitter_murmur'], undefined, '迈克尔·迈尔斯');
   const bitterTarget = bitter.people.find((person) => person.role !== 'police')!;
@@ -2057,7 +2056,7 @@ function caseNewPerkSystem(): void {
   const bitterExecuted = executeDownedPerson(bitter, bitterTarget.id);
   check('苦涩低语：下一次击杀后，其他存活人类气场显现',
     bitterExecuted && !bitter.bitterMurmurReady && otherHumans.length > 0 &&
-    otherHumans.every((person) => (person.revealedActions ?? 0) > 0));
+    otherHumans.every((person) => (person.revealedActions ?? 0) >= 3));
 
   const reveal = createGame(['hell'], undefined, '迈克尔·迈尔斯');
   const revealTarget = reveal.people.find((person) => person.role !== 'police')!;
@@ -2067,8 +2066,18 @@ function caseNewPerkSystem(): void {
   reveal.energy = 6;
   const revealPlayed = playCard(reveal, 'test-hell');
   const auraSelected = selectAuraRoom(reveal, revealRoom);
-  check('恶灵低语：打出后可选任意房间，并显示该房间人类气场',
-    revealPlayed && auraSelected && !reveal.auraTargeting && (revealTarget.revealedActions ?? 0) > 0);
+  check('恶灵低语：0费且不推进 NPC 行动，可选任意房间并显示气场',
+    revealPlayed && reveal.energy === 6 && auraSelected && !reveal.auraTargeting && (revealTarget.revealedActions ?? 0) > 0);
+
+  const shrine = createGame(['scourge_shrine'], undefined, '迈克尔·迈尔斯');
+  const shrineTarget = shrine.people.find((person) => person.role !== 'police')!;
+  shrineTarget.room = shrine.playerRoom;
+  shrineTarget.fear = 0;
+  shrine.hand = [{ uid: 'test-shrine', defId: 'scourge_shrine' }];
+  shrine.energy = 6;
+  const shrinePlayed = playCard(shrine, 'test-shrine');
+  check('鬼魔神龛：当前房间有人时立即触发恐惧与气场效果',
+    shrinePlayed && shrineTarget.fear >= 35 && (shrineTarget.revealedActions ?? 0) >= 3 && shrine.scourgeShrineRoom === null);
 
   const fear = createGame(['distressing'], undefined, '迈克尔·迈尔斯');
   const adjacentRoom = ROOM_MAP[fear.playerRoom].neighbors[0];
@@ -2088,11 +2097,8 @@ function caseNewPerkSystem(): void {
   sloppy.hand = [{ uid: 'test-sloppy', defId: 'sloppy_butcher' }];
   sloppy.energy = 6;
   const sloppyPlayed = playCard(sloppy, 'test-sloppy');
-  sloppy.energy = 6;
-  sloppy.attackReady = true;
-  const sloppyHit = attack(sloppy, sloppyTarget.id);
-  check('辣手屠夫：下一刀命中后造成持续流血',
-    sloppyPlayed && sloppyHit && sloppyTarget.bleed === 2);
+  check('辣手屠夫：打牌本身发动一次攻击，命中附带流血',
+    sloppyPlayed && sloppyTarget.hp < 4 && sloppyTarget.bleed === 2 && !sloppy.attackReady);
 
   const stealth = createGame(['insidious'], undefined, '迈克尔·迈尔斯');
   stealth.hand = [{ uid: 'test-stealth', defId: 'insidious' }];

@@ -73,6 +73,8 @@ export interface CardDef {
   unlocked: boolean;
   /** 效果程序：由 effect.ts 的解释器执行，改这里就能改卡牌效果 */
   ops: Op[];
+  /** 打出后不推进 NPC 行动、状态计时与世界时间 */
+  noAction?: boolean;
   /** 出牌前的条件检查：不满足时不消耗行动点、不弃牌 */
   precheck?: Precheck;
   /** initial = 通用初始卡；killer = 对应杀手专属卡；未标记的旧卡仅保留兼容。 */
@@ -518,7 +520,6 @@ export interface GameState {
   hexHuntressUsed: boolean;
   hexNoedActive: boolean;
   hexNoedBonusGranted: boolean;
-  scourgeShrineReady: boolean;
   distressingActive: boolean;
   hexRuinActive: boolean;
   hexRuinUsed: boolean;

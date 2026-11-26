@@ -659,27 +659,32 @@ function rememberVisible(state: GameState): void {
   });
 }
 
+/** 检查鬼魔神龛：放置时房间内已有幸存者也会立即触发；空房间则等待第一名进入者。 */
+function checkScourgeShrine(state: GameState): void {
+  if (!state.scourgeShrineRoom) return;
+  const present = state.people.filter((person) => person.role !== 'police' && person.hp > 0 && !person.hidden && person.room === state.scourgeShrineRoom);
+  const newcomer = present.find((person) => !state.scourgeShrineOccupants.includes(person.id));
+  if (newcomer) {
+    newcomer.fear = clamp(newcomer.fear + 35, 0, 100);
+    newcomer.alert = clamp(newcomer.alert + 12, 0, 100);
+    newcomer.awareness = Math.max(newcomer.awareness, 2);
+    newcomer.revealedActions = Math.max(newcomer.revealedActions ?? 0, 4);
+    newcomer.intent = 'wary';
+    log(state, `鬼魔神龛触发：${newcomer.name}受到惊吓，恐惧 +35、警觉 +12，气场显现 3 次后续行动！`);
+    state.scourgeShrineRoom = null;
+    state.scourgeShrineOccupants = [];
+  } else {
+    state.scourgeShrineOccupants = present.map((person) => person.id);
+  }
+}
+
 /** 玩家每一个动作结束后的统一收尾：世界动一下，视野记一下，胜负判一下 */
 function afterPlayerAction(state: GameState): void {
   if (state.result) return;
+  checkScourgeShrine(state);
   const beforeReaction = snapshotRooms(state);
   npcReact(state);
-  if (state.scourgeShrineRoom) {
-    const present = state.people.filter((person) => person.role !== 'police' && person.hp > 0 && !person.hidden && person.room === state.scourgeShrineRoom);
-    const newcomer = present.find((person) => !state.scourgeShrineOccupants.includes(person.id));
-    if (newcomer) {
-      newcomer.fear = clamp(newcomer.fear + 35, 0, 100);
-      newcomer.alert = clamp(newcomer.alert + 12, 0, 100);
-      newcomer.awareness = Math.max(newcomer.awareness, 2);
-      newcomer.revealedActions = Math.max(newcomer.revealedActions ?? 0, 3);
-      newcomer.intent = 'wary';
-      log(state, `鬼魔神龛触发：${newcomer.name}踏入神龛所在房间，受到惊吓并暴露气场！`);
-      state.scourgeShrineRoom = null;
-      state.scourgeShrineOccupants = [];
-    } else {
-      state.scourgeShrineOccupants = present.map((person) => person.id);
-    }
-  }
+  checkScourgeShrine(state);
   resolveTrapEntries(state, beforeReaction);
   if (state.result) return;
   if (state.nurseFatiguePending) {
@@ -883,15 +888,10 @@ function killPerson(state: GameState, person: Person): void {
   if (state.bitterMurmurReady && person.role !== 'police') {
     state.bitterMurmurReady = false;
     const remaining = state.people.filter((p) => p.role !== 'police' && p.hp > 0 && !p.hidden);
-    remaining.forEach((other) => { other.revealedActions = Math.max(other.revealedActions ?? 0, 3); });
+    remaining.forEach((other) => { other.revealedActions = Math.max(other.revealedActions ?? 0, 4); });
     log(state, remaining.length
       ? `苦涩低语：${person.name}倒下的回声传遍猎场，另外 ${remaining.length} 名人类的气场显现。`
       : '苦涩低语：最后的回声沉入空屋。');
-  }
-  if (state.hexHuntressActive && !state.hexHuntressUsed && person.role !== 'police') {
-    state.hexHuntressUsed = true;
-    state.cardBonusScore += 50;
-    log(state, '厄咒：猎杀戾气触发：这次击杀额外获得 50 点猎杀评分。');
   }
   state.kills += 1;
   if (person.role !== 'police') state.survivorKills += 1;
@@ -1159,6 +1159,8 @@ function checkCond(state: GameState, cond: Cond): boolean {
       return state.stalkMeter >= cond.gte;
     case 'possession':
       return state.possessed;
+    case 'visibleSurvivor':
+      return npcs(state).some((person) => person.role !== 'police' && person.hp > 0 && isPersonVisible(state, person));
     case 'flag':
       if (cond.key === 'phoneCut') return state.phoneCut;
       if (cond.key === 'wiretap') return state.wiretap;
@@ -2768,6 +2770,24 @@ export function playCard(state: GameState, cardUid: string): boolean {
     return false;
   }
 
+  // 辣手屠夫：卡牌本身就是一次攻击，费用只扣一次；命中时附带流血。
+  if (card.defId === 'sloppy_butcher' || card.defId === 'shuriken') {
+    const victim = findVictim(state, state.playerRoom);
+    if (!victim) {
+      log(state, '辣手屠夫：当前房间没有可以攻击的站立幸存者。');
+      return false;
+    }
+    const reason = attackBlockReason(state, victim.id, cost);
+    if (reason) {
+      log(state, `辣手屠夫：${reason}。`);
+      return false;
+    }
+    state.hand.splice(index, 1);
+    state.discardPile.push(card);
+    log(state, `你打出「${def.name}」，对当前房间的 ${victim.name} 发动攻击。`);
+    return attack(state, victim.id, { costOverride: cost, bleedOnHit: true });
+  }
+
   state.energy -= cost;
   state.hand.splice(index, 1);
   state.discardPile.push(card);
@@ -2788,8 +2808,9 @@ export function playCard(state: GameState, cardUid: string): boolean {
   } else if (card.defId === 'myers_last_best') {
     const last = state.people.find((person) => person.role !== 'police');
     if (last) {
-      last.revealedActions = Math.max(last.revealedActions ?? 0, 3);
-      log(state, `把最好的留在最后：最后一名人类 ${last.name} 的气场显现。`);
+      last.revealedActions = Math.max(last.revealedActions ?? 0, 6);
+      state.freeMove = true;
+      log(state, `把最好的留在最后：最后一名人类 ${last.name} 的气场显现 5 次后续行动；你获得一次免费移动。`);
     }
   }
 
@@ -2805,12 +2826,14 @@ export function playCard(state: GameState, cardUid: string): boolean {
       log(state, `把最好的留在最后：免费擦刀移除 ${removed} 枚专属印记（剩余 ${state.myersLastBestMarks}）。`);
     }
     log(state, '不屈不挠：抽牌并免费擦刀（不消耗行动点）。');
-  } else {
-    // 其他卡牌仍按原规则收回刀锋。
+  } else if (!def.noAction) {
+    // 普通卡牌仍按原规则收回刀锋；零行动卡不刷新攻击状态。
     state.attackReady = true;
   }
-  afterPlayerAction(state);
-  checkImmediateWin(state);
+  if (!def.noAction) {
+    afterPlayerAction(state);
+    checkImmediateWin(state);
+  }
   return true;
 }
 
@@ -2826,7 +2849,7 @@ export function playCard(state: GameState, cardUid: string): boolean {
  *   2. 上一刀已经收回来——「无法连续挥刀」，砍完必须再做一件事
  *   3. 屋里确实站着一个能下手的人——倒地的人只能处决，砍不动
  */
-export function attackBlockReason(state: GameState, targetId?: string): string {
+export function attackBlockReason(state: GameState, targetId?: string, costOverride = ATTACK_COST): string {
   if (state.phase !== 'playing') return '现在不能攻击';
   if (state.attackBlockedTurn === state.turn) return '戏耍食物生效中：本回合不能攻击。';
   // 攻击只针对站立目标；倒地者有独立的处决按钮，避免两个动作混在一起。
@@ -2839,7 +2862,7 @@ export function attackBlockReason(state: GameState, targetId?: string): string {
     if (picked.hp <= 0) return '目标已经倒地，请使用「处决」按钮';
   }
   if (!state.attackReady) return '刀还没收回来：先挪一步或出一张牌';
-  if (state.energy < ATTACK_COST) return `需要 ${ATTACK_COST} 点行动点`;
+  if (state.energy < costOverride) return `需要 ${costOverride} 点行动点`;
   if (findVictim(state, state.playerRoom, Infinity, false, targetId)) return '';
   const downedHere = peopleInRoom(state, state.playerRoom).some((p) => p.role !== 'police' && p.hp <= 0);
   if (downedHere) return '当前房间只有倒地目标，请使用「处决」按钮';
@@ -2894,9 +2917,10 @@ export function executeDownedPerson(state: GameState, targetId?: string): boolea
  * 所以「一刀接一刀」不是按得快就行，中间得有一次追逐或一次控制。
  * 传入 targetId 时只砍那个人——点房间里的谁，就砍谁。
  */
-export function attack(state: GameState, targetId?: string): boolean {
+export function attack(state: GameState, targetId?: string, options: { costOverride?: number; bleedOnHit?: boolean } = {}): boolean {
   if (state.phase !== 'playing') return false;
-  const reason = attackBlockReason(state, targetId);
+  const attackCost = options.costOverride ?? ATTACK_COST;
+  const reason = attackBlockReason(state, targetId, attackCost);
   if (reason) {
     log(state, reason);
     return false;
@@ -2907,7 +2931,7 @@ export function attack(state: GameState, targetId?: string): boolean {
     person.id === target.id || person.room !== state.playerRoom || person.hp <= 0,
   );
   const ambushStrike = ambushActive(state) && target.role !== 'police' && target.alert < 100 && alone;
-  const noedActive = state.hexNoedActive && state.emergencyActive;
+  const noedActive = state.hexNoedActive && state.totems.length > 0;
   // 带手电筒的人可能从隔壁冲进来照你：这一刀落空，两个人都趁机跑掉
   const flasher = npcs(state).find(
     (p) =>
@@ -2934,7 +2958,7 @@ export function attack(state: GameState, targetId?: string): boolean {
     checkImmediateWin(state);
     return false;
   }
-  state.energy -= ATTACK_COST;
+  state.energy -= attackCost;
   state.attackReady = false;
   state.lastAttackedId = target.id;
   if (target.role === 'police') {
@@ -2948,10 +2972,10 @@ export function attack(state: GameState, targetId?: string): boolean {
   log(
     state,
     target.hp <= 0
-      ? `你俯身补上一刀，${target.name} 没能再起来（消耗 ${ATTACK_COST} 点行动点）。`
+      ? `你俯身补上一刀，${target.name} 没能再起来（消耗 ${attackCost} 点行动点）。`
       : heavy
-        ? `恶魔附身 · 你挥刀砍向 ${target.name}，这一刀直接见骨（消耗 ${ATTACK_COST} 点行动点）。`
-        : `你挥刀砍向 ${target.name}（消耗 ${ATTACK_COST} 点行动点）。`,
+        ? `恶魔附身 · 你挥刀砍向 ${target.name}，这一刀直接见骨（消耗 ${attackCost} 点行动点）。`
+        : `你挥刀砍向 ${target.name}（消耗 ${attackCost} 点行动点）。`,
   );
   // 鬼面监视完成：这一刀直接把还站着的人放倒，不必补第二下
   const nightfallKill = target.watched;
@@ -2969,17 +2993,24 @@ export function attack(state: GameState, targetId?: string): boolean {
     : heavy || nightfallKill || ambushStrike ? 2 : 1;
   const comboDamage = controlCombo && baseDamage < SURVIVOR_MAX_HP ? 1 : 0;
   if (noedActive && target.role !== 'police') {
-    target.hp = 0;
-    state.executions += 1;
-    log(state, `难逃一死：全局警报已满，你一刀处决了 ${target.name}！`);
-    killPerson(state, target);
+    damagePerson(state, target, SURVIVOR_MAX_HP);
+    log(state, `难逃一死：厄咒图腾仍然存续，${target.name}被攻击后直接倒地（图腾剩余 ${state.totems.length} 座）。`);
   } else {
     damagePerson(state, target, baseDamage + comboDamage);
+  }
+  if (options.bleedOnHit && target.role !== 'police' && state.people.some((person) => person.id === target.id) && target.hp < hpBeforeHit) {
+    target.bleed = Math.max(target.bleed, 2);
+    log(state, `辣手屠夫：${target.name}的伤口开始持续流血，移动时会留下血迹。`);
   }
   if (state.bleedNextHit && target.role !== 'police' && state.people.some((person) => person.id === target.id) && target.hp > 0) {
     target.bleed = Math.max(target.bleed, 2);
     state.bleedNextHit = false;
     log(state, `辣手屠夫：${target.name}的伤口开始持续流血，移动时会留下血迹。`);
+  }
+  if (target.role !== 'police' && target.hp < hpBeforeHit && state.hexHuntressActive && !state.hexHuntressUsed) {
+    state.hexHuntressUsed = true;
+    state.cardBonusScore += 50;
+    log(state, '厄咒：猎杀戾气触发：这次攻击命中，额外获得 50 点猎杀评分。');
   }
   if (heavy && state.killer === '迈克尔·迈尔斯' && target.hp < hpBeforeHit) {
     state.huntStats.myersBurstHits += 1;
@@ -3003,11 +3034,6 @@ export function attack(state: GameState, targetId?: string): boolean {
     if (state.killer === '迈克尔·迈尔斯' && state.myersFoodMarks > 0) {
       state.myersFoodMarks -= 1;
       log(state, `戏耍食物印记 -1（${state.myersFoodMarks}/8）。`);
-    }
-    if (state.scourgeShrineReady && target.room === 'kitchen') {
-      reduceTeamProgress(state, 12);
-      state.scourgeShrineReady = false;
-      log(state, '天灾：鬼魔神龛触发，厨房特殊处决地点的攻击使团队进度倒退 12。');
     }
   }
   afterPlayerAction(state);

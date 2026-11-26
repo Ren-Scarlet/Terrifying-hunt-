@@ -154,6 +154,8 @@ export type Cond =
   | { c: 'alarm'; gte?: number; lte?: number }
   | { c: 'stalk'; gte: number }
   | { c: 'possession' }
+  /** 视野中至少有一名存活幸存者 */
+  | { c: 'visibleSurvivor' }
   | { c: 'flag'; key: FlagKey }
   | { c: 'room'; is: RoomId }
   | { c: 'markedAlive' }

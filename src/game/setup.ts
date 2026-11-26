@@ -154,7 +154,6 @@ export function createGame(
     hexHuntressUsed: false,
     hexNoedActive: false,
     hexNoedBonusGranted: false,
-    scourgeShrineReady: false,
     distressingActive: false,
     hexRuinActive: false,
     hexRuinUsed: false,

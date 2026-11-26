@@ -1,6 +1,6 @@
 import type { Op } from './effect';
 
-export type EffectFieldType = 'num' | 'who' | 'dest' | 'flag' | 'sabotage' | 'text';
+export type EffectFieldType = 'num' | 'who' | 'dest' | 'flag' | 'sabotage' | 'status' | 'text';
 export interface EffectOpMeta {
   label: string;
   fields: ReadonlyArray<readonly [string, EffectFieldType]>;
@@ -31,6 +31,11 @@ export const FLAG_OPTIONS = [
   ['bitterMurmur', '苦涩低语'], ['bleedNextHit', '辣手屠夫流血'], ['noAttackTurn', '本回合禁攻'],
 ] as const;
 
+export const STATUS_OPTIONS = [
+  ['blind', '障目'], ['undetectable', '无法侦测'], ['danger', '危险'],
+  ['deepWound', '深度伤口'], ['oblivious', '浑然不觉'], ['incurable', '不治'], ['cursed', '被诅咒'],
+] as const;
+
 export const SABOTAGE_OPTIONS = [
   ['phone', '电话线'], ['radio', '无线电'], ['exit', '后院门'], ['lights', '电闸'],
 ] as const;
@@ -45,7 +50,7 @@ export const EFFECT_OPS: Record<Op['op'], EffectOpMeta> = {
   wantedHalf: { label: '暴露度减半', fields: [] },
   alert: { label: '警觉', fields: [['who', 'who'], ['amount', 'num']] },
   block: { label: '定身', fields: [['who', 'who'], ['turns', 'num']] },
-  status: { label: '施加状态', fields: [['who', 'who'], ['status', 'text'], ['turns', 'num']] },
+  status: { label: '施加状态', fields: [['who', 'who'], ['status', 'status'], ['turns', 'num']] },
   pin: { label: '钉住', fields: [['who', 'who']] },
   move: { label: '强制移动', fields: [['who', 'who'], ['to', 'dest']] },
   teleportPlayer: { label: '自己移动', fields: [['to', 'dest']] },

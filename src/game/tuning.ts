@@ -23,6 +23,8 @@ const KEY = 'night-hunt-tuning-v2';
 
 export interface CardTune {
   cost?: number;
+  desc?: string;
+  noAction?: boolean;
   ops?: Op[];
 }
 
@@ -39,7 +41,7 @@ export interface TuningData {
 const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 
 /** 原始定义：用于「恢复默认」 */
-const BASELINE_CARDS = clone(CARDS.map((c) => ({ id: c.id, cost: c.cost, ops: c.ops })));
+const BASELINE_CARDS = clone(CARDS.map((c) => ({ id: c.id, cost: c.cost, desc: c.desc, noAction: !!c.noAction, ops: c.ops })));
 const BASELINE_POWERS = clone(
   KILLERS.flatMap((k) =>
     k.powers.map((p) => ({ owner: k.owner, id: p.id, cooldown: p.cooldown, ops: p.ops })),
@@ -75,6 +77,8 @@ export function applyTuning(): void {
     const card = CARD_MAP[id];
     if (!card) return;
     if (typeof tune.cost === 'number') card.cost = tune.cost;
+    if (typeof tune.desc === 'string') card.desc = tune.desc;
+    if (typeof tune.noAction === 'boolean') card.noAction = tune.noAction;
     if (Array.isArray(tune.ops)) card.ops = clone(tune.ops);
   });
   Object.entries(data.powers).forEach(([key, tune]) => {
@@ -124,7 +128,7 @@ function writePath(ops: Op[], path: string, value: number | string | boolean): b
 function recordCard(id: string): void {
   const card = CARD_MAP[id];
   if (!card) return;
-  data.cards[id] = { cost: card.cost, ops: clone(card.ops) };
+  data.cards[id] = { cost: card.cost, desc: card.desc, noAction: !!card.noAction, ops: clone(card.ops) };
   persist();
 }
 
@@ -136,6 +140,20 @@ function recordPower(owner: string, powerId: string): void {
 }
 
 /** 卡牌：费用 */
+export function setCardDesc(id: string, desc: string): void {
+  const card = CARD_MAP[id];
+  if (!card) return;
+  card.desc = desc.slice(0, 500);
+  recordCard(id);
+}
+
+export function setCardNoAction(id: string, noAction: boolean): void {
+  const card = CARD_MAP[id];
+  if (!card) return;
+  card.noAction = noAction;
+  recordCard(id);
+}
+
 export function setCardCost(id: string, cost: number): void {
   const card = CARD_MAP[id];
   if (!card) return;
@@ -180,6 +198,8 @@ export function resetTuning(): void {
     const card = CARD_MAP[base.id];
     if (!card) return;
     card.cost = base.cost;
+    card.desc = base.desc;
+    card.noAction = base.noAction;
     card.ops = clone(base.ops);
   });
   BASELINE_POWERS.forEach((base) => {
@@ -201,13 +221,16 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 const WHO_VALUES = new Set([
   'victim', 'lowestHpHere', 'highestAlert', 'targetsHere', 'civilsHere', 'allHere',
-  'markedAny', 'allAny', 'fleeing', 'downedHere', 'downedAny', 'injuredAny',
+  'markedAny', 'allAny', 'fleeing', 'downedHere', 'downedAny', 'injuredAny', 'bloodSacrifice',
   'randomAny', 'unawareNearby',
 ]);
 const FLAG_VALUES = new Set([
   'phoneCut', 'wiretap', 'poltergeist', 'policeBlocked', 'noAlarm', 'exitBlocked',
-  'clearBarricade', 'freeMove', 'possessReady',
+  'clearBarricade', 'freeMove', 'possessReady', 'myersStalk', 'hexHuntress', 'hexNoed',
+  'scourgeShrine', 'distressing', 'hexRuin', 'stealthNext', 'revealAura',
+  'revealNearestTrail', 'revealWorkers', 'myersLastBest', 'bitterMurmur', 'bleedNextHit', 'noAttackTurn',
 ]);
+const STATUS_VALUES = new Set(['blind', 'undetectable', 'danger', 'deepWound', 'oblivious', 'incurable', 'cursed']);
 const SABOTAGE_VALUES = new Set(['phone', 'exit', 'radio', 'lights']);
 const DEST_VALUES = new Set([
   'here', 'adjacent', 'far', 'exit', 'garden', 'attic', 'nursery', 'bedroom',
@@ -284,6 +307,7 @@ function validateOps(value: unknown, baseline: Op[]): value is Op[] {
       } else if (typeof original === 'string') {
         if (typeof current !== 'string' || current.length > 1000) return false;
         if (key === 'who' && !WHO_VALUES.has(current)) return false;
+        if (key === 'status' && candidate.op === 'status' && !STATUS_VALUES.has(current)) return false;
         if ((key === 'to' || key === 'room') && !DEST_VALUES.has(current)) return false;
         if (key === 'key' && candidate.op === 'flag' && !FLAG_VALUES.has(current)) return false;
         if (key === 'key' && candidate.op === 'sabotage' && !SABOTAGE_VALUES.has(current)) return false;
@@ -301,8 +325,10 @@ function validateTuning(value: unknown): value is TuningData {
 
   for (const [id, tune] of Object.entries(value.cards)) {
     const base = BASELINE_CARDS.find((item) => item.id === id);
-    if (!base || !isRecord(tune) || Object.keys(tune).some((key) => key !== 'cost' && key !== 'ops')) return false;
+    if (!base || !isRecord(tune) || Object.keys(tune).some((key) => key !== 'cost' && key !== 'desc' && key !== 'noAction' && key !== 'ops')) return false;
     if ('cost' in tune && (typeof tune.cost !== 'number' || !Number.isInteger(tune.cost) || tune.cost < 0 || tune.cost > 6)) return false;
+    if ('desc' in tune && (typeof tune.desc !== 'string' || tune.desc.length > 500)) return false;
+    if ('noAction' in tune && typeof tune.noAction !== 'boolean') return false;
     if ('ops' in tune && !validateOps(tune.ops, base.ops)) return false;
   }
 
@@ -333,6 +359,8 @@ export function importTuning(raw: string): boolean {
     const card = CARD_MAP[base.id];
     if (!card) return;
     card.cost = base.cost;
+    card.desc = base.desc;
+    card.noAction = base.noAction;
     card.ops = clone(base.ops);
   });
   BASELINE_POWERS.forEach((base) => {

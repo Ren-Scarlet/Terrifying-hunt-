@@ -2,7 +2,7 @@ import { CARDS } from '../game/data/cards';
 import { ACTIVE_KILLERS } from '../game/data/killers';
 import type { Op } from '../game/effect';
 import { exportTuning, hasTuning } from '../game/tuning';
-import { DEST_OPTIONS, EFFECT_OPS, FLAG_OPTIONS, SABOTAGE_OPTIONS, WHO_OPTIONS, type EffectFieldType } from '../game/effectCatalog';
+import { DEST_OPTIONS, EFFECT_OPS, FLAG_OPTIONS, SABOTAGE_OPTIONS, STATUS_OPTIONS, WHO_OPTIONS, type EffectFieldType } from '../game/effectCatalog';
 import { PERK_RARITY_BG, cardImage } from '../game/assetMap';
 
 /**
@@ -31,11 +31,11 @@ function fieldHtml(op: Op, field: string, type: EffectFieldType, tuneKey: string
   const record = op as unknown as Record<string, unknown>;
   const value = record[field];
   if (type === 'text') {
-    return `<span class="tune-text">${escape(String(value ?? ''))}</span>`;
+    return `<input type="text" data-tune="${tuneKey}.${field}" value="${escape(String(value ?? ''))}" aria-label="${field}">`;
   }
-  if (type === 'who' || type === 'dest' || type === 'flag' || type === 'sabotage') {
+  if (type === 'who' || type === 'dest' || type === 'flag' || type === 'sabotage' || type === 'status') {
     const list =
-      type === 'who' ? WHO_OPTIONS : type === 'dest' ? DEST_OPTIONS : type === 'flag' ? FLAG_OPTIONS : SABOTAGE_OPTIONS;
+      type === 'who' ? WHO_OPTIONS : type === 'dest' ? DEST_OPTIONS : type === 'flag' ? FLAG_OPTIONS : type === 'status' ? STATUS_OPTIONS : SABOTAGE_OPTIONS;
     return `<select data-tune="${tuneKey}.${field}">${options(list, value)}</select>`;
   }
   // 没定义的字段留空，不要显示一个会误伤的 0（比如 maxHp: 0）
@@ -76,6 +76,8 @@ function cardBlock(): string {
         <b>${escape(card.name)}</b>
         <label class="tune-cost">费 <input type="number" min="0" max="6" data-tune="card|${card.id}|cost" value="${card.cost}"></label>
       </div>
+      <label class="tune-description">卡牌描述<textarea rows="3" data-tune="card|${card.id}|desc">${escape(card.desc)}</textarea></label>
+      <label class="tune-no-action"><input type="checkbox" data-tune="card|${card.id}|noAction" ${card.noAction ? 'checked' : ''}> 不推进幸存者行动（不消耗世界行动）</label>
       <div class="tune-ops">${opsHtml(card.ops, `card|${card.id}|`)}</div>
       ${card.precheck ? `<div class="tune-pre">前置：${escape(card.precheck.hint)}</div>` : ''}
     </div>`;
@@ -108,7 +110,7 @@ export function renderAdmin(): string {
       <div class="modal admin-modal">
         <div class="subtitle">BALANCE WORKBENCH</div>
         <h1>平衡<span>调整</span></h1>
-        <p class="admin-lead">直接改数字，改完立刻生效并存进这台机器的浏览器。改动写的是「卡牌费用、每条效果的数值、能力冷却」——想加新效果还是去 <code>src/game/data</code> 里写。</p>
+        <p class="admin-lead">本地卡牌工作台：改动只保存在当前浏览器，不会自动上传或影响其他玩家。可直接调整费用、描述、行动规则，以及现有效果指令的参数与状态类型；配置可导出备份。</p>
         <div class="admin-toolbar">
           <span class="admin-state ${hasTuning() ? 'dirty' : ''}">${hasTuning() ? '正在使用本地改动' : '使用原始数值'}</span>
           <button class="btn mini" data-action="admin-export">导出数据</button>
@@ -134,7 +136,7 @@ export function renderAdmin(): string {
         </div>
         <div class="admin-sections">
           <section>
-            <h2>卡牌 <small>${CARDS.length} 张 · 费用与效果数值</small></h2>
+            <h2>卡牌 <small>${CARDS.length} 张 · 费用、描述、行动规则与效果参数</small></h2>
             <div class="admin-grid">${cardBlock()}</div>
           </section>
           <section>

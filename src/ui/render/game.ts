@@ -71,7 +71,7 @@ import {
 
 import { isCardTuned } from '../../game/tuning';
 import { isMuted, playHeartbeat, playTrapScream } from '../audio';
-import { escape, icon, itemBadge, itemIconHtml, personChip, intentDot, shadowFigures, perkIconHtml, TYPE_NAMES, killerFaceHtml, defaultDetailHtml } from './shared';
+import { escape, icon, itemBadge, itemIconHtml, personChip, intentDot, shadowFigures, perkIconHtml, TYPE_NAMES, killerFaceHtml, defaultDetailHtml, cardTextHtml } from './shared';
 import type { GameState, Person, RoomId, SaveData } from '../../game/types';
 
 let lastRenderedTrapTriggerCount: number | null = null;
@@ -489,7 +489,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
           ${isCardTuned(def.id) ? '<span class="card-tuned" title="这张卡使用了你在平衡调整里改过的数值">调</span>' : ''}
           ${perkIconHtml(def.id)}
           <div class="card-name">${escape(def.name)}</div>
-          <div class="card-desc">${escape(def.desc)}</div>
+          <div class="card-desc">${cardTextHtml(def.desc)}</div>
           <div class="card-flavor">${escape(def.flavor)}</div>
         </button>
       `;

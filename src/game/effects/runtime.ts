@@ -3,7 +3,7 @@ import { INTENT_LABEL } from '../npc/catalog';
 import { POSSESS_TURNS } from '../constants';
 import { roomDistance } from '../navigation';
 import { roomName } from '../missions';
-import { ROOM_MAP, ROOMS } from '../rooms';
+import { ROOM_MAP, ROOMS, TOTEM_ROOMS } from '../rooms';
 import type { Cond, Dest, Op, Who } from '../effect';
 import type { GameState, Person, RoomId } from '../types';
 
@@ -328,15 +328,12 @@ export function executeOps(state: GameState, ops: Op[], runtime: EffectRuntime):
             break;
           case 'hexNoed':
             state.hexNoedActive = true;
-            log(state, state.emergencyActive
-              ? '难逃一死已生效：全局警报已满，当前房间的人类可以被一刀处决。'
-              : '难逃一死已启用：等待全局警报达到 100，之后每次挥刀都能处决当前房间的一名人类。');
+            state.totems = [...TOTEM_ROOMS];
+            log(state, `难逃一死已启用：${state.totems.map(roomName).join('、')}出现厄咒图腾；只要仍有图腾存续，攻击命中就会直接击倒幸存者。`);
             break;
           case 'scourgeShrine':
             state.scourgeShrineRoom = state.playerRoom;
-            state.scourgeShrineOccupants = npcs(state)
-              .filter((person) => person.role !== 'police' && person.hp > 0 && person.room === state.playerRoom)
-              .map((person) => person.id);
+            state.scourgeShrineOccupants = [];
             log(state, `鬼魔神龛已安置在${roomName(state.playerRoom)}：之后第一个踏入此处的人会受到惊吓并显形。`);
             break;
           case 'distressing': {

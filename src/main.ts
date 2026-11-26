@@ -40,6 +40,8 @@ import {
   importTuning,
   resetTuning,
   setCardCost,
+  setCardDesc,
+  setCardNoAction,
   setCardOpValue,
   setPowerCooldown,
   setPowerOpValue,
@@ -68,8 +70,8 @@ import { currentMenuMap, rollMenuMap } from './ui/mapArt';
 
 type Screen = 'menu' | 'game' | 'result';
 
-// 平衡工作台只在本地开发模式加载；正式网页始终使用仓库中的正式数值。
-if (import.meta.env.DEV) applyTuning();
+// 从当前浏览器读取本地卡牌覆盖；没有个人配置时仍使用仓库默认数值。
+applyTuning();
 
 let save: SaveData = loadSave();
 let game: GameState | null = null;
@@ -77,7 +79,7 @@ let screen: Screen = 'menu';
 let editorOpen = false;
 let shopOpen = false;
 let guideOpen = false;
-let adminOpen = import.meta.env.DEV && new URLSearchParams(window.location.search).get('admin') === '1';
+let adminOpen = new URLSearchParams(window.location.search).get('admin') === '1';
 let editorDeck: string[] = [...save.deck];
 let resultApplied = false;
 /** 本局新解锁的卡牌，用于结算面板只提示真正新增的那张 */
@@ -320,7 +322,6 @@ app.addEventListener('click', (event) => {
   const target = (event.target as HTMLElement).closest<HTMLElement>('[data-action]');
   if (!target) return;
   const action = target.dataset.action;
-  if (action?.startsWith('admin') && !import.meta.env.DEV) return;
   // 浏览器要求先有用户交互才允许出声
   unlockAudio();
 
@@ -365,7 +366,6 @@ app.addEventListener('click', (event) => {
   }
 
   if (action === 'admin') {
-    if (!import.meta.env.DEV) return;
     adminOpen = true;
     render();
     return;
@@ -796,15 +796,16 @@ app.addEventListener('click', (event) => {
 
 /* 平衡调整：任何输入/下拉变化都直接写回运行中的数据 */
 app.addEventListener('change', (event) => {
-  const el = (event.target as HTMLElement).closest<HTMLInputElement | HTMLSelectElement>('[data-tune]');
+  const el = (event.target as HTMLElement).closest<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>('[data-tune]');
   if (!el) return;
   const key = el.dataset.tune ?? '';
   const parts = key.split('|');
   const raw = el.value;
   const isNumber = el instanceof HTMLInputElement && el.type === 'number';
+  const isCheckbox = el instanceof HTMLInputElement && el.type === 'checkbox';
   // 数字框被清空时不写回，避免把可选字段（如 maxHp）误设成 0
   if (isNumber && raw.trim() === '') return;
-  const value: number | string = isNumber ? Number(raw) : raw;
+  const value: number | string | boolean = isCheckbox ? el.checked : isNumber ? Number(raw) : raw;
   let ok = false;
 
   if (parts[0] === 'card' && parts.length >= 3) {
@@ -812,6 +813,12 @@ app.addEventListener('change', (event) => {
     const path = parts[2];
     if (path === 'cost') {
       setCardCost(id, Number(value));
+      ok = true;
+    } else if (path === 'desc') {
+      setCardDesc(id, String(value));
+      ok = true;
+    } else if (path === 'noAction') {
+      setCardNoAction(id, Boolean(value));
       ok = true;
     } else {
       ok = setCardOpValue(id, path, value);

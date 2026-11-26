@@ -16,6 +16,13 @@ import type { GameState, Person, SaveData } from '../../game/types';
 export const escape = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
+/** 卡牌描述中的机制名与状态名统一使用金色强调，方便快速扫读。 */
+export function cardTextHtml(text: string): string {
+  const terms = ['无法侦测', '无法行动', '不可侦测', '深度伤口', '浑然不觉', '被诅咒', '行动点', '血祭品', '尾随值', '恐惧值', '警觉值', '暴露度', '气场', '图腾', '倒地', '受伤', '重伤', '流血', '障目', '危险', '不治', '处决', '逃生者', '幸存者', '视野', '视线', '报警', '治疗', '救援', '攻击', '击倒', '移动'];
+  const pattern = new RegExp(terms.sort((a, b) => b.length - a.length).join('|'), 'g');
+  return escape(text).replace(pattern, (match) => `<span class="card-keyword">${match}</span>`);
+}
+
 export const TYPE_NAMES: Record<string, string> = { attack: '攻击', skill: '技能', tactic: '战术', setup: '布局' };
 export const TYPE_RARITY: Record<string, string> = { attack: 'visceral', skill: 'very-rare', tactic: 'rare', setup: 'uncommon' };
 
@@ -54,7 +61,7 @@ export function detailCardHtml(
       </header>
       <div class="detail-body">
         ${leadingHtml}
-        ${paragraphs.map((p) => `<p>${escape(p)}</p>`).join('')}
+        ${paragraphs.map((p) => `<p>${cardTextHtml(p)}</p>`).join('')}
       </div>
     </article>
   `;
