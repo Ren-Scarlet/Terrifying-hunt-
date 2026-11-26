@@ -375,6 +375,37 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
           rand,
         );
       }
+      // 厨房瓷砖的长期使用痕迹：灶台附近油污、柜脚磨痕与拖拽水痕
+      if (room.id === 'kitchen') {
+        c.save();
+        c.globalCompositeOperation = 'multiply';
+        for (let stain = 0; stain < 13; stain++) {
+          const sx = r.x + r.w * (0.12 + rand() * 0.76);
+          const sy = r.y + r.h * (0.18 + rand() * 0.72);
+          const rx = r.w * (0.008 + rand() * 0.026);
+          const ry = r.h * (0.008 + rand() * 0.035);
+          roughEllipse(c, sx, sy, rx, ry, `rgba(10,15,15,${0.10 + rand() * 0.12})`, rand);
+          if (stain % 3 === 0) {
+            c.strokeStyle = 'rgba(8,13,14,.18)';
+            c.lineWidth = 1 + rand() * 1.5;
+            c.beginPath();
+            c.moveTo(sx - rx * 0.8, sy + ry * 0.3);
+            c.quadraticCurveTo(sx, sy + ry * 1.8, sx + rx * 1.4, sy + ry * 2.2);
+            c.stroke();
+          }
+        }
+        // 橱柜与冰箱前的脚印状磨损，边缘模糊，不做明显图标
+        for (let scuff = 0; scuff < 8; scuff++) {
+          const sx = r.x + r.w * (0.18 + rand() * 0.68);
+          const sy = r.y + r.h * (0.3 + rand() * 0.58);
+          c.strokeStyle = 'rgba(135,145,137,.075)';
+          c.lineWidth = 1 + rand() * 2;
+          c.beginPath();
+          c.ellipse(sx, sy, r.w * (0.012 + rand() * 0.018), r.h * (0.008 + rand() * 0.016), rand(), 0, Math.PI * 2);
+          c.stroke();
+        }
+        c.restore();
+      }
       // 墙脚的积灰：贴着四边的一条暗带
       const g1 = c.createLinearGradient(0, r.y, 0, r.y + r.h * 0.18);
       g1.addColorStop(0, 'rgba(0,0,0,.34)');
@@ -518,6 +549,41 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
         g.addColorStop(1, 'rgba(58,78,100,.22)');
         c.fillStyle = g;
         c.fillRect(frame.x, frame.y, frame.w, frame.h);
+        if (room.id === 'kitchen') {
+          // 厨房窗玻璃：冷色夜景、凝结水汽和垂直雨痕
+          c.save();
+          c.beginPath();
+          c.rect(frame.x + 1.5, frame.y + 1.5, Math.max(1, frame.w - 3), Math.max(1, frame.h - 3));
+          c.clip();
+          const glass = c.createLinearGradient(frame.x, frame.y, frame.x + frame.w, frame.y + frame.h);
+          glass.addColorStop(0, 'rgba(10,18,24,.42)');
+          glass.addColorStop(.48, 'rgba(72,94,111,.18)');
+          glass.addColorStop(1, 'rgba(5,11,16,.52)');
+          c.fillStyle = glass;
+          c.fillRect(frame.x, frame.y, frame.w, frame.h);
+          for (let streak = 0; streak < 9; streak++) {
+            const along = (streak + 0.5) / 9;
+            c.strokeStyle = streak % 3 === 0 ? 'rgba(174,192,198,.2)' : 'rgba(0,0,0,.16)';
+            c.lineWidth = streak % 3 === 0 ? 1.1 : .7;
+            c.beginPath();
+            if (horizontal) {
+              const x = frame.x + frame.w * along;
+              c.moveTo(x, frame.y + 2);
+              c.lineTo(x + (streak % 2 ? 1.2 : -0.8), frame.y + frame.h - 2);
+            } else {
+              const y = frame.y + frame.h * along;
+              c.moveTo(frame.x + 2, y);
+              c.lineTo(frame.x + frame.w - 2, y + (streak % 2 ? 1 : -1));
+            }
+            c.stroke();
+          }
+          const condensation = c.createRadialGradient(frame.x + frame.w * .5, frame.y + frame.h * .5, 1, frame.x + frame.w * .5, frame.y + frame.h * .5, Math.max(frame.w, frame.h) * .55);
+          condensation.addColorStop(0, 'rgba(173,190,194,.11)');
+          condensation.addColorStop(1, 'rgba(173,190,194,0)');
+          c.fillStyle = condensation;
+          c.fillRect(frame.x, frame.y, frame.w, frame.h);
+          c.restore();
+        }
         // 窗框：中间一根竖梃
         c.fillStyle = 'rgba(14,14,15,.85)';
         if (win.side === 'left' || win.side === 'right') {
