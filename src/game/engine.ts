@@ -2125,6 +2125,7 @@ function escapePhase(state: GameState): void {
       person.escapeProgress = 0;
       continue;
     }
+    if (!wantsToLeave(state, person)) continue;
     // 逃生点本身的房门被封锁时，NPC 不能穿过房门离开。
     if (isLocked(state, person.room)) {
       person.activity = '逃生点房门被封锁，无法离开';
