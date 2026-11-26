@@ -833,10 +833,10 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
     cc.rect(pr.x + 1, pr.y + 1, pr.w - 2, pr.h - 2);
     cc.clip();
     const rg = cc.createRadialGradient(px, py, 0, px, py, coneLen);
-    rg.addColorStop(0, 'rgba(255,244,214,1)');
-    rg.addColorStop(0.22, 'rgba(255,238,204,.92)');
-    rg.addColorStop(0.55, 'rgba(255,230,192,.5)');
-    rg.addColorStop(1, 'rgba(255,226,188,0)');
+    rg.addColorStop(0, 'rgba(255,54,66,1)');
+    rg.addColorStop(0.22, 'rgba(238,32,48,.96)');
+    rg.addColorStop(0.55, 'rgba(190,20,38,.62)');
+    rg.addColorStop(1, 'rgba(150,12,28,0)');
     cc.fillStyle = rg;
     cc.fillRect(px - coneLen, py - coneLen, coneLen * 2, coneLen * 2);
     cc.restore();
@@ -943,8 +943,8 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
       }
     }
 
-    // 手电筒暖白：复用同一张光锥图
-    ctx.globalAlpha = 0.34;
+    // 暗红手电筒：复用同一张光锥图，光束保留柔和衰减
+    ctx.globalAlpha = 0.76;
     ctx.drawImage(refs.coneCv, 0, 0, w, h);
     ctx.globalAlpha = 1;
 
