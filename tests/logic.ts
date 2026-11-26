@@ -1831,8 +1831,8 @@ function caseNewPerkSystem(): void {
   noedTarget.hp = 4;
   noed.energy = Math.max(noed.energy, 2);
   noed.attackReady = true;
-  attack(noed, noedTarget.id);
-  check('难逃一死：警报最终阶段且图腾存留时获得行动并一刀击倒', noed.hexNoedBonusGranted && noedTarget.hp === 0 && noed.energy >= noedEnergy - 2, `bonus=${noed.hexNoedBonusGranted} hp=${noedTarget.hp} energy=${noed.energy} emergency=${noed.emergencyActive}`);
+  const noedAttack = attack(noed, noedTarget.id);
+  check('难逃一死：警报最终阶段且图腾存留时获得行动并一刀击倒', noed.hexNoedBonusGranted && noedTarget.hp === 0 && noed.energy >= noedEnergy - 2, `attack=${noedAttack} block=${attackBlockReason(noed, noedTarget.id)} active=${noed.hexNoedActive} bonus=${noed.hexNoedBonusGranted} hp=${noedTarget.hp} energy=${noed.energy} emergency=${noed.emergencyActive}`);
 
   const bitter = createGame(['bitter_murmur'], undefined, '迈克尔·迈尔斯');
   const worker = bitter.people.find((person) => person.role !== 'police')!;
