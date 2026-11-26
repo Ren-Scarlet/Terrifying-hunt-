@@ -1,3 +1,4 @@
+// Prototype-aligned HUD controls: camera, drawers, hand collapse and keyboard shortcuts.
 type CameraMode = 'center' | 'smooth';
 
 let root: HTMLElement | null = null;
