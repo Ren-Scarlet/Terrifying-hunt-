@@ -256,7 +256,7 @@ export const PROPS: Record<RoomId, Prop[]> = {
   storage: [
     { k: 'shelf', x: 0.24, y: 0.28, w: 0.4, h: 0.22 },
     { k: 'boiler', x: 0.74, y: 0.34, w: 0.26, h: 0.36 },
-    { k: 'pipes', x: 0.5, y: 0.1, w: 0.94, h: 0.09 },
+    { k: 'pipes', x: 0.5, y: 0.22, w: 0.84, h: 0.1 },
     { k: 'crate', x: 0.34, y: 0.7, w: 0.32, h: 0.26, rot: 4 },
     { k: 'crate', x: 0.68, y: 0.76, w: 0.22, h: 0.2, rot: -6 },
     { k: 'clutter', x: 0.5, y: 0.52, w: 0.2, h: 0.18 },
@@ -275,7 +275,7 @@ export const PROPS: Record<RoomId, Prop[]> = {
     { k: 'rug', x: 0.5, y: 0.5, w: 0.26, h: 0.92 },
     { k: 'table', x: 0.15, y: 0.64, w: 0.16, h: 0.16 },
     { k: 'bench', x: 0.15, y: 0.24, w: 0.14, h: 0.3 },
-    { k: 'pipes', x: 0.5, y: 0.07, w: 0.96, h: 0.07 },
+    { k: 'pipes', x: 0.5, y: 0.22, w: 0.84, h: 0.1 },
     { k: 'crate', x: 0.85, y: 0.72, w: 0.17, h: 0.2, rot: 4 },
     { k: 'clutter', x: 0.8, y: 0.26, w: 0.16, h: 0.18 },
   ],
@@ -291,7 +291,7 @@ export const PROPS: Record<RoomId, Prop[]> = {
   ],
   basement: [
     { k: 'boiler', x: 0.15, y: 0.3, w: 0.18, h: 0.3 },
-    { k: 'pipes', x: 0.5, y: 0.09, w: 0.94, h: 0.09 },
+    { k: 'pipes', x: 0.5, y: 0.22, w: 0.84, h: 0.1 },
     { k: 'shelf', x: 0.15, y: 0.72, w: 0.16, h: 0.34 },
     { k: 'candles', x: 0.62, y: 0.64, w: 0.32, h: 0.32 },
     { k: 'crate', x: 0.87, y: 0.26, w: 0.17, h: 0.19, rot: -8 },
@@ -302,7 +302,7 @@ export const PROPS: Record<RoomId, Prop[]> = {
   laundry: [
     { k: 'counter', x: 0.22, y: 0.2, w: 0.36, h: 0.22 },
     { k: 'fridge', x: 0.62, y: 0.2, w: 0.18, h: 0.26 },
-    { k: 'pipes', x: 0.5, y: 0.08, w: 0.9, h: 0.07 },
+    { k: 'pipes', x: 0.5, y: 0.22, w: 0.84, h: 0.1 },
     { k: 'puddle', x: 0.44, y: 0.62, w: 0.5, h: 0.26 },
     { k: 'shelf', x: 0.86, y: 0.66, w: 0.16, h: 0.3 },
     { k: 'clutter', x: 0.2, y: 0.7, w: 0.24, h: 0.2 },
