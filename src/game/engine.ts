@@ -1,4 +1,5 @@
 import { random, randomOf, shuffle } from './random';
+import { getExecutionMethod, type ExecutionMethodId } from './executions';
 import { nearestOf, roomDistance } from './navigation';
 import { awarenessStage, myersStalkGain } from './npc/awareness';
 import { ESCAPE_ROOMS, BASE_AP, SABOTAGE_COST, ITEM_BOX_CHARGES, GENERATOR_JAM_TURNS, POSSESS_TURNS, SURVIVOR_MAX_HP, SURVIVOR_INJURED_HP } from './constants';
@@ -853,25 +854,27 @@ export function carryPerson(state: GameState, personId: string): boolean {
   return true;
 }
 
-export function executeCarriedPerson(state: GameState, method: 'fridge' | 'microwave'): boolean {
+export function executeCarriedPerson(state: GameState, methodId: ExecutionMethodId): boolean {
   if (!state.carryPersonId || state.phase !== 'playing') return false;
   const person = state.people.find((p) => p.id === state.carryPersonId);
   if (!person || person.room !== state.playerRoom || !canExecuteNow(person)) {
     log(state, '怀里的人尚不能处决，或已经不在现场。');
     return false;
   }
+  const method = getExecutionMethod(methodId);
+  if (!method || method.room !== state.playerRoom) {
+    log(state, '这里没有可用的特殊处决场地。');
+    return false;
+  }
   if (state.energy < 1) { log(state, '行动点不足，无法完成特殊处决。'); return false; }
-  if (state.playerRoom !== 'kitchen') { log(state, '这里没有可用的特殊处决地形。'); return false; }
   state.energy -= 1;
   const name = person.name;
   state.carryPersonId = null;
   state.executions += 1;
-  const flavor = method === 'fridge'
-    ? `你把${name}塞进冰箱，沉重的门缓缓合上……一切归于寂静。`
-    : `你将${name}按在微波炉旁，刺耳的嗡鸣吞没了最后的挣扎声。`;
-  log(state, `特殊处决：${flavor}（额外奖励 +35 分）。`);
+  log(state, `特殊处决【${method.name}】：${method.flavor(name)}（额外奖励 +35 分）。`);
   killPerson(state, person);
   state.specialExecutionBonus += 35;
+  if (!state.executionMethodsUsed.includes(method.id)) state.executionMethodsUsed.push(method.id);
   state.attackReady = true;
   addAlarm(state, 8);
   afterPlayerAction(state);

@@ -50,6 +50,7 @@ import {
   getHuntOpportunities,
 } from '../../game/engine';
 import { roomDistance } from '../../game/navigation';
+import { executionMethodsAtRoom } from '../../game/executions';
 import { KILLERS, type KillerProfile } from '../../game/killers';
 import { roomName } from '../../game/missions';
 import {
@@ -127,7 +128,8 @@ function roomFeatures(state: GameState, roomId: RoomId): string {
     const radioBroken = state.sabotage.includes('radio');
     parts.push(`<span class="room-feature radio ${radioBroken ? 'broken' : 'on'}" title="备用无线电：${radioBroken ? '已被破坏' : '电话中断时可进行有限范围协调'}">▣<b>无线电</b></span>`);
   }
-  if (roomId === 'kitchen') parts.push('<span class="room-feature execution-site" title="特殊处决地点：冰箱 / 微波炉">☠<b>处决点</b></span>');
+  const executionSites = executionMethodsAtRoom(roomId);
+  if (executionSites.length) parts.push(`<span class="room-feature execution-site" title="特殊处决地点：${executionSites.map((method) => escape(method.name)).join(' / ')}">☠<b>处决点 ${executionSites.length}</b></span>`);
   if (roomId === EXIT_ROOM) parts.push(`<span class="room-feature escape" title="撤离点：任务完成的撤离位置">${icon('escape', 'ui-icon tiny')}</span>`);
   if (state.escapeRooms.includes(roomId)) parts.push(`<span class="room-feature escape-npc" title="团队第4阶段开启的逃生点">${icon('escape', 'ui-icon tiny')}</span>`);
   if (TOTEM_ROOMS.includes(roomId)) parts.push(`<span class="room-feature totem" title="图腾：在此结束回合，下回合 +1 行动点">${icon('totem', 'ui-icon tiny')}<b>图腾</b></span>`);
@@ -540,10 +542,53 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
   const lethalWindow = state.ambushTurn === state.turn && standingHere.length === 1 && standingHere[0].alert < 100;
   const huntPhase = lethalWindow ? '致命窗口' : standingHere.length ? '目标接触' : preparations.length ? '猎场布置' : '观察与部署';
   const huntFocus = nextTask ? nextTask.label : (m.objective ?? m.title);
+  const markedAlive = state.people.find((person) => person.marked && person.role !== 'police');
+  const downedHereNow = here.find((person) => person.role !== 'police' && person.hp <= 0);
+  const visibleOpportunity = getHuntOpportunities(state)[0];
+  let guidanceTitle = '开始侦查';
+  let guidanceDetail = '先查看相邻房间，寻找标记目标、脚印和异常动静。不要盲目巡房：每次移动都应服务于确认目标、接近目标或布置猎场。';
+  let guidanceRoom: RoomId | null = null;
+  if (state.carryPersonId) {
+    const carriedPerson = state.people.find((person) => person.id === state.carryPersonId);
+    const nearestSite = executionMethodsAtRoom(state.playerRoom);
+    guidanceTitle = nearestSite.length ? '选择一种特殊处决' : '把猎物运往特殊处决地点';
+    guidanceDetail = nearestSite.length
+      ? '你已经控制住倒地目标。选择当前场地的处决方式，完成一次有记录的特殊处决。'
+      : '可以把倒地目标搬到厨房、车库、工具间、浴室或洗衣房，尝试不同的特殊处决。';
+    if (carriedPerson) guidanceDetail += ` 当前搬运目标：${carriedPerson.name}。`;
+  } else if (downedHereNow) {
+    guidanceTitle = '猎物已经倒地';
+    guidanceDetail = '现在可以立即处决，或花行动点搬运到特殊场地，尝试不同的处决方式；若拖延，同伴可能赶来救援。';
+  } else if (markedAlive) {
+    const targetVisible = isPersonVisible(state, markedAlive);
+    guidanceRoom = targetVisible ? markedAlive.room : markedAlive.lastSeenRoom;
+    if (guidanceRoom === state.playerRoom && targetVisible) {
+      guidanceTitle = '指定目标就在眼前';
+      guidanceDetail = '先判断目标是否落单、是否警觉，再决定直接攻击、打出控制牌，或先制造更安全的致命窗口。';
+    } else if (targetVisible) {
+      guidanceTitle = `接近指定目标：${roomName(guidanceRoom)}`;
+      guidanceDetail = `情报已确认 ${markedAlive.name} 位于${roomName(guidanceRoom)}。规划路线靠近，不要把行动点浪费在无关房间。`;
+    } else {
+      guidanceTitle = `追查指定目标：${roomName(guidanceRoom)}`;
+      guidanceDetail = `最后一次确认 ${markedAlive.name} 在${roomName(guidanceRoom)}。前往最后位置调查，并留意脚印、乌鸦和地板动静；情报可能已经过时。`;
+    }
+  } else if (visibleOpportunity) {
+    guidanceTitle = `把握猎杀窗口：${visibleOpportunity.title}`;
+    guidanceDetail = `${visibleOpportunity.targetName} · ${roomName(visibleOpportunity.room)}。 ${visibleOpportunity.detail}`;
+    guidanceRoom = visibleOpportunity.room;
+  } else if (standingHere.length) {
+    guidanceTitle = '当前房间存在猎物';
+    guidanceDetail = '先检查人物档案与警觉状态，选择优先目标；如果多人在场，考虑先隔离或分散他们。';
+  }
   const huntPlanHtml = `<div class="hunt-plan ${lethalWindow ? 'lethal-ready' : ''}">
-    <div class="hunt-plan-heading"><b>猎杀计划</b><span>${huntPhase}</span></div>
-    <div class="hunt-plan-focus"><small>当前重点</small><strong>${escape(huntFocus)}</strong></div>
-    <div class="hunt-plan-prep"><small>已完成准备</small><span>${preparations.length ? preparations.map(escape).join(' · ') : '尚未布置：可先切断通讯、照明或控制退路'}</span></div>
+    <div class="hunt-plan-heading"><b>本局猎杀指令</b><span>${huntPhase}</span></div>
+    <div class="hunt-plan-focus"><small>契约目标</small><strong>${escape(m.objective ?? m.title)} · ${escape(huntFocus)}</strong></div>
+    <div class="hunt-plan-guidance">
+      <b>${escape(guidanceTitle)}</b>
+      <span>${escape(guidanceDetail)}</span>
+      ${guidanceRoom ? `<em>行动地点：${escape(roomName(guidanceRoom))}</em>` : ''}
+    </div>
+    <div class="hunt-plan-prep"><small>猎场准备</small><span>${preparations.length ? preparations.map(escape).join(' · ') : '尚未准备。可根据目标习惯和地图设施，选择断电、切断通讯、布置陷阱或直接突袭。'}</span></div>
   </div>`;
 
   const atkOk = canAttack(state);
@@ -585,8 +630,10 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
   const cabinetHere = CABINET_ROOMS.includes(state.playerRoom);
   const hiddenHere = state.people.some((p) => p.room === state.playerRoom && p.hidden);
   const carried = state.carryPersonId ? state.people.find((p) => p.id === state.carryPersonId) : null;
-  const specialExecution = carried && state.playerRoom === 'kitchen' && carried.hp <= 0
-    ? `<button class="btn execution" data-action="execute-fridge">冰箱处决 · +35</button><button class="btn execution" data-action="execute-microwave">微波炉处决 · +35</button>`
+  const specialExecution = carried && carried.hp <= 0
+    ? executionMethodsAtRoom(state.playerRoom).map((method) =>
+        `<button class="btn execution" data-action="execute-special" data-method="${method.id}" title="${escape(method.description)}">${escape(method.name)} · +35</button>`,
+      ).join('')
     : '';
   const carryStatus = carried ? `<div class="status-badge carrying">抱着 ${escape(carried.name)} · 搬运中不会自行挣脱</div>` : '';
   const trapCacheBtn = state.killer === '设陷者' && state.trapCaches.includes(state.playerRoom)

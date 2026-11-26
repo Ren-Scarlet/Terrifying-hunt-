@@ -391,6 +391,8 @@ export interface GameState {
   executions: number;
   survivorKills: number;
   specialExecutionBonus: number;
+  /** 本局使用过的特殊处决方式；用于结算与永久图鉴记录。 */
+  executionMethodsUsed: string[];
   npcAlarmed: boolean;
   carryPersonId: string | null;
   evidence: number;
@@ -540,6 +542,8 @@ export interface SaveData {
   /** 暗金细胞：用于解锁额外杀手 */
   darkCells: number;
   unlockedKillers: string[];
+  /** 已经亲自使用过的特殊处决方式，永久收录到处决图鉴。 */
+  executionRecords?: string[];
   /** 存档里记一下版本，方便以后迁移 */
   version?: number;
 }

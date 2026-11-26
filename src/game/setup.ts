@@ -77,6 +77,7 @@ export function createGame(
     executions: 0,
     survivorKills: 0,
     specialExecutionBonus: 0,
+    executionMethodsUsed: [],
     npcAlarmed: false,
     carryPersonId: null,
     evidence: 0,
