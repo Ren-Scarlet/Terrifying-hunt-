@@ -242,49 +242,143 @@ export function drawProp(c: Ctx, p: Prop, room: Rect, seed: number): void {
       c.fillRect(r.x + r.w * 0.18, r.y + 2, r.w * 0.64, 3);
       break;
     }
-    case 'counter':
-    case 'stove':
+    case 'counter': {
+      // 厨房操作台：深色柜体、石质台面、嵌入式水槽与磨损边缘
+      boxShadowed(c, r, '#252b2c', 11, 'concrete');
+      const top = { x: r.x + 1, y: r.y + 1, w: r.w - 2, h: r.h * 0.68 };
+      const stone = c.createLinearGradient(top.x, top.y, top.x + top.w, top.y + top.h);
+      stone.addColorStop(0, '#555a56');
+      stone.addColorStop(0.42, '#343b3b');
+      stone.addColorStop(1, '#202729');
+      c.fillStyle = stone;
+      c.beginPath();
+      c.roundRect(top.x, top.y, top.w, top.h, 3);
+      c.fill();
+      c.save();
+      c.beginPath();
+      c.roundRect(top.x, top.y, top.w, top.h, 3);
+      c.clip();
+      c.globalAlpha = 0.34;
+      c.globalCompositeOperation = 'overlay';
+      tileFill(c, texture('concrete'), top, Math.round(r.x + r.y));
+      c.globalCompositeOperation = 'source-over';
+      c.globalAlpha = 1;
+      // 石材细小矿物颗粒与刀痕
+      for (let i = 0; i < 24; i++) {
+        const x = top.x + rand() * top.w;
+        const y = top.y + rand() * top.h;
+        c.fillStyle = i % 3 === 0 ? 'rgba(184,190,180,.22)' : 'rgba(0,0,0,.22)';
+        c.fillRect(x, y, 1 + rand() * 2.5, 0.7 + rand() * 1.2);
+      }
+      c.restore();
+      // 台面厚度和柜门
+      c.fillStyle = 'rgba(0,0,0,.48)';
+      c.fillRect(r.x + 2, r.y + r.h * 0.68, r.w - 4, r.h * 0.27);
+      c.strokeStyle = 'rgba(154,163,157,.18)';
+      c.lineWidth = 1;
+      c.strokeRect(r.x + 3, r.y + r.h * 0.72, r.w - 6, r.h * 0.2);
+      c.beginPath();
+      c.moveTo(r.x + r.w * 0.5, r.y + r.h * 0.72);
+      c.lineTo(r.x + r.w * 0.5, r.y + r.h * 0.91);
+      c.stroke();
+      c.fillStyle = 'rgba(166,171,163,.42)';
+      c.fillRect(r.x + r.w * 0.22, r.y + r.h * 0.79, 2, r.h * 0.035);
+      c.fillRect(r.x + r.w * 0.72, r.y + r.h * 0.79, 2, r.h * 0.035);
+      // 水槽：黑色内盆、金属唇边、排水孔与水痕
+      const sx = r.x + r.w * 0.1, sy = r.y + r.h * 0.18, sw = r.w * 0.34, sh = r.h * 0.42;
+      c.fillStyle = 'rgba(0,0,0,.68)';
+      c.beginPath(); c.roundRect(sx, sy, sw, sh, 3); c.fill();
+      c.strokeStyle = 'rgba(157,170,171,.56)'; c.lineWidth = 1.4;
+      c.strokeRect(sx + 1, sy + 1, sw - 2, sh - 2);
+      const basin = c.createLinearGradient(sx, sy, sx + sw, sy + sh);
+      basin.addColorStop(0, 'rgba(104,120,122,.35)');
+      basin.addColorStop(1, 'rgba(12,19,22,.78)');
+      c.fillStyle = basin; c.fillRect(sx + 3, sy + 3, sw - 6, sh - 6);
+      c.fillStyle = 'rgba(0,0,0,.75)';
+      c.beginPath(); c.arc(sx + sw * 0.5, sy + sh * 0.58, Math.max(1.2, small * 0.035), 0, Math.PI * 2); c.fill();
+      c.strokeStyle = 'rgba(173,185,183,.5)'; c.lineWidth = 1;
+      c.beginPath(); c.arc(sx + sw * 0.5, sy + sh * 0.58, Math.max(2.2, small * 0.065), 0, Math.PI * 2); c.stroke();
+      // 水龙头与刀具的微弱冷光
+      c.strokeStyle = 'rgba(173,184,181,.7)'; c.lineWidth = 1.5;
+      c.beginPath(); c.moveTo(sx + sw * 0.52, sy + 1); c.lineTo(sx + sw * 0.52, sy - 3); c.quadraticCurveTo(sx + sw * 0.52 + 4, sy - 5, sx + sw * 0.52 + 6, sy - 1); c.stroke();
+      c.fillStyle = 'rgba(164,177,179,.5)';
+      for (let i = 0; i < 3; i++) c.fillRect(r.x + r.w * (0.58 + i * 0.065), r.y + r.h * 0.24, 1.6, r.h * 0.25);
+      // 台面边缘积垢
+      c.strokeStyle = 'rgba(0,0,0,.48)'; c.lineWidth = 1.2;
+      c.beginPath(); c.moveTo(r.x + 2, r.y + r.h * 0.66); c.lineTo(r.x + r.w - 2, r.y + r.h * 0.66); c.stroke();
+      break;
+    }
+    case 'stove': {
+      // 老式搪瓷炉灶：玻璃面板、铸铁炉圈、旋钮和烧焦痕迹
+      boxShadowed(c, r, '#171d20', 10, 'concrete');
+      const panel = c.createLinearGradient(r.x, r.y, r.x + r.w, r.y + r.h);
+      panel.addColorStop(0, '#42494a'); panel.addColorStop(0.45, '#202729'); panel.addColorStop(1, '#111719');
+      c.fillStyle = panel;
+      c.beginPath(); c.roundRect(r.x + 2, r.y + 2, r.w - 4, r.h - 4, 3); c.fill();
+      c.strokeStyle = 'rgba(178,185,179,.24)'; c.lineWidth = 1;
+      c.strokeRect(r.x + 2.5, r.y + 2.5, r.w - 5, r.h - 5);
+      for (let i = 0; i < 4; i++) {
+        const bx = r.x + r.w * (0.28 + (i % 2) * 0.44);
+        const by = r.y + r.h * (0.28 + Math.floor(i / 2) * 0.38);
+        const rad = Math.max(3, small * 0.13);
+        c.fillStyle = 'rgba(0,0,0,.5)';
+        c.beginPath(); c.arc(bx, by, rad + 2, 0, Math.PI * 2); c.fill();
+        c.strokeStyle = 'rgba(145,151,148,.62)'; c.lineWidth = 1.6;
+        c.beginPath(); c.arc(bx, by, rad, 0, Math.PI * 2); c.stroke();
+        c.strokeStyle = 'rgba(0,0,0,.8)'; c.lineWidth = 1.1;
+        c.beginPath(); c.arc(bx, by, rad * 0.56, 0, Math.PI * 2); c.stroke();
+        c.fillStyle = 'rgba(0,0,0,.62)';
+        c.beginPath(); c.arc(bx, by, 1.3, 0, Math.PI * 2); c.fill();
+      }
+      // 炉面油污与冷色擦痕
+      c.fillStyle = 'rgba(0,0,0,.24)';
+      c.beginPath(); c.ellipse(r.x + r.w * 0.52, r.y + r.h * 0.5, r.w * 0.42, r.h * 0.43, 0, 0, Math.PI * 2); c.fill();
+      c.strokeStyle = 'rgba(177,185,182,.16)'; c.lineWidth = 1;
+      c.beginPath(); c.moveTo(r.x + 4, r.y + r.h * 0.12); c.lineTo(r.x + r.w * 0.42, r.y + 3); c.stroke();
+      // 前沿控制旋钮
+      for (let i = 0; i < 4; i++) {
+        const kx = r.x + r.w * (0.2 + i * 0.2), ky = r.y + r.h * 0.88;
+        c.fillStyle = 'rgba(0,0,0,.72)'; c.beginPath(); c.arc(kx, ky, Math.max(1.8, small * 0.055), 0, Math.PI * 2); c.fill();
+        c.strokeStyle = 'rgba(170,178,173,.52)'; c.lineWidth = 0.8;
+        c.beginPath(); c.arc(kx, ky, Math.max(1.8, small * 0.055), 0, Math.PI * 2); c.stroke();
+      }
+      break;
+    }
     case 'fridge': {
-      boxShadowed(c, r, p.k === 'fridge' ? '#464b50' : '#3e4142', 9, 'concrete');
-      c.fillStyle = 'rgba(255,255,255,.07)';
-      c.fillRect(r.x + 2, r.y + 2, r.w - 4, Math.max(3, r.h * 0.18));
-      if (p.k === 'counter') {
-        c.fillStyle = '#1e2228';
-        c.beginPath();
-        c.roundRect(r.x + r.w * 0.12, r.y + r.h * 0.3, r.w * 0.28, r.h * 0.44, 3);
-        c.fill();
-        c.strokeStyle = 'rgba(168,178,188,.55)';
-        c.lineWidth = 1.5;
-        c.beginPath();
-        c.arc(r.x + r.w * 0.26, r.y + r.h * 0.34, 3.2, 0, Math.PI);
-        c.stroke();
-        // 刀架上的刀
-        c.fillStyle = 'rgba(190,196,200,.42)';
-        for (let i = 0; i < 3; i++) c.fillRect(r.x + r.w * (0.54 + i * 0.06), r.y + r.h * 0.32, 2, r.h * 0.34);
+      // 老式金属冰箱：厚门体、双层门缝、长把手、冷凝水和锈蚀
+      boxShadowed(c, r, '#30383b', 12, 'concrete');
+      const shell = c.createLinearGradient(r.x, r.y, r.x + r.w, r.y);
+      shell.addColorStop(0, '#11191d'); shell.addColorStop(0.16, '#687174'); shell.addColorStop(0.42, '#3b4548'); shell.addColorStop(0.78, '#252e31'); shell.addColorStop(1, '#111719');
+      c.fillStyle = shell;
+      c.beginPath(); c.roundRect(r.x + 1, r.y + 1, r.w - 2, r.h - 2, 3); c.fill();
+      // 门板压边与上下冷冻/冷藏分隔
+      c.strokeStyle = 'rgba(0,0,0,.74)'; c.lineWidth = 1.5;
+      c.beginPath(); c.moveTo(r.x + 3, r.y + r.h * 0.39); c.lineTo(r.x + r.w - 3, r.y + r.h * 0.39); c.stroke();
+      c.strokeStyle = 'rgba(190,199,196,.22)'; c.lineWidth = 1;
+      c.beginPath(); c.moveTo(r.x + 3, r.y + r.h * 0.4); c.lineTo(r.x + r.w - 3, r.y + r.h * 0.4); c.stroke();
+      // 纵向拉手
+      const hx = r.x + r.w * 0.78;
+      c.fillStyle = 'rgba(0,0,0,.55)';
+      c.beginPath(); c.roundRect(hx - 1.4, r.y + r.h * 0.12, 4.2, r.h * 0.2, 2); c.fill();
+      const handle = c.createLinearGradient(hx, 0, hx + 2.5, 0);
+      handle.addColorStop(0, '#8a9695'); handle.addColorStop(0.45, '#3b4546'); handle.addColorStop(1, '#11191b');
+      c.fillStyle = handle;
+      c.beginPath(); c.roundRect(hx, r.y + r.h * 0.12, 2.4, r.h * 0.2, 1.2); c.fill();
+      // 门面冷凝水痕
+      for (let i = 0; i < 7; i++) {
+        const x = r.x + r.w * (0.12 + i * 0.105);
+        const y = r.y + r.h * (0.46 + (i % 3) * 0.08);
+        c.strokeStyle = 'rgba(174,192,193,.12)'; c.lineWidth = 0.7;
+        c.beginPath(); c.moveTo(x, y); c.lineTo(x + (i % 2 ? 1 : -1), y + r.h * (0.1 + (i % 3) * 0.04)); c.stroke();
       }
-      if (p.k === 'stove') {
-        for (let i = 0; i < 4; i++) {
-          c.strokeStyle = 'rgba(0,0,0,.62)';
-          c.beginPath();
-          c.arc(
-            r.x + r.w * (0.28 + (i % 2) * 0.44),
-            r.y + r.h * (0.32 + Math.floor(i / 2) * 0.38),
-            small * 0.13,
-            0,
-            Math.PI * 2,
-          );
-          c.stroke();
-        }
+      // 锈点、凹痕与门边积灰
+      for (let i = 0; i < 13; i++) {
+        const x = r.x + rand() * r.w, y = r.y + rand() * r.h;
+        c.fillStyle = i % 3 === 0 ? 'rgba(116,67,43,.34)' : 'rgba(5,10,12,.3)';
+        c.beginPath(); c.ellipse(x, y, 0.7 + rand() * 1.3, 0.6 + rand(), rand(), 0, Math.PI * 2); c.fill();
       }
-      if (p.k === 'fridge') {
-        c.strokeStyle = 'rgba(0,0,0,.5)';
-        c.beginPath();
-        c.moveTo(r.x + 2, r.y + r.h * 0.38);
-        c.lineTo(r.x + r.w - 2, r.y + r.h * 0.38);
-        c.stroke();
-        c.fillStyle = 'rgba(196,196,186,.6)';
-        c.fillRect(r.x + r.w - 6, r.y + r.h * 0.1, 2, r.h * 0.16);
-      }
+      c.fillStyle = 'rgba(0,0,0,.34)'; c.fillRect(r.x + 2, r.y + r.h - 3, r.w - 4, 2);
+      c.fillStyle = 'rgba(202,212,205,.12)'; c.fillRect(r.x + 3, r.y + 2, 1, r.h - 5);
       break;
     }
     case 'fireplace': {
