@@ -50,6 +50,7 @@ import {
   getHuntOpportunities,
 } from '../../game/engine';
 import { roomDistance } from '../../game/navigation';
+import { executionMethodsAtRoom } from '../../game/executions';
 import { KILLERS, type KillerProfile } from '../../game/killers';
 import { roomName } from '../../game/missions';
 import {
@@ -127,7 +128,8 @@ function roomFeatures(state: GameState, roomId: RoomId): string {
     const radioBroken = state.sabotage.includes('radio');
     parts.push(`<span class="room-feature radio ${radioBroken ? 'broken' : 'on'}" title="备用无线电：${radioBroken ? '已被破坏' : '电话中断时可进行有限范围协调'}">▣<b>无线电</b></span>`);
   }
-  if (roomId === 'kitchen') parts.push('<span class="room-feature execution-site" title="特殊处决地点：冰箱 / 微波炉">☠<b>处决点</b></span>');
+  const executionSites = executionMethodsAtRoom(roomId);
+  if (executionSites.length) parts.push(`<span class="room-feature execution-site" title="特殊处决地点：${executionSites.map((method) => escape(method.name)).join(' / ')}">☠<b>处决点 ${executionSites.length}</b></span>`);
   if (roomId === EXIT_ROOM) parts.push(`<span class="room-feature escape" title="撤离点：任务完成的撤离位置">${icon('escape', 'ui-icon tiny')}</span>`);
   if (state.escapeRooms.includes(roomId)) parts.push(`<span class="room-feature escape-npc" title="团队第4阶段开启的逃生点">${icon('escape', 'ui-icon tiny')}</span>`);
   if (TOTEM_ROOMS.includes(roomId)) parts.push(`<span class="room-feature totem" title="图腾：在此结束回合，下回合 +1 行动点">${icon('totem', 'ui-icon tiny')}<b>图腾</b></span>`);
@@ -585,8 +587,10 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
   const cabinetHere = CABINET_ROOMS.includes(state.playerRoom);
   const hiddenHere = state.people.some((p) => p.room === state.playerRoom && p.hidden);
   const carried = state.carryPersonId ? state.people.find((p) => p.id === state.carryPersonId) : null;
-  const specialExecution = carried && state.playerRoom === 'kitchen' && carried.hp <= 0
-    ? `<button class="btn execution" data-action="execute-fridge">冰箱处决 · +35</button><button class="btn execution" data-action="execute-microwave">微波炉处决 · +35</button>`
+  const specialExecution = carried && carried.hp <= 0
+    ? executionMethodsAtRoom(state.playerRoom).map((method) =>
+        `<button class="btn execution" data-action="execute-special" data-method="${method.id}" title="${escape(method.description)}">${escape(method.name)} · +35</button>`,
+      ).join('')
     : '';
   const carryStatus = carried ? `<div class="status-badge carrying">抱着 ${escape(carried.name)} · 搬运中不会自行挣脱</div>` : '';
   const trapCacheBtn = state.killer === '设陷者' && state.trapCaches.includes(state.playerRoom)
