@@ -246,7 +246,8 @@ export function buildLayout(style: LayoutStyle = 'wide'): string {
       throw new Error('地图布局无法继续分割：可用区域不足。');
     }
 
-    const shortlist = candidates.slice(0, Math.min(4, candidates.length));
+    // 只在面积最大的两个候选区中切分，降低单个房间占据过大版面的概率。
+    const shortlist = candidates.slice(0, Math.min(2, candidates.length));
     const chosen = shortlist[Math.floor(random() * shortlist.length)];
     const preferredAxis = chosen.region.width / chosen.region.height >= 1 ? 'vertical' : 'horizontal';
     let option = chosen.options.find((item) => item.axis === preferredAxis) ?? chosen.options[0];
