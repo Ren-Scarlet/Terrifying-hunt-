@@ -278,11 +278,10 @@ function threatRowsHtml(state: GameState): string {
     other.id !== p.id && other.role !== 'police' && other.hp > 0 && !other.hidden && other.room === p.room,
   )).length;
   if (highAlert) rows.push({ name: '高度警戒', count: highAlert, hint: highAlert + ' 名幸存者已经高度警戒；贸然接近容易引发逃跑或呼救。考虑先制造干扰，或等待警戒下降。', level: highAlert >= 3 ? 'hot' : 'warn' });
-  if (working) rows.push({ name: '设施作业', count: working, hint: working + ' 名幸存者正在推进团队设施目标。此时注意力集中在工作上，是观察或接近的窗口。', level: 'warn' });
   const summary = '存活 ' + alive.length + ' · 受伤 ' + injured + ' · 倒地 ' + downed.length +
     ' · 高度警戒 ' + highAlert + ' · 落单 ' + isolated +
-    ' · 团队进度 ' + state.teamProgress + '% · 暴露度 ' + state.alarm + '% · 断电回路 ' + brokenCircuits + '/' + state.powerCircuits.length;
-  const empty = rows.length ? '' : '<div class="threat-clear"><b>当前没有正在推进的高危行动</b><span>幸存者人数、伤势、警觉、落单情况、团队进度与设施状态仍会持续更新。局势变化时，这里会列出具体威胁和反制方向。</span></div>';
+    ' · 警报值 ' + state.alarm + '% · 断电回路 ' + brokenCircuits + '/' + state.powerCircuits.length;
+  const empty = rows.length ? '' : '<div class="threat-clear"><b>当前没有正在推进的高危行动</b><span>幸存者人数、伤势、恐惧、警戒、落单情况与设施状态仍会持续更新。局势变化时，这里会列出具体威胁和反制方向。</span></div>';
   return '<div class="threat-live-summary"><b>幸存者威胁 · 实时状态</b><span>' + summary + '</span><small>' + (activeGenerators ? activeGenerators + ' 台发电机仍可被修复。' : '当前没有可继续修复的发电机。') + '</small></div>' +
     '<div class="threat-list">' + rows.map((r) => '<div class="threat-row ' + r.level + '"><span class="t-name">' + r.name + '</span><b class="t-count">' + r.count + '</b><span class="t-hint">' + escape(r.hint) + '</span></div>').join('') + empty + '</div>';
 }
@@ -735,10 +734,10 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
           <div class="stats">
             <div class="stat"><b>${state.turn}<i>/${m.turns}</i></b><small>回合</small></div>
             <div class="stat energy" title="走路、挥刀、出牌、搜索柜子，全都从这一个池子里扣"><b>${state.energy}<i>/${state.maxEnergy}</i></b><small>行动点</small></div>
-            <div class="stat alarm-stat ${state.alarm >= 70 ? 'hot' : state.alarm >= 40 ? 'warm' : ''}" title="暴露度：你的动作（挥刀、破坏、被目击、袭警、报警）会推高它，每回合自动回落；满 ${ALARM_MAX} 就会被捕，灵异鬼怪则是被符咒驱散。它和「他们的进度」是两回事。">
+            <div class="stat alarm-stat ${state.alarm >= 70 ? 'hot' : state.alarm >= 40 ? 'warm' : ''}" title="全局警报值：人类报警、目击异常和现场破坏会推高；可通过压制报警与安静行动降低。达到 60 开放逃生点，达到 100 进入最终逃亡阶段。">
               <b>${state.alarm}<i>/${ALARM_MAX}</i></b>
               <div class="alarm-track"><span style="width:${state.alarm}%"></span></div>
-              <small>暴露度</small>
+              <small>警报值</small>
             </div>
             <div class="stat"><b>${state.kills}</b><small>击杀</small></div>
             <div class="stat ${state.escaped > 0 ? 'escaped' : ''}" title="每逃走一人结算扣 15 分；幸存者全跑光契约作废"><b>${state.escaped}</b><small>逃走</small></div>
@@ -746,11 +745,6 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
               <b>${state.frenzy}<i>/${FRENZY_MAX}</i></b>
               <div class="alarm-track"><span style="width:${state.frenzy}%"></span></div>
               <small>杀戮</small>
-            </div>
-            <div class="stat team ${state.teamStage >= 3 ? 'hot' : ''}" title="幸存者团队目标：${escape(state.teamGoalLabel)}。每完成 25% 解锁一个阶段；第四阶段开启双逃生点。">
-              <b>${state.teamStage}<i>/4</i></b>
-              <div class="team-stage-track">${Array.from({ length: 4 }, (_, i) => `<span class="team-stage-segment ${state.teamStage > i ? 'done' : ''}"></span>`).join('')}</div>
-              <small>${state.teamStage >= 4 ? '逃生点已开启' : '逃生阶段'}</small>
             </div>
             <div class="stat score"><b>${currentScore(state)}</b><small>预计得分</small></div>
           </div>
