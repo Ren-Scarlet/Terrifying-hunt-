@@ -891,47 +891,64 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
     cc.setTransform(1, 0, 0, 1, 0, 0);
     cc.clearRect(0, 0, refs.coneCv.width, refs.coneCv.height);
     cc.setTransform(k, 0, 0, k, 0, 0);
+    // 深红手电：不画硬边三角形，而是用弧形光束、宽幅漫反射和中心热点叠加。
+    // 整束光裁切在当前房间内，墙体仍然阻挡光照。
     cc.save();
-    cc.beginPath();
-    cc.moveTo(px, py);
-    cc.arc(px, py, coneLen, facing - coneHalf, facing + coneHalf);
-    cc.closePath();
-    cc.clip();
     cc.beginPath();
     cc.rect(pr.x + 1, pr.y + 1, pr.w - 2, pr.h - 2);
     cc.clip();
-    const rg = cc.createRadialGradient(px, py, 0, px, py, coneLen);
-    // 手电使用暖白色真实光照，不再把光束画成红色标记。
-    rg.addColorStop(0, 'rgba(255,246,224,.96)');
-    rg.addColorStop(0.2, 'rgba(255,238,207,.78)');
-    rg.addColorStop(0.52, 'rgba(225,218,196,.38)');
-    rg.addColorStop(1, 'rgba(190,202,216,0)');
-    cc.fillStyle = rg;
-    cc.fillRect(px - coneLen, py - coneLen, coneLen * 2, coneLen * 2);
-    cc.restore();
+    cc.translate(px, py);
+    cc.rotate(facing);
 
-    // 光锥两侧软边
-    cc.globalCompositeOperation = 'destination-in';
-    const nx = Math.cos(facing + Math.PI / 2);
-    const ny = Math.sin(facing + Math.PI / 2);
-    const halfW = Math.max(4, coneLen * Math.tan(coneHalf) * 0.82);
-    const lg = cc.createLinearGradient(px - nx * halfW, py - ny * halfW, px + nx * halfW, py + ny * halfW);
-    lg.addColorStop(0, 'rgba(0,0,0,0)');
-    lg.addColorStop(0.14, 'rgba(0,0,0,.78)');
-    lg.addColorStop(0.5, 'rgba(0,0,0,1)');
-    lg.addColorStop(0.86, 'rgba(0,0,0,.78)');
-    lg.addColorStop(1, 'rgba(0,0,0,0)');
-    cc.fillStyle = lg;
-    cc.fillRect(px - coneLen, py - coneLen, coneLen * 2, coneLen * 2);
-    cc.globalCompositeOperation = 'source-over';
-    // 锥体末端再淡出，光束才不会像一块硬三角
-    cc.globalCompositeOperation = 'destination-in';
-    const fade = cc.createRadialGradient(px, py, coneLen * 0.55, px, py, coneLen);
-    fade.addColorStop(0, 'rgba(0,0,0,1)');
-    fade.addColorStop(1, 'rgba(0,0,0,0)');
-    cc.fillStyle = fade;
-    cc.fillRect(px - coneLen, py - coneLen, coneLen * 2, coneLen * 2);
-    cc.globalCompositeOperation = 'source-over';
+    // 环境漫反射：照到墙面和地板上的宽阔暗红色光晕。
+    const halo = cc.createRadialGradient(coneLen * 0.42, 0, coneLen * 0.06, coneLen * 0.42, 0, coneLen * 0.78);
+    halo.addColorStop(0, 'rgba(235,24,34,.34)');
+    halo.addColorStop(0.42, 'rgba(194,10,24,.20)');
+    halo.addColorStop(0.76, 'rgba(130,5,18,.07)');
+    halo.addColorStop(1, 'rgba(70,0,8,0)');
+    cc.fillStyle = halo;
+    cc.beginPath();
+    cc.ellipse(coneLen * 0.42, 0, coneLen * 0.72, coneLen * 0.39, 0, 0, Math.PI * 2);
+    cc.fill();
+
+    // 主光束采用弧形边缘与渐隐，不会出现机械的直线三角边。
+    const beamGradient = cc.createLinearGradient(0, 0, coneLen, 0);
+    beamGradient.addColorStop(0, 'rgba(255,54,64,.58)');
+    beamGradient.addColorStop(0.18, 'rgba(230,24,38,.42)');
+    beamGradient.addColorStop(0.56, 'rgba(178,10,26,.20)');
+    beamGradient.addColorStop(0.88, 'rgba(120,4,16,.06)');
+    beamGradient.addColorStop(1, 'rgba(80,0,8,0)');
+    cc.fillStyle = beamGradient;
+    cc.shadowColor = 'rgba(235,18,35,.42)';
+    cc.shadowBlur = Math.max(12, coneLen * 0.16);
+    cc.beginPath();
+    cc.moveTo(0, 0);
+    cc.bezierCurveTo(coneLen * 0.18, -coneLen * 0.11, coneLen * 0.68, -coneLen * 0.30, coneLen, -coneLen * 0.045);
+    cc.bezierCurveTo(coneLen * 1.04, 0, coneLen * 0.68, coneLen * 0.30, coneLen * 0.18, coneLen * 0.11);
+    cc.closePath();
+    cc.fill();
+    cc.shadowBlur = 0;
+
+    // 光束中心的漫射热点，边缘逐渐融入黑暗。
+    const hot = cc.createRadialGradient(coneLen * 0.52, 0, coneLen * 0.025, coneLen * 0.52, 0, coneLen * 0.32);
+    hot.addColorStop(0, 'rgba(255,68,72,.30)');
+    hot.addColorStop(0.48, 'rgba(218,18,34,.18)');
+    hot.addColorStop(1, 'rgba(125,0,14,0)');
+    cc.fillStyle = hot;
+    cc.beginPath();
+    cc.ellipse(coneLen * 0.52, 0, coneLen * 0.43, coneLen * 0.19, 0, 0, Math.PI * 2);
+    cc.fill();
+
+    // 手电筒发光口附近的红色溢光。
+    const emitter = cc.createRadialGradient(0, 0, 1, 0, 0, coneLen * 0.19);
+    emitter.addColorStop(0, 'rgba(255,90,92,.52)');
+    emitter.addColorStop(0.38, 'rgba(224,18,32,.28)');
+    emitter.addColorStop(1, 'rgba(120,0,10,0)');
+    cc.fillStyle = emitter;
+    cc.beginPath();
+    cc.arc(0, 0, coneLen * 0.19, 0, Math.PI * 2);
+    cc.fill();
+    cc.restore();
 
     d.globalCompositeOperation = 'destination-out';
     d.drawImage(refs.coneCv, 0, 0, w, h);
@@ -1019,23 +1036,24 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
     ctx.drawImage(refs.coneCv, 0, 0, w, h);
     ctx.restore();
 
-    // 空气中的微弱体积光：沿光束方向渐隐，边缘柔化并受当前房间边界裁切。
+    // 空气中的暗红体积光，边缘弥散，不再形成几何三角形。
     ctx.save();
     ctx.globalCompositeOperation = 'screen';
+    ctx.globalAlpha = 0.30;
+    ctx.translate(px, py);
+    ctx.rotate(facing);
+    const volume = ctx.createLinearGradient(0, 0, coneLen, 0);
+    volume.addColorStop(0, 'rgba(245,20,34,.18)');
+    volume.addColorStop(0.38, 'rgba(200,8,24,.10)');
+    volume.addColorStop(1, 'rgba(110,0,12,0)');
+    ctx.fillStyle = volume;
+    ctx.shadowColor = 'rgba(220,8,25,.18)';
+    ctx.shadowBlur = coneLen * 0.2;
     ctx.beginPath();
-    ctx.moveTo(px, py);
-    ctx.arc(px, py, coneLen, facing - coneHalf, facing + coneHalf);
-    ctx.closePath();
-    ctx.clip();
-    ctx.beginPath();
-    ctx.rect(pr.x + 1, pr.y + 1, pr.w - 2, pr.h - 2);
-    ctx.clip();
-    const beam = ctx.createLinearGradient(px, py, px + Math.cos(facing) * coneLen, py + Math.sin(facing) * coneLen);
-    beam.addColorStop(0, 'rgba(255,236,198,.10)');
-    beam.addColorStop(0.45, 'rgba(255,231,190,.055)');
-    beam.addColorStop(1, 'rgba(225,230,235,0)');
-    ctx.fillStyle = beam;
-    ctx.fillRect(pr.x, pr.y, pr.w, pr.h);
+    ctx.moveTo(0, 0);
+    ctx.bezierCurveTo(coneLen * .2, -coneLen * .12, coneLen * .7, -coneLen * .26, coneLen, 0);
+    ctx.bezierCurveTo(coneLen * .7, coneLen * .26, coneLen * .2, coneLen * .12, 0, 0);
+    ctx.fill();
     ctx.restore();
 
     // 门缝冷光：门槛上的一条细光，不是一团亮斑
