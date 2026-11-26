@@ -632,7 +632,9 @@ function rememberVisible(state: GameState): void {
 /** 玩家每一个动作结束后的统一收尾：世界动一下，视野记一下，胜负判一下 */
 function afterPlayerAction(state: GameState): void {
   if (state.result) return;
+  const beforeReaction = snapshotRooms(state);
   npcReact(state);
+  resolveTrapEntries(state, beforeReaction);
   if (state.result) return;
   if (state.nurseFatiguePending) {
     state.nurseFatiguePending = false;
@@ -1060,6 +1062,7 @@ function movePersonTo(state: GameState, person: Person, room: RoomId, clearAlert
   person.room = room;
   if (clearAlert) person.alert = 0;
   log(state, `${person.name} 从${from}移动到${roomName(room)}。`);
+  triggerBearTrapForPerson(state, person);
 }
 
 /* ==================================================================== */
@@ -1118,9 +1121,11 @@ function fleeAway(state: GameState, person: Person, quiet = false): boolean {
   // 逃跑路线始终留下脚印；潜行者只是不制造额外声响。
   pushTrail(state, fromId, person.room, person.hp <= SURVIVOR_INJURED_HP);
   if (!isQuietMove(state, person)) addDisturbance(state, person.room);
-  if (quiet) return true;
-  log(state, `${person.name} 从${from}逃向${roomName(person.room)}。`);
-  shout(state, person, 14);
+  if (!quiet) {
+    log(state, `${person.name} 从${from}逃向${roomName(person.room)}。`);
+    shout(state, person, 14);
+  }
+  triggerBearTrapForPerson(state, person);
   return true;
 }
 
@@ -1656,6 +1661,52 @@ function actByArchetype(state: GameState, person: Person): void {
 
 /** 尾随不是自动挂机：每次点击能力都要花 1 AP，并承担被目标察觉的风险。 */
 
+function triggerBearTrapForPerson(state: GameState, person: Person): void {
+  if (person.role === 'police' || person.hp <= 0) return;
+  const trap = state.bearTraps.find((item) => item.armed && item.room === person.room);
+  if (!trap) return;
+  if (trap.discovered) {
+    trap.armed = false;
+    log(state, `${person.name} 发现并拆除了${roomName(person.room)}的捕兽夹。`);
+    return;
+  }
+  if (person.alert >= 40 && random() < 0.4) {
+    trap.discovered = true;
+    person.awareness = Math.max(person.awareness, 2);
+    person.intent = 'wary';
+    person.activity = '发现地上的捕兽夹，正小心观察';
+    log(state, `${person.name} 在${roomName(person.room)}发现了捕兽夹，暂时没有踩上去。`);
+    return;
+  }
+  trap.armed = false;
+  trap.triggeredBy = person.id;
+  person.hp = Math.max(0, person.hp - 1);
+  person.alert = 100;
+  person.awareness = 3;
+  person.blockedTurns = 1;
+  person.intent = 'stunned';
+  if (person.hp <= 0) {
+    person.hp = 0;
+    person.downedTurns = 0;
+    person.activity = '被捕兽夹击倒，倒在地上';
+    log(state, `${person.name} 踩中捕兽夹，受到 1 点伤害并被击倒！`);
+  } else {
+    person.activity = '脚踝被捕兽夹咬住，暂时无法移动';
+    log(state, `${person.name} 踩中捕兽夹，受到 1 点伤害并被困住 1 回合！`);
+  }
+  addAlarm(state, 2);
+  npcs(state).filter((other) => other.id !== person.id && other.room === person.room)
+    .forEach((other) => { other.alert = clamp(other.alert + 15, 0, 100); });
+}
+
+function resolveTrapEntries(state: GameState, before: Map<string, RoomId>): void {
+  for (const person of npcs(state)) {
+    const previousRoom = before.get(person.id);
+    if (previousRoom === undefined || previousRoom === person.room) continue;
+    triggerBearTrapForPerson(state, person);
+  }
+}
+
 /** 回合结束时 NPC 的一轮行动 */
 function npcTurn(state: GameState): void {
   const before = snapshotRooms(state);
@@ -1972,45 +2023,8 @@ function npcTurn(state: GameState): void {
       }
     }
   }
-  // 只对本轮真正进入新房间的幸存者结算捕兽夹；警觉者有机会发现并拆除。
-  for (const person of npcs(state)) {
-    const previousRoom = before.get(person.id);
-    if (person.hp <= 0 || previousRoom === undefined || previousRoom === person.room) continue;
-    const trap = state.bearTraps.find((item) => item.armed && item.room === person.room);
-    if (!trap) continue;
-    if (trap.discovered) {
-      trap.armed = false;
-      log(state, `${person.name} 发现并拆除了${roomName(person.room)}的捕兽夹。`);
-      continue;
-    }
-    if (person.alert >= 40 && random() < 0.4) {
-      trap.discovered = true;
-      person.awareness = Math.max(person.awareness, 2);
-      person.intent = 'wary';
-      person.activity = '发现地上的捕兽夹，正小心观察';
-      log(state, `${person.name} 在${roomName(person.room)}发现了捕兽夹，暂时没有踩上去。`);
-      continue;
-    }
-    trap.armed = false;
-    trap.triggeredBy = person.id;
-    person.hp = Math.max(0, person.hp - 1);
-    person.alert = 100;
-    person.awareness = 3;
-    person.blockedTurns = 1;
-    person.intent = 'stunned';
-    if (person.hp <= 0) {
-      person.hp = 0;
-      person.downedTurns = 0;
-      person.activity = '被捕兽夹击倒，倒在地上';
-      log(state, `${person.name} 踩中捕兽夹，受到 1 点伤害并被击倒！`);
-    } else {
-      person.activity = '脚踝被捕兽夹咬住，暂时无法移动';
-      log(state, `${person.name} 踩中捕兽夹，受到 1 点伤害并被困住 1 回合！`);
-    }
-    addAlarm(state, 2);
-    npcs(state).filter((other) => other.id !== person.id && other.room === person.room)
-      .forEach((other) => { other.alert = clamp(other.alert + 15, 0, 100); });
-  }
+  // 结算 NPC 本轮移动进入的陷阱；即时反应与直接移动也由统一入口处理。
+  resolveTrapEntries(state, before);
   updateNpcDialogue(state);
   recordTrails(state, before);
 }
