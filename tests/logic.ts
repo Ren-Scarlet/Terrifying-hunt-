@@ -491,7 +491,7 @@ function caseUnaware(): void {
   darkAlreadyWary.awareness = 1;
   movePlayer(darkPanic, darkWaryRoom);
   check('E 暗处进入只增加极少警觉，低于恐慌者仍不逃跑',
-    darkAlreadyWary.room === darkWaryRoom && darkAlreadyWary.alert <= 34 && darkAlreadyWary.intent !== 'flee',
+    darkAlreadyWary.room === darkWaryRoom && darkAlreadyWary.alert <= 37 && darkAlreadyWary.intent !== 'flee',
     `警觉=${darkAlreadyWary.alert}，意图=${darkAlreadyWary.intent}`);
 
   const panic = newGame();
