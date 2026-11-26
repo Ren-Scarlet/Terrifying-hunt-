@@ -171,6 +171,9 @@ export function installImmersiveKeys(): void {
     else if (key === '0') { event.preventDefault(); handleImmersiveAction('camera-global'); }
     else if (key === 'f') { event.preventDefault(); handleImmersiveAction('camera-follow'); }
     else if (key === 't') { event.preventDefault(); handleImmersiveAction('toggle-task-drawer'); }
+    else if (key === 'g') { event.preventDefault(); root?.querySelector<HTMLButtonElement>('[data-action="drop-carried"]:not(:disabled)')?.click(); }
+    else if (/^[1-6]$/.test(key)) { event.preventDefault(); root?.querySelectorAll<HTMLButtonElement>('.hand-row [data-action="play"]')[Number(key) - 1]?.click(); }
+    else if (key === ' ') { event.preventDefault(); root?.querySelector<HTMLButtonElement>('[data-action="end-turn"]:not(:disabled)')?.click(); }
     else if (key === 'escape') {
       const task = root?.querySelector<HTMLElement>('.task-detail-drawer');
       const intel = root?.querySelector<HTMLDetailsElement>('.intel-drawer');
