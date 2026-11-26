@@ -1339,3 +1339,25 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
   #app.immersive-game .floorplan .map-door-marker { width: 20px; height: 25px; }
   #app.immersive-game .floorplan .map-door-marker i { left: 6px; width: 8px; height: 16px; }
 }
+
+/* Doors are already painted as real openings in the Canvas world layer.
+   Remove the duplicate floating door glyphs; the wall opening is the marker. */
+#app.immersive-game .floorplan .map-door-marker { display: none !important; }
+/* Keep match metrics in the upper-left information lane, clear of the bottom dock. */
+#app.immersive-game .statusline {
+  top: 136px;
+  bottom: auto;
+  left: 18px;
+  max-width: min(46vw, 720px);
+}
+@media (max-width: 900px) {
+  #app.immersive-game .statusline { top: 112px; bottom: auto; }
+}
+@media (max-width: 700px) {
+  #app.immersive-game .statusline {
+    top: 104px;
+    bottom: auto;
+    left: 10px;
+    max-width: calc(100vw - 20px);
+  }
+}
