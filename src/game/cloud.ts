@@ -1,65 +1,81 @@
-const PROJECT_URL = 'https://lbyobelugnlrkwwmnske.supabase.co';
-const PUBLIC_KEY = 'sb_publishable_tC_VrNT8t2KkWyfIhVJUkA_kwzygUoK';
-const SESSION_KEY = 'night-hunt-supabase-session-v1';
+const REPO_OWNER = 'Ren-Scarlet';
+const REPO_NAME = 'Terrifying-hunt-';
+const CONFIG_PATH = 'data/game-config.json';
+const BRANCH = 'main';
 export type CloudConfig = { cards: Record<string, unknown>; powers: Record<string, unknown> };
-type Session = { access_token: string; refresh_token: string; expires_at: number };
-let session: Session | null = null;
-function readSession(): Session | null {
-  try { const raw = localStorage.getItem(SESSION_KEY); return raw ? JSON.parse(raw) as Session : null; } catch { return null; }
-}
-function saveSession(value: Session | null): void {
-  session = value;
-  try { if (value) localStorage.setItem(SESSION_KEY, JSON.stringify(value)); else localStorage.removeItem(SESSION_KEY); } catch { /* private mode */ }
-}
+let githubToken: string | null = null;
+let githubLogin: string | null = null;
+
 export async function initCloudAuth(): Promise<void> {
-  const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
-  const access = hash.get('access_token'), refresh = hash.get('refresh_token');
-  if (access && refresh) {
-    saveSession({ access_token: access, refresh_token: refresh, expires_at: Date.now() + Number(hash.get('expires_in') ?? 3600) * 1000 });
-    history.replaceState(null, '', window.location.pathname + window.location.search);
-  } else session = readSession();
-  if (session) {
-    try { await refreshSession(); } catch { saveSession(null); }
+  // GitHub PAT 只保存在当前页面内存中；刷新页面后需要重新验证。
+}
+export function isCloudSignedIn(): boolean { return !!githubToken && githubLogin === REPO_OWNER; }
+export function clearGitHubToken(): void { githubToken = null; githubLogin = null; }
+
+export async function verifyGitHubToken(token: string): Promise<string> {
+  const clean = token.trim();
+  if (!clean) throw new Error('请先粘贴 GitHub 密钥。');
+  const headers = { Authorization: 'Bearer ' + clean, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' };
+  const userResponse = await fetch('https://api.github.com/user', { headers });
+  if (!userResponse.ok) throw new Error(userResponse.status === 401 ? '密钥无效或已过期。' : 'GitHub 验证失败（HTTP ' + userResponse.status + '）。');
+  const user = await userResponse.json() as { login?: string };
+  if (user.login !== REPO_OWNER) throw new Error('当前密钥属于 ' + (user.login ?? '未知账号') + '，请使用 Ren-Scarlet 账号创建的密钥。');
+  const repoResponse = await fetch('https://api.github.com/repos/' + REPO_OWNER + '/' + REPO_NAME + '/contents/README.md?ref=' + BRANCH, { headers });
+  if (!repoResponse.ok) {
+    if (repoResponse.status === 404 || repoResponse.status === 403) throw new Error('密钥无法读取游戏仓库。请将 Fine-grained token 限定到 Ren-Scarlet/Terrifying-hunt-，并授予 Contents 读写权限。');
+    throw new Error('仓库授权检查失败（HTTP ' + repoResponse.status + '）。');
   }
+  githubToken = clean;
+  githubLogin = user.login;
+  return user.login;
 }
-async function refreshSession(): Promise<void> {
-  if (!session || session.expires_at > Date.now() + 60000) return;
-  const response = await fetch(PROJECT_URL + '/auth/v1/token?grant_type=refresh_token', {
-    method: 'POST', headers: { apikey: PUBLIC_KEY, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ refresh_token: session.refresh_token }),
-  });
-  if (!response.ok) { saveSession(null); throw new Error('登录已过期，请重新发送登录链接。'); }
-  const data = await response.json() as { access_token: string; refresh_token: string; expires_in: number };
-  saveSession({ access_token: data.access_token, refresh_token: data.refresh_token, expires_at: Date.now() + data.expires_in * 1000 });
+
+function decodeBase64Utf8(value: string): string {
+  const binary = atob(value.replace(/\\s/g, ''));
+  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
 }
-export function isCloudSignedIn(): boolean { return !!session?.access_token; }
-export async function sendCloudLogin(email: string): Promise<void> {
-  const response = await fetch(PROJECT_URL + '/auth/v1/otp', {
-    method: 'POST', headers: { apikey: PUBLIC_KEY, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, create_user: false, redirect_to: 'https://ren-scarlet.github.io/Terrifying-hunt-/?admin=1' }),
-  });
-  if (!response.ok) {
-    const detail = await response.text();
-    if (detail.toLowerCase().includes('redirect')) throw new Error('Supabase 尚未允许游戏网址作为登录回跳地址，请在 Auth → URL Configuration 添加 GitHub Pages 地址。');
-    throw new Error('登录邮件发送失败（HTTP ' + response.status + '）。请确认管理员邮箱已创建并验证。');
-  }
+function encodeBase64Utf8(value: string): string {
+  const bytes = new TextEncoder().encode(value);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(binary);
 }
+function apiHeaders(): Record<string, string> {
+  return { Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', ...(githubToken ? { Authorization: 'Bearer ' + githubToken } : {}) };
+}
+
 export async function loadCloudConfig(): Promise<CloudConfig | null> {
-  const response = await fetch(PROJECT_URL + '/rest/v1/game_config?id=eq.main&select=config', {
-    headers: { apikey: PUBLIC_KEY, Authorization: 'Bearer ' + (session?.access_token ?? PUBLIC_KEY) },
-  });
-  if (!response.ok) throw new Error('读取云端配置失败（HTTP ' + response.status + '）。');
-  const rows = await response.json() as Array<{ config?: CloudConfig }>;
-  return rows[0]?.config ?? null;
+  const url = 'https://raw.githubusercontent.com/' + REPO_OWNER + '/' + REPO_NAME + '/' + BRANCH + '/' + CONFIG_PATH;
+  const response = await fetch(url, { cache: 'no-store' });
+  if (response.status === 404) return null;
+  if (!response.ok) throw new Error('读取公开配置失败（HTTP ' + response.status + '）。');
+  return await response.json() as CloudConfig;
 }
+
 export async function saveCloudConfig(config: CloudConfig): Promise<void> {
-  await refreshSession();
-  if (!session?.access_token) throw new Error('请先登录管理员账号。');
-  const response = await fetch(PROJECT_URL + '/rest/v1/game_config?on_conflict=id', {
-    method: 'POST',
-    headers: { apikey: PUBLIC_KEY, Authorization: 'Bearer ' + session.access_token, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
-    body: JSON.stringify({ id: 'main', config, updated_at: new Date().toISOString() }),
-  });
-  if (response.status === 401 || response.status === 403) throw new Error('云端拒绝写入：请确认管理员邮箱登录及 SQL 权限策略。');
-  if (!response.ok) throw new Error('上传云端失败（HTTP ' + response.status + '）。');
+  if (!githubToken || githubLogin !== REPO_OWNER) throw new Error('请先验证 GitHub 管理密钥。');
+  const url = 'https://api.github.com/repos/' + REPO_OWNER + '/' + REPO_NAME + '/contents/' + CONFIG_PATH;
+  const headers = { ...apiHeaders(), 'Content-Type': 'application/json' };
+  const current = await fetch(url + '?ref=' + BRANCH, { headers });
+  let sha: string | undefined;
+  if (current.ok) {
+    const file = await current.json() as { sha?: string };
+    sha = file.sha;
+  } else if (current.status !== 404) {
+    throw new Error('检查云端旧配置失败（HTTP ' + current.status + '）。');
+  }
+  const body: Record<string, string> = {
+    message: 'Update game balance configuration',
+    content: encodeBase64Utf8(JSON.stringify(config, null, 2) + '\\n'),
+    branch: BRANCH,
+  };
+  if (sha) body.sha = sha;
+  const response = await fetch(url, { method: 'PUT', headers, body: JSON.stringify(body) });
+  if (!response.ok) {
+    const detail = await response.json().catch(() => ({})) as { message?: string };
+    if (response.status === 401 || response.status === 403) throw new Error('GitHub 拒绝写入：请确认密钥有 Contents: Read and write 权限。');
+    if (response.status === 409 || response.status === 422) throw new Error('云端文件发生冲突，请重新读取配置后再上传。');
+    throw new Error('上传云端失败（HTTP ' + response.status + '）：' + (detail.message ?? '未知错误'));
+  }
 }

@@ -66,7 +66,7 @@ import {
   shopPrice,
 } from './ui/render';
 import { renderAdmin } from './ui/admin';
-import { initCloudAuth, loadCloudConfig, saveCloudConfig, sendCloudLogin } from './game/cloud';
+import { initCloudAuth, loadCloudConfig, saveCloudConfig, verifyGitHubToken, clearGitHubToken } from './game/cloud';
 import { mountFloorplanScene, type SceneHandle } from './ui/scene';
 import { playSfx, setMusic, toggleMute, unlockAudio } from './ui/audio';
 import type { SfxName } from './ui/audio';
@@ -405,12 +405,23 @@ app.addEventListener('click', (event) => {
   }
 
   if (action === 'cloud-login') {
-    const email = (document.getElementById('cloudEmail') as HTMLInputElement | null)?.value.trim();
+    const input = document.getElementById('githubToken') as HTMLInputElement | null;
     const status = document.getElementById('cloudStatus');
-    if (!email || !status) return;
-    status.textContent = '正在发送登录链接……';
-    void sendCloudLogin(email).then(() => { status.textContent = '登录邮件已发送，请打开邮件中的链接返回游戏。'; })
-      .catch((error: unknown) => { status.textContent = error instanceof Error ? error.message : '登录邮件发送失败。'; });
+    const token = input?.value.trim();
+    if (!token || !status) return;
+    status.textContent = '正在验证 GitHub 密钥……';
+    void verifyGitHubToken(token).then((login) => {
+      if (input) input.value = '';
+      status.textContent = '授权成功：GitHub 账号 ' + login + '。现在可以上传配置。';
+    }).catch((error: unknown) => {
+      if (status) status.textContent = error instanceof Error ? error.message : '密钥验证失败。';
+    });
+    return;
+  }
+  if (action === 'cloud-logout') {
+    clearGitHubToken();
+    const status = document.getElementById('cloudStatus');
+    if (status) status.textContent = '已退出 GitHub 管理员授权。';
     return;
   }
   if (action === 'cloud-load') {
