@@ -122,6 +122,7 @@ export function createGame(
     rewardCards: [],
     phoneCut: false,
     bearTraps: [],
+    trapTriggerCount: 0,
     trapInventory: killerId === '设陷者' ? 2 : 0,
     trapCaches: [],
     huntressAiming: false,

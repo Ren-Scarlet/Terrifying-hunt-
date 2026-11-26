@@ -45,6 +45,7 @@ export const ASSET_PATHS: AssetPaths = {
     medkit: 'assets/ui/medkit.webp',
     flashlight: 'assets/ui/flashlight.webp',
     bearTrap: 'assets/ui/bear-trap.webp',
+    obsession: 'assets/ui/IconHelp_obsession.webp',
     window: 'assets/ui/window.webp',
   },
 };

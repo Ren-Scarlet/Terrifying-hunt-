@@ -1837,11 +1837,8 @@ export function triggerBearTrapForPerson(state: GameState, person: Person): void
   if (person.role === 'police' || person.hp <= 0) return;
   const trap = state.bearTraps.find((item) => item.armed && item.room === person.room);
   if (!trap) return;
-  if (trap.discovered) {
-    trap.armed = false;
-    log(state, `${person.name} 发现并拆除了${roomName(person.room)}的捕兽夹。`);
-    return;
-  }
+  // 已发现的陷阱留给 NPC 自己的回合拆除，避免同一次移动结算时被重复入口立即拆掉。
+  if (trap.discovered) return;
   if (person.alert >= 40 && random() < 0.4) {
     trap.discovered = true;
     person.awareness = Math.max(person.awareness, 2);
@@ -1853,6 +1850,9 @@ export function triggerBearTrapForPerson(state: GameState, person: Person): void
   trap.armed = false;
   trap.triggeredBy = person.id;
   state.huntStats.trapTriggers += 1;
+  state.trapTriggerCount += 1;
+  person.trapTriggered = true;
+  person.revealedActions = Math.max(person.revealedActions ?? 0, 2);
   person.hp = Math.max(0, person.hp - 1);
   person.alert = 100;
   person.awareness = 3;
@@ -1862,10 +1862,10 @@ export function triggerBearTrapForPerson(state: GameState, person: Person): void
     person.hp = 0;
     person.downedTurns = 0;
     person.activity = '被捕兽夹击倒，倒在地上';
-    log(state, `${person.name} 踩中捕兽夹，受到 1 点伤害并被击倒！`);
+    log(state, `${person.name} 踩中捕兽夹，受到 1 点伤害并被击倒，发出尖叫！`);
   } else {
     person.activity = '脚踝被捕兽夹咬住，暂时无法移动';
-    log(state, `${person.name} 踩中捕兽夹，受到 1 点伤害并被困住 1 回合！`);
+    log(state, `${person.name} 踩中捕兽夹，受到 1 点伤害并被困住 1 回合，发出尖叫！`);
   }
   addAlarm(state, 2);
   npcs(state).filter((other) => other.id !== person.id && other.room === person.room)
@@ -1882,6 +1882,8 @@ function resolveTrapEntries(state: GameState, before: Map<string, RoomId>): void
 
 /** 回合结束时 NPC 的一轮行动 */
 function npcTurn(state: GameState): void {
+  // 红色人影只保留到下一次 NPC 回合开始，给玩家足够时间确认陷阱命中。
+  state.people.forEach((person) => { person.trapTriggered = false; });
   const before = snapshotRooms(state);
   for (const person of [...npcs(state)]) {
     if (state.result) return;
@@ -3521,7 +3523,7 @@ export function powerCooldown(state: GameState, powerId: string): number {
 
 function visibleMyersStalkTargets(state: GameState) {
   // 只排除无法观察的目标；正在逃跑但仍在视野里的幸存者也可以被观察。
-  return npcs(state).filter((person) => person.hp > 0 && !person.hidden && person.role !== 'police' && isPersonVisible(state, person));
+  return npcs(state).filter((person) => person.hp > 0 && !person.hidden && person.role !== 'police' && isRoomVisible(state, person.room));
 }
 
 function trapPlacementBlockReason(state: GameState): string | null {

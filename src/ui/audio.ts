@@ -147,6 +147,11 @@ export function playHeartbeat(): void {
   playSfxRepeat('heartbeat', 3, 0.42);
 }
 
+/** 捕兽夹命中时播放幸存者尖叫；男女音轨随机选择，避免每次听起来完全相同。 */
+export function playTrapScream(): void {
+  playSfx(Math.random() < 0.5 ? 'voiceFScream' : 'voiceMScream', 0.9);
+}
+
 export function isMuted(): boolean {
   return muted;
 }

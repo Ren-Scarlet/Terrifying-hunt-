@@ -70,9 +70,11 @@ import {
 
 
 import { isCardTuned } from '../../game/tuning';
-import { isMuted, playHeartbeat } from '../audio';
+import { isMuted, playHeartbeat, playTrapScream } from '../audio';
 import { escape, icon, itemBadge, itemIconHtml, personChip, intentDot, shadowFigures, perkIconHtml, TYPE_NAMES, killerFaceHtml, defaultDetailHtml } from './shared';
 import type { GameState, Person, RoomId, SaveData } from '../../game/types';
+
+let lastRenderedTrapTriggerCount: number | null = null;
 
 function roomFeatures(state: GameState, roomId: RoomId): string {
   const parts: string[] = [];
@@ -117,7 +119,7 @@ function roomFeatures(state: GameState, roomId: RoomId): string {
   const placedTrap = state.bearTraps.find((trap) => trap.room === roomId);
   if (placedTrap) {
     const trapStatus = placedTrap.armed ? (placedTrap.discovered ? '已被幸存者发现，可能被拆除' : '已布设，等待触发') : '已触发或拆除，可由设陷者回收';
-    parts.push(`<span class="room-feature bear-trap ${placedTrap.armed ? 'armed' : 'spent'}" title="捕兽夹：${trapStatus}>${icon('bearTrap', 'ui-icon tiny')}<b>捕兽夹</b></span>`);
+    parts.push(`<span class="room-feature bear-trap ${placedTrap.armed ? 'armed' : 'spent'}" title="捕兽夹：${trapStatus}">${icon('bearTrap', 'ui-icon tiny')}<b>捕兽夹</b></span>`);
   }
   if (state.trapCaches.includes(roomId)) {
     parts.push('<span class="room-feature trap-cache" title="捕兽夹补给：设陷者可在此收集额外捕兽夹">＋<b>陷阱补给</b></span>');
@@ -331,6 +333,12 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
   const policeHere = state.people.some((p) => p.room === state.playerRoom && p.role === 'police');
   if (here.some((p) => p.hp > 0 && !p.hidden)) playHeartbeat();
   const isMyers = killer.owner === '迈克尔·迈尔斯';
+  if (lastRenderedTrapTriggerCount === null || state.trapTriggerCount < lastRenderedTrapTriggerCount) {
+    lastRenderedTrapTriggerCount = state.trapTriggerCount;
+  } else if (state.trapTriggerCount > lastRenderedTrapTriggerCount) {
+    playTrapScream();
+    lastRenderedTrapTriggerCount = state.trapTriggerCount;
+  }
 
   // 任务条：目标 / 达成条件 / 失败条件 / 实时进度 / 倒计时，一眼看清这一局要做什么
   const left = Math.max(0, m.turns - state.turn + 1);

@@ -24,7 +24,17 @@ export type RoomId =
   | 'workshop'
   | 'stairwell'
   | 'chapel'
-  | 'balcony';
+  | 'balcony'
+  | 'pantry'
+  | 'servants_quarters'
+  | 'guest_bath'
+  | 'infirmary'
+  | 'archives'
+  | 'cold_storage'
+  | 'greenhouse_annex'
+  | 'loading_dock'
+  | 'billiard_room'
+  | 'observatory';
 
 export type CardType = 'attack' | 'skill' | 'tactic' | 'setup';
 
@@ -193,6 +203,8 @@ export interface Person {
   routineLastObservedTurn?: number;
   /** 被限制移动的剩余回合（支配、钉住、恐惧、夹子） */
   blockedTurns: number;
+  /** 刚踩中捕兽夹：地图短暂显示红色人影。 */
+  trapTriggered?: boolean;
   /** 流血：每回合结束掉血 */
   bleed: number;
   /** 幸存者状态剩余行动次数；诅咒还受图腾存续影响。 */
@@ -458,6 +470,8 @@ export interface GameState {
   phoneCut: boolean;
   /** 设陷者的可布设捕兽夹、携带数量与地图补给点。 */
   bearTraps: BearTrap[];
+  /** 本局捕兽夹触发次数；供界面播放一次尖叫音效。 */
+  trapTriggerCount: number;
   trapInventory: number;
   trapCaches: RoomId[];
   /** 女猎手瞄准状态与当前剩余飞斧。 */

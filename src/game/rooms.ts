@@ -8,10 +8,10 @@ import type { Room, RoomId } from './types';
  * 再把房间随机塞进去——所以每一局的户型、走廊长度、后院挂在哪个方向都不一样。
  * 各处的 `ROOM_MAP[x].neighbors` / `rect` 都是开局时才填的，不要在模块加载阶段缓存。
  *
- * 23 间房（含后院）散在 32 个格子里，最远的两间要走 10 步以上；
+ * 每局 23–33 间房（含后院）随机散布在地图网格中，最远的两间要走多步；
  * 生成树只开少量环路，门少、走廊长——想追上一个人得真的绕房子，不是点两下就贴脸。
  */
-const BLUEPRINTS: Array<Pick<Room, 'id' | 'name' | 'desc'>> = [
+const CORE_BLUEPRINTS: Array<Pick<Room, 'id' | 'name' | 'desc'>> = [
   { id: 'attic', name: '阁楼', desc: '倾斜屋顶下堆满旧箱子，脚步声会被木板放大。' },
   { id: 'nursery', name: '儿童房', desc: '婴儿床空着，墙上的涂鸦还湿着；床底能塞下一个人。' },
   { id: 'bedroom', name: '卧室', desc: '床铺凌乱，衣柜半开，适合藏匿也适合下手。' },
@@ -37,22 +37,22 @@ const BLUEPRINTS: Array<Pick<Room, 'id' | 'name' | 'desc'>> = [
   { id: 'balcony', name: '阳台', desc: '栏杆外能看见整条街，也更早看见警灯。' },
 ];
 
-export const ROOMS: Room[] = BLUEPRINTS.map((b) => ({
-  ...b,
-  x: 0,
-  y: 0,
-  rect: { left: 0, top: 0, width: 0, height: 0 },
-  size: 'medium',
-  neighbors: [],
-}));
+/** 额外房间只在部分对局出现；核心 23 间始终保留，最多随机加入 10 间。 */
+const OPTIONAL_BLUEPRINTS: Array<Pick<Room, 'id' | 'name' | 'desc'>> = [
+  { id: 'pantry', name: '食品储藏间', desc: '罐头和干粮堆到天花板，木架深处传来细碎的碰撞声。' },
+  { id: 'servants_quarters', name: '仆人房', desc: '狭窄的单人床与旧制服还留在原处，门锁已经锈住。' },
+  { id: 'guest_bath', name: '客用浴室', desc: '洗手台下方积着水，镜柜里塞满过期药品。' },
+  { id: 'infirmary', name: '医务室', desc: '急救箱被翻开过，消毒水气味盖不住血腥味。' },
+  { id: 'archives', name: '档案室', desc: '纸箱里塞满旧照片与房屋记录，几页纸被匆忙撕走。' },
+  { id: 'cold_storage', name: '冷藏库', desc: '冷气仍在运转，金属门关上后几乎听不见外面的声音。' },
+  { id: 'greenhouse_annex', name: '温室侧厅', desc: '破碎花盆和潮湿泥土散落一地，玻璃后有模糊的人影。' },
+  { id: 'loading_dock', name: '装卸间', desc: '货箱挡住半扇门，地面留着拖拽重物的长痕。' },
+  { id: 'billiard_room', name: '台球室', desc: '球桌上的球散落一地，墙角的球杆少了一根。' },
+  { id: 'observatory', name: '观测室', desc: '屋顶天窗正对着夜空，望远镜仍停在某个奇怪的方向。' },
+];
 
-export const ROOM_MAP: Record<RoomId, Room> = ROOMS.reduce(
-  (acc, room) => {
-    acc[room.id] = room;
-    return acc;
-  },
-  {} as Record<RoomId, Room>,
-);
+export const ROOMS: Room[] = [];
+export const ROOM_MAP: Record<RoomId, Room> = {} as Record<RoomId, Room>;
 
 export const ENTRY_ROOM: RoomId = 'hall';
 export const EXIT_ROOM: RoomId = 'garage';
@@ -232,6 +232,17 @@ export function buildLayout(style: LayoutStyle = 'wide'): string {
     compact: [14, 13],
   };
   [GRID_COLS, GRID_ROWS] = dimensions[style];
+
+  // 每局保留全部核心房间，再随机抽取 0–10 间附加房间，形成 23–33 间的地图。
+  const extraCount = Math.floor(random() * (OPTIONAL_BLUEPRINTS.length + 1));
+  const activeBlueprints = [...CORE_BLUEPRINTS, ...shuffle(OPTIONAL_BLUEPRINTS).slice(0, extraCount)];
+  ROOMS.splice(0, ROOMS.length, ...activeBlueprints.map((b) => ({
+    ...b, x: 0, y: 0, rect: { left: 0, top: 0, width: 0, height: 0 },
+    size: 'medium' as const, neighbors: [] as RoomId[],
+  })));
+  for (const key of Object.keys(ROOM_MAP)) delete (ROOM_MAP as Partial<Record<RoomId, Room>>)[key as RoomId];
+  ROOMS.forEach((room) => { ROOM_MAP[room.id] = room; });
+
   const regions: Region[] = [
     { left: 0, top: 0, width: GRID_COLS, height: GRID_ROWS },
   ];
@@ -348,6 +359,8 @@ export function buildLayout(style: LayoutStyle = 'wide'): string {
     'workshop', 'bedroom', 'guestroom', 'nursery', 'study', 'corridor',
     'stairwell', 'balcony', 'attic', 'wine', 'bathroom', 'laundry',
     'storage', 'basement',
+    'pantry', 'servants_quarters', 'guest_bath', 'infirmary', 'archives', 'cold_storage',
+    'greenhouse_annex', 'loading_dock', 'billiard_room', 'observatory',
   ];
   const roomById = new Map<RoomId, Room>(ROOMS.map((room) => [room.id, room]));
   const regionRooms = new Map<number, Room>();

@@ -439,6 +439,21 @@ function caseMyersStalkingAndFearRadius(): void {
   check('迈尔斯：视野内正在逃跑的 NPC 仍可被观察',
     usePower(fleeingVisible, 'myers_gaze') && fleeingVisible.stalkMeter === 20 && fleeingVisible.energy === 1);
 
+  const trackedButInvisible = createGame(STARTING_DECK, undefined, '迈克尔·迈尔斯');
+  const trackedTarget = player(trackedButInvisible);
+  const trackedHiddenRoom = (Object.keys(ROOM_MAP) as RoomId[]).find((room) =>
+    room !== trackedButInvisible.playerRoom && !ROOM_MAP[trackedButInvisible.playerRoom].neighbors.includes(room),
+  ) ?? openNeighbor(trackedButInvisible.playerRoom);
+  trackedButInvisible.people.forEach((person) => {
+    if (person.role !== 'police' && person.id !== trackedTarget.id) { person.room = trackedHiddenRoom; person.hidden = true; }
+  });
+  trackedTarget.room = trackedHiddenRoom;
+  trackedTarget.hidden = false;
+  trackedTarget.trackedTurns = 2;
+  trackedButInvisible.energy = 4;
+  check('迈尔斯：追踪标记不能让视野外的人贡献尾随值',
+    !usePower(trackedButInvisible, 'myers_gaze') && trackedButInvisible.energy === 4 && trackedButInvisible.stalkMeter === 0);
+
   const noPrey = createGame(STARTING_DECK, undefined, '迈克尔·迈尔斯');
   const hiddenRoom = (Object.keys(ROOM_MAP) as RoomId[]).find((room) =>
     room !== noPrey.playerRoom && !ROOM_MAP[noPrey.playerRoom].neighbors.includes(room),
@@ -483,7 +498,24 @@ function caseMyersStalkingAndFearRadius(): void {
   triggerBearTrapForPerson(trapper, trappedPerson);
   check('设陷者：捕兽夹触发后造成伤害、限制移动并记录猎杀风格',
     trappedPerson.hp === 3 && trappedPerson.blockedTurns === 1 &&
-    trapper.huntStats.trapTriggers === 1 && !trapper.bearTraps[0].armed);
+    trapper.huntStats.trapTriggers === 1 && trapper.trapTriggerCount === 1 &&
+    trappedPerson.trapTriggered === true && (trappedPerson.revealedActions ?? 0) >= 2 && !trapper.bearTraps[0].armed);
+  const disarmGame = createGame(STARTING_DECK, undefined, '设陷者');
+  const disarmTarget = player(disarmGame);
+  const disarmRoom = openNeighbor(disarmGame.playerRoom);
+  disarmGame.bearTraps = [{ id: 'test-disarm-trap', room: disarmRoom, armed: true, discovered: false }];
+  disarmTarget.room = disarmRoom;
+  disarmTarget.hp = 4;
+  disarmTarget.alert = 100;
+  disarmTarget.awareness = 0;
+  withRandomSource(() => 0.01, () => triggerBearTrapForPerson(disarmGame, disarmTarget));
+  check('设陷者：警觉 NPC 能先发现陷阱而不是直接触发',
+    disarmGame.bearTraps[0].armed && disarmGame.bearTraps[0].discovered &&
+    disarmTarget.hp === 4 && disarmGame.trapTriggerCount === 0);
+  endTurn(disarmGame);
+  check('设陷者：发现陷阱的 NPC 会在自己的回合拆除陷阱',
+    !disarmGame.bearTraps[0].armed && disarmGame.huntStats.trapTriggers === 0);
+
   if (trapper.trapCaches.length) {
     trapper.playerRoom = trapper.trapCaches[0];
     trapper.energy = 4;
@@ -2040,9 +2072,13 @@ let layoutAdjacencyFailures = 0;
 let layoutConnectivityFailures = 0;
 let layoutGardenFailures = 0;
 let layoutSizeVarietyFailures = 0;
+let layoutCountFailures = 0;
+const layoutCounts = new Set<number>();
 let layoutDoorMarkerFailures = 0;
 for (let seed = 1; seed <= 40; seed += 1) {
   withRandomSource(createSeededRandom(seed), () => buildLayout());
+  layoutCounts.add(ROOMS.length);
+  if (ROOMS.length < 23 || ROOMS.length > 33) layoutCountFailures += 1;
   const rects = ROOMS.map((room) => room.rect);
   for (let i = 0; i < rects.length; i += 1) {
     for (let j = i + 1; j < rects.length; j += 1) {
@@ -2086,7 +2122,8 @@ buildLayout();
 check('不规则地图：40 组随机布局无房间重叠', layoutOverlapFailures === 0, `overlap=${layoutOverlapFailures}`);
 check('不规则地图：所有门都位于真实共边处', layoutAdjacencyFailures === 0, `invalid doors=${layoutAdjacencyFailures}`);
 check('不规则地图：每条可通行邻接边都有门形标记位置', layoutDoorMarkerFailures === 0, `missing door markers=${layoutDoorMarkerFailures}`);
-check('不规则地图：每局 23 个房间保持全图连通', layoutConnectivityFailures === 0, `disconnected maps=${layoutConnectivityFailures}`);
+check('不规则地图：每局 23–33 个房间且数量会随机变化', layoutCountFailures === 0 && layoutCounts.size > 1, `counts=${[...layoutCounts].sort((a,b)=>a-b).join(',')}`);
+check('不规则地图：每局房间保持全图连通', layoutConnectivityFailures === 0, `disconnected maps=${layoutConnectivityFailures}`);
 check('不规则地图：后院始终只有车库一个入口', layoutGardenFailures === 0, `invalid garden exits=${layoutGardenFailures}`);
 check('不规则地图：每局至少出现三种房间尺寸', layoutSizeVarietyFailures === 0, `low-variety maps=${layoutSizeVarietyFailures}`);
 
