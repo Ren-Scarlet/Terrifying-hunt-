@@ -55,6 +55,8 @@ import {
   CABINET_ROOMS,
   EXIT_ROOM,
   OBSTACLE_ROOMS,
+  PHONE_ROOMS,
+  RADIO_ROOMS,
   ROOM_MAP,
   ROOMS,
   TOTEM_ROOMS,
@@ -108,6 +110,13 @@ function roomFeatures(state: GameState, roomId: RoomId): string {
     const sourceOffline = !!source && (source.broken || source.jammedTurns > 0);
     const status = circuitAt.broken ? '控制箱损坏' : circuitAt.enabled === false ? '已拉闸' : sourceOffline ? '发电机停机' : '供电正常';
     parts.push(`<span class="room-feature breaker ${circuitAt.broken || circuitAt.enabled === false || sourceOffline ? 'broken' : ''}" title="${escape(circuitAt.name)}：${status}，影响 ${circuitAt.affectedRooms.map(roomName).join('、')}">⚡<b>电闸</b></span>`);
+  }
+  if (PHONE_ROOMS.includes(roomId)) {
+    parts.push(`<span class="room-feature telephone ${state.phoneCut ? 'broken' : 'on'}" title="电话：${state.phoneCut ? '线路已中断，跨区域协调受限' : '线路正常，可进行远程求救协调'}">☎<b>电话</b></span>`);
+  }
+  if (RADIO_ROOMS.includes(roomId)) {
+    const radioBroken = state.sabotage.includes('radio');
+    parts.push(`<span class="room-feature radio ${radioBroken ? 'broken' : 'on'}" title="备用无线电：${radioBroken ? '已被破坏' : '电话中断时可进行有限范围协调'}">▣<b>无线电</b></span>`);
   }
   if (roomId === 'kitchen') parts.push('<span class="room-feature execution-site" title="特殊处决地点：冰箱 / 微波炉">☠<b>处决点</b></span>');
   if (roomId === EXIT_ROOM) parts.push(`<span class="room-feature escape" title="撤离点：任务完成的撤离位置">${icon('escape', 'ui-icon tiny')}</span>`);
@@ -197,6 +206,28 @@ function huntOpportunityHtml(state: GameState): string {
   ).join('') + '</div>';
 }
 
+function facilityOverviewHtml(state: GameState): string {
+  const boxes = state.siteItems.filter((item) => item.kind === 'itemBox');
+  const generators = state.siteItems.filter((item) => item.kind === 'generator');
+  const workingGenerators = generators.filter((item) => !item.broken && item.jammedTurns <= 0 && !item.charged).length;
+  const darkCircuits = state.powerCircuits.filter((circuit) =>
+    circuit.broken || circuit.enabled === false || (circuit.generatorId && state.siteItems.some((item) =>
+      item.id === circuit.generatorId && (item.broken || item.jammedTurns > 0),
+    )),
+  ).length;
+  const radioBroken = state.sabotage.includes('radio');
+  return `<section class="facility-overview" aria-label="现场设施状态">
+    <div class="facility-overview-heading"><b>现场设施</b><small>地图标记与当前状态</small></div>
+    <div class="facility-overview-items">
+      <span class="facility-pill"><i>▣</i><b>道具箱</b><strong>${boxes.filter((item) => !item.broken && item.charges > 0).length}/${boxes.length}</strong></span>
+      <span class="facility-pill"><i>⚙</i><b>发电机</b><strong>${workingGenerators}/${generators.length} 可修复</strong></span>
+      <span class="facility-pill"><i>⚡</i><b>电闸</b><strong>${darkCircuits} 组断电</strong></span>
+      <span class="facility-pill ${state.phoneCut ? 'offline' : ''}"><i>☎</i><b>电话线</b><strong>${state.phoneCut ? '中断' : '正常'}</strong></span>
+      <span class="facility-pill ${radioBroken ? 'offline' : ''}"><i>▤</i><b>备用无线电</b><strong>${radioBroken ? '已破坏' : '可用'}</strong></span>
+    </div>
+  </section>`;
+}
+
 function threatRowsHtml(state: GameState): string {
   const alive = state.people.filter((p) => p.role !== 'police' && p.hp > 0);
   const downed = state.people.filter((p) => p.role !== 'police' && p.hp <= 0);
@@ -214,9 +245,19 @@ function threatRowsHtml(state: GameState): string {
   if (hiding.length) rows.push({ name: '藏匿目标', count: hiding.length, hint: hiding.length + ' 人藏在柜子或床底，需要搜索所在房间才能发现。', level: 'warn' });
   const brokenCircuits = state.powerCircuits.filter((c) => c.broken).length;
   const activeGenerators = state.siteItems.filter((i) => i.kind === 'generator' && !i.broken && i.jammedTurns <= 0 && !i.charged).length;
-  const summary = '团队进度 ' + state.teamProgress + '% · 暴露度 ' + state.alarm + '% · ' + downed.length + ' 人倒地 · ' + brokenCircuits + '/' + state.powerCircuits.length + ' 组电路已断';
-  const empty = rows.length ? '' : '<div class="threat-clear"><b>暂未发现正在发生的紧急行动</b><span>留意团队进度、暴露度与现场设施状态；局势变化时这里会显示具体威胁和可采取的反制。</span></div>';
-  return '<div class="threat-live-summary"><b>当前局势</b><span>' + summary + '</span><small>' + (activeGenerators ? activeGenerators + ' 台发电机仍可被幸存者修复。' : '当前没有正在推进的发电机修复。') + '</small></div>' +
+  const injured = alive.filter((p) => p.hp > 0 && p.hp <= 2).length;
+  const highAlert = alive.filter((p) => p.alert >= 75).length;
+  const working = alive.filter((p) => p.intent === 'work').length;
+  const isolated = alive.filter((p) => !state.people.some((other) =>
+    other.id !== p.id && other.role !== 'police' && other.hp > 0 && !other.hidden && other.room === p.room,
+  )).length;
+  if (highAlert) rows.push({ name: '高度警戒', count: highAlert, hint: highAlert + ' 名幸存者已经高度警戒；贸然接近容易引发逃跑或呼救。考虑先制造干扰，或等待警戒下降。', level: highAlert >= 3 ? 'hot' : 'warn' });
+  if (working) rows.push({ name: '设施作业', count: working, hint: working + ' 名幸存者正在推进团队设施目标。此时注意力集中在工作上，是观察或接近的窗口。', level: 'warn' });
+  const summary = '存活 ' + alive.length + ' · 受伤 ' + injured + ' · 倒地 ' + downed.length +
+    ' · 高度警戒 ' + highAlert + ' · 落单 ' + isolated +
+    ' · 团队进度 ' + state.teamProgress + '% · 暴露度 ' + state.alarm + '% · 断电回路 ' + brokenCircuits + '/' + state.powerCircuits.length;
+  const empty = rows.length ? '' : '<div class="threat-clear"><b>当前没有正在推进的高危行动</b><span>幸存者人数、伤势、警觉、落单情况、团队进度与设施状态仍会持续更新。局势变化时，这里会列出具体威胁和反制方向。</span></div>';
+  return '<div class="threat-live-summary"><b>幸存者威胁 · 实时状态</b><span>' + summary + '</span><small>' + (activeGenerators ? activeGenerators + ' 台发电机仍可被修复。' : '当前没有可继续修复的发电机。') + '</small></div>' +
     '<div class="threat-list">' + rows.map((r) => '<div class="threat-row ' + r.level + '"><span class="t-name">' + r.name + '</span><b class="t-count">' + r.count + '</b><span class="t-hint">' + escape(r.hint) + '</span></div>').join('') + empty + '</div>';
 }
 /**
@@ -616,6 +657,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
             <button class="btn ghost mini audio-toggle" data-action="mute" title="开关音效与背景音乐">${isMuted() ? '音效 关' : '音效 开'}</button>
           </div>
           ${statusHtml}${carryStatus}${huntPlanHtml}
+          ${facilityOverviewHtml(state)}
           ${state.lookingAround ? '<div class="look-prompt" role="status"><b>选择要查看的房间</b><span>地图上亮起边框的房间都与当前位置相邻。点击其中一个，消耗 1 点行动点查看。</span><button class="btn ghost mini" data-action="look-cancel">取消</button></div>' : ''}
           <div class="map-viewport">
             <div class="floorplan" style="--ar:${layoutAspectNum().toFixed(4)};aspect-ratio:${layoutAspect()}">
@@ -631,12 +673,14 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
             <span>${icon('totem', 'ui-icon tiny')} 图腾</span>
             <span>${icon('cabinet', 'ui-icon tiny')} 柜子</span>
             <span>${icon('obstacle', 'ui-icon tiny')} 障碍物</span>
+            <span>⚡ 电闸 / 💡 照明</span>
+            <span>☎ 电话 / ▣ 无线电</span>
             <span class="legend-intent"><i class="intent-dot i-flee"></i> 逃跑中 <i class="intent-dot i-call"></i> 打电话 <i class="intent-dot i-escape"></i> 翻篱笆 <i class="intent-dot i-rescue"></i> 救援</span>
             <span class="legend-fog">？ 最后确认位置</span>
             <span class="legend-trail"><i class="legend-claw"></i> 鞋印：只看得见当前房间，跟丢了就断</span>
             <span class="legend-noise">${icon('crow', 'crow-icon tiny')} 动静：乌鸦叫 / 地板响，有人刚经过（短线索）</span>
             <span class="legend-objective">蓝框：他们的团队目标点</span>
-            <span class="legend-sites">${icon('itemBox', 'ui-icon tiny')} 道具箱 ${icon('generator', 'ui-icon tiny')} 发电机：他们能用，你只能砸</span>
+            <span class="legend-sites">${icon('itemBox', 'ui-icon tiny')} 道具箱 ${icon('generator', 'ui-icon tiny')} 发电机：幸存者可使用，你可以破坏</span>
           </div>
         </div>
 
