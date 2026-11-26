@@ -188,3 +188,10 @@ body.immersive-hunt { overflow: hidden; min-height: 100dvh; }
   #app.immersive-game .hunt-sidebar { right: 48px; width: min(290px, calc(100vw - 60px)); }
   #app.immersive-game .task-detail-drawer { left: 9px; top: 98px; }
 }
+
+body.immersive-hunt::before { z-index: 5; }
+body.immersive-hunt::after { z-index: 6; }
+#app.immersive-game .map-world-actions { left: 50%; top: 50%; }
+#app.immersive-game .mission-strip:hover { border-color: #c85c6370; }
+#app.immersive-game .person-world-actions .btn:disabled,
+#app.immersive-game .map-world-actions .btn:disabled { opacity: .42; cursor: not-allowed; }
