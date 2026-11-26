@@ -561,20 +561,15 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
           glass.addColorStop(1, 'rgba(5,11,16,.52)');
           c.fillStyle = glass;
           c.fillRect(frame.x, frame.y, frame.w, frame.h);
-          for (let streak = 0; streak < 9; streak++) {
-            const along = (streak + 0.5) / 9;
+          const streakCount = horizontal ? 9 : 4;
+          for (let streak = 0; streak < streakCount; streak++) {
+            const along = (streak + 0.5) / streakCount;
+            const x = frame.x + frame.w * along;
             c.strokeStyle = streak % 3 === 0 ? 'rgba(174,192,198,.2)' : 'rgba(0,0,0,.16)';
             c.lineWidth = streak % 3 === 0 ? 1.1 : .7;
             c.beginPath();
-            if (horizontal) {
-              const x = frame.x + frame.w * along;
-              c.moveTo(x, frame.y + 2);
-              c.lineTo(x + (streak % 2 ? 1.2 : -0.8), frame.y + frame.h - 2);
-            } else {
-              const y = frame.y + frame.h * along;
-              c.moveTo(frame.x + 2, y);
-              c.lineTo(frame.x + frame.w - 2, y + (streak % 2 ? 1 : -1));
-            }
+            c.moveTo(x, frame.y + 2);
+            c.lineTo(x + (streak % 2 ? 1.2 : -0.8), frame.y + frame.h - 2);
             c.stroke();
           }
           const condensation = c.createRadialGradient(frame.x + frame.w * .5, frame.y + frame.h * .5, 1, frame.x + frame.w * .5, frame.y + frame.h * .5, Math.max(frame.w, frame.h) * .55);
