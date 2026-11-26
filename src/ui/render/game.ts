@@ -595,7 +595,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
   const possessed = state.possessed;
   const sabotageReason = sabotageBlockReason(state);
   const lockedDoor = ROOM_MAP[state.playerRoom].neighbors.find((room) => isLocked(state, room));
-  const sabotageHere = PHONE_ROOMS.includes(state.playerRoom) && !state.phoneCut ? '剪断电话线' : RADIO_ROOMS.includes(state.playerRoom) && !state.sabotage.includes('radio') ? '破坏备用无线电' : state.powerCircuits.some((c) => c.breakerRoom === state.playerRoom && !c.broken) ? '破坏区域电闸' : state.siteItems.some((item) => item.room === state.playerRoom && !item.broken) ? '破坏现场设施' : lockedDoor ? `撞开通往${roomName(lockedDoor)}的门锁` : '破坏现场设施';
+  const sabotageHere = state.powerCircuits.some((c) => c.breakerRoom === state.playerRoom && !c.broken) || state.siteItems.some((item) => item.room === state.playerRoom && !item.broken) ? '破坏现场设施' : PHONE_ROOMS.includes(state.playerRoom) && !state.phoneCut ? '剪断电话线' : RADIO_ROOMS.includes(state.playerRoom) && !state.sabotage.includes('radio') ? '破坏备用无线电' : lockedDoor ? `撞开通往${roomName(lockedDoor)}的门锁` : '破坏现场设施';
   const sabotageTitle = sabotageReason ?? `${sabotageHere}。消耗 ${SABOTAGE_COST} 点行动点；强行破门会惊动屋内的人。`;
   const sabotageMeta = sabotageReason ? escape(sabotageReason) : `${SABOTAGE_COST} 点 · ${sabotageHere}`;
   const sabotageBtn = `<button class="btn sabotage ${sabotageReason ? 'spent' : ''}" data-action="sabotage" ${sabotageReason ? 'disabled' : ''}
