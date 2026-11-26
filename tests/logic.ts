@@ -98,6 +98,33 @@ function newGame(): GameState {
 /** 房间导航模块：验证随机生成的房屋图最短路与候选点选择。 */
 
 /** 新抽牌规则：每回合补 1 张、主动抽牌、六张上限、洗牌推进团队进度。 */
+/** 环境事件：每三回合改变一次现场局势，并正确区分临时闪断与永久断电。 */
+function caseEnvironmentalEvents(): void {
+  const s = newGame();
+  s.turn = 2;
+  s.people.forEach((person) => {
+    person.alert = 0;
+    person.awareness = 0;
+    person.intent = 'idle';
+    person.movesThisTurn = 3;
+  });
+  withRandomSource(createSeededRandom(20261126), () => endTurn(s));
+  check('环境事件：进入第 3 回合时触发一次事件',
+    s.turn === 3 && s.log.some((line) => line.includes('【环境事件】')),
+    s.log.find((line) => line.includes('【环境事件】')) ?? '没有事件记录');
+
+  const circuit = s.powerCircuits.find((item) => !item.broken);
+  if (circuit) {
+    const room = circuit.affectedRooms[0];
+    circuit.flickerTurns = 1;
+    const darkDuringFlicker = !isRoomLit(s, room);
+    circuit.flickerTurns = 0;
+    const lightReturns = isRoomLit(s, room);
+    check('环境事件：临时闪断只影响供电区域且恢复后重新点亮',
+      darkDuringFlicker && lightReturns, `闪断时暗=${darkDuringFlicker}，恢复后亮=${lightReturns}`);
+  }
+}
+
 function caseDrawAndDiscardRules(): void {
   const s = newGame();
   check('抽牌规则：开局仍有 5 张手牌', s.hand.length === 5, `hand=${s.hand.length}`);
@@ -1083,6 +1110,7 @@ function caseMergeAndMissions(): void {
 caseMyersStalkingAndFearRadius();
 caseNavigationUtilities();
 caseMergeAndMissions();
+caseEnvironmentalEvents();
 caseDrawAndDiscardRules();
 
 /** 本轮：人人可救援 / 主动赶去救 / 连杀之后团队进度被催快 */
