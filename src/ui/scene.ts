@@ -1028,7 +1028,7 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
       }
     }
 
-    // 手电在地面形成暖白光斑；以 screen 混合保留材质纹理，不绘制符号或光源图标。
+    // 手电在地面形成深红光斑；以 screen 混合保留材质纹理，不绘制符号或光源图标。
     ctx.save();
     ctx.globalCompositeOperation = 'screen';
     ctx.globalAlpha = 0.34;
