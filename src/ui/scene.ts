@@ -820,10 +820,16 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
 
     // 玩家：手电筒光锥（裁剪到当前房间，光不穿墙）
     const pr = rectOf(state.playerRoom, view);
-    const px = pr.x + pr.w / 2;
-    const py = pr.y + pr.h / 2;
+    // The DOM player marker is centered on this exact room center. Move the
+    // flashlight emitter a short distance toward the facing edge so the beam
+    // appears to leave the killer, rather than starting underneath the portrait.
+    const markerX = pr.x + pr.w / 2;
+    const markerY = pr.y + pr.h / 2;
+    const torchOffset = Math.min(pr.w, pr.h) * 0.22;
+    const px = markerX + Math.cos(facing) * torchOffset;
+    const py = markerY + Math.sin(facing) * torchOffset;
     const coneLen = Math.min(Math.max(w, h) * 0.27, Math.hypot(pr.w, pr.h) * 0.7);
-    const coneHalf = 0.42;
+    const coneHalf = 0.34;
     const k = view.dpr * DARK_SCALE;
     const cc = refs.coneCtx;
     cc.setTransform(1, 0, 0, 1, 0, 0);
