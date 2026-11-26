@@ -56,7 +56,8 @@ import {
 } from '../src/game/engine';
 import { OBSTACLE_ROOMS, ROOM_MAP, ROOMS, buildLayout, doorMarkerPosition } from '../src/game/rooms';
 import { cardImage } from '../src/game/assetMap';
-import { personChip } from '../src/ui/render/shared';
+import { personChip, personDetailHtml } from '../src/ui/render/shared';
+import { renderGame } from '../src/ui/render/game';
 import { SURVIVOR_MAP } from '../src/game/survivors';
 import { generateMission } from '../src/game/missions';
 import type { GameState, RoomId } from '../src/game/types';
@@ -585,6 +586,27 @@ function caseFinisher(): void {
   attack(s3, v3.id);
   check('F 迈尔斯恶魔附身一刀击倒健康幸存者', v3.hp === 0 && conditionOf(v3) === 'downed');
 }
+
+/** G：猎杀动作必须明确区分，人物档案必须展示背景与实时状态。 */
+function caseHuntActionAndDossierUi(): void {
+  const s = newGame();
+  const victim = s.people.find((person) => person.id === 'S01')!;
+  victim.room = s.playerRoom;
+  victim.hp = 0;
+  victim.downedTurns = 0;
+  victim.activity = '倒在地上，试图呼救';
+  s.energy = 3;
+  const html = renderGame(s, KILLERS[0]);
+  check('G 挥刀与处决是两个独立且明确命名的按钮',
+    html.includes('挥刀攻击') && html.includes('处决倒地者') &&
+    html.includes('data-action="attack"') && html.includes('data-action="execute"'));
+  const dossier = personDetailHtml(s, victim.id);
+  check('G 人物档案显示身份职业与背景',
+    dossier.includes('团队协调员') && dossier.includes('总在找人组队'));
+  check('G 人物档案显示当前状态与正在做的事',
+    dossier.includes('倒地') && dossier.includes('倒在地上，试图呼救'));
+}
+caseHuntActionAndDossierUi();
 
 /** G：卡牌数据仍然挂着正确的指令，而且不再直接造成伤害 */
 function caseCardData(): void {
