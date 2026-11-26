@@ -56,8 +56,8 @@ import type {
 
 /** 倒地后撑不过这么多回合就会自动流血而死 */
 export const BLEEDOUT_TURNS = 4;
-/** 倒地后要隔这么多回合才能补刀 / 处决：这段时间是同伴真正的救援窗口 */
-export const DOWNED_LOCK_TURNS = 2;
+/** 兼容旧配置的导出；现在倒地后即可处决，救援窗口由玩家是否选择处决决定。 */
+export const DOWNED_LOCK_TURNS = 0;
 /** 暴露度上限：到 100 直接判负（实体杀手被捕，灵异鬼怪被驱散） */
 export const ALARM_MAX = 100;
 /** 1 点旧「暴露度」折算成多少暴露度：暴露度只是暴露度的 0~10 镜像 */
@@ -591,8 +591,9 @@ function npcReact(state: GameState): void {
     const sameRoom = person.room === state.playerRoom;
     if (sameRoom && person.id === state.lastAttackedId) continue;
     if (sameRoom) {
-      // 伏击这一下他们根本没察觉，别让「目击者反应」把偷袭白送掉
+      // 伏击这一下他们根本没察觉；低警觉者也不会因玩家已经在屋里而每次行动都突然逃跑。
       if (state.ambushTurn === state.turn) continue;
+      if (person.alert < 75 && person.awareness < 2) continue;
       if (person.movesThisTurn >= REACT_MOVE_CAP) continue;
       if (witnessInRoom(state, person)) person.movesThisTurn += 1;
       continue;
@@ -883,7 +884,7 @@ export function executeCarriedPerson(state: GameState, method: 'fridge' | 'micro
 }
 
 function canExecuteNow(person: Person): boolean {
-  return person.hp <= 0 && person.downedTurns >= DOWNED_LOCK_TURNS;
+  return person.hp <= 0;
 }
 
 function executePerson(state: GameState, person: Person): void {
@@ -1180,18 +1181,20 @@ function npcOnPlayerEnter(state: GameState): void {
       person.alert = 100;
     }
 
-    // 用「进门之前」的警觉决定他有多慌，但推门这个动作本身就是一次照面：
-    // 只要没打伏击，屋里的人就会察觉并转身跑——不存在「他背对着门没看见你」的白送窗口。
-    // 「进门不惊动任何人」是静止隐身这张牌买来的，不该白送。
+    // 推门会制造动静，但不代表每个人都会立刻认出杀手。
+    // 只有警觉达到「警戒」(75+) 才会夺路而逃；低于阈值先观察、怀疑或继续原本的事。
     const wasAlert = person.alert;
+    const darkRoom = !isRoomLit(state, state.playerRoom);
 
     let gain = 30;
     if (threat === 'spiritual') gain = 65;
     else if (threat === 'alarm') gain = 55;
     else if (threat === 'lead') gain = 42;
     else if (threat === 'team') gain = 38;
-    if (person.hidden) gain = Math.round(gain * 0.3);
-    if (hidden && threat !== 'spiritual') gain = Math.round(gain * 0.4);
+    if (threat !== 'spiritual') {
+      if (hidden) gain = Math.round(gain * 0.4);
+      if (darkRoom) gain = Math.round(gain * 0.35);
+    }
     person.alert = clamp(person.alert + gain, 0, 100);
     // 迈尔斯的尾随：盯着看得越久，越不容易被屋里的人察觉
     if (state.killer === '迈克尔·迈尔斯' && state.stalkMeter >= 60) {
@@ -1208,30 +1211,28 @@ function npcOnPlayerEnter(state: GameState): void {
     // 已经跑满这一回合的人，腿已经不听使唤了：门一开他也只能贴着墙喘气。
     // 这是玩家唯一能稳稳砍中「警觉的人」的机会，也是痕迹系统的兑现点。
     const exhausted = person.movesThisTurn >= REACT_MOVE_CAP;
-    if (!exhausted && fleeAway(state, person)) {
+    if (!exhausted && person.alert >= 75 && fleeAway(state, person)) {
       person.movesThisTurn += 1;
       person.alert = 100;
       log(
         state,
         wasAlert >= 85
           ? `${person.name} 根本没等你站稳，已经冲出了门口。`
-          : wasAlert < 30
-            ? `门一响，${person.name} 猛地回头，撒腿就跑。`
-            : `${person.name} 看见你，转身就跑。`,
+          : `${person.name} 确认了你的威胁，终于转身逃跑。`,
       );
       return;
     }
 
-    // 退无可退：被堵在墙角的人只能贴着墙看着你
-    person.intent = 'wary';
-    person.alert = 100;
-    person.activity = exhausted ? '跑不动了，靠着墙喘气' : '无路可退，贴着墙盯着你';
-    log(
-      state,
-      exhausted
-        ? `${person.name} 跑了整整一路，这会儿只能扶着墙喘气——你终于追上他了。`
-        : `${person.name} 想跑，但门口被你占着——他退到了墙角。`,
-    );
+    // 尚未恐慌的人不会自动逃跑：明亮环境里先起疑，黑暗里可能根本没看清你。
+    person.intent = person.alert >= 12 ? 'wary' : 'idle';
+    person.activity = exhausted
+      ? '跑不动了，靠着墙喘气'
+      : darkRoom && person.alert < 12
+        ? '黑暗中没有察觉到你的存在'
+        : person.alert >= 12
+          ? '察觉到异常，但还没有确认危险'
+          : '没有察觉到你的存在';
+    if (person.alert >= 12) log(state, `${person.name} 察觉到异常，但还没有确认危险（警觉 ${person.alert}/100）。`);
   });
 
   // 追击热度：你越死盯着同一个人，其他人越敢放手干活
@@ -1348,10 +1349,11 @@ function witnessInRoom(state: GameState, person: Person): boolean {
       p.alert = clamp(p.alert + (p.room === person.room ? 20 : 8), 0, 100);
     });
   addDisturbance(state, person.room);
-  if (random() < 0.55 && person.movesThisTurn < REACT_MOVE_CAP) {
+  person.awareness = Math.max(person.awareness, 2);
+  if (person.alert >= 75 && random() < 0.55 && person.movesThisTurn < REACT_MOVE_CAP) {
     fleeAway(state, person);
     person.movesThisTurn += 1;
-    log(state, `${person.name} 看见同伴被砍，喊了一声夺路而逃。`);
+    log(state, `${person.name} 看见同伴被砍，确认危险后喊了一声夺路而逃。`);
   } else {
     addTeamProgress(state, scaleSurvivorProgress(state, person, 3));
     person.intent = 'work';
@@ -2469,29 +2471,63 @@ export function playCard(state: GameState, cardUid: string): boolean {
  *   3. 屋里确实站着一个能下手的人——倒地的人只能处决，砍不动
  */
 export function attackBlockReason(state: GameState, targetId?: string): string {
-  if (state.phase !== 'playing') return '现在不能动手';
-  // 点了具体的人：先检查这个人本身。同屋多人时，点谁打谁。
+  if (state.phase !== 'playing') return '现在不能攻击';
+  // 攻击只针对站立目标；倒地者有独立的处决按钮，避免两个动作混在一起。
   if (targetId) {
     const picked = state.people.find((p) => p.id === targetId);
     if (!picked) return '这个人已经不在现场了';
-    // 袭警允许，但代价写在 attack() 里：暴露度 +6、警戒 +12、警察立刻锁定你
     if (picked.role === 'police' && state.policeAssaulted) return '警员已经倒下，别再看了';
     if (picked.room !== state.playerRoom) return '他不在这间屋里';
     if (picked.hidden) return '他躲起来了，先搜索这间屋子';
+    if (picked.hp <= 0) return '目标已经倒地，请使用「处决」按钮';
   }
   if (!state.attackReady) return '刀还没收回来：先挪一步或出一张牌';
   if (state.energy < ATTACK_COST) return `需要 ${ATTACK_COST} 点行动点`;
-  if (findVictim(state, state.playerRoom, Infinity, true, targetId)) return '';
-  // 屋里只剩刚倒下的人：这 2 回合是救援窗口，刀还不能落下去
-  const lockedDowned = peopleInRoom(state, state.playerRoom).filter(
-    (p) => p.hp <= 0 && !canExecuteNow(p),
-  );
-  if (lockedDowned.length) {
-    const wait = Math.min(...lockedDowned.map((p) => DOWNED_LOCK_TURNS - p.downedTurns));
-    return `他刚倒下，还要等 ${wait} 回合才能补刀（这期间同伴可能把他救走）`;
-  }
+  if (findVictim(state, state.playerRoom, Infinity, false, targetId)) return '';
+  const downedHere = peopleInRoom(state, state.playerRoom).some((p) => p.role !== 'police' && p.hp <= 0);
+  if (downedHere) return '当前房间只有倒地目标，请使用「处决」按钮';
   const onlyPolice = peopleInRoom(state, state.playerRoom).some((p) => p.role === 'police');
-  return onlyPolice ? '屋里只有警察——他不能攻击，别在他眼皮底下动手' : '这间屋子里没有人';
+  return onlyPolice ? '屋里只有警察——他不能攻击，别在他眼皮底下动手' : '这间屋子里没有站立目标';
+}
+
+export function canAttack(state: GameState, targetId?: string): boolean {
+  return attackBlockReason(state, targetId) === '';
+}
+
+/** 独立处决动作：倒地后立即可用，消耗 1 AP；玩家不处决时，同伴仍可在之后救援。 */
+export function executeBlockReason(state: GameState, targetId?: string): string {
+  if (state.phase !== 'playing') return '现在不能处决';
+  const target = targetId
+    ? state.people.find((person) => person.id === targetId)
+    : peopleInRoom(state, state.playerRoom).find((person) => person.role !== 'police' && person.hp <= 0);
+  if (!target) return '当前房间没有倒地的幸存者';
+  if (target.role === 'police') return '警员不能使用普通处决';
+  if (target.room !== state.playerRoom) return '目标不在当前房间';
+  if (target.hp > 0) return '目标还站着，先将其击倒';
+  if (state.energy < 1) return '需要 1 点行动点';
+  return '';
+}
+
+export function executeDownedPerson(state: GameState, targetId?: string): boolean {
+  const reason = executeBlockReason(state, targetId);
+  if (reason) {
+    log(state, reason);
+    return false;
+  }
+  const target = targetId
+    ? state.people.find((person) => person.id === targetId)!
+    : peopleInRoom(state, state.playerRoom).find((person) => person.role !== 'police' && person.hp <= 0)!;
+  state.energy -= 1;
+  if (state.carryPersonId === target.id) {
+    state.carryPersonId = null;
+    state.carryDistance = 0;
+  }
+  executePerson(state, target);
+  if (state.result) return true;
+  state.attackReady = true;
+  afterPlayerAction(state);
+  checkImmediateWin(state);
+  return true;
 }
 
 export function canAttack(state: GameState, targetId?: string): boolean {
@@ -2512,7 +2548,7 @@ export function attack(state: GameState, targetId?: string): boolean {
     log(state, reason);
     return false;
   }
-  const target = findVictim(state, state.playerRoom, Infinity, true, targetId)!;
+  const target = findVictim(state, state.playerRoom, Infinity, false, targetId)!;
   const heavy = state.possessed;
   const alone = npcs(state).every((person) =>
     person.id === target.id || person.room !== state.playerRoom || person.hp <= 0,
