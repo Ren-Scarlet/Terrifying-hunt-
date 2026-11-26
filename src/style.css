@@ -2523,3 +2523,14 @@ button, .room-hit, .hand-row { touch-action: manipulation; }
   .map-event-feed { width: 82%; max-height: 36%; left: 6px; bottom: 6px; }
   .map-event { font-size: 9px; padding: 5px 7px; }
 }
+
+/* 环境事件的临时闪断：与玩家永久破坏电闸区分显示。 */
+.room-feature.light.flickering {
+  color: #e6c879;
+  filter: drop-shadow(0 0 5px #e6c87999);
+  animation: circuitFlicker .7s steps(2, end) infinite;
+}
+@keyframes circuitFlicker {
+  0%, 100% { opacity: .95; }
+  50% { opacity: .28; }
+}
