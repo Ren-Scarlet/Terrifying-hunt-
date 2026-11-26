@@ -192,15 +192,15 @@ function caseMyersStalkingAndFearRadius(): void {
   prey.hp = 4;
   stalking.energy = 5;
   const stalkStart = stalking.stalkMeter;
-  check('迈尔斯：第一次点击尾随立即进入姿态、消耗 1 AP 并增加 10 尾随值',
-    usePower(stalking, 'myers_gaze') && stalking.myersStalking && stalking.stalkMeter === stalkStart + 10 && stalking.energy === 4,
+  check('迈尔斯：未发觉目标首次尾随增加 15 点尾随值',
+    usePower(stalking, 'myers_gaze') && stalking.myersStalking && stalking.stalkMeter === stalkStart + 15 && stalking.energy === 4,
     `stalk=${stalking.stalkMeter} AP=${stalking.energy}`);
   check('迈尔斯：第二次点击继续消耗行动并使目标开始起疑',
-    usePower(stalking, 'myers_gaze') && stalking.stalkMeter === stalkStart + 20 && stalking.energy === 3 && stalking.stalkPressure === 40 && prey.awareness >= 1,
+    usePower(stalking, 'myers_gaze') && stalking.stalkMeter === stalkStart + 23 && stalking.energy === 3 && stalking.stalkPressure === 40 && prey.awareness >= 1,
     `stalk=${stalking.stalkMeter} pressure=${stalking.stalkPressure} awareness=${prey.awareness}`);
   const thirdStalk = withRandomSource(() => 0.99, () => usePower(stalking, 'myers_gaze'));
   check('迈尔斯：持续盯梢第三次时目标逃离，不能稳定刷同一人',
-    thirdStalk && stalking.stalkMeter === stalkStart + 30 && stalking.stalkPressure === 0 && prey.intent === 'flee',
+    thirdStalk && stalking.stalkMeter === stalkStart + 31 && stalking.stalkPressure === 0 && prey.intent === 'flee',
     `stalk=${stalking.stalkMeter} intent=${prey.intent}`);
 
   const noPrey = newGame();
@@ -1478,10 +1478,10 @@ check('不规则地图：每局至少出现三种房间尺寸', layoutSizeVariet
 
 /* NPC 认知分档、迈尔斯尾随收益、对白真实性与寻路避让。 */
 check('幸存者认知：100 点严格分为未发觉 / 怀疑 / 恐慌 / 警觉',
-  [0, 24, 25, 49, 50, 74, 75, 100].map(awarenessLabel).join('|') === '未发觉|未发觉|怀疑|怀疑|恐慌|恐慌|警觉|警觉' &&
-  [0, 25, 50, 75].map(awarenessStage).join('|') === '0|1|2|3');
+  [0, 11, 12, 39, 40, 74, 75, 100].map(awarenessLabel).join('|') === '未发觉|未发觉|怀疑|怀疑|恐慌|恐慌|警觉|警觉' &&
+  [0, 12, 40, 75].map(awarenessStage).join('|') === '0|1|2|3');
 check('迈尔斯尾随：目标越警觉，尾随收益越低',
-  [0, 25, 50, 75].map(myersStalkGain).join('|') === '15|8|3|0');
+  [0, 12, 40, 75].map(myersStalkGain).join('|') === '15|8|3|0');
 const dialogueGuard = newGame();
 const dialoguePerson = dialogueGuard.people.find((p) => p.role !== 'police')!;
 dialoguePerson.alert = 0;
