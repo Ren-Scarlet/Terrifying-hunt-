@@ -777,11 +777,7 @@ function damagePerson(state: GameState, person: Person, amount: number): void {
   person.blockedTurns = 0;
 
   if (before <= 0) {
-    // 已经倒地：过了保护期才是补刀，否则这一刀落不下去
-    if (!canExecuteNow(person)) {
-      log(state, `${person.name} 刚倒下，刀还落不下去——再等 ${DOWNED_LOCK_TURNS - person.downedTurns} 回合。`);
-      return;
-    }
+    // 对倒地目标造成伤害即为补刀；普通攻击按钮本身不会选择倒地者。
     state.executions += 1;
     killPerson(state, person);
     return;
@@ -795,12 +791,13 @@ function damagePerson(state: GameState, person: Person, amount: number): void {
     person.intent = 'stunned';
     person.activity = '倒在地上，动不了';
     person.alert = 100;
-    log(state, `${person.name} 被打倒在地上。他还没死——要隔 ${DOWNED_LOCK_TURNS} 回合才能补刀，这期间同伴能把他救走。`);
+    log(state, `${person.name} 被打倒在地上。现在可以直接处决；如果暂时放过，同伴仍可能赶来救援。`);
     addAlarm(state, 4);
     peopleInRoom(state, person.room)
       .filter((p) => p.id !== person.id && p.role !== 'police')
       .forEach((p) => {
         p.alert = clamp(p.alert + 30, 0, 100);
+        p.awareness = Math.max(p.awareness, 2);
         p.intent = p.intent === 'idle' ? 'wary' : p.intent;
       });
     return;
@@ -892,10 +889,6 @@ function executePerson(state: GameState, person: Person): void {
     log(state, `${person.name} 还站着，处决需要先把他打倒。`);
     return;
   }
-  if (!canExecuteNow(person)) {
-    log(state, `${person.name} 刚倒下，还撑得住——再等 ${DOWNED_LOCK_TURNS - person.downedTurns} 回合才能处决。`);
-    return;
-  }
   addAlarm(state, 8);
   state.executions += 1;
   log(state, `你处决了 ${person.name}。`);
@@ -929,8 +922,8 @@ function selectPeople(state: GameState, who: Who): Person[] {
   );
   switch (who) {
     case 'victim': {
-      // allowDowned：屋里只剩倒地的人时，攻击牌自动变成补刀
-      const v = findVictim(state, state.playerRoom, Infinity, true);
+      // 攻击类牌只选择站立目标；倒地目标交给独立处决动作。
+      const v = findVictim(state, state.playerRoom, Infinity, false);
       return v ? [v] : [];
     }
     case 'lowestHpHere': {
@@ -2535,7 +2528,7 @@ export function canAttack(state: GameState, targetId?: string): boolean {
 }
 
 /**
- * 挥刀：健康 → 受伤，受伤 → 倒地，倒地 → 补刀致死。
+ * 普通攻击：只针对站立目标，健康 → 受伤，受伤 → 倒地；倒地后使用独立处决动作。
  * 恶魔附身期间伤害翻倍，还站着的人一刀就倒。
  * 砍完就把 attackReady 关掉，必须再做一件事（走路 / 出牌 / 用能力）才能砍第二刀，
  * 所以「一刀接一刀」不是按得快就行，中间得有一次追逐或一次控制。
