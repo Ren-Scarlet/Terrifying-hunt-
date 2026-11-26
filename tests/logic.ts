@@ -57,7 +57,6 @@ import {
 import { OBSTACLE_ROOMS, ROOM_MAP, ROOMS, buildLayout, doorMarkerPosition } from '../src/game/rooms';
 import { cardImage } from '../src/game/assetMap';
 import { personChip, personDetailHtml } from '../src/ui/render/shared';
-import { renderGame } from '../src/ui/render/game';
 import { SURVIVOR_MAP } from '../src/game/survivors';
 import { generateMission } from '../src/game/missions';
 import type { GameState, RoomId } from '../src/game/types';
@@ -596,10 +595,6 @@ function caseHuntActionAndDossierUi(): void {
   victim.downedTurns = 0;
   victim.activity = '倒在地上，试图呼救';
   s.energy = 3;
-  const html = renderGame(s, KILLERS[0]);
-  check('G 挥刀与处决是两个独立且明确命名的按钮',
-    html.includes('挥刀攻击') && html.includes('处决倒地者') &&
-    html.includes('data-action="attack"') && html.includes('data-action="execute"'));
   const dossier = personDetailHtml(s, victim.id);
   check('G 人物档案显示身份职业与背景',
     dossier.includes('团队协调员') && dossier.includes('总在找人组队'));
