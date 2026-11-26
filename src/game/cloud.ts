@@ -36,7 +36,7 @@ export function isCloudSignedIn(): boolean { return !!session?.access_token; }
 export async function sendCloudLogin(email: string): Promise<void> {
   const response = await fetch(PROJECT_URL + '/auth/v1/otp', {
     method: 'POST', headers: { apikey: PUBLIC_KEY, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, create_user: false, options: { emailRedirectTo: window.location.origin + window.location.pathname + '?admin=1' } }),
+    body: JSON.stringify({ email, create_user: false, options: { emailRedirectTo: 'https://ren-scarlet.github.io/Terrifying-hunt/?admin=1' } }),
   });
   if (!response.ok) {
     const detail = await response.text();
