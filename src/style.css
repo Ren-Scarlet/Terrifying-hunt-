@@ -990,6 +990,54 @@ button { font-family: inherit; cursor: pointer; }
   50% { opacity: 1; }
 }
 .menu-modal > * { position: relative; }
+
+/* 今夜的猎场：2:1 地图插画横幅，只做氛围，不承载玩法 */
+.menu-map {
+  position: relative;
+  margin: 0 0 18px;
+  border: 1px solid #2c2724;
+  border-radius: 3px;
+  overflow: hidden;
+  background: #08090b;
+  isolation: isolate;
+}
+.menu-map img {
+  display: block;
+  width: 100%;
+  max-height: 190px;
+  object-fit: cover;
+  object-position: center 45%;
+  filter: saturate(.82) contrast(1.05) brightness(.72);
+}
+/* 底部压暗，保证文字在任何一张插画上都读得清 */
+.menu-map::after {
+  content: '';
+  position: absolute; inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, transparent 28%, rgba(6, 7, 9, .35) 62%, rgba(6, 7, 9, .94) 100%);
+}
+.menu-map-copy {
+  position: absolute;
+  left: 18px; right: 18px; bottom: 12px;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  pointer-events: none;
+}
+.menu-map-copy small {
+  font-size: 9px; letter-spacing: 3.5px; text-transform: uppercase;
+  color: #b08a5e;
+}
+.menu-map-copy b {
+  font-size: 14px; letter-spacing: 1.4px; font-weight: 700;
+  color: #e7ddd0;
+  text-shadow: 0 2px 8px #000;
+}
+.menu-map-copy span {
+  font-size: 10.5px; color: #9d968b;
+  text-shadow: 0 1px 6px #000;
+}
 .menu-hero { align-items: start; }
 .menu-hero { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(220px, .6fr); gap: 22px; align-items: center; }
 .hero-copy {

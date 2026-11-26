@@ -49,7 +49,8 @@ import {
 } from './ui/render';
 import { renderAdmin } from './ui/admin';
 import { mountFloorplanScene, type SceneHandle } from './ui/scene';
-import { playSfx, setMusic, toggleMute, unlockAudio } from './ui/audio';
+import { playSfx, playSfxRepeat, setMusic, toggleMute, unlockAudio } from './ui/audio';
+import { rollMenuMap } from './ui/mapArt';
 
 type Screen = 'menu' | 'game' | 'result';
 
@@ -153,11 +154,14 @@ function sfxFromLogs(): void {
   const head = game.log[0] ?? '';
   if (head === lastLogHead) return;
   lastLogHead = head;
-  if (/恶魔附身：/.test(head)) playSfx('possess');
+  if (/地图出现两个逃生点|第四阶段完成/.test(head)) playSfx('gate');
+  else if (/幸存者团队完成第/.test(head)) playSfx('stage');
+  else if (/红色人影|显形|监视值满了/.test(head)) playSfxRepeat('heartbeat', 3);
+  else if (/恶魔附身：/.test(head)) playSfx('possess');
   else if (/停止了呼吸|处决了/.test(head)) playSfx('kill');
   else if (/致盲|击晕|手电筒|逼退/.test(head)) playSfx('stun');
   else if (/乌鸦|动静/.test(head)) playSfx('crow');
-  else if (/翻出了/.test(head)) playSfx('pickup');
+  else if (/翻出了|拾起|拿到了武器/.test(head)) playSfx('pickup');
   else if (/发电机/.test(head)) playSfx('generator');
 }
 
@@ -224,6 +228,12 @@ app.addEventListener('click', (event) => {
   // 浏览器要求先有用户交互才允许出声
   unlockAudio();
 
+  // 主菜单按钮音：选角色框有专属音效，其余大厅按钮统一一个轻音
+  if (screen === 'menu' && !game && action && action !== 'mute') {
+    if (action === 'killer' || action === 'unlock-killer') playSfx('killerPick');
+    else if (action !== 'start' && action !== 'again') playSfx('menuButton');
+  }
+
   if (action === 'mute') {
     toggleMute();
     afterAction();
@@ -231,8 +241,11 @@ app.addEventListener('click', (event) => {
   }
 
   if (action === 'start' || action === 'again') {
+    // 三段串起来，避免同时响糊成一团：点击准备完成 → 进入地图 → 游戏开始
+    playSfx('ready');
+    window.setTimeout(() => playSfx('enterMap'), 190);
+    window.setTimeout(() => playSfx('start'), 430);
     startGame();
-    playSfx('start');
     return;
   }
 
@@ -244,6 +257,7 @@ app.addEventListener('click', (event) => {
     shopOpen = false;
     adminOpen = false;
     lastNewCard = null;
+    rollMenuMap();
     render();
     return;
   }

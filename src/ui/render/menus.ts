@@ -2,11 +2,13 @@ import { CARDS, deckCardsForKiller } from '../../game/cards';
 import { BASE_AP } from '../../game/engine';
 import { ACTIVE_KILLERS } from '../../game/killers';
 import type { SaveData } from '../../game/types';
+import { currentMenuMap, mapArtSrc } from '../mapArt';
 import { detailCardHtml, escape, getKiller, icon, killerFaceHtml, perkIconHtml, powerIconHtml } from './shared';
 
 export function renderMenu(save: SaveData): string {
   const killer = getKiller(save.killer);
   const canAfford = save.darkCells >= 2;
+  const map = currentMenuMap();
   const picker = ACTIVE_KILLERS.map((k) => {
     const unlocked = save.unlockedKillers.includes(k.owner);
     const disabled = !unlocked && !canAfford;
@@ -27,6 +29,14 @@ export function renderMenu(save: SaveData): string {
   return `
     <div class="overlay menu-overlay">
       <div class="modal menu-modal">
+        <div class="menu-map" title="${escape(map.code)}">
+          <img src="${mapArtSrc(map)}" alt="今夜的猎场" loading="lazy">
+          <div class="menu-map-copy">
+            <small>TONIGHT'S HUNTING GROUND</small>
+            <b>今夜的猎场 · ${map.sector}</b>
+            <span>你在这里。每一局，房子都会换一副样子。</span>
+          </div>
+        </div>
         <div class="menu-hero">
           <div>
             <div class="subtitle">A SOLO SLASHER STRATEGY GAME</div>
