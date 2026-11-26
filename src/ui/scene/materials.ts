@@ -81,24 +81,71 @@ function makeTexture(kind: MatKind): HTMLCanvasElement {
     }
     speckle(160, ['#000000', '#5b452f', '#2a1d13'], 1.6, 0.28);
   } else if (kind === 'tile') {
+    // 老旧瓷砖：低饱和灰绿釉面、深色填缝、边缘磨损和局部积垢
     const t = 26;
     for (let y = 0; y < TEX; y += t) {
       for (let x = 0; x < TEX; x += t) {
-        c.fillStyle = `rgba(${180 + rand() * 40},${190 + rand() * 40},${196 + rand() * 40},${0.02 + rand() * 0.05})`;
+        const tone = rand();
+        const shade = tone > 0.68 ? 13 : tone > 0.34 ? 0 : -12;
+        c.fillStyle = `rgba(${112 + shade},${126 + shade},${126 + shade},.24)`;
         c.fillRect(x + 1.5, y + 1.5, t - 3, t - 3);
+        // 瓷面釉光：不是亮白格子，而是很弱的冷色反射
+        const glaze = c.createLinearGradient(x + 2, y + 2, x + t - 2, y + t - 2);
+        glaze.addColorStop(0, 'rgba(190,204,198,.10)');
+        glaze.addColorStop(.42, 'rgba(130,148,145,.015)');
+        glaze.addColorStop(1, 'rgba(0,0,0,.16)');
+        c.fillStyle = glaze;
+        c.fillRect(x + 2, y + 2, t - 4, t - 4);
+        // 每块砖独立的污渍与水痕
+        if (rand() > .48) {
+          const sx = x + 4 + rand() * (t - 8);
+          const sy = y + 4 + rand() * (t - 8);
+          const radius = 3 + rand() * 8;
+          const stain = c.createRadialGradient(sx, sy, 0.5, sx, sy, radius);
+          stain.addColorStop(0, `rgba(8,13,14,${.08 + rand() * .12})`);
+          stain.addColorStop(1, 'rgba(8,13,14,0)');
+          c.fillStyle = stain;
+          c.fillRect(sx - radius, sy - radius, radius * 2, radius * 2);
+        }
+        // 釉面细划痕
+        if (rand() > .72) {
+          c.strokeStyle = 'rgba(190,198,188,.10)';
+          c.lineWidth = .55;
+          c.beginPath();
+          c.moveTo(x + 4, y + 5 + rand() * 13);
+          c.lineTo(x + 9 + rand() * 10, y + 4 + rand() * 14);
+          c.stroke();
+        }
       }
     }
-    c.strokeStyle = 'rgba(12,14,16,.8)';
-    c.lineWidth = 1.8;
+    // 填缝线带有积灰与水垢，边缘有轻微高光
+    c.strokeStyle = 'rgba(7,11,12,.82)';
+    c.lineWidth = 2;
     for (let i = 0; i <= TEX; i += t) {
       c.beginPath();
-      c.moveTo(i, 0);
-      c.lineTo(i, TEX);
-      c.moveTo(0, i);
-      c.lineTo(TEX, i);
+      c.moveTo(i, 0); c.lineTo(i, TEX);
+      c.moveTo(0, i); c.lineTo(TEX, i);
       c.stroke();
     }
-    speckle(150, ['#000000', '#565d60', '#33383b'], 1.5, 0.28);
+    c.strokeStyle = 'rgba(151,164,157,.09)';
+    c.lineWidth = .7;
+    for (let i = 2; i < TEX; i += t) {
+      c.beginPath();
+      c.moveTo(i, 0); c.lineTo(i, TEX);
+      c.moveTo(0, i); c.lineTo(TEX, i);
+      c.stroke();
+    }
+    // 不规则的地面水渍与磨耗，避免瓷砖看起来像整齐的新地砖
+    for (let i = 0; i < 18; i++) {
+      const x = rand() * TEX, y = rand() * TEX, radius = 5 + rand() * 24;
+      const stain = c.createRadialGradient(x, y, 1, x, y, radius);
+      stain.addColorStop(0, `rgba(3,8,9,${.06 + rand() * .1})`);
+      stain.addColorStop(.72, 'rgba(14,22,22,.035)');
+      stain.addColorStop(1, 'rgba(0,0,0,0)');
+      c.fillStyle = stain;
+      c.fillRect(x - radius, y - radius, radius * 2, radius * 2);
+    }
+    speckle(260, ['#000000', '#565d60', '#33383b', '#78827d'], 1.5, 0.22);
   } else if (kind === 'concrete' || kind === 'plaster') {
     speckle(1100, ['#43474a', '#24272a', '#4d5155', '#1c1e20'], 2.4, 0.3);
     if (kind === 'concrete') {
