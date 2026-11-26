@@ -164,6 +164,7 @@ export function createGame(
     revealedThisTurn: false,
     resultReason: '',
     alarm: 12,
+    emergencyActive: false,
     explored: [ENTRY_ROOM, ...ROOM_MAP[ENTRY_ROOM].neighbors],
     scouted: {},
     noiseRoom: null,
@@ -190,7 +191,7 @@ export function createGame(
     (id) => id !== ENTRY_ROOM && id !== EXIT_ROOM && !ESCAPE_ROOMS.includes(id) && !OBSTACLE_ROOMS.includes(id),
   );
   state.objectiveRooms = shuffle(objPool).slice(0, 3);
-  state.teamGoalLabel = randomOf(['修好电闸', '凑齐后门钥匙', '接通无线电']);
+  state.teamGoalLabel = '';
 
   // 场地物品：道具箱固定 2 个，发电机随机 1~2 台，撒在能走的房间里。
   // 杀手用不了它们，但能砸——去哪边、什么时候砸，多了一层取舍。
@@ -233,18 +234,17 @@ export function createGame(
     .filter((p) => p.role !== 'police')
     .forEach((p) => {
       const roll = random();
-      if (roll < 0.18) p.goal = 'supply';
-      else if (roll < 0.34) p.goal = 'generator';
-      else if (roll < 0.50) p.goal = 'objective';
-      else if (roll < 0.60) p.goal = 'key';
-      else if (roll < 0.80) p.goal = 'routine';
+      if (roll < 0.22) p.goal = 'supply';
+      else if (roll < 0.42) p.goal = 'routine';
+      else if (roll < 0.62) p.goal = 'hide';
+      else if (roll < 0.82) p.goal = 'help';
     });
   drawCards(state, 5);
   log(state, `猎场：${ground.name} · ${ground.ruleName}：${ground.ruleDescription}`);
   log(state, `契约已接取：${mission.title}`);
   if (sacrifice) log(state, `血祭品已标记：${sacrifice.name}。此标记本身没有额外效果。`);
   log(state, `你以「${killerId}」的身份行动。每回合 ${BASE_AP} 点行动点：走路、挥刀、出牌、搜索柜子都从这里扣。`);
-  log(state, `他们也在忙自己的事：${state.teamGoalLabel}就会集体从后门逃走。留意乌鸦叫和地板响，那是有人刚经过。`);
+  log(state, '留意每个人的恐惧值与警戒值：恐惧会使人崩溃，警戒会促使人报警或逃跑。');
   log(state, `屋里有 ${items.filter((i) => i.kind === 'itemBox').length} 个道具箱、${genCount} 台发电机：他们会靠这些翻盘，你只能砸掉它们（${SABOTAGE_COST} 点行动点）。`);
   return state;
 }
