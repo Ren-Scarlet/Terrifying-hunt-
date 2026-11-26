@@ -296,6 +296,8 @@ export interface PowerCircuit {
   breakerRoom: RoomId;
   affectedRooms: RoomId[];
   broken: boolean;
+  /** 环境事件造成的临时熄灯回合数，不等于电闸被破坏。 */
+  flickerTurns?: number;
 }
 
 export interface GameState {
