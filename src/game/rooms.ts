@@ -81,8 +81,8 @@ export const WEAPON_ROOMS: RoomId[] = ['kitchen', 'garage', 'conservatory'];
  * 小房间约 4–6 单位，普通房间约 7–11 单位，大厅/室外区域更大。
  * 房间仍然是单个移动节点，面积只影响地图空间表现，不改变行动点消耗。
  */
-const GRID_COLS = 16;
-const GRID_ROWS = 12;
+let GRID_COLS = 16;
+let GRID_ROWS = 12;
 const PAD = 1.8;
 const GAP = 0.72;
 const MIN_REGION_AREA = 4;
@@ -221,7 +221,17 @@ export function doorMarkerPosition(fromId: RoomId, toId: RoomId): DoorMarkerPosi
  * 每局重新切分整张平面图。
  * 邻接关系由矩形真实共边计算，随后只在这些真实门位中选出连通的门网。
  */
-export function buildLayout(): string {
+export type LayoutStyle = 'tall' | 'wide' | 'branching' | 'compact';
+
+export function buildLayout(style: LayoutStyle = 'wide'): string {
+  // 地图主题不仅改房间名称，也改变画布比例和门网密度。
+  const dimensions: Record<LayoutStyle, [number, number]> = {
+    tall: [13, 18],
+    wide: [20, 11],
+    branching: [17, 15],
+    compact: [14, 13],
+  };
+  [GRID_COLS, GRID_ROWS] = dimensions[style];
   const regions: Region[] = [
     { left: 0, top: 0, width: GRID_COLS, height: GRID_ROWS },
   ];
@@ -368,7 +378,7 @@ export function buildLayout(): string {
     physicalEdges.filter((edge) => !treeEdges.some((tree) =>
       (tree.a === edge.a && tree.b === edge.b) || (tree.a === edge.b && tree.b === edge.a),
     ) && edge.a !== gardenIndex && edge.b !== gardenIndex),
-  ).slice(0, Math.max(3, Math.round(ROOMS.length / 6)));
+  ).slice(0, style === 'tall' ? 2 : style === 'wide' ? 6 : style === 'branching' ? 3 : 5);
   const selectedEdges = [...treeEdges, ...extraEdges];
 
   selectedEdges.forEach(({ a, b }) => {
