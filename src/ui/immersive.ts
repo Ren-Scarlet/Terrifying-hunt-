@@ -68,8 +68,10 @@ function animateCamera(x: number, y: number, scale: number, duration = 360): voi
   animationStart = performance.now();
   const tick = (now: number): void => {
     const raw = clamp((now - animationStart) / duration, 0, 1);
-    // Ease-out cubic: quick response at the start, soft landing at the target.
-    const eased = 1 - Math.pow(1 - raw, 3);
+    // Smoothstep cubic: begin and end gently so room-to-room camera travel feels continuous.
+    const eased = raw < 0.5
+      ? 4 * raw * raw * raw
+      : 1 - Math.pow(-2 * raw + 2, 3) / 2;
     setCameraTransform(
       animationFrom.x + (animationTo.x - animationFrom.x) * eased,
       animationFrom.y + (animationTo.y - animationFrom.y) * eased,
@@ -104,7 +106,7 @@ function cameraTarget(): { x: number; y: number; zoom: number } {
 function updateCamera(animate = true): void {
   if (!mapElement || mapWidth < 1 || mapHeight < 1 || viewportWidth < 1 || viewportHeight < 1) return;
   const target = cameraTarget();
-  animateCamera(target.x, target.y, target.zoom, animate && mode === 'smooth' && !globalView ? 360 : animate ? 260 : 0);
+  animateCamera(target.x, target.y, target.zoom, animate && mode === 'smooth' && !globalView ? 480 : animate ? 300 : 0);
   updateCameraControls();
 }
 
