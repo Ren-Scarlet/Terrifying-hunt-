@@ -796,8 +796,12 @@ export function renderResult(state: GameState, newCard: string | null): string {
   const stars = getStars(state.score);
   const win = state.result === 'win';
   const rank = win ? (state.score >= 260 ? 'S' : state.score >= 190 ? 'A' : 'B') : '—';
-  const earned = win ? Math.max(10, Math.round(state.score / 5)) : 0;
+  const baseEarned = win ? Math.max(10, Math.round(state.score / 5)) : 0;
+  const earned = baseEarned + state.huntStyleBonus;
   const darkCells = win && state.score >= 150 ? 1 : 0;
+  const styleBreakdown = state.huntStyleBreakdown
+    .map((line) => `<div class="style-score-line"><span>${escape(line.label)}</span><b>+${line.value}</b></div>`)
+    .join('');
   const breakdown = state.scoreBreakdown
     .map((line) => `<div class="score-line ${line.value < 0 ? 'minus' : ''}">
         <span>${escape(line.label)}</span><b>${line.value >= 0 ? '+' : ''}${line.value}</b>
@@ -822,9 +826,18 @@ export function renderResult(state: GameState, newCard: string | null): string {
           <div><small>逃走人数</small><b>${state.escaped}</b></div>
           <div><small>最终暴露度</small><b>${state.alarm}/${ALARM_MAX}</b></div>
         </div>
+        <section class="hunt-style-card">
+          <div class="hunt-style-heading">
+            <div><small>猎杀风格评价</small><b>计划、隐蔽与能力运用</b></div>
+            <strong class="hunt-style-rank rank-${state.huntStyleRank.toLowerCase()}">${state.huntStyleRank}</strong>
+            <span class="hunt-style-score">${state.huntStyleScore}/100</span>
+          </div>
+          <div class="hunt-style-breakdown">${styleBreakdown}</div>
+          ${state.huntStyleBonus ? `<p class="hunt-style-reward">风格奖励 · 额外血点 +${state.huntStyleBonus}</p>` : '<p class="hunt-style-reward muted">本局未获得额外风格血点；尝试利用目标习惯、环境或杀手专属能力提升评级。</p>'}
+        </section>
         <div class="score-breakdown">${breakdown}</div>
         ${newCard ? `<p style="color:var(--gold)">新卡牌解锁：<b>${escape(CARD_MAP[newCard]?.name ?? newCard)}</b></p>` : ''}
-        ${earned ? `<p style="color:var(--gold)">${icon('bloodPoint', 'ui-icon tiny')} 获得血点：<b>+${earned}</b></p>` : ''}
+        ${earned ? `<p style="color:var(--gold)">${icon('bloodPoint', 'ui-icon tiny')} 获得血点：<b>+${earned}</b>${state.huntStyleBonus ? `（含风格奖励 +${state.huntStyleBonus}）` : ''}</p>` : ''}
         ${darkCells ? `<p style="color:var(--gold)">${icon('darkCell', 'ui-icon tiny')} 获得暗金细胞：<b>+${darkCells}</b></p>` : ''}
         <div class="actions">
           <button class="btn primary" data-action="again">再来一局</button>
