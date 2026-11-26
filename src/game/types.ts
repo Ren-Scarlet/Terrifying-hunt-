@@ -119,7 +119,9 @@ export type NpcGoal =
   /** 去道具箱翻一件能用的东西 */
   | 'supply'
   /** 去把发电机修好 */
-  | 'generator';
+  | 'generator'
+  /** 按个人习惯在常去地点之间活动 */
+  | 'routine';
 
 /** 幸存者从道具箱里翻出来的东西：用完即弃，是他们多出来的一条选择 */
 export type SurvivorItem = 'medkit' | 'toolbox' | 'flare' | 'key' | 'weapon' | 'smoke' | 'flashlight';
@@ -170,6 +172,11 @@ export interface Person {
   intent: NpcIntent;
   /** 个人目的 */
   goal: NpcGoal;
+  /** 日常路线的当前停靠点、观察次数与是否已被玩家识破。 */
+  routineIndex?: number;
+  routineSightings?: number;
+  routineObserved?: boolean;
+  routineLastObservedTurn?: number;
   /** 被限制移动的剩余回合（支配、钉住、恐惧、夹子） */
   blockedTurns: number;
   /** 流血：每回合结束掉血 */
