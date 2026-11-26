@@ -3623,6 +3623,7 @@ export function usePower(state: GameState, powerId: string): boolean {
 export function missionTaskProgress(state: GameState, task: MissionTask): number {
   switch (task.kind) {
     case 'kill_count': return state.survivorKills;
+    case 'kill_count_before_turn': return state.completedMissionTasks.includes(task.id) || (task.deadlineTurn !== undefined && state.turn <= task.deadlineTurn && state.survivorKills >= task.target) ? task.target : 0;
     case 'marked_kill': return state.markedKilled;
     case 'execute': return state.executions;
     case 'special_execute': return state.executionMethodsUsed.length;
@@ -3633,7 +3634,20 @@ export function missionTaskProgress(state: GameState, task: MissionTask): number
 
 function checkImmediateWin(state: GameState): void {
   if (state.result || state.mission.mode === 'free') return;
-  const required = (state.mission.tasks ?? []).filter((task) => !task.optional);
+  const tasks = state.mission.tasks ?? [];
+  for (const task of tasks) {
+    if (task.kind !== 'kill_count_before_turn' || task.deadlineTurn === undefined) continue;
+    if (state.survivorKills >= task.target && state.turn <= task.deadlineTurn && !state.completedMissionTasks.includes(task.id)) {
+      state.completedMissionTasks.push(task.id);
+      log(state, `限时目标完成：${task.label}。`);
+    }
+    if (!task.optional && state.turn > task.deadlineTurn && !state.completedMissionTasks.includes(task.id)) {
+      state.resultReason = `限时目标失败：${task.label}。`;
+      finish(state, 'failed');
+      return;
+    }
+  }
+  const required = tasks.filter((task) => !task.optional);
   if (required.length > 0 && required.every((task) => missionTaskProgress(state, task) >= task.target)) finish(state, 'win');
 }
 
