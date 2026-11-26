@@ -10,7 +10,7 @@ let panY = 0;
 let focusX = 0;
 let focusY = 0;
 let frame = 0;
-let lastTime = 0;
+let previousFrameTime = 0;
 let taskDrawerOpen = false;
 
 function clamp(value: number, min: number, max: number): number {
@@ -31,7 +31,7 @@ function readPlayerPoint(map: HTMLElement, marker: HTMLElement): { x: number; y:
   return { x: map.offsetWidth * left / 100, y: map.offsetHeight * top / 100 };
 }
 
-function applyTransform(): void {
+function applyTransform(deltaSeconds = 1 / 60): void {
   const found = elements();
   if (!found) return;
   const { viewport, map, marker } = found;
@@ -56,7 +56,7 @@ function applyTransform(): void {
         focusX = desiredX;
         focusY = desiredY;
       } else {
-        const alpha = 1 - Math.exp(-Math.max(1, lastTime) / 1000 * 9);
+        const alpha = 1 - Math.exp(-clamp(deltaSeconds, 0.001, 0.05) * 9);
         focusX += (desiredX - focusX) * clamp(alpha, 0.08, 0.24);
         focusY += (desiredY - focusY) * clamp(alpha, 0.08, 0.24);
       }
@@ -75,8 +75,9 @@ function applyTransform(): void {
 
 function loop(time: number): void {
   if (!root) { frame = 0; return; }
-  lastTime = time;
-  if (!globalView) applyTransform();
+  const delta = previousFrameTime ? (time - previousFrameTime) / 1000 : 1 / 60;
+  previousFrameTime = time;
+  if (!globalView) applyTransform(delta);
   frame = window.requestAnimationFrame(loop);
 }
 
@@ -115,6 +116,7 @@ export function handleImmersiveAction(action: string | undefined): boolean {
   if (action === 'camera-follow') {
     globalView = false;
     following = true;
+    zoom = 1.18;
     panX = 0;
     panY = 0;
     applyTransform();
