@@ -2999,7 +2999,7 @@ function triggerEnvironmentalEvent(state: GameState): void {
       const room = 'garden' as RoomId;
       state.disturbances.push({ room, turn: state.turn, clock: state.trailClock, label: '暴风雪呼啸' });
       if (state.disturbances.length > 24) state.disturbances.splice(0, state.disturbances.length - 24);
-      log(state, '【奥蒙德 · 白色风墙】暴风雪撞上木屋，窗外一片白茫。风声吞掉了远处的动静，暴露度 -6。');
+      log(state, '【环境事件 · 奥蒙德 · 白色风墙】暴风雪撞上木屋，窗外一片白茫。风声吞掉了远处的动静，暴露度 -6。');
     } else {
       const room = randomOf(['balcony', 'garden'] as RoomId[]);
       const affected = npcs(state).filter((person) => person.hp > 0 && !person.hidden && roomDistance(person.room, room) <= 1);
@@ -3011,7 +3011,7 @@ function triggerEnvironmentalEvent(state: GameState): void {
       });
       state.disturbances.push({ room, turn: state.turn, clock: state.trailClock, label: '积雪坠落' });
       if (state.disturbances.length > 24) state.disturbances.splice(0, state.disturbances.length - 24);
-      log(state, `【奥蒙德 · 屋顶雪崩】${roomName(room)}外传来沉闷的坠落声，${affected.length ? affected.map((person) => person.name).join('、') + '被惊动' : '没有人靠近窗边'}。`);
+      log(state, `【环境事件 · 奥蒙德 · 屋顶雪崩】${roomName(room)}外传来沉闷的坠落声，${affected.length ? affected.map((person) => person.name).join('、') + '被惊动' : '没有人靠近窗边'}。`);
     }
     return;
   }
@@ -3029,7 +3029,7 @@ function triggerEnvironmentalEvent(state: GameState): void {
         if (person.intent === 'idle') person.intent = 'wary';
         person.activity = '被幼儿教室断续响起的玩具音乐吸引';
       });
-      log(state, `【巴德姆 · 玩具音乐盒】幼儿教室传出走调的旋律，${affected.length ? affected.map((person) => person.name).join('、') + '开始寻找声音来源' : '空荡荡的走廊里只有音乐在回响'}。`);
+      log(state, `【环境事件 · 巴德姆 · 玩具音乐盒】幼儿教室传出走调的旋律，${affected.length ? affected.map((person) => person.name).join('、') + '开始寻找声音来源' : '空荡荡的走廊里只有音乐在回响'}。`);
     } else {
       const room = 'hall' as RoomId;
       state.noiseRoom = room;
@@ -3042,7 +3042,7 @@ function triggerEnvironmentalEvent(state: GameState): void {
         caller.intent = 'wary';
         caller.activity = '听见广播里的求救杂音，正在确认来源';
       }
-      log(state, `【巴德姆 · 失真广播】大厅喇叭突然响起一段听不清的求救录音${caller ? '，' + caller.name + '停下脚步侧耳倾听' : ''}。`);
+      log(state, `【环境事件 · 巴德姆 · 失真广播】大厅喇叭突然响起一段听不清的求救录音${caller ? '，' + caller.name + '停下脚步侧耳倾听' : ''}。`);
     }
     return;
   }
@@ -3052,9 +3052,9 @@ function triggerEnvironmentalEvent(state: GameState): void {
       const circuit = randomOf(state.powerCircuits.filter((item) => !item.broken && (item.flickerTurns ?? 0) <= 0));
       if (circuit) {
         circuit.flickerTurns = 2;
-        log(state, `【兰普金巷 · 街灯熄灭】${circuit.name}的电流突然中断，窗外的街灯接连熄灭，阴影沿着房间边缘蔓延。`);
+        log(state, `【环境事件 · 兰普金巷 · 街灯熄灭】${circuit.name}的电流突然中断，窗外的街灯接连熄灭，阴影沿着房间边缘蔓延。`);
       } else {
-        log(state, '【兰普金巷 · 街灯熄灭】街灯闪了几下又恢复，窗外仿佛有个人影一闪而过。');
+        log(state, '【环境事件 · 兰普金巷 · 街灯熄灭】街灯闪了几下又恢复，窗外仿佛有个人影一闪而过。');
       }
     } else {
       const room = 'garage' as RoomId;
@@ -3068,7 +3068,7 @@ function triggerEnvironmentalEvent(state: GameState): void {
         if (person.intent === 'idle') person.intent = 'wary';
         person.activity = '被车库外突然响起的汽车警报惊动';
       });
-      log(state, `【兰普金巷 · 汽车警报】车库里的警报器突然尖叫，${affected.length ? affected.map((person) => person.name).join('、') + '被惊动' : '街道上没有人回应'}。`);
+      log(state, `【环境事件 · 兰普金巷 · 汽车警报】车库里的警报器突然尖叫，${affected.length ? affected.map((person) => person.name).join('、') + '被惊动' : '街道上没有人回应'}。`);
     }
     return;
   }
