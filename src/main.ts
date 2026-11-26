@@ -59,7 +59,7 @@ import { renderAdmin } from './ui/admin';
 import { mountFloorplanScene, type SceneHandle } from './ui/scene';
 import { playSfx, playSfxRepeat, setMusic, toggleMute, unlockAudio } from './ui/audio';
 import type { SfxName } from './ui/audio';
-import { rollMenuMap } from './ui/mapArt';
+import { currentMenuMap, rollMenuMap } from './ui/mapArt';
 
 type Screen = 'menu' | 'game' | 'result';
 
@@ -288,7 +288,7 @@ function afterAction(): void {
 
 function startGame(): void {
   selectedPersonId = null;
-  game = createGame(save.deck, undefined, save.killer ?? '迈克尔·迈尔斯');
+  game = createGame(save.deck, undefined, save.killer ?? '迈克尔·迈尔斯', currentMenuMap().id);
   screen = 'game';
   lastKills = game.kills;
   lastWanted = game.wanted;
