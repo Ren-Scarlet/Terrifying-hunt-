@@ -3222,7 +3222,7 @@ button, .room-hit, .hand-row { touch-action: manipulation; }
     width: 100%;
     min-width: 0;
   }
-  #app .hunt-layout > .intel-log-panel {
+  #app .hunt-layout > .main-column > .intel-log-panel {
     grid-column: 1 !important;
     grid-row: 2 !important;
     position: static !important;
@@ -3277,7 +3277,7 @@ button, .room-hit, .hand-row { touch-action: manipulation; }
   #app .layout.hunt-layout { display: flex !important; flex-direction: column; gap: 12px; }
   #app .hunt-layout > .main-column { display: flex !important; flex-direction: column; order: 0; width: 100%; }
   #app .hunt-layout > .main-column > .map-panel { order: 0; width: 100%; }
-  #app .hunt-layout > .intel-log-panel { order: 1; position: static; width: 100%; max-height: 260px; }
+  #app .hunt-layout > .main-column > .intel-log-panel { order: 1; position: static; width: 100%; max-height: 260px; }
   #app .hunt-layout > .main-column > .bottom-dock { order: 2; width: 100%; }
   #app .hunt-sidebar-left { order: 3; width: 100%; max-height: none; overflow: visible; }
   #app .hunt-sidebar-right { order: 4; width: 100%; max-height: none; overflow: visible; }
