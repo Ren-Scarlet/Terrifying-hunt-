@@ -1211,6 +1211,12 @@ function caseWitnessFearAndUnifiedSabotage(): void {
   carryWitness.alert = 0;
   carryWitness.awareness = 0;
   carryWitness.intent = 'idle';
+  // 固定目击者原型，避免随机的二次呼喊让门口 NPC 在玩家进入前就逃离。
+  carryWitness.archetype = 'hider';
+  carryWitness.item = null;
+  carryWitness.itemUses = 0;
+  doorwayWitness.item = null;
+  doorwayWitness.itemUses = 0;
   doorwayWitness.room = carryDestination;
   doorwayWitness.hidden = false;
   doorwayWitness.alert = 0;
