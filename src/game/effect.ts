@@ -64,7 +64,7 @@ import type { RoomId } from './types';
  *   pursue     追击：立刻贴到目标所在房间，不计步数
  *
  * —— 资源 ——
- *   draw / energy / steps / evidence / discount / bonusDamage / arrestThreshold
+ *   draw / energy / steps / discount / bonusDamage / arrestThreshold
  *   wanted / wantedHalf / stalk / silenceAlarm / stun
  *
  * —— 流程 ——
