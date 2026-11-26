@@ -126,7 +126,8 @@ function caseRoutineHuntOpportunities(): void {
   const second = recordRoutineObservation(s, person.room);
   check('日常习惯：跨回合观察两次后确认路线',
     second === 1 && person.routineObserved === true && person.routineSightings === 2);
-  s.people.filter((item) => item.id !== person.id).forEach((item) => { item.room = 'garage'; });
+  const otherRoom: RoomId = person.room === 'garage' ? 'attic' : 'garage';
+  s.people.filter((item) => item.id !== person.id).forEach((item) => { item.room = otherRoom; });
   person.alert = 0;
   person.hp = 4;
   person.hidden = false;
