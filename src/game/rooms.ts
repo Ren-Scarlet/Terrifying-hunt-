@@ -51,8 +51,21 @@ const OPTIONAL_BLUEPRINTS: Array<Pick<Room, 'id' | 'name' | 'desc'>> = [
   { id: 'observatory', name: '观测室', desc: '屋顶天窗正对着夜空，望远镜仍停在某个奇怪的方向。' },
 ];
 
+const ALL_ROOMS: Room[] = [...CORE_BLUEPRINTS, ...OPTIONAL_BLUEPRINTS].map((b) => ({
+  ...b,
+  x: 0,
+  y: 0,
+  rect: { left: 0, top: 0, width: 0, height: 0 },
+  size: 'medium',
+  neighbors: [],
+}));
+
+/** ROOMS 是本局实际出现的房间；ROOM_MAP 保留全部房间 ID，兼容仍引用旧局房间的状态。 */
 export const ROOMS: Room[] = [];
-export const ROOM_MAP: Record<RoomId, Room> = {} as Record<RoomId, Room>;
+export const ROOM_MAP: Record<RoomId, Room> = ALL_ROOMS.reduce(
+  (acc, room) => { acc[room.id] = room; return acc; },
+  {} as Record<RoomId, Room>,
+);
 
 export const ENTRY_ROOM: RoomId = 'hall';
 export const EXIT_ROOM: RoomId = 'garage';
@@ -236,12 +249,15 @@ export function buildLayout(style: LayoutStyle = 'wide'): string {
   // 每局保留全部核心房间，再随机抽取 0–10 间附加房间，形成 23–33 间的地图。
   const extraCount = Math.floor(random() * (OPTIONAL_BLUEPRINTS.length + 1));
   const activeBlueprints = [...CORE_BLUEPRINTS, ...shuffle(OPTIONAL_BLUEPRINTS).slice(0, extraCount)];
-  ROOMS.splice(0, ROOMS.length, ...activeBlueprints.map((b) => ({
-    ...b, x: 0, y: 0, rect: { left: 0, top: 0, width: 0, height: 0 },
-    size: 'medium' as const, neighbors: [] as RoomId[],
-  })));
-  for (const key of Object.keys(ROOM_MAP)) delete (ROOM_MAP as Partial<Record<RoomId, Room>>)[key as RoomId];
-  ROOMS.forEach((room) => { ROOM_MAP[room.id] = room; });
+  ROOMS.splice(0, ROOMS.length, ...activeBlueprints.map((blueprint) => ROOM_MAP[blueprint.id]));
+  // 先重置所有房间的几何与门网。未进入本局的房间仍保留稳定 ID，但不参与地图循环。
+  ALL_ROOMS.forEach((room) => {
+    room.x = 0;
+    room.y = 0;
+    room.rect = { left: 0, top: 0, width: 0, height: 0 };
+    room.size = 'medium';
+    room.neighbors = [];
+  });
 
   const regions: Region[] = [
     { left: 0, top: 0, width: GRID_COLS, height: GRID_ROWS },
