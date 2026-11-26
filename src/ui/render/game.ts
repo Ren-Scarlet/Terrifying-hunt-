@@ -676,7 +676,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
         <div class="mission-icon">${icon('missionTarget', 'ui-icon')}</div>
         <div class="mission-content">
           <div class="mission-title">${escape(m.title)}<em>${escape(ground.name)}</em><em>奖励 ${m.reward}</em></div>
-          <div class="mission-objective"><b>全部完成</b><div class="mission-task-list">${progress}</div></div>
+          <div class="mission-objective"><b>${m.mode === 'free' ? '自主挑战（不强制）' : '全部完成'}</b><div class="mission-task-list">${progress}</div></div>
           <div class="mission-rules">
             <span class="mission-ok">猎场规则：${escape(ground.ruleName)} · ${escape(ground.ruleDescription)}</span>
             <span class="mission-ok">✓ 成功：${escape(m.successText ?? '达成主目标')}</span>
@@ -776,7 +776,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
             ${trapCacheBtn}${trapRecoverBtn}${hatchetRefillBtn}
             <div class="power-row">${powerButtonHtml(state, killer)}</div>
             <button class="btn primary end-turn" data-action="end-turn" ${selectingDiscards ? 'disabled' : ''}>结束回合</button>
-            <button class="btn ghost" data-action="give-up">放弃任务</button>
+            <button class="btn ghost" data-action="${m.mode === 'free' ? 'finish-free-hunt' : 'give-up'}">${m.mode === 'free' ? '结束猎杀' : '放弃任务'}</button>
           </div>
           <div class="hand-count">手牌 ${state.hand.length}/${HAND_LIMIT}</div>
           <div class="hand-row">${hand || '<div style="color:var(--muted);font-size:13px">手牌已空，可花行动点主动抽牌。</div>'}</div>
