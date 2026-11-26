@@ -1945,7 +1945,7 @@ export function updateNpcDialogue(state: GameState): void {
   const injured = ['好痛……谁来帮帮我。', '我流血了……', '别把我一个人留在这里。'];
   for (const person of npcs(state)) {
     const stage = awarenessStage(person.alert);
-    person.awareness = stage;
+    // awareness 记录已确认的危险知识；对白只读取当前 alert 分档，不得反向清空记忆。
     if (person.hp <= 0) {
       person.dialogue = randomOf(['……', '救……命……', '我动不了了……']);
     } else if ((person.intent === 'flee' || person.intent === 'escape') && stage >= 2) {
