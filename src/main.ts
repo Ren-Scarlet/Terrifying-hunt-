@@ -1,8 +1,11 @@
 import './style.css';
+import './ui/immersive.css';
+import { handleImmersiveAction, installImmersiveKeys, syncImmersiveCamera } from './ui/immersive';
 import { CARD_MAP, deckCardsForKiller, STARTING_DECK } from './game/cards';
 import {
   attack,
   carryPerson,
+  dropCarriedPerson,
   blinkPlayer,
   collectTrapCache,
   nurseGrabPerson,
@@ -185,6 +188,9 @@ function render(): void {
   }
   if (guideOpen) html += renderGuide();
   app.innerHTML = html;
+  const immersiveActive = Boolean(game && screen === 'game');
+  app.classList.toggle('immersive-game', immersiveActive);
+  document.body.classList.toggle('immersive-hunt', immersiveActive);
   applyDisplaySettings();
   detailCardUid = null;
   if (game && screen === 'game' && selectedPersonId) {
@@ -194,6 +200,7 @@ function render(): void {
     selectedPersonId = null;
   }
   syncScene();
+  if (immersiveActive) syncImmersiveCamera(app);
 }
 
 /** 把场景画布挂到新的平面图节点上；离开对局时销毁 */
@@ -343,6 +350,7 @@ app.addEventListener('click', (event) => {
   const target = (event.target as HTMLElement).closest<HTMLElement>('[data-action]');
   if (!target) return;
   const action = target.dataset.action;
+  if (handleImmersiveAction(action)) return;
   // 浏览器要求先有用户交互才允许出声
   unlockAudio();
 
@@ -681,6 +689,13 @@ app.addEventListener('click', (event) => {
     return;
   }
 
+  if (action === 'drop-carried') {
+    if (!game || screen !== 'game') return;
+    if (dropCarriedPerson(game)) playSfx('click');
+    afterAction();
+    return;
+  }
+
   if (action === 'carry') {
     if (!game || screen !== 'game') return;
     const personId = target.dataset.personId;
@@ -956,4 +971,5 @@ app.addEventListener('focusout', (event) => {
   showCardDetail(null);
 });
 
+installImmersiveKeys();
 render();
