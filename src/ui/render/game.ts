@@ -52,7 +52,7 @@ import {
 import { roomDistance } from '../../game/navigation';
 import { executionMethodsAtRoom } from '../../game/executions';
 import { getHuntingGround } from '../../game/maps';
-import { KILLERS, type KillerProfile } from '../../game/killers';
+import { KILLERS, KILLER_MAP, type KillerProfile } from '../../game/killers';
 import { roomName } from '../../game/missions';
 import {
   CABINET_ROOMS,
@@ -75,6 +75,7 @@ import { escape, icon, itemBadge, itemIconHtml, personChip, intentDot, shadowFig
 import type { GameState, Person, RoomId, SaveData } from '../../game/types';
 
 let lastRenderedTrapTriggerCount: number | null = null;
+let lastRedFigureSignature = '';
 
 function roomFeatures(state: GameState, roomId: RoomId): string {
   const parts: string[] = [];
@@ -166,7 +167,7 @@ function doorMarkersHtml(state: GameState): string {
 
 /** 把最近发生的关键行动投射到地图上；完整记录仍保留在情报抽屉。 */
 function mapEventFeedHtml(state: GameState): string {
-  const important = /没能再起来|停止了呼吸|处决了|处决成功|砸毁了|砸烂了|你砸了|立即断电|电话线被剪断|封锁了|陷阱触发|报警成功|逃出了房子|翻出了后院|被警察逮捕|【环境事件】|雷雨|电话突然响起|玻璃碎裂声|灯光突然闪烁/;
+  const important = /没能再起来|停止了呼吸|处决了|特殊处决|砸毁了|砸烂了|你砸了|立即断电|电话线被剪断|封锁了|踩中捕兽夹|报警成功|成功逃离|已抵达逃生点|警报升高！猎场出现逃生点|被警察逮捕|被同伴救起|【环境事件】|雷雨|电话突然响起|玻璃碎裂声|灯光突然闪烁/;
   const recent = state.log.filter((line) => {
     const match = line.match(/^\[第 (\d+) 回合\]/);
     const turn = match ? Number(match[1]) : state.turn;
@@ -331,12 +332,24 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
   const ground = getHuntingGround(state.mapId);
   const here = state.people.filter((p) => p.room === state.playerRoom && p.role !== 'police');
   const policeHere = state.people.some((p) => p.room === state.playerRoom && p.role === 'police');
-  if (here.some((p) => p.hp > 0 && !p.hidden)) playHeartbeat();
+  const redFigures = state.people.filter((person) => {
+    if (person.role === 'police' || person.hp <= 0 || person.hidden || isRoomVisible(state, person.room)) return false;
+    const aura = state.revealAuraActions > 0 && (person.room === state.playerRoom || ROOM_MAP[state.playerRoom].neighbors.includes(person.room));
+    return isSensing(state) || aura || (person.revealedActions ?? 0) > 0;
+  });
+  const redSignature = redFigures.map((person) => person.id).sort().join('|');
+  if (redSignature && redSignature !== lastRedFigureSignature) playHeartbeat();
+  lastRedFigureSignature = redSignature;
   const isMyers = killer.owner === '迈克尔·迈尔斯';
-  if (lastRenderedTrapTriggerCount === null || state.trapTriggerCount < lastRenderedTrapTriggerCount) {
+  if (state.turn === 1 && state.trailClock === 0) {
     lastRenderedTrapTriggerCount = state.trapTriggerCount;
+    lastRedFigureSignature = '';
+  } else if (lastRenderedTrapTriggerCount === null || state.trapTriggerCount < lastRenderedTrapTriggerCount) {
+    lastRenderedTrapTriggerCount = state.trapTriggerCount;
+    lastRedFigureSignature = '';
   } else if (state.trapTriggerCount > lastRenderedTrapTriggerCount) {
     playTrapScream();
+    playHeartbeat();
     lastRenderedTrapTriggerCount = state.trapTriggerCount;
   }
 
@@ -354,7 +367,9 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
     const targetNames = task.kind === 'marked_kill'
       ? `<small class="mission-target-names">${markedTargetNames.length ? `指定目标：${markedTargetNames.map(escape).join('、')}` : `已击杀指定目标 ${state.markedKilled} 人`}</small>`
       : '';
-    return `<span class="mission-task ${done ? 'done' : failed ? 'failed' : ''} ${task.optional ? 'optional' : 'required'}"><b>${done ? '✓' : failed ? '✕' : '○'}</b> ${escape(task.label)} <em>${task.kind === 'no_alarm' ? (failed ? '已报警' : '保持中') : `${Math.min(value, task.target)}/${task.target}`}</em>${targetNames}</span>`;
+    const progressText = task.kind === 'alarm_below' ? `警报 ${state.alarm} / ≤${task.limit ?? 35}` : task.kind === 'no_alarm' ? (failed ? '已报警' : '保持中') : `${Math.min(value, task.target)}/${task.target}`;
+    const rewardText = task.optional && (task.reward ?? 0) > 0 ? `<small class="mission-task-reward">+ ${task.reward} 分</small>` : '';
+    return `<span class="mission-task ${done ? 'done' : failed ? 'failed' : ''} ${task.optional ? 'optional' : 'required'}"><b>${done ? '✓' : failed ? '✕' : '○'}</b> ${escape(task.label)} <em>${progressText}</em>${rewardText}${targetNames}</span>`;
   }).join('');
 
   const rooms = ROOMS.map((room) => {
@@ -530,8 +545,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
     statusBits.push('<span class="status-badge blind">致盲 / 被击晕：动作被打断，下一回合少 1 点行动点</span>');
   if (state.nightfallActive)
     statusBits.push('<span class="status-badge nightfall">夜幕监视中 · 相邻房间的目标正在显形</span>');
-  if (state.chaseTurns >= 2)
-    statusBits.push(`<span class="status-badge chase">死追同一人 ${state.chaseTurns} 回合 · 其他幸存者效率 +${Math.round(Math.min(1, state.chaseTurns * 0.25) * 100)}%</span>`);
+  // 长时间追踪单一目标不再增加其他幸存者团队效率，该机制已由警报系统取代。
   state.people
     .filter((p) => p.role !== 'police' && p.hp <= 0)
     .forEach((p) => {
@@ -689,7 +703,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
         <div class="mission-icon">${icon('missionTarget', 'ui-icon')}</div>
         <div class="mission-content">
           <div class="mission-title">${escape(m.title)}<em>${escape(ground.name)}</em><em>奖励 ${m.reward}</em></div>
-          <div class="mission-objective"><b>${m.mode === 'free' ? '自主挑战（不强制）' : '核心目标必做 · 额外挑战加分'}</b><div class="mission-task-list">${progress}</div></div>
+          <div class="mission-objective"><b>${m.mode === 'free' ? '自主挑战（不强制）' : state.missionPrimaryCompleted ? '主目标已完成 · 可继续完成额外挑战' : '主目标必做 · 额外挑战自由选择'}</b><div class="mission-task-list">${progress}</div></div>
           <div class="mission-rules">
             <span class="mission-ok">猎场规则：${escape(ground.ruleName)} · ${escape(ground.ruleDescription)}</span>
             <span class="mission-ok">✓ 成功：${escape(m.successText ?? '达成主目标')}</span>
@@ -756,7 +770,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
               <small>警报值</small>
             </div>
             <div class="stat"><b>${state.kills}</b><small>击杀</small></div>
-            <div class="stat ${state.escaped > 0 ? 'escaped' : ''}" title="每逃走一人结算扣 15 分；幸存者全跑光契约作废"><b>${state.escaped}</b><small>逃走</small></div>
+            <div class="stat survivor-count" title="当前存活、逃走、被杀和倒地人数；倒地者仍有机会被同伴救起。"><b>${state.people.filter((p) => p.role !== 'police' && p.hp > 0).length}/${state.survivorTotal}</b><small>存活 · 逃 ${state.escaped} · 杀 ${Math.max(0, state.survivorTotal - state.escaped - state.people.filter((p) => p.role !== 'police').length)}${state.people.filter((p) => p.role !== 'police' && p.hp <= 0).length ? ` · 倒地 ${state.people.filter((p) => p.role !== 'police' && p.hp <= 0).length}` : ''}</small></div>
             <div class="stat frenzy ${state.frenzy >= FRENZY_THRESHOLD ? 'active' : ''}" title="杀戮：严格踩着脚印连续追才涨；满 ${FRENZY_THRESHOLD} 后每回合多 ${FRENZY_AP_BONUS} 点行动点，路自己走。砍中人或被击晕清零。">
               <b>${state.frenzy}<i>/${FRENZY_MAX}</i></b>
               <div class="alarm-track"><span style="width:${state.frenzy}%"></span></div>
@@ -779,8 +793,9 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
             ${sabotageBtn}${specialExecution}
             ${trapCacheBtn}${trapRecoverBtn}${hatchetRefillBtn}
             <div class="power-row">${powerButtonHtml(state, killer)}</div>
+            <button class="btn search wait-action" data-action="wait" ${selectingDiscards || state.energy < 1 ? 'disabled' : ''} title="消耗 1 点行动点；幸存者各自行动一次，你继续观察当前房间与刚离开的房间。">等待 · 1 AP</button>
             <button class="btn primary end-turn" data-action="end-turn" ${selectingDiscards ? 'disabled' : ''}>结束回合</button>
-            <button class="btn ghost" data-action="${m.mode === 'free' ? 'finish-free-hunt' : 'give-up'}">${m.mode === 'free' ? '结束猎杀' : '放弃任务'}</button>
+            <button class="btn ghost" data-action="${m.mode === 'free' ? 'finish-free-hunt' : objectiveDone ? 'finish-contract' : 'give-up'}">${m.mode === 'free' ? '结束猎杀' : objectiveDone ? '完成主目标 · 结算' : '放弃任务'}</button>
           </div>
           <div class="hand-count">手牌 ${state.hand.length}/${HAND_LIMIT}</div>
           <div class="hand-row">${hand || '<div style="color:var(--muted);font-size:13px">手牌已空，可花行动点主动抽牌。</div>'}</div>
@@ -817,9 +832,17 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
 
 /** newCard：本局新解锁的卡牌 id（已解锁过的不会再重复提示）。 */
 export function renderResult(state: GameState, newCard: string | null): string {
+  const supernatural = KILLER_MAP[state.killer]?.school === 'supernatural';
   const labels: Record<string, string> = {
-    win: '任务完成', caught: '被警察抓捕', timeout: '任务超时', failed: '任务失败',
+    win: '猎杀结束', caught: supernatural ? '力量被封印' : '被警察抓捕', timeout: '猎场终止', failed: '猎杀失败',
   };
+  const ending = state.result === 'win'
+    ? '目标已经倒下，猎场终于安静下来。你可以回顾这场猎杀，看看哪些行动让结局走向了这里。'
+    : state.result === 'caught'
+      ? (supernatural ? '猎场中的力量被某种更强大的力量压制，恶意暂时退回黑暗。' : '警笛声越来越近，退路被封锁。你最终没能逃出警方的包围。')
+      : state.result === 'timeout'
+        ? (supernatural ? '天光刺破雾幕，恶灵失去依附之所，猎杀被迫终止。' : '天亮了，警队封锁整条街。你不得不放弃这场猎杀。')
+        : (supernatural ? '猎场的诅咒反噬了你，黑暗不再听从召唤。' : '猎场局势失控，目标逃离或行动失败，你没能完成这场猎杀。');
   const stars = getStars(state.score);
   const win = state.result === 'win';
   const rank = win ? (state.score >= 260 ? 'S' : state.score >= 190 ? 'A' : 'B') : '—';
@@ -841,6 +864,7 @@ export function renderResult(state: GameState, newCard: string | null): string {
         <div class="subtitle">CONTRACT REPORT</div>
         <h1>${labels[state.result ?? 'failed']}</h1>
         ${state.resultReason ? `<p class="result-reason">${escape(state.resultReason)}</p>` : ''}
+        <p class="result-epilogue">${escape(ending)}</p>
         <div class="result-rank"><small>本局评级</small><b>${rank}</b></div>
         <div class="result-stars">${'★'.repeat(stars)}${'☆'.repeat(3 - stars)}</div>
         <div class="result-objective ${win ? 'done' : ''}">
@@ -863,6 +887,7 @@ export function renderResult(state: GameState, newCard: string | null): string {
           ${state.huntStyleBonus ? `<p class="hunt-style-reward">风格奖励 · 额外血点 +${state.huntStyleBonus}</p>` : '<p class="hunt-style-reward muted">本局未获得额外风格血点；尝试利用目标习惯、环境或杀手专属能力提升评级。</p>'}
         </section>
         <div class="score-breakdown">${breakdown}</div>
+        <details class="result-log"><summary>本局日志 · ${state.log.length} 条记录</summary><div class="result-log-list">${[...state.log].reverse().map((line) => `<div>${escape(line)}</div>`).join('')}</div></details>
         ${newCard ? `<p style="color:var(--gold)">新卡牌解锁：<b>${escape(CARD_MAP[newCard]?.name ?? newCard)}</b></p>` : ''}
         ${earned ? `<p style="color:var(--gold)">${icon('bloodPoint', 'ui-icon tiny')} 获得血点：<b>+${earned}</b>${state.huntStyleBonus ? `（含风格奖励 +${state.huntStyleBonus}）` : ''}</p>` : ''}
         ${darkCells ? `<p style="color:var(--gold)">${icon('darkCell', 'ui-icon tiny')} 获得暗金细胞：<b>+${darkCells}</b></p>` : ''}

@@ -62,7 +62,7 @@ import {
 } from './ui/render';
 import { renderAdmin } from './ui/admin';
 import { mountFloorplanScene, type SceneHandle } from './ui/scene';
-import { playSfx, playSfxRepeat, setMusic, toggleMute, unlockAudio } from './ui/audio';
+import { playSfx, setMusic, toggleMute, unlockAudio } from './ui/audio';
 import type { SfxName } from './ui/audio';
 import { currentMenuMap, rollMenuMap } from './ui/mapArt';
 

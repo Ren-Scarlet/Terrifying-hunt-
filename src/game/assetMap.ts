@@ -47,6 +47,12 @@ export const ASSET_PATHS: AssetPaths = {
     bearTrap: 'assets/ui/bear-trap.webp',
     obsession: 'assets/ui/IconHelp_obsession.webp',
     window: 'assets/ui/window.webp',
+    statusInjured: 'assets/ui/重伤.webp', statusBlind: 'assets/ui/障目.webp',
+    statusUndetectable: 'assets/ui/无法侦测.webp', statusBlocked: 'assets/ui/无法行动.webp',
+    statusDanger: 'assets/ui/危险.webp', statusDeepWound: 'assets/ui/深度伤口.webp',
+    statusBleed: 'assets/ui/流血.webp', statusOblivious: 'assets/ui/浑然不觉.webp',
+    statusIncurable: 'assets/ui/不治.webp', statusCursed: 'assets/ui/被诅咒.webp',
+    statusKill: 'assets/ui/杀戮.webp',
   },
 };
 
