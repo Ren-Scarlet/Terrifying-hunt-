@@ -381,7 +381,7 @@ export const CARDS: CardDef[] = [
     name: '失效开关',
     cost: 1,
     type: 'setup',
-    desc: '剪断电话线：本局再没有人能打电话报警，正在打电话的人会被打断。',
+    desc: '剪断电话线路：阻断电话报警与跨区域救援协调；附近幸存者仍能听见呼救，无线电若未被破坏仍可在有限范围内协调。正在打电话的人会被打断。',
     flavor: '沉默从一根线开始。',
     sourceSkill: "Dead Man's Switch",
     sourceText: '逃生者停止修理时封锁发电机。',
