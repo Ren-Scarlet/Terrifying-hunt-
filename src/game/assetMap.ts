@@ -14,7 +14,7 @@ export const ASSET_PATHS: AssetPaths = {
   /** 一卡一图标：文件的 basename 与卡牌 id 相同 */
   cards: Object.keys(CARD_MAP).reduce(
     (acc, id) => {
-      acc[id] = `assets/dbd/perks/${id}.png`;
+      acc[id] = id.startsWith('trapper_') ? `assets/dbd/perks/${id}.svg` : `assets/dbd/perks/${id}.png`;
       return acc;
     },
     {} as Record<string, string>,
