@@ -134,12 +134,31 @@ function roomFeatures(state: GameState, roomId: RoomId): string {
   }
   if (roomId === EXIT_ROOM) parts.push(`<span class="room-feature escape" title="撤离点：任务完成的撤离位置">${icon('escape', 'ui-icon tiny')}</span>`);
   if (state.escapeRooms.includes(roomId)) parts.push(`<span class="room-feature escape-npc" title="团队第4阶段开启的逃生点">${icon('escape', 'ui-icon tiny')}</span>`);
-  if (TOTEM_ROOMS.includes(roomId)) parts.push(`<span class="room-feature totem" title="图腾：在此结束回合，下回合 +1 行动点">${icon('totem', 'ui-icon tiny')}<b>图腾</b></span>`);
-  if (state.totems.includes(roomId)) parts.push(`<span class="room-feature totem cursed" title="厄咒图腾：支撑难逃一死；幸存者可能发现并破坏">${icon('totem', 'ui-icon tiny')}<b>厄咒</b></span>`);
+  if (TOTEM_ROOMS.includes(roomId)) {
+    if (state.totems.includes(roomId) && state.playerRoom === roomId && !state.totemInteractions.includes(roomId)) {
+      parts.push(`<div class="room-feature totem totem-interaction">${icon('totem', 'ui-icon tiny')}<b>图腾</b><button type="button" data-action="totem-draw" title="本局仅可从这座图腾领取一次奖励">抽 1 张牌</button><button type="button" data-action="totem-energy" title="本局仅可从这座图腾领取一次奖励">+1 行动点</button></div>`);
+    } else {
+      const label = state.totems.includes(roomId) ? (state.totemInteractions.includes(roomId) ? '已汲取' : '图腾') : '已熄灭';
+      parts.push(`<span class="room-feature totem ${state.totems.includes(roomId) ? 'cursed' : 'broken'}" title="${label}：幸存者可以拆除；杀手可从每座存续图腾领取一次奖励">${icon('totem', 'ui-icon tiny')}<b>${label}</b></span>`);
+    }
+  }
+  if (state.totems.includes(roomId) && !TOTEM_ROOMS.includes(roomId)) parts.push(`<span class="room-feature totem cursed" title="厄咒图腾：支撑难逃一死；幸存者可能发现并破坏">${icon('totem', 'ui-icon tiny')}<b>厄咒</b></span>`);
   if (state.trailRevealActions > 0 && visibleTrails(state).some((trail) => trail.room === roomId || trail.to === roomId)) parts.push('<span class="room-feature trail-highlight" title="猎鹿者显现的脚印路线">👣</span>');
   if (state.scourgeShrineRoom === roomId) parts.push('<span class="room-feature shrine" title="鬼魔神龛：等待有人踏入">☠<b>神龛</b></span>');
-  if (CABINET_ROOMS.includes(roomId) || (state.mapId === 'badham' && ['nursery', 'storage', 'guestroom'].includes(roomId))) parts.push(`<span class="room-feature cabinet" title="柜子：藏身者不会被引诱类卡牌锁定">${icon('cabinet', 'ui-icon tiny')}<b>柜子</b></span>`);
-  if (OBSTACLE_ROOMS.includes(roomId) && !cleared) parts.push(`<span class="room-feature obstacle" title="障碍：进入多花 1 点行动点；破门能力可以直接清掉">${icon('obstacle', 'ui-icon tiny')}<b>障碍</b></span>`);
+  if (CABINET_ROOMS.includes(roomId) || (state.mapId === 'badham' && ['nursery', 'storage', 'guestroom'].includes(roomId))) {
+    const cabinetHere = state.playerRoom === roomId;
+    const cabinetLabel = state.killer === '女猎手' ? '补给飞斧' : '搜索柜子';
+    parts.push(cabinetHere
+      ? `<button type="button" class="room-feature cabinet cabinet-action" data-action="cabinet-interact" title="${state.killer === '女猎手' ? '从柜子补充飞斧' : '打开柜子，检查是否藏有幸存者'}">${icon('cabinet', 'ui-icon tiny')}<b>${cabinetLabel}</b></button>`
+      : `<span class="room-feature cabinet" title="柜子：幸存者可以躲藏">${icon('cabinet', 'ui-icon tiny')}<b>柜子</b></span>`);
+  }
+  if (state.barricades.includes(roomId)) {
+    const canBreak = ROOM_MAP[state.playerRoom].neighbors.includes(roomId);
+    parts.push(canBreak
+      ? `<button type="button" class="room-feature pallet barricade-action" data-action="break-barricade" data-room="${roomId}" title="破坏木板需要 1 点行动点">${icon('obstacle', 'ui-icon tiny')}<b>破坏木板</b></button>`
+      : `<span class="room-feature pallet" title="木板已封住入口">${icon('obstacle', 'ui-icon tiny')}<b>木板封门</b></span>`);
+  }
+  if (OBSTACLE_ROOMS.includes(roomId) && !cleared) parts.push(`<span class="room-feature obstacle" title="木板障碍：进入时需要花费额外行动点">${icon('obstacle', 'ui-icon tiny')}<b>木板</b></span>`);
   return parts.join('');
 }
 
@@ -158,7 +177,7 @@ function doorMarkersHtml(state: GameState): string {
     const canPass = !!targetRoom && !locked && canMoveTo(state, targetRoom);
     const shortOnAp = adjacent && !locked && !canPass;
     const status = locked ? 'blocked' : barricaded ? 'barricaded' : canPass ? 'active' : shortOnAp ? 'low-ap' : 'open';
-    const title = locked ? '封锁的门' : barricaded ? '堵门：通行需要额外行动点' : canPass ? '当前可通行' : shortOnAp ? '门已打开，但行动点不足' : '可通行的门';
+    const title = locked ? '封锁的门' : barricaded ? '木板封门：点击破坏，追逐中强行冲门可能被砸晕' : canPass ? '当前可通行' : shortOnAp ? '门已打开，但行动点不足' : '可通行的门';
     return `<span class="map-door-marker ${position.orientation} ${status}" style="left:${position.left.toFixed(3)}%;top:${position.top.toFixed(3)}%" title="${title}" aria-hidden="true"><i></i></span>`;
   })).join('');
 }
@@ -445,7 +464,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
             : locked
               ? '<span class="room-tag lock">封锁 · 进不去</span>'
               : barricaded
-                ? `<span class="room-tag bar">堵门 · ${cost}点</span>`
+                ? '<span class="room-tag bar">木板封门</span>'
                 : obstacleOpen
                   ? `<span class="room-tag obstacle">障碍 · ${cost}点</span>`
                   : reachable
@@ -757,6 +776,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
           ${statusHtml}${carryStatus}${huntPlanHtml}
           ${facilityOverviewHtml(state)}
           ${state.lookingAround ? '<div class="look-prompt" role="status"><b>选择要查看的房间</b><span>地图上亮起边框的房间都与当前位置相邻。点击其中一个，消耗 1 点行动点查看。</span><button class="btn ghost mini" data-action="look-cancel">取消</button></div>' : ''}
+          ${state.auraTargeting ? '<div class="look-prompt aura-prompt" role="status"><b>恶灵低语 · 选择房间</b><span>点击地图任意房间，包括你当前所在的房间；也可以取消，不发动显形效果。</span><button class="btn ghost mini" data-action="aura-cancel">取消选择</button></div>' : ''}
           <div class="map-viewport">
             <div class="floorplan" style="--ar:${layoutAspectNum().toFixed(4)};aspect-ratio:${layoutAspect()}">
               ${rooms}
