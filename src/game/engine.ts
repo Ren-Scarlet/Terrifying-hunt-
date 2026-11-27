@@ -1660,7 +1660,8 @@ function actByArchetype(state: GameState, person: Person): void {
   // 拉扯型、反抗型与英勇型会在近距离追逐中放倒家具，给自己争取逃跑时间。
   const counterArchetype = person.archetype === 'defiant' || person.archetype === 'brave' || person.archetype === 'kiter';
   const inPursuit = (person.alert >= 40 || state.chaseTargetId === person.id) && roomDistance(person.room, state.playerRoom) <= 2;
-  if (!inPursuit && state.totems.length && (person.awareness >= 1 || person.alert >= 25) && random() < 0.16) {
+  const seeksTotemThisTurn = (person.id.charCodeAt(0) + state.turn + (person.routineIndex ?? 0)) % 6 === 0;
+  if (!inPursuit && state.totems.length && (person.awareness >= 1 || person.alert >= 25) && seeksTotemThisTurn) {
     const targetTotem = nearestOf(person.room, state.totems);
     if (targetTotem !== person.room) {
       const step = nextStepToward(state, person.room, targetTotem, [state.playerRoom]);
@@ -1931,7 +1932,7 @@ function npcTurn(state: GameState): void {
     if (state.result) return;
     if (!state.people.some((p) => p.id === person.id)) continue;
     const totemIndex = state.totems.indexOf(person.room);
-    if (totemIndex >= 0 && person.hp > 0 && (person.awareness >= 1 || person.alert >= 25) && random() < 0.65) {
+    if (totemIndex >= 0 && person.hp > 0 && (person.awareness >= 1 || person.alert >= 25) && (person.id.charCodeAt(0) + state.turn) % 2 === 0) {
       state.totems.splice(totemIndex, 1);
       log(state, `${person.name} 在${roomName(person.room)}发现并破坏了图腾。`);
     }
