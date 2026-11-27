@@ -979,15 +979,18 @@ function killPerson(state: GameState, person: Person): void {
   npcs(state).forEach((other) => {
     // 尸体不会让整栋房子瞬间获知消息；只有同屋或相邻房间的人先察觉。
     const discoveryRadius = state.mapId === 'lampkin' ? 2 : 1;
-    if (roomDistance(other.room, person.room) <= discoveryRadius) {
+    if (other.hp > 0 && !other.hidden && roomDistance(other.room, person.room) <= discoveryRadius) {
       const nearby = other.room === person.room;
       other.fear = clamp(other.fear + (nearby ? 38 : 18), 0, 100);
       other.alert = clamp(other.alert + (nearby ? 20 : 10), 0, 100);
       stirred += 1;
     }
   });
-  addAlarm(state, 6);
-  if (stirred > 0) log(state, '血腥味顺着地板缝散开，房子里的人开始不安地走动。');
+  // 没人闻到血腥味就不该抬警报：空屋里悄悄处决只留极少痕迹。
+  if (stirred > 0) {
+    addAlarm(state, 6);
+    log(state, '血腥味顺着地板缝散开，房子里的人开始不安地走动。');
+  }
 }
 
 /** 受到伤害：只能推进一档，倒地的人再挨一下才会死 */
@@ -1106,6 +1109,7 @@ export function executeCarriedPerson(state: GameState, methodId: ExecutionMethod
   state.carryDistance = 0;
   state.executions += 1;
   log(state, `特殊处决【${method.name}】：${method.flavor(name)}（额外奖励 +35 分）。`);
+  addAlarm(state, executionWitnessed(state, person) ? 6 : 2);
   killPerson(state, person);
   state.specialExecutionBonus += 35;
   if (!state.executionMethodsUsed.includes(method.id)) state.executionMethodsUsed.push(method.id);
@@ -1120,15 +1124,30 @@ function canExecuteNow(person: Person): boolean {
   return person.hp <= 0;
 }
 
+
+/**
+ * 处决是否被目击：同屋还活着的幸存者，或相邻房间里听得见动静的人。
+ * 没人的屋子里悄悄处决，不应该把警报拉满。
+ */
+function executionWitnessed(state: GameState, victim: Person): boolean {
+  return npcs(state).some((person) =>
+    person.id !== victim.id
+    && person.hp > 0
+    && !person.hidden
+    && (person.room === state.playerRoom || ROOM_MAP[state.playerRoom].neighbors.includes(person.room)),
+  );
+}
+
 function executePerson(state: GameState, person: Person): void {
   if (person.hp > 0) {
     log(state, `${person.name} 还站着，处决需要先把他打倒。`);
     return;
   }
-  addAlarm(state, 8);
+  const witnessed = executionWitnessed(state, person);
+  addAlarm(state, witnessed ? 8 : 1);
   state.executions += 1;
   if (person.role !== 'police') state.loot += LOOT_EXECUTION;
-  log(state, `你处决了 ${person.name}。`);
+  log(state, witnessed ? `你处决了 ${person.name}，屋里的人看见了这一幕。` : `你悄悄处决了 ${person.name}，没有惊动别人。`);
   killPerson(state, person);
 }
 
@@ -2074,6 +2093,24 @@ function resolveTrapEntries(state: GameState, before: Map<string, RoomId>): void
 }
 
 /** 回合结束时 NPC 的一轮行动 */
+
+/**
+ * 乌鸦：幸存者在有乌鸦的房间里做事，就会惊起一群乌鸦。
+ * 同一间屋两次行动内不重复报，蹲着走的人有机会不惊动它们。
+ */
+function crowAlertFor(state: GameState, person: Person): void {
+  if (person.hp <= 0 || person.role === 'police') return;
+  if (!(state.crows ?? []).includes(person.room)) return;
+  if (isQuietMove(state, person)) return;
+  state.crowAlerts ??= {};
+  const last = state.crowAlerts[person.room] ?? -99;
+  if (state.trailClock - last < 2) return;
+  state.crowAlerts[person.room] = state.trailClock;
+  state.disturbances.push({ room: person.room, turn: state.turn, clock: state.trailClock, label: '乌鸦被惊起' });
+  if (state.disturbances.length > 24) state.disturbances.splice(0, state.disturbances.length - 24);
+  log(state, `${roomName(person.room)}方向传来一阵乌鸦扑棱棱的振翅声——有人在那里动了。`);
+}
+
 function npcTurn(state: GameState): void {
   // 红色人影只保留到下一次 NPC 回合开始，给玩家足够时间确认陷阱命中。
   state.people.forEach((person) => { person.trapTriggered = false; });
@@ -2106,14 +2143,24 @@ function npcTurn(state: GameState): void {
         person.alert = clamp(person.alert + 5, 0, 100);
       }
     }
-    // 恐惧的环境来源：独处和黑暗会放大恐惧，结伴待在亮处才会回落。
+    // 恐惧：被追着的人越怕越慌；脱离接触、没人追的人会冷静下来。
     if (person.hp > 0 && person.role !== 'police') {
       const companions = peopleInRoom(state, person.room).filter((other) => other.id !== person.id && other.role !== 'police' && other.hp > 0).length;
       const lit = isRoomLit(state, person.room);
       if (companions === 0) person.fear = clamp(person.fear + 8, 0, 100);
       if (!lit) person.fear = clamp(person.fear + 6, 0, 100);
       if (companions > 0 && lit) person.fear = clamp(person.fear - 8, 0, 100);
+      // 安全时从恐慌里缓过来：离杀手远、没人追、警戒也不高的人不会永久满恐惧。
+      const nearby = person.room === state.playerRoom || ROOM_MAP[state.playerRoom].neighbors.includes(person.room);
+      const safe = !nearby && person.alert < 70 && person.trackedTurns <= 0 && person.blockedTurns <= 0 && !state.possessed;
+      if (safe && (person.statusEffects.cursed ?? 0) === 0) {
+        if (person.fear >= 85) person.fear = clamp(person.fear - 18, 0, 100);
+        else if (person.fear >= 60) person.fear = clamp(person.fear - 10, 0, 100);
+      }
     }
+
+    // 乌鸦：停在这间屋的人一动就会惊起它们
+    crowAlertFor(state, person);
     if ((person.statusEffects.deepWound ?? 0) > 0) person.bleed = Math.max(person.bleed, 1);
     // 即时警觉值可以下降，但已经确认的危险不会被忘记。
     person.awareness = Math.max(person.awareness, person.alert >= 75 ? 3 : person.alert >= 40 ? 2 : person.alert >= 12 ? 1 : 0);
@@ -3207,7 +3254,7 @@ export function executeScoreSpecial(state: GameState, targetId: string): boolean
   state.energy -= 1;
   state.scoreExecutions += 1;
   state.specialExecutionBonus += 25;
-  addAlarm(state, 8);
+  addAlarm(state, executionWitnessed(state, target) ? 8 : 1);
   state.executions += 1;
   log(state, '分数处决：你消耗 1 AP，发动独立处决动作，额外获得 25 分。');
   killPerson(state, target);
@@ -3812,9 +3859,10 @@ function sabotageTarget(state: GameState): { kind: 'door'; room: RoomId } | { ki
   const breaker = state.powerCircuits.some((c) => c.breakerRoom === state.playerRoom && !c.broken);
   const item = state.siteItems.some((i) => i.room === state.playerRoom && !i.broken && i.charges > 0);
   if (breaker || item) return { kind: 'facility' };
+  const lockedNeighbor = ROOM_MAP[state.playerRoom].neighbors.find((room) => isLocked(state, room));
+  if (lockedNeighbor) return { kind: 'door', room: lockedNeighbor };
   if (phoneWorks(state, state.playerRoom)) return { kind: 'phone', room: state.playerRoom };
   if (RADIO_ROOMS.includes(state.playerRoom) && !state.sabotage.includes('radio')) return { kind: 'radio' };
-  const lockedNeighbor = ROOM_MAP[state.playerRoom].neighbors.find((room) => isLocked(state, room));
   if (lockedNeighbor) return { kind: 'door', room: lockedNeighbor };
   return isLocked(state, state.playerRoom) ? { kind: 'door', room: state.playerRoom } : null;
 }

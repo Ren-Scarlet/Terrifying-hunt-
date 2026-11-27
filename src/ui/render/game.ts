@@ -97,7 +97,6 @@ function scoreGroupsHtml(lines: ScoreLine[]): string {
 }
 
 let lastRenderedTrapTriggerCount: number | null = null;
-let lastRedFigureSignature = '';
 let lastDiscoveryMissionId: string | null = null;
 const discoveredSurvivorIds = new Set<string>();
 function roomFeatures(state: GameState, roomId: RoomId): string {
@@ -171,7 +170,10 @@ function roomFeatures(state: GameState, roomId: RoomId): string {
       parts.push(`<span class="room-feature totem ${state.totems.includes(roomId) ? 'cursed' : 'broken'}" title="${label}：幸存者可以拆除；杀手可从每座存续图腾领取一次奖励">${icon('totem', 'ui-icon tiny')}<b>${label}</b></span>`);
     }
   }
-  if (state.totems.includes(roomId) && !TOTEM_ROOMS.includes(roomId)) parts.push(`<span class="room-feature totem cursed" title="厄咒图腾：支撑难逃一死；幸存者可能发现并破坏">${icon('totem', 'ui-icon tiny')}<b>厄咒</b></span>`);
+  if (state.totems.includes(roomId) && !TOTEM_ROOMS.includes(roomId)) {
+      const taken = state.totemInteractions.includes(roomId);
+      parts.push(`<span class="room-feature totem cursed" title="厄咒图腾：支撑难逃一死；幸存者可能发现并破坏">${icon('totem', 'ui-icon tiny')}<b>${taken ? '已汲取' : '图腾'}</b></span>`);
+    }
   if (state.trailRevealActions > 0 && visibleTrails(state).some((trail) => trail.room === roomId || trail.to === roomId)) parts.push('<span class="room-feature trail-highlight" title="猎鹿者显现的脚印路线">👣</span>');
   if (state.scourgeShrineRoom === roomId) parts.push('<span class="room-feature shrine" title="鬼魔神龛：等待有人踏入">☠<b>神龛</b></span>');
   if (CABINET_ROOMS.includes(roomId) || (state.mapId === 'badham' && ['nursery', 'storage', 'guestroom'].includes(roomId))) {
@@ -389,14 +391,12 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
   const ground = getHuntingGround(state.mapId);
   const here = state.people.filter((p) => p.room === state.playerRoom && p.role !== 'police');
   const policeHere = state.people.some((p) => p.room === state.playerRoom && p.role === 'police');
+  const auraActive = state.people.some((person) => person.role !== 'police' && person.hp > 0 && ((person.revealedActions ?? 0) > 0 || (state.revealAuraActions > 0 && (person.room === state.playerRoom || ROOM_MAP[state.playerRoom].neighbors.includes(person.room)))));
   const redFigures = state.people.filter((person) => {
     if (person.role === 'police' || person.hp <= 0 || person.hidden || isRoomVisible(state, person.room)) return false;
     const aura = state.revealAuraActions > 0 && (person.room === state.playerRoom || ROOM_MAP[state.playerRoom].neighbors.includes(person.room));
     return aura || (person.revealedActions ?? 0) > 0;
   });
-  const redSignature = redFigures.map((person) => person.id).sort().join('|');
-  if (redSignature && redSignature !== lastRedFigureSignature) playHeartbeat();
-  lastRedFigureSignature = redSignature;
   if (lastDiscoveryMissionId !== m.id) {
     lastDiscoveryMissionId = m.id;
     discoveredSurvivorIds.clear();
@@ -410,10 +410,8 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
   const isMyers = killer.owner === '迈克尔·迈尔斯';
   if (state.turn === 1 && state.trailClock === 0) {
     lastRenderedTrapTriggerCount = state.trapTriggerCount;
-    lastRedFigureSignature = '';
   } else if (lastRenderedTrapTriggerCount === null || state.trapTriggerCount < lastRenderedTrapTriggerCount) {
     lastRenderedTrapTriggerCount = state.trapTriggerCount;
-    lastRedFigureSignature = '';
   } else if (state.trapTriggerCount > lastRenderedTrapTriggerCount) {
     const trapGender = state.lastTrapTriggerId ? SURVIVOR_MAP[state.lastTrapTriggerId]?.gender ?? 'male' : 'male';
     playTrapScream(trapGender);
@@ -823,6 +821,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
           ${state.huntressAiming ? '<div class="look-prompt hatchet-prompt" role="status"><b>狩猎飞斧瞄准中</b><span>点击地图上可见的站立幸存者。飞斧只能命中当前房间或正前方直线房间内的目标；无法投出的原因会显示在现场反馈中。</span></div>' : ''}
           ${state.barricades.length ? `<div class="look-prompt barricade-prompt" role="status"><b>幸存者放下了木板</b><span>${state.barricades.map((room) => roomName(room)).join('、')}：地图上的橙色高亮标记就是被封住的入口。靠近该房间后点击「破坏木板 · 1 AP」即可通行。</span></div>` : ''}
           ${state.auraTargeting ? '<div class="look-prompt aura-prompt" role="status"><b>恶灵低语 · 选择房间</b><span>点击地图任意房间，包括你当前所在的房间；也可以取消，不发动显形效果。</span><button class="btn ghost mini" data-action="aura-cancel">取消选择</button></div>' : ''}
+          ${auraActive ? `<div class="aura-callout" role="status"><b>气场显形</b><span>地图上红色发光的人就是被显形的幸存者；气场按「行动次数」倒计时，走完就熄灭。</span></div>` : ''}
           <div class="map-viewport">
             <div class="floorplan" style="--ar:${layoutAspectNum().toFixed(4)};aspect-ratio:${layoutAspect()}">
               ${rooms}

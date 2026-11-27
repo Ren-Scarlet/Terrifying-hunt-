@@ -30,6 +30,30 @@ function log(state: GameState, message: string): void {
  * 电话位置每局随机：从非逃生、非后院的房间里抽 2 间。
  * 用固定种子之外的随机源，保证每局位置不同；太小的房间不放电话。
  */
+
+/**
+ * 乌鸦：每局随机停在 3 间屋里（避开电话房，避免线索叠在一起）。
+ * 幸存者在这间屋做任何动作都会惊起乌鸦，给玩家一个不带技能的动静提示。
+ */
+function pickCrowRooms(state: GameState, phones: RoomId[]): RoomId[] {
+  const pool = ROOMS
+    .filter((room) => room.id !== 'garden' && !phones.includes(room.id) && room.size !== 'small')
+    .map((room) => room.id);
+  const seedText = `crow|${state.mapId}|${state.mission.title}|${state.people.length}`;
+  let seed = 2166136261;
+  for (const ch of seedText) {
+    seed ^= ch.codePointAt(0) ?? 0;
+    seed = Math.imul(seed, 16777619) >>> 0;
+  }
+  const pick = createSeededRandom(seed);
+  const picked: RoomId[] = [];
+  const local = [...pool];
+  while (picked.length < 3 && local.length) {
+    picked.push(local.splice(Math.floor(pick() * local.length), 1)[0]);
+  }
+  return picked;
+}
+
 function pickPhoneRooms(state: GameState): RoomId[] {
   const candidates = ROOMS
     .filter((room) => room.id !== 'garden' && !ESCAPE_ROOMS.includes(room.id) && room.size !== 'small')
@@ -200,6 +224,8 @@ export function createGame(
     distressingActive: false,
     totems: [...TOTEM_ROOMS],
     phones: [],
+    crows: [],
+    crowAlerts: {},
     brokenPhones: [],
     totemInteractions: [],
     bonusEnergyNextTurn: 0,
@@ -291,6 +317,7 @@ export function createGame(
   log(state, `屋里有 ${items.length} 个道具箱；照明由各区域电闸独立控制。`);
   // 电话放在最后抽：不改变前面布局 / NPC / 物品的随机序列，避免影响既有对局与测试。
   state.phones = pickPhoneRooms(state);
+  state.crows = pickCrowRooms(state, state.phones);
   return state;
 }
 

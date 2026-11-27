@@ -2767,3 +2767,54 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
   0%, 100% { box-shadow: 0 0 0 rgba(255, 110, 70, 0); }
   50% { box-shadow: 0 0 10px rgba(255, 110, 70, .55); }
 }
+
+/* 倒地 / 受伤：用图标代替文字，状态行放宽一点，避免糊成一团 */
+#app.immersive-game .floorplan .room-people .person-chip .chip-state {
+  gap: 2px !important; min-width: 21px !important; height: 21px !important;
+  padding: 0 4px !important;
+}
+#app.immersive-game .floorplan .room-people .person-chip .chip-state .chip-state-icon {
+  display: block !important; width: 13px !important; height: 13px !important;
+  object-fit: contain !important; filter: drop-shadow(0 1px 2px #000);
+}
+#app.immersive-game .floorplan .room-people .person-chip .chip-state b {
+  font-size: 9px !important; line-height: 1 !important; font-weight: 700;
+}
+#app.immersive-game .floorplan .room-people .person-chip .person-status-row {
+  top: -16px !important; gap: 3px !important; max-width: 128px !important;
+}
+#app.immersive-game .floorplan .room-people .person-chip .person-status-icon {
+  width: 16px !important; height: 16px !important; flex: 0 0 16px !important;
+}
+
+/* 气场显形：黄色说明条，和普通提示区分开 */
+#app.immersive-game .aura-callout {
+  position: fixed; left: 50%; top: 96px; transform: translateX(-50%);
+  z-index: 34; display: flex; align-items: baseline; gap: 8px;
+  max-width: min(680px, 76vw); padding: 6px 12px;
+  border: 1px solid rgba(235, 200, 96, .75);
+  border-radius: 8px;
+  background: rgba(28, 24, 12, .92);
+  color: #ffe9a8;
+  font-size: 12px; line-height: 1.35;
+  box-shadow: 0 0 16px rgba(235, 200, 96, .22);
+  pointer-events: none;
+}
+#app.immersive-game .aura-callout b {
+  color: #ffd24a; font-size: 12px; letter-spacing: .04em; white-space: nowrap;
+}
+#app.immersive-game .aura-callout span { color: #f0dfae; }
+
+@media (max-width: 920px) and (pointer: coarse) {
+  #app.immersive-game.mobile-game-active .aura-callout {
+    top: calc(var(--mob-top, 121px) + 44px);
+    left: 6px; right: 6px; transform: none;
+    max-width: none; font-size: 10px; padding: 4px 8px;
+  }
+}
+
+/* 幸存者放下的木板：整块显示，不做半透明提示 */
+#app.immersive-game .floorplan .room-feature.pallet,
+#app.immersive-game .floorplan .room-feature.obstacle {
+  opacity: 1 !important;
+}

@@ -2610,6 +2610,46 @@ function caseHexPhonesAndAlarm(): void {
   check('警报：上限 100 并进入最终危机', alarm.alarm === 100 && alarm.emergencyActive, `alarm=${alarm.alarm}`);
   addAlarm(alarm, -999);
   check('警报：不会降到 0 以下', alarm.alarm === 0, `alarm=${alarm.alarm}`);
+
+  // 处决：屋里没别人时只涨一点点警报
+  const quiet = createGame(STARTING_DECK, undefined, '设陷者');
+  quiet.people.forEach((person) => {
+    if (person.role === 'police') return;
+    person.room = person.id === quiet.people[0].id ? quiet.playerRoom : 'attic';
+    person.hidden = true;
+    person.hp = 4;
+    person.alert = 0;
+  });
+  const victim = quiet.people.find((person) => person.role !== 'police')!;
+  victim.room = quiet.playerRoom;
+  victim.hp = 0;
+  victim.hidden = false;
+  const alarmBefore = quiet.alarm;
+  quiet.energy = 4;
+  executeDownedPerson(quiet, victim.id);
+  check('处决：屋里没有目击者时几乎不涨警报', quiet.alarm - alarmBefore <= 2, `delta=${quiet.alarm - alarmBefore}`);
+
+  // 恐惧：安全且已经恐慌的人会随时间冷静下来
+  const calm = createGame(STARTING_DECK, undefined, '设陷者');
+  const scared = calm.people.find((person) => person.role !== 'police')!;
+  scared.room = (Object.keys(ROOM_MAP) as RoomId[]).find((room) => room !== calm.playerRoom && !ROOM_MAP[calm.playerRoom].neighbors.includes(room))!;
+  scared.fear = 90;
+  scared.alert = 10;
+  scared.hp = 4;
+  endTurn(calm);
+  check('恐惧：安全时会从恐慌中回落', scared.fear < 90, `fear=${scared.fear}`);
+
+  // 乌鸦：停在有乌鸦房间的人一动就会惊起乌鸦
+  const crowGame = createGame(STARTING_DECK, undefined, '设陷者');
+  const bird = crowGame.people.find((person) => person.role !== 'police')!;
+  crowGame.crows = [bird.room];
+  crowGame.crowAlerts = {};
+  crowGame.log = [];
+  bird.sneaky = false;
+  endTurn(crowGame);
+  check('乌鸦：幸存者在乌鸦房间行动会发出动静',
+    crowGame.log.some((line) => line.includes('乌鸦')) || crowGame.disturbances.some((d) => d.label.includes('乌鸦')),
+    `crowRooms=${crowGame.crows.join(',')} log=${crowGame.log.slice(0, 2).join(' / ')}`);
 }
 
 caseHexPhonesAndAlarm();

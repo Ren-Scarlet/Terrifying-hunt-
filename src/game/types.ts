@@ -601,6 +601,10 @@ export interface GameState {
   hexNoedBonusGranted: boolean;
   distressingActive: boolean;
   totems: RoomId[];
+  /** 本局随机停着乌鸦的房间 */
+  crows: RoomId[];
+  /** 每间屋上次乌鸦被惊动的行动计数，用来做冷却 */
+  crowAlerts: Record<string, number>;
   /** 本局随机布置的电话所在房间 */
   phones: RoomId[];
   /** 已经被玩家砸坏的电话（按房间记） */

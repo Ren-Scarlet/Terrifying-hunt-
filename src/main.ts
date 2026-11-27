@@ -68,7 +68,7 @@ import {
 import { renderAdmin } from './ui/admin';
 import { initCloudAuth, loadCloudConfig } from './game/cloud';
 import { mountFloorplanScene, type SceneHandle } from './ui/scene';
-import { playSfx, playStep, playSurvivorHit, playSurvivorDeath, setMusic, toggleMute, unlockAudio } from './ui/audio';
+import { playHeartbeat, playSfx, playStep, playSurvivorHit, playSurvivorDeath, setMusic, toggleMute, unlockAudio } from './ui/audio';
 import type { SfxName } from './ui/audio';
 import { currentMenuMap, rollMenuMap } from './ui/mapArt';
 import { ActionRegistry, type ActionContext, type ActionTable } from './ui/actions';
@@ -665,6 +665,26 @@ function sfxFromLogs(): void {
 
 /** 本轮新发现的幸存者数量：用来决定「发现幸存者」提示音，并压掉同一拍的受惊尖叫。 */
 let freshSightings = 0;
+/** 上一次「气场显形」的幸存者签名与全局气场计数：心跳只在气场出现/刷新时响一次。 */
+let lastAuraSignature = '';
+let lastAuraActions = 0;
+
+/**
+ * 气场心跳：只有「新的人被显形」或「气场被重新施放」时才播放，
+ * 回合结束、普通重绘都不会再误响。
+ */
+function pulseAuraHeartbeat(): void {
+  if (!game) return;
+  const signature = game.people
+    .filter((person) => person.role !== 'police' && person.hp > 0 && (person.revealedActions ?? 0) > 0)
+    .map((person) => person.id)
+    .sort()
+    .join('|');
+  const refreshed = game.revealAuraActions > lastAuraActions;
+  if (signature && (signature !== lastAuraSignature || refreshed)) playHeartbeat();
+  lastAuraSignature = signature;
+  lastAuraActions = game.revealAuraActions;
+}
 /** 已经见过的幸存者：只在第一次看见时播放发现音效。 */
 let knownSurvivorIds = new Set<string>();
 
@@ -687,6 +707,7 @@ function announceNewSightings(): void {
 function afterAction(): void {
   pulseFeedback();
   announceNewSightings();
+  pulseAuraHeartbeat();
   sfxFromLogs();
   freshSightings = 0;
   if (game?.executionMethodsUsed.length) {
@@ -729,6 +750,8 @@ function startGame(freeHunt = false, loadout: string[] = []): void {
   playedDeathLogMessages.clear();
   knownSurvivorIds = new Set();
   freshSightings = 0;
+  lastAuraSignature = '';
+  lastAuraActions = 0;
   selectedPersonId = null;
   // 三段串起来，避免同时响糊成一团：装配完成 → 进入地图 → 游戏开始
   playSfx('ready');
