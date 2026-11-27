@@ -1681,8 +1681,8 @@ function actByArchetype(state: GameState, person: Person): void {
       person.movesThisTurn = Math.min(REACT_MOVE_CAP, person.movesThisTurn + 1);
       person.alert = Math.max(person.alert, alertBeforeEscape);
     }
-    person.activity = `放倒家具阻挡追击后逃离${roomName(blockedRoom)}`;
-    log(state, `${person.name} 趁你追近时猛地放倒家具堵住门口，转身逃向远处！`);
+    person.activity = `放下木板阻挡追击后逃离${roomName(blockedRoom)}`;
+    log(state, `${person.name} 趁你追近时猛地放下木板封住入口，转身逃向远处！`);
     return;
   }
   // 房间锁作用于整扇门，任何原型都不能从锁住的房间直接穿门离开。
@@ -2644,8 +2644,7 @@ export function effectiveCost(defId: string, state: GameState): number {
 
 /**
  * 移动到某房间要花几点行动点。
- * 堵门 +1；障碍房（储藏室/地下室）没撞开前也 +1——但**不再是进不去**，
- * 否则一个随机长在死角的障碍房会把整条支路变成永远走不到的死路。
+ * 普通障碍房（储藏室/地下室）没清除前多花 1 点；幸存者放下的木板则完全封门。
  */
 export function moveCost(state: GameState, room: RoomId): number {
   // 恶魔附身能直接撞开障碍物，不额外花行动点
