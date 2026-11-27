@@ -514,8 +514,6 @@ export interface GameState {
   hexNoedActive: boolean;
   hexNoedBonusGranted: boolean;
   distressingActive: boolean;
-  hexRuinActive: boolean;
-  hexRuinUsed: boolean;
   totems: RoomId[];
   /** 本局已经从哪些图腾领取过一次性互动奖励，防止反复刷取。 */
   totemInteractions: RoomId[];
