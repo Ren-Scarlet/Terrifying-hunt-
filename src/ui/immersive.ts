@@ -106,6 +106,56 @@ function stopCameraAnimation(): void {
   frame = 0;
 }
 
+/** 跟随视角时，把视野外已显形的幸存者转换成屏幕边缘方向提示。只在镜头停稳后读取布局。 */
+function updateAuraEdgeIndicators(): void {
+  if (!viewportElement || !mapElement) return;
+  let layer = viewportElement.querySelector<HTMLElement>('.aura-edge-layer');
+  if (!layer) {
+    layer = document.createElement('div');
+    layer.className = 'aura-edge-layer';
+    layer.setAttribute('aria-hidden', 'true');
+    viewportElement.appendChild(layer);
+  }
+  layer.replaceChildren();
+  if (!following || globalView || !root?.classList.contains('immersive-game')) return;
+  const viewport = viewportElement.getBoundingClientRect();
+  const centerX = viewport.left + viewport.width / 2;
+  const centerY = viewport.top + viewport.height / 2;
+  const inset = 26;
+  mapElement.querySelectorAll<HTMLElement>('.room[data-aura-count]').forEach((room) => {
+    const count = Number(room.dataset.auraCount ?? 0);
+    if (count <= 0) return;
+    const rect = room.getBoundingClientRect();
+    const targetX = rect.left + rect.width / 2;
+    const targetY = rect.top + rect.height / 2;
+    const dx = targetX - centerX;
+    const dy = targetY - centerY;
+    if (Math.abs(dx) <= viewport.width / 2 - inset && Math.abs(dy) <= viewport.height / 2 - inset) return;
+    if (rect.right > viewport.left + inset && rect.left < viewport.right - inset &&
+        rect.bottom > viewport.top + inset && rect.top < viewport.bottom - inset) return;
+    if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
+    const scale = Math.min(
+      (viewport.width / 2 - inset) / Math.max(1, Math.abs(dx)),
+      (viewport.height / 2 - inset) / Math.max(1, Math.abs(dy)),
+    );
+    const x = viewport.width / 2 + dx * scale;
+    const y = viewport.height / 2 + dy * scale;
+    const indicator = document.createElement('div');
+    indicator.className = 'aura-edge-indicator';
+    indicator.style.left = String(x) + 'px';
+    indicator.style.top = String(y) + 'px';
+    indicator.style.setProperty('--aura-angle', String(Math.atan2(dy, dx) * 180 / Math.PI) + 'deg');
+    indicator.title = '气场方向：视野外有 ' + count + ' 名幸存者';
+    const arrow = document.createElement('span');
+    arrow.className = 'aura-edge-arrow';
+    arrow.textContent = '➤';
+    const label = document.createElement('b');
+    label.textContent = count > 1 ? String(count) : '';
+    indicator.append(arrow, label);
+    layer?.appendChild(indicator);
+  });
+}
+
 function animateCamera(x: number, y: number, scale: number, duration = 360): void {
   stopCameraAnimation();
   if (!mapElement) return;
@@ -114,6 +164,7 @@ function animateCamera(x: number, y: number, scale: number, duration = 360): voi
   if (!hasCamera || duration <= 0) {
     setCameraTransform(x, y, scale);
     hasCamera = true;
+    updateAuraEdgeIndicators();
     return;
   }
   animationStart = performance.now();
@@ -129,7 +180,10 @@ function animateCamera(x: number, y: number, scale: number, duration = 360): voi
       animationFrom.zoom + (animationTo.zoom - animationFrom.zoom) * eased,
     );
     if (raw < 1) frame = window.requestAnimationFrame(tick);
-    else frame = 0;
+    else {
+      frame = 0;
+      updateAuraEdgeIndicators();
+    }
   };
   frame = window.requestAnimationFrame(tick);
 }
