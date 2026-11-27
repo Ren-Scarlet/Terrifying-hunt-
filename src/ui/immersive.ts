@@ -131,8 +131,6 @@ function updateAuraEdgeIndicators(): void {
     const dx = targetX - centerX;
     const dy = targetY - centerY;
     if (Math.abs(dx) <= viewport.width / 2 - inset && Math.abs(dy) <= viewport.height / 2 - inset) return;
-    if (rect.right > viewport.left + inset && rect.left < viewport.right - inset &&
-        rect.bottom > viewport.top + inset && rect.top < viewport.bottom - inset) return;
     if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
     const scale = Math.min(
       (viewport.width / 2 - inset) / Math.max(1, Math.abs(dx)),
