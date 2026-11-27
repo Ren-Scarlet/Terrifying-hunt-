@@ -1072,12 +1072,15 @@ app.addEventListener('click', (event) => {
     const personId = target.dataset.personId;
     const ghosts = captureAttackGhosts();
     const victimIsSurvivor = !!personId && game.people.some((person) => person.id === personId && person.role !== 'police');
+    const killsBefore = game.kills;
     if (personId && throwHuntressHatchet(game, personId)) {
       pendingMapAttackTarget = personId;
       pendingMapAttackGhost = ghosts.get(personId) ?? null;
       updateAttackGhostEscapeDirection(pendingMapAttackGhost, personId);
       playSfx('huntressAxe');
       if (victimIsSurvivor) playSurvivorHit(personId ? SURVIVOR_MAP[personId]?.gender ?? 'male' : 'male');
+      if (game.kills > killsBefore) playSurvivorDeath(SURVIVOR_MAP[personId]?.gender ?? 'male');
+      lastLogHead = game.log[0] ?? '';
     }
     afterAction();
     return;
@@ -1088,12 +1091,15 @@ app.addEventListener('click', (event) => {
     const personId = target.dataset.personId;
     const ghosts = captureAttackGhosts();
     const victimIsSurvivor = !!personId && game.people.some((person) => person.id === personId && person.role !== 'police');
+    const killsBefore = game.kills;
     if (personId && nurseGrabPerson(game, personId)) {
       pendingMapAttackTarget = personId;
       pendingMapAttackGhost = ghosts.get(personId) ?? null;
       updateAttackGhostEscapeDirection(pendingMapAttackGhost, personId);
       playSfx('nurseAttack');
       if (victimIsSurvivor) playSurvivorHit(personId ? SURVIVOR_MAP[personId]?.gender ?? 'male' : 'male');
+      if (game.kills > killsBefore) playSurvivorDeath(SURVIVOR_MAP[personId]?.gender ?? 'male');
+      lastLogHead = game.log[0] ?? '';
     }
     afterAction();
     return;
@@ -1148,7 +1154,7 @@ app.addEventListener('click', (event) => {
       if (pendingMapAttackTarget && survivorIdsBefore.has(pendingMapAttackTarget)) playSurvivorHit(SURVIVOR_MAP[pendingMapAttackTarget]?.gender ?? 'male');
     }
     playKillerAttackSound(game);
-    if (game.kills > kills) playSfx('kill');
+    if (game.kills > kills) playSurvivorDeath(SURVIVOR_MAP[game.lastAttackedId ?? '']?.gender ?? 'male');
     lastLogHead = game.log[0] ?? '';
     afterAction();
     return;
@@ -1243,10 +1249,16 @@ app.addEventListener('click', (event) => {
 
   if (action === 'play') {
     const ghosts = captureAttackGhosts();
+    const killsBefore = game.kills;
     const survivorIdsBefore = new Set(game.people.filter((person) => person.role !== 'police').map((person) => person.id));
     const oldLogs = new Set(game.log);
     const cardUid = target.dataset.uid;
     if (cardUid) playCard(game, cardUid);
+    if (game.kills > killsBefore) {
+      const deadId = [...survivorIdsBefore].find((id) => !game.people.some((person) => person.id === id));
+      if (deadId) playSurvivorDeath(SURVIVOR_MAP[deadId]?.gender ?? 'male');
+      lastLogHead = game.log[0] ?? '';
+    }
     const newLogs = game.log.filter((line) => !oldLogs.has(line));
     if (game.lastAttackedId && newLogs.some((line) => line.includes('你挥刀砍向') || line.includes('你俯身补上一刀'))) {
       pendingMapAttackTarget = game.lastAttackedId;
