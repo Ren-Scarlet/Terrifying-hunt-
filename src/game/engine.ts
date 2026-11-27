@@ -3024,6 +3024,7 @@ export function executeDownedPerson(state: GameState, targetId?: string): boolea
 
 export function scoreExecutionBlockReason(state: GameState, targetId: string): string {
   if (currentScore(state) < SCORE_EXECUTION_THRESHOLD) return '猎杀评分尚未达到 ' + SCORE_EXECUTION_THRESHOLD + ' 分，暂时无法发动分数处决。';
+  if (state.carryPersonId === targetId) return '目标已经被抱起；请将其搬运到地点处决区域。';
   return executeBlockReason(state, targetId);
 }
 
