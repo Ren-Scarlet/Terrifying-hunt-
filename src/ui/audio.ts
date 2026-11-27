@@ -166,9 +166,9 @@ export function playHeartbeat(): void {
 }
 
 /** 幸存者被命中时同时播放物理打击声与受伤叫喊，形成明确的双层反馈。 */
-export function playSurvivorHit(): void {
+export function playSurvivorHit(gender: 'female' | 'male'): void {
   playSfx('survivorImpact', 0.9);
-  playSfx(Math.random() < 0.5 ? 'voiceFHurt' : 'voiceMHurt', 0.76);
+  playSfx(gender === 'female' ? 'voiceFHurt' : 'voiceMHurt', 0.76);
 }
 
 /** 捕兽夹命中时播放幸存者尖叫；男女音轨随机选择，避免每次听起来完全相同。 */
