@@ -595,7 +595,6 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
     statusBits.push('<span class="status-badge blind">致盲 / 被击晕：动作被打断，下一回合少 1 点行动点</span>');
   if (state.nightfallActive)
     statusBits.push('<span class="status-badge nightfall">夜幕监视中 · 相邻房间的目标正在显形</span>');
-  // 长时间追踪单一目标不再增加其他幸存者团队效率，该机制已由警报系统取代。
   state.people
     .filter((p) => p.role !== 'police' && p.hp <= 0)
     .forEach((p) => {
