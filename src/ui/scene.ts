@@ -924,7 +924,7 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
     // appears to leave the killer, rather than starting underneath the portrait.
     const markerX = pr.x + pr.w / 2;
     const markerY = pr.y + pr.h / 2;
-    const torchOffset = Math.min(pr.w, pr.h) * 0.22;
+    const torchOffset = Math.min(pr.w, pr.h) * 0.06;
     const px = markerX + Math.cos(facing) * torchOffset;
     const py = markerY + Math.sin(facing) * torchOffset;
     const coneLen = Math.min(Math.max(w, h) * 0.19, Math.hypot(pr.w, pr.h) * 0.50);
@@ -949,8 +949,8 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
 
     // 1. 外围溢光：顺着光轴拉长成锥形，边缘整体模糊
     const spillGlow = cc.createLinearGradient(0, 0, coneLen, 0);
-    spillGlow.addColorStop(0, 'rgba(150,6,18,.13)');
-    spillGlow.addColorStop(0.5, 'rgba(120,3,14,.15)');
+    spillGlow.addColorStop(0, 'rgba(150,6,18,.20)');
+    spillGlow.addColorStop(0.5, 'rgba(120,3,14,.22)');
     spillGlow.addColorStop(1, 'rgba(90,0,10,0)');
     cc.fillStyle = spillGlow;
     cc.filter = `blur(${Math.max(6, coneLen * 0.06)}px)`;
@@ -963,10 +963,10 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
 
     // 2. 主光束：沿光轴线性衰减，两侧靠模糊过渡，没有硬边
     const beam = cc.createLinearGradient(0, 0, coneLen, 0);
-    beam.addColorStop(0, 'rgba(255,64,72,.34)');
-    beam.addColorStop(0.18, 'rgba(232,22,42,.44)');
-    beam.addColorStop(0.52, 'rgba(196,10,30,.36)');
-    beam.addColorStop(0.8, 'rgba(158,4,20,.18)');
+    beam.addColorStop(0, 'rgba(255,70,78,.52)');
+    beam.addColorStop(0.18, 'rgba(240,26,48,.62)');
+    beam.addColorStop(0.52, 'rgba(210,12,34,.50)');
+    beam.addColorStop(0.8, 'rgba(170,6,24,.28)');
     beam.addColorStop(1, 'rgba(120,0,10,0)');
     cc.fillStyle = beam;
     cc.filter = `blur(${Math.max(4, coneLen * 0.025)}px)`;
@@ -978,26 +978,26 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
     cc.fill();
 
     // 3. 光斑落点：光轴 70% 处的圆形高光，外围迅速淡出
-    const pool = cc.createRadialGradient(coneLen * 0.7, 0, coneLen * 0.01, coneLen * 0.7, 0, coneLen * 0.30);
-    pool.addColorStop(0, 'rgba(255,86,86,.40)');
-    pool.addColorStop(0.35, 'rgba(226,20,38,.26)');
-    pool.addColorStop(0.72, 'rgba(170,4,20,.10)');
+    const pool = cc.createRadialGradient(coneLen * 0.38, 0, coneLen * 0.01, coneLen * 0.38, 0, coneLen * 0.34);
+    pool.addColorStop(0, 'rgba(255,96,92,.62)');
+    pool.addColorStop(0.35, 'rgba(236,24,44,.44)');
+    pool.addColorStop(0.72, 'rgba(180,6,24,.18)');
     pool.addColorStop(1, 'rgba(130,0,14,0)');
     cc.fillStyle = pool;
     cc.filter = `blur(${Math.max(5, coneLen * 0.04)}px)`;
     cc.beginPath();
-    cc.ellipse(coneLen * 0.7, 0, coneLen * 0.26, coneLen * 0.20, 0, 0, Math.PI * 2);
+    cc.ellipse(coneLen * 0.38, 0, coneLen * 0.30, coneLen * 0.23, 0, 0, Math.PI * 2);
     cc.fill();
 
     // 4. 灯口溢光：贴身处很淡的一点红，不形成明显圆点
-    const emitter = cc.createRadialGradient(0, 0, 1, 0, 0, coneLen * 0.12);
-    emitter.addColorStop(0, 'rgba(255,90,90,.20)');
-    emitter.addColorStop(0.4, 'rgba(210,14,30,.11)');
+    const emitter = cc.createRadialGradient(0, 0, 1, 0, 0, coneLen * 0.18);
+    emitter.addColorStop(0, 'rgba(255,110,100,.46)');
+    emitter.addColorStop(0.4, 'rgba(224,18,36,.30)');
     emitter.addColorStop(1, 'rgba(150,0,16,0)');
     cc.fillStyle = emitter;
     cc.filter = `blur(${Math.max(4, coneLen * 0.03)}px)`;
     cc.beginPath();
-    cc.arc(0, 0, coneLen * 0.12, 0, Math.PI * 2);
+    cc.arc(0, 0, coneLen * 0.18, 0, Math.PI * 2);
     cc.fill();
     cc.filter = 'none';
     cc.globalAlpha = 1;
@@ -1085,14 +1085,14 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
     // 手电在地面形成深红光斑；以 screen 混合保留材质纹理，不绘制符号或光源图标。
     ctx.save();
     ctx.globalCompositeOperation = 'screen';
-    ctx.globalAlpha = 0.46;
+    ctx.globalAlpha = 0.62;
     ctx.drawImage(refs.coneCv, 0, 0, w, h);
     ctx.restore();
 
     // 空气中的微弱红色散射：只保留极淡的近光源雾化，不覆盖地面材质。
     ctx.save();
     ctx.globalCompositeOperation = 'screen';
-    ctx.globalAlpha = 0.18;
+    ctx.globalAlpha = 0.26;
     ctx.beginPath();
     ctx.rect(pr.x + 1, pr.y + 1, pr.w - 2, pr.h - 2);
     ctx.clip();
