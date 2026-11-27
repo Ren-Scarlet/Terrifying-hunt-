@@ -131,11 +131,11 @@ function roomFeatures(state: GameState, roomId: RoomId): string {
     const canExecuteHere = !!carried && carried.hp <= 0 && state.playerRoom === roomId;
     if (canExecuteHere || downedHere) {
       executionSites.forEach((method) => {
-        const hint = canExecuteHere ? method.description : '先抱起这里的倒地幸存者，再将其带到此处使用特殊处决。';
+        const hint = canExecuteHere ? method.description : '先抱起这里的倒地幸存者，再将其带到此处执行地点处决。';
         parts.push(`<button type="button" class="room-feature execution-site execution-action ${state.executionSiteHint === roomId ? 'nearest' : ''}" data-action="execute-special" data-method="${method.id}" ${canExecuteHere ? '' : 'disabled'} title="${escape(hint)}"><img class="execution-site-icon" src="${uiIcon('executionSite')}" alt="" aria-hidden="true" onerror="this.style.display='none'"><b>${escape(method.name)}</b></button>`);
       });
     } else {
-      parts.push(`<span class="room-feature execution-site ${state.executionSiteHint === roomId ? 'nearest' : ''}" title="特殊处决地点：${executionSites.map((method) => escape(method.name)).join(' / ')}"><img class="execution-site-icon" src="${uiIcon('executionSite')}" alt="" aria-hidden="true" onerror="this.style.display='none'"><b>处决点 ${executionSites.length}</b></span>`);
+      parts.push(`<span class="room-feature execution-site ${state.executionSiteHint === roomId ? 'nearest' : ''}" title="地点处决地点：${executionSites.map((method) => escape(method.name)).join(' / ')}"><img class="execution-site-icon" src="${uiIcon('executionSite')}" alt="" aria-hidden="true" onerror="this.style.display='none'"><b>处决点 ${executionSites.length}</b></span>`);
     }
   }
   if (roomId === EXIT_ROOM) parts.push(`<span class="room-feature escape" title="撤离点：任务完成的撤离位置">${icon('escape', 'ui-icon tiny')}</span>`);
@@ -629,10 +629,10 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
   if (state.carryPersonId) {
     const carriedPerson = state.people.find((person) => person.id === state.carryPersonId);
     const nearestSite = executionMethodsAtRoom(state.playerRoom);
-    guidanceTitle = nearestSite.length ? '选择一种特殊处决' : '把猎物运往特殊处决地点';
+    guidanceTitle = nearestSite.length ? '选择一种地点处决' : '把猎物运往地点处决区域';
     guidanceDetail = nearestSite.length
-      ? '你已经控制住倒地目标。选择当前场地的处决方式，完成一次有记录的特殊处决。'
-      : '可以把倒地目标搬到厨房、车库、工具间、浴室或洗衣房，尝试不同的特殊处决。';
+      ? '你已经控制住倒地目标。选择当前场地的处决方式，完成一次地点处决。'
+      : '可以把倒地目标搬到厨房、车库、工具间、浴室或洗衣房，选择该地点对应的处决方式。';
     if (carriedPerson) guidanceDetail += ` 当前搬运目标：${carriedPerson.name}。`;
   } else if (downedHereNow) {
     guidanceTitle = '猎物已经倒地';
