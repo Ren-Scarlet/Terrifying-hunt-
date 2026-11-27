@@ -638,8 +638,9 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
   const markedAlive = state.people.find((person) => person.marked && person.role !== 'police');
   const downedHereNow = here.find((person) => person.role !== 'police' && person.hp <= 0);
   const visibleOpportunity = getHuntOpportunities(state)[0];
-  let guidanceTitle = '开始侦查';
-  let guidanceDetail = '先查看相邻房间，寻找标记目标、脚印和异常动静。不要盲目巡房：每次移动都应服务于确认目标、接近目标或布置猎场。';
+  // 没有具体指引时不显示提示条：常驻的「开始侦查」属于噪音，已被移除。
+  let guidanceTitle = '';
+  let guidanceDetail = '';
   let guidanceRoom: RoomId | null = null;
   if (state.carryPersonId) {
     const carriedPerson = state.people.find((person) => person.id === state.carryPersonId);
@@ -676,11 +677,11 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
   const huntPlanHtml = `<div class="hunt-plan ${lethalWindow ? 'lethal-ready' : ''}">
     <div class="hunt-plan-heading"><b>本局猎杀指令</b><span>${huntPhase}</span></div>
     <div class="hunt-plan-focus"><small>契约目标</small><strong>${escape(m.objective ?? m.title)} · ${escape(huntFocus)}</strong></div>
-    <div class="hunt-plan-guidance">
+    ${guidanceTitle ? `<div class="hunt-plan-guidance">
       <b>${escape(guidanceTitle)}</b>
       <span>${escape(guidanceDetail)}</span>
       ${guidanceRoom ? `<em>行动地点：${escape(roomName(guidanceRoom))}</em>` : ''}
-    </div>
+    </div>` : ''}
     <div class="hunt-plan-prep"><small>猎场准备</small><span>${preparations.length ? preparations.map(escape).join(' · ') : '尚未准备。可根据目标习惯和地图设施，选择断电、切断通讯、布置陷阱或直接突袭。'}</span></div>
   </div>`;
 

@@ -286,6 +286,58 @@ export const CARDS: CardDef[] = [
     ops: [{ op: 'energy', amount: 1 }, { op: 'revealExecutionSite', turns: 3 }],
   },
 
+  /* ------------------------------------------------------------------ */
+  /* 商店卡池：需要用血点在卡牌商店购买解锁                              */
+  /* ------------------------------------------------------------------ */
+  {
+    id: 'bloodhound',
+    name: '血猎犬',
+    cost: 1,
+    type: 'skill',
+    desc: '受伤者的气味会自己找上门：所有已经受伤的人位置显形 2 回合。',
+    flavor: '血不会说谎。',
+    sourceSkill: 'Deerstalker',
+    unlocked: false,
+    pool: 'shop',
+    ops: [{ op: 'track', who: 'injuredAny', turns: 2 }],
+  },
+  {
+    id: 'terror_howl',
+    name: '惊惧嚎叫',
+    cost: 2,
+    type: 'tactic',
+    desc: '你发出一声不属于人的嚎叫：当前房间的幸存者恐惧 +35，并立刻朝远处逃开。',
+    flavor: '声音比刀先到。',
+    sourceSkill: 'Distressing',
+    unlocked: false,
+    pool: 'shop',
+    ops: [{ op: 'fearFlee', amount: 35 }],
+  },
+  {
+    id: 'scavenge',
+    name: '翻找',
+    cost: 1,
+    type: 'skill',
+    desc: '翻箱倒柜：抽 2 张牌，警报 +5。',
+    flavor: '总能翻出点能用的。',
+    sourceSkill: 'Bitter Murmur',
+    unlocked: false,
+    pool: 'shop',
+    ops: [{ op: 'draw', amount: 2 }, { op: 'alarm', amount: 5 }],
+  },
+  {
+    id: 'wreck',
+    name: '拆毁',
+    cost: 1,
+    type: 'setup',
+    desc: '免费破坏当前房间的一处设施。',
+    flavor: '这栋房子挡不住你。',
+    sourceSkill: 'Shattered Hope',
+    unlocked: false,
+    pool: 'shop',
+    ops: [{ op: 'destroyCurrentObject' }],
+  },
+
 ];
 
 export const CARD_MAP: Record<string, CardDef> = CARDS.reduce(
@@ -299,7 +351,10 @@ export const CARD_MAP: Record<string, CardDef> = CARDS.reduce(
 export const INITIAL_CARD_IDS = CARDS.filter((card) => card.pool === 'initial').map((card) => card.id);
 
 export function deckCardsForKiller(killer: string): CardDef[] {
-  return CARDS.filter((card) => card.pool === 'initial' || (card.pool === 'killer' && card.killerOnly === killer));
+  // 商店卡也进入构筑池：未购买时在牌组编辑器里显示为「未解锁 · 可在商店购买」。
+  return CARDS.filter(
+    (card) => card.pool === 'initial' || card.pool === 'shop' || (card.pool === 'killer' && card.killerOnly === killer),
+  );
 }
 
 export const STARTING_DECK: string[] = [

@@ -2307,6 +2307,14 @@ check('苦涩低语：出牌后会等待下一次人类死亡，再触发全场�
   check('加注：未达成时结算扣分', scoreLines(anteFail, 'timeout').some((line) => line.label.includes('加注未达成') && line.value < 0));
 }
 
+// 商店卡池：4 张需购买，不进初始牌组，但买后能进构筑
+{
+  const shopCards = CARDS.filter((card) => card.pool === 'shop');
+  check('商店卡池：4 张待解锁卡', shopCards.length === 4 && shopCards.every((card) => !card.unlocked), `count=${shopCards.length}`);
+  check('商店卡池：不进初始牌组', shopCards.every((card) => !STARTING_DECK.includes(card.id)));
+  check('商店卡池：进入构筑池（买后可用）', shopCards.every((card) => deckCardsForKiller('设陷者').some((poolCard) => poolCard.id === card.id)));
+}
+
 caseNewPerkSystem();
 });
 

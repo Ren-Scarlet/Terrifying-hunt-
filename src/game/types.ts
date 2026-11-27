@@ -78,7 +78,8 @@ export interface CardDef {
   /** 出牌前的条件检查：不满足时不消耗行动点、不弃牌 */
   precheck?: Precheck;
   /** initial = 通用初始卡；killer = 对应杀手专属卡；未标记的旧卡仅保留兼容。 */
-  pool?: 'initial' | 'killer';
+  /** initial = 初始解锁；killer = 杀手专属；shop = 商店购买后可用 */
+  pool?: 'initial' | 'killer' | 'shop';
   killerOnly?: string;
 }
 
