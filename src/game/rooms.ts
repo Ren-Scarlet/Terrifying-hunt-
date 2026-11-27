@@ -99,6 +99,7 @@ let GRID_ROWS = 12;
 const PAD = 1.8;
 const GAP = 0.72;
 const MIN_REGION_AREA = 4;
+const MAX_ROOM_ASPECT = 2.5;
 
 interface Region {
   left: number;
@@ -124,14 +125,38 @@ function regionArea(region: Region): number {
 
 function splitOptions(region: Region): SplitOption[] {
   const options: SplitOption[] = [];
-  if (region.width >= 2) {
-    const min = Math.max(1, Math.ceil(MIN_REGION_AREA / region.height));
-    const max = region.width - min;
+  const aspect = Math.max(region.width / region.height, region.height / region.width);
+
+  // 已经明显细长的区域，优先沿长轴均衡切开，逐步消除长廊形状。
+  // 最终房间长宽比控制在 2.5 以内，同时不改变房间数量与移动节点。
+  if (aspect > MAX_ROOM_ASPECT) {
+    if (region.width > region.height && region.width >= 4) {
+      const minChild = Math.max(2, Math.ceil(MIN_REGION_AREA / region.height));
+      const min = Math.max(minChild, Math.floor(region.width * 0.4));
+      const max = Math.min(region.width - minChild, Math.ceil(region.width * 0.6));
+      if (min <= max) options.push({ axis: 'vertical', min, max });
+    } else if (region.height > region.width && region.height >= 4) {
+      const minChild = Math.max(2, Math.ceil(MIN_REGION_AREA / region.width));
+      const min = Math.max(minChild, Math.floor(region.height * 0.4));
+      const max = Math.min(region.height - minChild, Math.ceil(region.height * 0.6));
+      if (min <= max) options.push({ axis: 'horizontal', min, max });
+    }
+    return options;
+  }
+
+  // 对正常比例区域，只允许切出仍满足最小面积、最小边长和长宽比的子区域。
+  if (region.width >= 4) {
+    const minChild = Math.max(2, Math.ceil(MIN_REGION_AREA / region.height), Math.ceil(region.height / MAX_ROOM_ASPECT));
+    const maxChild = Math.min(Math.floor(region.height * MAX_ROOM_ASPECT), region.width - minChild);
+    const min = Math.max(minChild, region.width - maxChild);
+    const max = Math.min(maxChild, region.width - minChild);
     if (min <= max) options.push({ axis: 'vertical', min, max });
   }
-  if (region.height >= 2) {
-    const min = Math.max(1, Math.ceil(MIN_REGION_AREA / region.width));
-    const max = region.height - min;
+  if (region.height >= 4) {
+    const minChild = Math.max(2, Math.ceil(MIN_REGION_AREA / region.width), Math.ceil(region.width / MAX_ROOM_ASPECT));
+    const maxChild = Math.min(Math.floor(region.width * MAX_ROOM_ASPECT), region.height - minChild);
+    const min = Math.max(minChild, region.height - maxChild);
+    const max = Math.min(maxChild, region.height - minChild);
     if (min <= max) options.push({ axis: 'horizontal', min, max });
   }
   return options;
