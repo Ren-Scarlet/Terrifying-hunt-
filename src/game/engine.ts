@@ -3261,11 +3261,11 @@ export function attack(state: GameState, targetId?: string, options: { costOverr
   // 卡牌联动：定位、控制、伏击都能转化成真正的猎杀优势，而不是只提供一段说明文字。
   const trackingCombo = target.role !== 'police' && target.trackedTurns > 0;
   const controlCombo = target.role !== 'police' && target.blockedTurns > 0;
-  // 基础挥刀 2 点：一刀受伤、两刀倒地，再补一次处决。
+  // 基础挥刀 1 点：健康 4 点、受伤 2 点，所以四刀倒地（第二刀进入受伤）。
   // 配件的「挥刀伤害」只在普通挥刀上生效，不放大厄咒/附身的一击倒地。
   const baseDamage = noedActive || (heavy && state.killer === '迈克尔·迈尔斯')
     ? SURVIVOR_MAX_HP
-    : Math.min(SURVIVOR_MAX_HP, 2 + modifierValue(state, 'attackDamage'));
+    : Math.min(SURVIVOR_MAX_HP, 1 + modifierValue(state, 'attackDamage'));
   const comboDamage = controlCombo && baseDamage < SURVIVOR_MAX_HP ? 1 : 0;
   if (noedActive && target.role !== 'police') {
     damagePerson(state, target, SURVIVOR_MAX_HP);

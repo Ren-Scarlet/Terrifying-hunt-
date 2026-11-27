@@ -73,13 +73,44 @@ npm install
 npm run dev
 ```
 
-常用检查：
+常用检查（`npm run check` 会串起类型检查、界面状态、规则回归与整局冒烟）：
 
 ```bash
 npm run typecheck
 npm run check
 npm run build
 ```
+
+### 手机端
+
+对局界面在 pointer: coarse 且宽度 ≤920px 时切换为独立布局（src/ui/mobile-shell.css + src/ui/mobile-layout.ts）：
+
+- 顶部固定：契约目标 + 回合/警报/击杀/存活/得分；
+- 中间固定窗口显示整张地图，镜头自动缩放到窗口内（不再跟随、不响应滚轮）；
+- 底部固定：杀手能力（含行动点）、操作按钮横滑、手牌横滑；
+- 情报、任务、活动日志改为底部抽屉/浮层；
+- --mob-top / --mob-bottom 由脚本按实测高度写入，地图窗口据此留白。
+
+竖屏是主要形态；横屏会压缩上下 HUD 把高度让给地图。
+
+### 界面层结构
+
+界面不再由一堆布尔量 + 一条 if 长链驱动，而是分成四块：
+
+| 文件 | 职责 |
+|---|---|
+| `src/ui/viewState.ts` | 唯一的界面状态：`screen` + 单个 `panel` 槽位 + 引导浮层。面板互斥由数据结构保证；迁移只有 `showMenu / showGame / showResult / openPanel / closePanel / setGuideOpen` 六个函数。 |
+| `src/ui/actions.ts` | 动作注册表 `ActionRegistry`：`data-action` → 处理器。`scope: 'game'` 表示只在对局且无面板时触发，分发器统一做校验。 |
+| `src/ui/menuActions.ts` | 大厅与面板动作：杀手、牌组、商店、配件装配、引导。 |
+| `src/ui/adminActions.ts` | 平衡面板与云端配置动作（含调参表单写回 `applyTuneChange`）。 |
+
+`src/main.ts` 只保留：存档/对局状态、渲染管线、对局动作表、全局事件监听。
+
+新增一个界面的步骤：
+
+1. 需要新面板时，在 `viewState.ts` 的 `Panel` 里加一项，并在 `render()` 里加一个分支；
+2. 在对应模块的动作表里加「动作名 → 处理器」，处理器只改状态并调用 `render()`；
+3. 界面测试在 `tests/ui.ts`，断言状态迁移，不需要浏览器。
 
 卡牌或配件改名 / 加新条目后，额外跑：
 

@@ -3,6 +3,14 @@
 // Animation is event-driven: no permanent RAF loop and no layout reads per frame.
 type CameraMode = 'center' | 'smooth';
 
+/** 手机端布局：地图窗口只有中间一条，镜头固定为「整张地图缩放到窗口内」。 */
+const MOBILE_LAYOUT_QUERY = '(max-width: 920px) and (pointer: coarse)';
+
+function isMobileLayout(): boolean {
+  return window.matchMedia(MOBILE_LAYOUT_QUERY).matches;
+}
+
+
 let root: HTMLElement | null = null;
 let mapElement: HTMLElement | null = null;
 let viewportElement: HTMLElement | null = null;
@@ -230,7 +238,12 @@ export function syncImmersiveCamera(nextRoot: HTMLElement): void {
   mapElement = root.querySelector<HTMLElement>('.floorplan');
   const marker = root.querySelector<HTMLElement>('.player-marker');
   if (!viewportElement || !mapElement || !marker) return;
-  if (wheelBoundViewport !== viewportElement) {
+  // 手机端没有鼠标滚轮，也不需要跟随镜头：固定为「整张地图缩放到窗口」。
+  if (isMobileLayout()) {
+    globalView = true;
+    following = false;
+  }
+  if (!isMobileLayout() && wheelBoundViewport !== viewportElement) {
     wheelBoundViewport = viewportElement;
     viewportElement.addEventListener('wheel', (event: WheelEvent) => {
       if (!root?.classList.contains('immersive-game')) return;
@@ -263,7 +276,7 @@ export function syncImmersiveCamera(nextRoot: HTMLElement): void {
   if (intel) intel.open = intelDrawerOpen;
   bindIntelPanelDrag();
   const intelPanel = root.querySelector<HTMLElement>('.hunt-sidebar-left');
-  if (intelPanel && intelPanelPosition) {
+  if (intelPanel && intelPanelPosition && !isMobileLayout()) {
     intelPanel.style.left = String(intelPanelPosition.left) + 'px';
     intelPanel.style.top = String(intelPanelPosition.top) + 'px';
     intelPanel.style.right = 'auto';

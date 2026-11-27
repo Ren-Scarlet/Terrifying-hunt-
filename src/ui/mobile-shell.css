@@ -1,78 +1,760 @@
-/* Independent touch UI shell. Only activated by the runtime mobile layout manager. */
-@media (max-width: 760px) and (pointer: coarse) {
-  html, body.immersive-hunt { height:100dvh; min-height:100dvh; width:100%; overflow:hidden; overscroll-behavior:none; }
-  #app.immersive-game.mobile-game-active { position:fixed; inset:0; width:100vw; height:100dvh; min-height:0; max-width:none; margin:0; padding:0; overflow:hidden; }
-  #app.immersive-game.mobile-game-active .mobile-game-shell { position:absolute; inset:0; display:grid; grid-template-rows:auto minmax(0,1fr) auto; gap:4px; padding:env(safe-area-inset-top,0px) 4px env(safe-area-inset-bottom,0px); min-height:0; background:#080b0e; z-index:20; }
-  #app.immersive-game.mobile-game-active .mobile-game-header { display:flex; flex-direction:column; gap:4px; min-width:0; z-index:30; }
-  #app.immersive-game.mobile-game-active .topline { position:relative; inset:auto; display:flex; align-items:center; gap:5px; min-width:0; pointer-events:auto; }
-  #app.immersive-game.mobile-game-active .brand { flex:0 0 auto; gap:4px; font-size:9px; letter-spacing:.05em; }
-  #app.immersive-game.mobile-game-active .brand .sigil { width:24px; height:24px; flex-basis:24px; font-size:12px; }
-  #app.immersive-game.mobile-game-active .brand strong { font-size:9px; }
-  #app.immersive-game.mobile-game-active .brand small { display:none; }
-  #app.immersive-game.mobile-game-active .top-right { flex:1 1 auto; min-width:0; }
-  #app.immersive-game.mobile-game-active .camera-controls { display:flex; flex-wrap:nowrap; gap:3px; min-width:0; overflow-x:auto; scrollbar-width:none; }
-  #app.immersive-game.mobile-game-active .camera-controls::-webkit-scrollbar { display:none; }
-  #app.immersive-game.mobile-game-active .camera-controls .hudbtn { flex:0 0 auto; height:28px; min-width:26px; padding:0 5px; font-size:9px; }
-  #app.immersive-game.mobile-game-active .camera-controls .hudbtn.icon { width:27px; padding:0; }
-  #app.immersive-game.mobile-game-active .camera-controls .zoomread { min-width:32px; font-size:9px; }
-  #app.immersive-game.mobile-game-active .objective { display:flex; position:relative; inset:auto; width:auto; max-width:100%; padding:5px 7px; border-radius:7px; font-size:10px; pointer-events:auto; }
-  #app.immersive-game.mobile-game-active .objective span { font-size:9px; }
-  #app.immersive-game.mobile-game-active .statusline { position:relative; inset:auto; width:auto; max-width:none; padding:4px; border-radius:8px; background:#10161b; border:1px solid #34414a; overflow:auto; }
-  #app.immersive-game.mobile-game-active .resource-bar, #app.immersive-game.mobile-game-active .resource-bar .stats { width:100%; display:flex; flex-wrap:nowrap; justify-content:space-between; gap:2px; }
-  #app.immersive-game.mobile-game-active .resource-bar .stat { flex:1 1 0; min-width:0; padding:2px; text-align:center; }
-  #app.immersive-game.mobile-game-active .resource-bar .stat b { display:block; font-size:11px; line-height:1.2; }
-  #app.immersive-game.mobile-game-active .resource-bar .stat small { display:block; font-size:7px; white-space:nowrap; }
-  #app.immersive-game.mobile-game-active .resource-bar .alarm-track { height:2px; margin:2px 0; }
-  #app.immersive-game.mobile-game-active .score-details { display:none; }
-  #app.immersive-game.mobile-game-active .play-status { display:none; }
-  #app.immersive-game.mobile-game-active .mobile-game-map { position:relative; min-height:0; min-width:0; overflow:hidden; border:1px solid #2b353d; border-radius:9px; background:#070b0e; }
-  #app.immersive-game.mobile-game-active .map-viewport { position:absolute; inset:0; width:100%; height:100%; overflow:hidden; }
-  #app.immersive-game.mobile-game-active .floorplan { max-width:none; }
-  #app.immersive-game.mobile-game-active .mobile-game-bottom { display:flex; flex-direction:column; gap:5px; min-height:0; max-height:36dvh; z-index:35; }
-  #app.immersive-game.mobile-game-active .killer-ability-panel { position:relative; inset:auto; transform:none; display:flex; flex-wrap:nowrap; gap:5px; width:auto; max-width:none; min-width:0; max-height:none; overflow-x:auto; overflow-y:hidden; padding:5px; border:1px solid #34414a; border-radius:8px; background:#11171c; }
-  #app.immersive-game.mobile-game-active .killer-hud-portrait { display:none !important; }
-  #app.immersive-game.mobile-game-active .killer-hud-abilities { flex:0 0 auto; min-width:0; }
-  #app.immersive-game.mobile-game-active .killer-power-grid { display:flex !important; flex-wrap:nowrap; gap:4px; }
-  #app.immersive-game.mobile-game-active .killer-power-grid .btn.power { display:flex; flex:0 0 36px; width:36px; min-width:36px; height:36px; min-height:36px; padding:3px; }
-  #app.immersive-game.mobile-game-active .killer-power-grid .power-art { width:28px; height:28px; flex-basis:28px; }
-  #app.immersive-game.mobile-game-active .killer-power-grid .power-body, #app.immersive-game.mobile-game-active .killer-power-grid .power-pips { display:none !important; }
-  #app.immersive-game.mobile-game-active .killer-hud-resources { flex:0 0 auto; display:flex; align-items:center; gap:5px; max-width:none; min-width:0; font-size:9px; }
-  #app.immersive-game.mobile-game-active .killer-frenzy-meter { min-width:60px; margin:0; }
-  #app.immersive-game.mobile-game-active .killer-frenzy-track { height:3px; }
-  #app.immersive-game.mobile-game-active .killer-resource-line { gap:2px; white-space:nowrap; font-size:9px; }
-  #app.immersive-game.mobile-game-active .killer-resource-line b { font-size:10px; }
-  #app.immersive-game.mobile-game-active .killer-ap-display { height:28px; min-height:28px; padding:2px 4px; font-size:9px; }
-  #app.immersive-game.mobile-game-active #bottomHud { position:relative; inset:auto; transform:none; display:grid; grid-template-rows:auto minmax(0,1fr); gap:4px; width:auto; max-width:none; min-width:0; max-height:calc(36dvh - 47px); padding:5px; border:1px solid #37434c; border-radius:8px; background:#0c1116; box-shadow:none; }
-  #app.immersive-game.mobile-game-active #bottomHud .action-pill { display:block; width:auto; min-width:0; max-width:none; margin:0; padding:0; background:none; border:0; overflow:hidden; }
-  #app.immersive-game.mobile-game-active #bottomHud .hand-actions { display:flex; flex-wrap:nowrap; gap:4px; overflow-x:auto; overflow-y:hidden; width:100%; padding-bottom:2px; scrollbar-width:thin; }
-  #app.immersive-game.mobile-game-active #bottomHud .hand-actions .btn { flex:0 0 auto; min-height:34px; padding:0 8px; font-size:9px; white-space:nowrap; }
-  #app.immersive-game.mobile-game-active #bottomHud .hand { min-width:0; width:auto; overflow:hidden; }
-  #app.immersive-game.mobile-game-active #bottomHud .hand-row { display:flex; flex-wrap:nowrap; justify-content:flex-start; gap:6px; min-width:0; max-width:none; width:100%; overflow-x:auto; overflow-y:hidden; padding:3px 2px 4px; touch-action:pan-x; overscroll-behavior-x:contain; scroll-snap-type:x mandatory; }
-  #app.immersive-game.mobile-game-active #bottomHud .hand-row .card { flex:0 0 75px; width:75px; min-width:75px; max-width:75px; height:100px; min-height:100px; max-height:100px; scroll-snap-align:start; }
-  #app.immersive-game.mobile-game-active #bottomHud .card-name { font-size:9px; }
-  #app.immersive-game.mobile-game-active #bottomHud .card-desc { font-size:7px; -webkit-line-clamp:3; }
-  #app.immersive-game.mobile-game-active #bottomHud .card-flavor { display:none; }
-  #app.immersive-game.mobile-game-active .hand-toggle { position:absolute; right:4px; top:-31px; inset:auto 4px auto auto; width:26px; height:26px; }
-  #app.immersive-game.mobile-game-active .activity-log-panel { position:absolute; right:5px; bottom:calc(36dvh + 4px); left:auto; max-width:44vw; z-index:31; }
-  #app.immersive-game.mobile-game-active .map-event-feed, #app.immersive-game.mobile-game-active .hint { display:none !important; }
-  #app.immersive-game.mobile-game-active .mobile-game-overlay { position:absolute; inset:0; z-index:50; pointer-events:none; }
-  #app.immersive-game.mobile-game-active .mobile-game-overlay > * { pointer-events:auto; }
-  #app.immersive-game.mobile-game-active .right-tools { position:absolute; top:50%; right:5px; bottom:auto; transform:translateY(-50%); display:flex; flex-direction:column; gap:5px; }
-  #app.immersive-game.mobile-game-active .right-tools .tool { width:34px; height:34px; border-radius:8px; font-size:14px; }
-  #app.immersive-game.mobile-game-active .right-tools .tool em { display:none; }
-  #app.immersive-game.mobile-game-active .task-pop { position:absolute; inset:10% 6% auto; width:auto; max-width:none; max-height:75%; overflow:auto; transform:none; }
-  #app.immersive-game.mobile-game-active .hunt-sidebar-left { position:absolute; inset:8% 6% auto; width:auto; max-width:none; max-height:80%; overflow:auto; transform:none; }
+/*
+ * 手机端对局界面（独立布局，只在 coarse pointer 的窄屏生效）。
+ *
+ * 桌面端把地图做成整屏世界（immersive.css 里 .map-viewport / .floorplan 都是
+ * position:fixed 且带 !important），HUD 只是浮在上面的图层。手机端沿用这个
+ * 前提，但把可视区域切成三段：
+ *
+ *   ┌──────────────┐  ← 顶部：目标 + 关键数值（悬浮，带渐变底）
+ *   │              │
+ *   │   地图（fit） │  ← 中间：固定定位的地图窗口，镜头自动缩放到整张地图
+ *   │              │
+ *   ├──────────────┤  ← 底部：能力条 + 操作按钮 + 手牌
+ *   └──────────────┘
+ *
+ * --mob-top / --mob-bottom 由 mobile-layout.ts 在每次渲染后按实测高度写入，
+ * 地图窗口据此留出上下空间，避免被 HUD 盖住。
+ *
+ * 这里大量使用 !important 是刻意的：桌面规则本身就是 !important 优先
+ * （见 immersive.css 的 .statusline / .killer-ability-panel 等），移动端
+ * 覆盖层必须压过它们。后续如果给桌面样式做去 !important 治理，这个文件可以
+ * 同步瘦身。
+ */
+
+@media (max-width: 920px) and (pointer: coarse) {
+  html,
+  body.immersive-hunt {
+    height: 100dvh;
+    min-height: 100dvh;
+    width: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+    background: #05080a;
+  }
+
+  #app.immersive-game.mobile-game-active {
+    position: fixed !important;
+    inset: 0;
+    width: 100vw;
+    height: 100dvh;
+    min-height: 0;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  /* ---------------- 顶部 HUD ---------------- */
+
+  #app.immersive-game.mobile-game-active .mobile-game-shell {
+    position: static !important;
+    display: block !important;
+    inset: auto;
+    padding: 0;
+    background: none;
+    z-index: auto;
+  }
+
+  #app.immersive-game.mobile-game-active .mobile-game-header {
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 40;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: calc(env(safe-area-inset-top, 0px) + 4px) 6px 6px;
+    background: linear-gradient(#05080a 62%, rgba(5, 8, 10, 0.82) 88%, transparent);
+    pointer-events: none;
+  }
+
+  #app.immersive-game.mobile-game-active .mobile-game-header > * {
+    pointer-events: auto;
+  }
+
+  /* 顶栏（品牌 + 镜头按钮）在手机端整体隐藏：镜头固定为整图适配 */
+  #app.immersive-game.mobile-game-active .topline {
+    display: none !important;
+  }
+
+  /* 目标条：标题 + 一行副文案，超出省略 */
+  #app.immersive-game.mobile-game-active .objective {
+    order: 1;
+    position: static !important;
+    inset: auto !important;
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    width: auto;
+    max-width: calc(100vw - 110px);
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+    font-size: 11px;
+    line-height: 1.25;
+    white-space: nowrap;
+    overflow: hidden;
+    pointer-events: auto;
+    z-index: auto;
+  }
+
+  #app.immersive-game.mobile-game-active .objective strong,
+  #app.immersive-game.mobile-game-active .objective b {
+    font-size: 11px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  #app.immersive-game.mobile-game-active .objective span {
+    font-size: 9px;
+    color: #8f9aa3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* 数值条：一行六项，占满宽度 */
+  #app.immersive-game.mobile-game-active .statusline {
+    order: 2;
+    position: static !important;
+    inset: auto !important;
+    top: auto !important;
+    bottom: auto !important;
+    left: auto !important;
+    right: auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0;
+    padding: 4px 6px;
+    border: 1px solid #2c373f;
+    border-radius: 8px;
+    background: rgba(12, 17, 21, 0.92);
+    box-shadow: none;
+    overflow: hidden;
+    z-index: auto;
+  }
+
+  #app.immersive-game.mobile-game-active .statusline .resource-bar,
+  #app.immersive-game.mobile-game-active .statusline .resource-bar .stats {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 2px;
+    width: 100%;
+  }
+
+  #app.immersive-game.mobile-game-active .statusline .resource-bar .stat {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 0 2px;
+    text-align: center;
+    border: 0;
+  }
+
+  #app.immersive-game.mobile-game-active .statusline .resource-bar .stat b {
+    display: block;
+    font-size: 12px;
+    line-height: 1.15;
+  }
+
+  #app.immersive-game.mobile-game-active .statusline .resource-bar .stat small {
+    display: block;
+    font-size: 8px;
+    line-height: 1.1;
+    white-space: nowrap;
+    color: #8b959d;
+  }
+
+  #app.immersive-game.mobile-game-active .statusline .alarm-track {
+    height: 2px;
+    margin: 1px 0;
+  }
+
+  #app.immersive-game.mobile-game-active .statusline .score-details,
+  #app.immersive-game.mobile-game-active .statusline .loot-stat {
+    display: none !important;
+  }
+
+  /* ---------------- 地图窗口 ---------------- */
+
+  #app.immersive-game.mobile-game-active .mobile-game-map {
+    position: static !important;
+    display: block !important;
+    min-height: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+  }
+
+  #app.immersive-game.mobile-game-active .map-viewport {
+    position: fixed !important;
+    top: var(--mob-top, 96px) !important;
+    bottom: var(--mob-bottom, 208px) !important;
+    left: 0 !important;
+    right: 0 !important;
+    inset: var(--mob-top, 96px) 0 var(--mob-bottom, 208px) 0 !important;
+    width: auto !important;
+    height: auto !important;
+    overflow: hidden;
+    background: #070b0e;
+    z-index: 0;
+  }
+
+  /* 房间信息：整张地图缩放到一屏后房间只有 40px 左右，标签必须收小 */
+  #app.immersive-game.mobile-game-active .floorplan .room-name {
+    font-size: 8px !important;
+    line-height: 1.1;
+    padding: 0 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  #app.immersive-game.mobile-game-active .floorplan .room-unknown {
+    font-size: 7px !important;
+    letter-spacing: 0;
+    opacity: 0.75;
+  }
+
+  #app.immersive-game.mobile-game-active .floorplan .room-desc,
+  #app.immersive-game.mobile-game-active .floorplan .room-feature b,
+  #app.immersive-game.mobile-game-active .floorplan .room-status-row,
+  #app.immersive-game.mobile-game-active .floorplan .room-meta {
+    display: none !important;
+  }
+
+  #app.immersive-game.mobile-game-active .floorplan .room-feature img,
+  #app.immersive-game.mobile-game-active .floorplan .room-feature .ui-icon {
+    width: 9px !important;
+    height: 9px !important;
+  }
+
+  #app.immersive-game.mobile-game-active .floorplan .room-features {
+    gap: 2px;
+    padding: 0;
+  }
+
+  #app.immersive-game.mobile-game-active .floorplan .room-people {
+    gap: 1px;
+    padding: 0;
+  }
+
+  #app.immersive-game.mobile-game-active .floorplan .person-chip,
+  #app.immersive-game.mobile-game-active .floorplan .room.room-size-small .person-chip {
+    width: 22px !important;
+    min-width: 22px !important;
+    height: 22px !important;
+    padding: 0;
+    gap: 0;
+  }
+
+  #app.immersive-game.mobile-game-active .floorplan .person-chip .person-avatar {
+    width: 20px !important;
+    height: 20px !important;
+  }
+
+  #app.immersive-game.mobile-game-active .floorplan .person-chip .person-name,
+  #app.immersive-game.mobile-game-active .floorplan .person-chip .person-status-row {
+    display: none !important;
+  }
+
+  /* 人物头像：圆角统一、去掉大描边，避免小尺寸下糊成一团 */
+  #app.immersive-game.mobile-game-active .floorplan .person-avatar-wrap {
+    border-radius: 50%;
+    overflow: hidden;
+  }
+
+  #app.immersive-game.mobile-game-active .map-event-feed,
+  #app.immersive-game.mobile-game-active .hint,
+  #app.immersive-game.mobile-game-active .map-legend,
+  #app.immersive-game.mobile-game-active .look-prompt {
+    display: none !important;
+  }
+
+  /* ---------------- 底部 HUD ---------------- */
+
+  #app.immersive-game.mobile-game-active .mobile-game-bottom {
+    position: fixed !important;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 40;
+    display: flex !important;
+    flex-direction: column;
+    gap: 4px;
+    max-height: none;
+    padding: 5px 6px calc(env(safe-area-inset-bottom, 0px) + 5px);
+    background: linear-gradient(transparent, rgba(5, 8, 10, 0.88) 26%, #05080a 62%);
+    pointer-events: none;
+  }
+
+  #app.immersive-game.mobile-game-active .mobile-game-bottom > * {
+    pointer-events: auto;
+  }
+
+  /* 能力条：头像隐藏，只留能力按钮 + 行动点 + 尾随/狂暴数值 */
+  #app.immersive-game.mobile-game-active .killer-ability-panel {
+    position: static !important;
+    inset: auto !important;
+    transform: none !important;
+    display: flex !important;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    width: 100% !important;
+    max-width: none;
+    min-width: 0;
+    height: 42px !important;
+    min-height: 42px !important;
+    max-height: 42px !important;
+    padding: 3px 6px;
+    border: 1px solid #2c373f;
+    border-radius: 8px;
+    background: rgba(13, 18, 23, 0.94);
+    box-shadow: none;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+  }
+
+  #app.immersive-game.mobile-game-active .killer-ability-panel::-webkit-scrollbar {
+    display: none;
+  }
+
+  #app.immersive-game.mobile-game-active .killer-hud-portrait,
+  #app.immersive-game.mobile-game-active .killer-frenzy-meter,
+  #app.immersive-game.mobile-game-active .killer-special-resources {
+    display: none !important;
+  }
+
+  /* 行动点必须一直可见，其余资源数值收进情报面板 */
+  #app.immersive-game.mobile-game-active .killer-hud-resources {
+    display: flex !important;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+    flex: 0 0 auto;
+  }
+
+  #app.immersive-game.mobile-game-active .killer-ap-display {
+    display: flex !important;
+  }
+
+  #app.immersive-game.mobile-game-active .killer-hud-abilities {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 34px;
+    display: flex;
+    align-items: center;
+  }
+
+  #app.immersive-game.mobile-game-active .killer-power-grid {
+    display: flex !important;
+    flex-wrap: nowrap;
+    gap: 6px;
+  }
+
+  #app.immersive-game.mobile-game-active .killer-power-grid .btn.power {
+    position: relative;
+    display: flex !important;
+    flex: 0 0 34px;
+    width: 34px;
+    min-width: 34px;
+    height: 34px;
+    min-height: 34px;
+    padding: 2px;
+    border-radius: 8px;
+  }
+
+  #app.immersive-game.mobile-game-active .killer-power-grid .power-art {
+    width: 30px;
+    height: 30px;
+    flex-basis: 30px;
+  }
+
+  #app.immersive-game.mobile-game-active .killer-power-grid .power-body,
+  #app.immersive-game.mobile-game-active .killer-power-grid .power-pips,
+  #app.immersive-game.mobile-game-active .killer-power-grid .power-cd {
+    display: none !important;
+  }
+
+  #app.immersive-game.mobile-game-active .killer-hud-resources {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    max-width: none;
+    min-width: 0;
+    font-size: 9px;
+  }
+
+  #app.immersive-game.mobile-game-active .killer-ap-display {
+    height: 30px;
+    min-height: 30px;
+    padding: 1px 6px;
+    font-size: 10px;
+    border-radius: 8px;
+  }
+
+  /* 手牌与操作 */
+  #app.immersive-game.mobile-game-active #bottomHud {
+    position: static !important;
+    inset: auto !important;
+    transform: none !important;
+    display: flex !important;
+    flex-direction: column;
+    gap: 4px;
+    width: auto;
+    max-width: none;
+    min-width: 0;
+    max-height: none;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+  }
+
+  #app.immersive-game.mobile-game-active #bottomHud .action-pill {
+    display: block !important;
+    flex: 0 0 auto !important;
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    min-width: 0;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    overflow: hidden;
+  }
+
+  #app.immersive-game.mobile-game-active #bottomHud .hand-actions {
+    position: static !important;
+    display: flex !important;
+    max-width: none !important;
+    flex-wrap: nowrap;
+    gap: 4px;
+    width: 100%;
+    padding: 0 0 1px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+  }
+
+  #app.immersive-game.mobile-game-active #bottomHud .hand-actions::-webkit-scrollbar {
+    display: none;
+  }
+
+  #app.immersive-game.mobile-game-active #bottomHud .hand-actions .btn {
+    flex: 0 0 auto;
+    min-height: 34px;
+    padding: 0 10px;
+    font-size: 10px;
+    white-space: nowrap;
+  }
+
+  #app.immersive-game.mobile-game-active #bottomHud .hand {
+    min-width: 0;
+    width: 100% !important;
+    max-width: none !important;
+    overflow: hidden;
+  }
+
+  #app.immersive-game.mobile-game-active #bottomHud .hand-row {
+    display: flex !important;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    align-items: stretch;
+    gap: 6px;
+    width: 100% !important;
+    min-width: 0;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 2px 2px 4px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    touch-action: pan-x;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+  }
+
+  #app.immersive-game.mobile-game-active #bottomHud .hand-row::-webkit-scrollbar {
+    display: none;
+  }
+
+  #app.immersive-game.mobile-game-active #bottomHud .hand-row .card {
+    flex: 0 0 78px;
+    width: 78px;
+    min-width: 78px;
+    max-width: 78px;
+    height: 104px;
+    min-height: 104px;
+    max-height: 104px;
+    scroll-snap-align: start;
+  }
+
+  #app.immersive-game.mobile-game-active #bottomHud .card-name {
+    font-size: 9px;
+    line-height: 1.15;
+  }
+
+  #app.immersive-game.mobile-game-active #bottomHud .card-desc {
+    font-size: 7px;
+    line-height: 1.2;
+    -webkit-line-clamp: 3;
+  }
+
+  #app.immersive-game.mobile-game-active #bottomHud .card-flavor,
+  #app.immersive-game.mobile-game-active #bottomHud .card-cost {
+    display: none !important;
+  }
+
+  /* 手牌收起按钮：贴在底部 HUD 右上 */
+  #app.immersive-game.mobile-game-active .hand-toggle {
+    position: fixed !important;
+    right: 6px;
+    bottom: calc(var(--mob-bottom, 208px) + 4px) !important;
+    inset: auto 6px calc(var(--mob-bottom, 208px) + 4px) auto !important;
+    width: 30px;
+    height: 26px;
+    z-index: 41;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* ---------------- 浮层控件 ---------------- */
+
+  #app.immersive-game.mobile-game-active .mobile-game-overlay {
+    position: static !important;
+    inset: auto;
+    z-index: auto;
+    pointer-events: none;
+  }
+
+  #app.immersive-game.mobile-game-active .mobile-game-overlay > * {
+    pointer-events: auto;
+  }
+
+  #app.immersive-game.mobile-game-active .right-tools {
+    position: fixed !important;
+    top: 50%;
+    right: 5px;
+    left: auto;
+    bottom: auto;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    z-index: 45;
+    padding: 0;
+    background: none;
+    border: 0;
+  }
+
+  #app.immersive-game.mobile-game-active .right-tools .tool {
+    width: 36px;
+    height: 36px;
+    border-radius: 9px;
+    font-size: 15px;
+    background: rgba(14, 20, 25, 0.92);
+    border: 1px solid #2f3b44;
+  }
+
+  #app.immersive-game.mobile-game-active .right-tools .tool em {
+    display: none !important;
+  }
+
+  /* 详情抽屉 / 情报面板：从底部弹起，占屏幕下半区 */
+  #app.immersive-game.mobile-game-active .task-pop,
+  #app.immersive-game.mobile-game-active .hunt-sidebar-left {
+    position: fixed !important;
+    left: 6px !important;
+    right: 6px !important;
+    top: auto !important;
+    bottom: 0 !important;
+    transform: none !important;
+    width: auto !important;
+    max-width: none !important;
+    max-height: 62dvh !important;
+    overflow: auto;
+    z-index: 60;
+    border-radius: 12px 12px 0 0;
+    border-bottom: 0;
+    background: #0c1216;
+    box-shadow: 0 -10px 40px #000c;
+  }
+
+  #app.immersive-game.mobile-game-active .hunt-sidebar-left .intel-drag-handle,
+  #app.immersive-game.mobile-game-active .hunt-sidebar-left .intel-close {
+    display: none !important;
+  }
+
+  /* 活动日志：底部 HUD 上方的浮层 */
+  #app.immersive-game.mobile-game-active .activity-log-panel {
+    position: fixed !important;
+    left: 6px;
+    right: auto !important;
+    bottom: calc(var(--mob-bottom, 208px) + 6px);
+    width: auto !important;
+    max-width: 62vw !important;
+    max-height: 30dvh;
+    overflow: auto;
+    z-index: 44;
+  }
 }
-@media (max-width: 760px) and (orientation:landscape) and (pointer:coarse) {
-  #app.immersive-game.mobile-game-active .mobile-game-shell { grid-template-rows:auto minmax(0,1fr) auto; gap:3px; padding:env(safe-area-inset-top,0px) 4px env(safe-area-inset-bottom,0px); }
-  #app.immersive-game.mobile-game-active .mobile-game-header { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:3px; }
-  #app.immersive-game.mobile-game-active .topline { grid-column:1/-1; }
-  #app.immersive-game.mobile-game-active .objective { grid-column:1; }
-  #app.immersive-game.mobile-game-active .statusline { grid-column:2; grid-row:2; min-width:260px; }
-  #app.immersive-game.mobile-game-active .mobile-game-bottom { max-height:40dvh; display:grid; grid-template-columns:auto minmax(0,1fr); gap:4px; align-items:stretch; }
-  #app.immersive-game.mobile-game-active .killer-ability-panel { max-width:44vw; flex-direction:column; align-items:flex-start; overflow-y:auto; overflow-x:hidden; }
-  #app.immersive-game.mobile-game-active .killer-power-grid { flex-wrap:wrap; }
-  #app.immersive-game.mobile-game-active .killer-hud-resources { flex-wrap:wrap; max-width:100%; }
-  #app.immersive-game.mobile-game-active #bottomHud { max-height:40dvh; grid-template-rows:auto minmax(0,1fr); }
-  #app.immersive-game.mobile-game-active #bottomHud .hand-row .card { flex-basis:68px; width:68px; min-width:68px; max-width:68px; height:86px; min-height:86px; max-height:86px; }
+
+
+  /* 操作按钮：不要被拉伸成一整块灰条 */
+  #app.immersive-game.mobile-game-active #bottomHud .hand-actions .btn {
+    flex: 0 0 auto !important;
+    width: auto !important;
+    max-width: none !important;
+    min-height: 36px;
+    height: 36px;
+    background-clip: padding-box;
+  }
+
+  #app.immersive-game.mobile-game-active #bottomHud .hand-actions .btn[disabled] {
+    opacity: 0.55;
+  }
+
+  /* 房间标签在小尺寸下会糊在一起，只保留已探索房间的名字 */
+  #app.immersive-game.mobile-game-active .floorplan .room-unknown {
+    display: none !important;
+  }
+
+  /* 玩家标记按比例缩小，避免盖住相邻三间房 */
+  #app.immersive-game.mobile-game-active .floorplan .player-marker {
+    transform: scale(0.55) !important;
+    transform-origin: 50% 60% !important;
+  }
+
+  #app.immersive-game.mobile-game-active .floorplan .player-marker > span {
+    font-size: 9px !important;
+  }
+
+  /* 右侧工具条固定在右边，别被旧规则推到左边 */
+  #app.immersive-game.mobile-game-active .right-tools {
+    left: auto !important;
+    right: 5px !important;
+  }
+
+  /* 活动日志折叠态做成小胶囊 */
+  #app.immersive-game.mobile-game-active .activity-log-toggle {
+    padding: 6px 10px !important;
+    font-size: 11px !important;
+    border-radius: 999px !important;
+  }
+
+/* 横屏：高度只有 ~390px，HUD 必须压扁，把中间留给地图 */
+@media (max-width: 920px) and (orientation: landscape) and (pointer: coarse) {
+  #app.immersive-game.mobile-game-active .mobile-game-header {
+    flex-direction: row !important;
+    align-items: center;
+    gap: 8px;
+    padding: calc(env(safe-area-inset-top, 0px) + 2px) 8px 2px;
+  }
+
+  #app.immersive-game.mobile-game-active .objective {
+    flex: 0 1 auto;
+    max-width: 42vw;
+    font-size: 10px;
+  }
+
+  #app.immersive-game.mobile-game-active .statusline {
+    flex: 1 1 auto;
+    width: auto !important;
+    padding: 2px 4px;
+  }
+
+  #app.immersive-game.mobile-game-active .statusline .stat b {
+    font-size: 10px;
+  }
+
+  #app.immersive-game.mobile-game-active .statusline .stat small {
+    font-size: 7px;
+  }
+
+  #app.immersive-game.mobile-game-active .mobile-game-bottom {
+    flex-direction: row !important;
+    align-items: stretch;
+    gap: 6px;
+    padding: 4px 6px calc(env(safe-area-inset-bottom, 0px) + 4px);
+  }
+
+  #app.immersive-game.mobile-game-active .killer-ability-panel {
+    flex: 0 0 128px !important;
+    width: 128px !important;
+    height: auto !important;
+    max-height: none !important;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 2px;
+    padding: 4px;
+  }
+
+  #app.immersive-game.mobile-game-active .killer-hud-resources {
+    margin-left: 0;
+  }
+
+  #app.immersive-game.mobile-game-active #bottomHud {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  #app.immersive-game.mobile-game-active #bottomHud .hand-row .card {
+    flex-basis: 66px;
+    width: 66px;
+    min-width: 66px;
+    max-width: 66px;
+    height: 84px;
+    min-height: 84px;
+    max-height: 84px;
+  }
+
+
+  /* 横屏再压一档：副标题和数值字号收小，把高度让给地图 */
+  #app.immersive-game.mobile-game-active .objective span {
+    display: none !important;
+  }
+
+  #app.immersive-game.mobile-game-active .statusline {
+    padding: 1px 4px !important;
+  }
+
+  #app.immersive-game.mobile-game-active .statusline .stat b {
+    font-size: 9px !important;
+    line-height: 1.05 !important;
+  }
+
+  #app.immersive-game.mobile-game-active .statusline .stat small {
+    font-size: 6px !important;
+  }
+
+  #app.immersive-game.mobile-game-active #bottomHud .hand-row .card {
+    height: 74px !important;
+    min-height: 74px !important;
+    max-height: 74px !important;
+  }
+
+  #app.immersive-game.mobile-game-active .right-tools {
+    top: 58%;
+  }
+
+  #app.immersive-game.mobile-game-active .activity-log-panel {
+    bottom: calc(var(--mob-bottom, 130px) + 4px);
+  }
 }

@@ -44,44 +44,14 @@ import {
   wipeBlade,
 } from './game/engine';
 import { loadSave, writeSave } from './game/save';
-import {
-  ACCESSORY_SLOTS,
-  buyAccessory,
-  consumeAccessories,
-  loadoutForRun,
-  sanitizeAccessoryLoadout,
-} from './game/accessories';
 import { generateFreeHunt, generateMission, withAnte } from './game/missions';
-import { STARTER_KILLERS } from './game/killers';
-import {
-  applyTuning,
-  exportTuning,
-  importTuning,
-  resetTuning,
-  setCardCost,
-  setCardDesc,
-  setCardName,
-  setCardType,
-  setCardFlavor,
-  setCardPrecheck,
-  createCustomCard,
-  duplicateCard,
-  deleteCard,
-  setCardNoAction,
-  addCardOp,
-  removeCardOp,
-  moveCardOp,
-  setCardOpValue,
-  setPowerCooldown,
-  setPowerOpValue,
-  setAddonDesc,
-  setAddonModValue,
-} from './game/tuning';
+import { applyTuning } from './game/tuning';
 import { ROOM_MAP } from './game/rooms';
 import { SURVIVOR_MAP } from './game/survivors';
 import { getExecutionMethod } from './game/executions';
 import type { ExecutionMethodId } from './game/executions';
-import type { AccessoryModKey, GameState, RoomId, SaveData } from './game/types';import {
+import type { GameState, RoomId, SaveData } from './game/types';
+import {
   cardDetailHtml,
   defaultDetailHtml,
   getKiller,
@@ -93,16 +63,18 @@ import type { AccessoryModKey, GameState, RoomId, SaveData } from './game/types'
   renderMenu,
   renderResult,
   renderShop,
-  shopPrice,
 } from './ui/render';
-import { renderAdmin, setAdminTab, type AdminTab } from './ui/admin';
-import { initCloudAuth, loadCloudConfig, saveCloudConfig, verifyGitHubToken, clearGitHubToken } from './game/cloud';
+import { renderAdmin } from './ui/admin';
+import { initCloudAuth, loadCloudConfig } from './game/cloud';
 import { mountFloorplanScene, type SceneHandle } from './ui/scene';
 import { playSfx, playStep, playSurvivorHit, playSurvivorDeath, setMusic, toggleMute, unlockAudio } from './ui/audio';
 import type { SfxName } from './ui/audio';
 import { currentMenuMap, rollMenuMap } from './ui/mapArt';
-
-type Screen = 'menu' | 'game' | 'result';
+import { ActionRegistry, type ActionContext, type ActionTable } from './ui/actions';
+import { applyTuneChange, createAdminActions } from './ui/adminActions';
+import { createMenuActions } from './ui/menuActions';
+import { session } from './ui/session';
+import { inGame, openPanel, showGame, showMenu, showResult, ui } from './ui/viewState';
 
 // 从当前浏览器读取本地卡牌覆盖；没有个人配置时仍使用仓库默认数值。
 applyTuning();
@@ -114,23 +86,14 @@ void initCloudAuth().then(async () => {
       if (tuningModule.importTuning(JSON.stringify(cloud))) render();
     }
   } catch (error) { console.warn('云端配置暂不可用：', error); }
-  if (adminOpen) render();
+  if (ui().panel === 'admin') render();
 });
 
 let save: SaveData = loadSave();
 let game: GameState | null = null;
-let screen: Screen = 'menu';
-let editorOpen = false;
-let shopOpen = false;
-let guideOpen = false;
-/** 配件装配界面；pendingRun 非空时，确认后直接进入猎场。 */
-let accessoryOpen = false;
-let accessoryDraft: string[] = [];
-let pendingRun: 'contract' | 'free' | null = null;
-/** 下一局是否加注：达成追加目标则契约分 +60%，未达成结算 −50%。 */
-let anteArmed = false;
-let adminOpen = new URLSearchParams(window.location.search).get('admin') === '1';
-let editorDeck: string[] = [...save.deck];
+// `?admin=1` 是平衡面板唯一的启动入口；其余界面切换全部走 viewState 的具名迁移。
+if (new URLSearchParams(window.location.search).get('admin') === '1') openPanel('admin');
+session.editorDeck = [...save.deck];
 let resultApplied = false;
 /** 本局新解锁的卡牌，用于结算面板只提示真正新增的那张 */
 let lastNewCard: string | null = null;
@@ -412,7 +375,7 @@ function nextRoomInDirection(key: string): RoomId | null {
 }
 
 function performHeldMovement(key: string): boolean {
-  if (!game || screen !== 'game' || game.phase !== 'playing') return false;
+  if (!game || !inGame() || game.phase !== 'playing') return false;
   if (game.lookingAround || game.nurseBlinkTargeting || game.huntressAiming || game.auraTargeting) return false;
   if (game.hand.length > 6) return false;
   const nextRoom = nextRoomInDirection(key);
@@ -545,24 +508,26 @@ function cycleDisplaySetting(key: keyof DisplaySettings): void {
 }
 
 function render(): void {
+  const view = ui();
   // 菜单（含商店/牌组/平衡面板）放角色选择曲，进入对局换背景曲；同一首不会重播
-  setMusic(screen === 'menu' || !game ? 'menu' : 'bgm');
+  setMusic(view.screen === 'menu' || !game ? 'menu' : 'bgm');
   let html = '';
-  if (adminOpen) {
+  // 面板最多只有一个（viewState 保证互斥），因此这里不需要再比较哪个布尔量优先。
+  if (view.panel === 'admin') {
     html = renderAdmin();
-  } else if (accessoryOpen) {
-    html = renderAccessoryLoadout(save, accessoryDraft, pendingRun !== null);
-  } else if (editorOpen) {
-    html = renderDeckEditor(editorDeck, save.unlockedCards, save.killer ?? '迈克尔·迈尔斯');
-  } else if (shopOpen) {
+  } else if (view.panel === 'accessories') {
+    html = renderAccessoryLoadout(save, session.accessoryDraft, session.pendingRun !== null);
+  } else if (view.panel === 'deck') {
+    html = renderDeckEditor(session.editorDeck, save.unlockedCards, save.killer ?? '迈克尔·迈尔斯');
+  } else if (view.panel === 'shop') {
     html = renderShop(save);
-  } else if (screen === 'menu' || !game) {
-    html = renderMenu(save, anteArmed);
+  } else if (view.screen === 'menu' || !game) {
+    html = renderMenu(save, session.anteArmed);
   } else {
     html = renderGame(game, getKiller(save.killer));
-    if (screen === 'result') html += renderResult(game, lastNewCard);
+    if (view.screen === 'result') html += renderResult(game, lastNewCard);
   }
-  if (guideOpen) html += renderGuide();
+  if (view.guide) html += renderGuide();
   renderMarkupPreservingMap(html);
   showPendingExecutionScene();
   if (pendingMapWalk) {
@@ -590,16 +555,16 @@ function render(): void {
       app.querySelectorAll<HTMLElement>('.attack-hit').forEach((node) => node.classList.remove('attack-hit'));
     }, 620);
   }
-  const immersiveActive = Boolean(game && screen === 'game');
+    const immersiveActive = Boolean(game && view.screen === 'game');
   app.classList.toggle('immersive-game', immersiveActive);
   document.body.classList.toggle('immersive-hunt', immersiveActive);
   applyMobileGameLayout(app, immersiveActive);
   applyDisplaySettings();
   detailCardUid = null;
-  if (game && screen === 'game' && selectedPersonId) {
+  if (game && view.screen === 'game' && selectedPersonId) {
     const panel = document.getElementById('cardDetail');
     if (panel) panel.innerHTML = personDetailHtml(game, selectedPersonId);
-  } else if (screen !== 'game') {
+  } else if (view.screen !== 'game') {
     selectedPersonId = null;
   }
   syncScene();
@@ -609,7 +574,7 @@ function render(): void {
 /** 把场景画布挂到新的平面图节点上；离开对局时销毁 */
 function syncScene(): void {
   const host = app.querySelector<HTMLElement>('.floorplan');
-  if (!game || !host || screen === 'menu') {
+  if (!game || !host || ui().screen === 'menu') {
     if (scene) {
       scene.destroy();
       scene = null;
@@ -708,9 +673,9 @@ function afterAction(): void {
       writeSave(save);
     }
   }
-  if (game && game.phase === 'gameover' && screen !== 'result') {
+    if (game && game.phase === 'gameover' && ui().screen !== 'result') {
     playSfx(game.result === 'win' ? 'win' : 'lose');
-    screen = 'result';
+    showResult();
     if (!resultApplied) {
       resultApplied = true;
       const newBest = Math.max(save.bestScore, game.score);
@@ -744,9 +709,9 @@ function startGame(freeHunt = false, loadout: string[] = []): void {
   window.setTimeout(() => playSfx('enterMap'), 190);
   window.setTimeout(() => playSfx('start'), 430);
   const killer = save.killer ?? '迈克尔·迈尔斯';
-  const mission = freeHunt ? generateFreeHunt() : (anteArmed ? withAnte(generateMission(killer)) : generateMission(killer));
+  const mission = freeHunt ? generateFreeHunt() : (session.anteArmed ? withAnte(generateMission(killer)) : generateMission(killer));
   game = createGame(save.deck, mission, killer, currentMenuMap().id, loadout);
-  screen = 'game';
+  showGame();
   lastKills = game.kills;
   lastWanted = game.wanted;
   resultApplied = false;
@@ -768,7 +733,7 @@ function hideCardPreview(): void {
 }
 
 function showCardPreview(uid: string | null, anchor: HTMLElement | null): void {
-  if (!uid || !anchor || !game || screen !== 'game') {
+  if (!uid || !anchor || !game || !inGame()) {
     hideCardPreview();
     return;
   }
@@ -829,424 +794,74 @@ function showCardDetail(uid: string | null): void {
   if (game) panel.innerHTML = cardDetailHtml(game, uid);
 }
 
-app.addEventListener('click', (event) => {
-  const target = (event.target as HTMLElement).closest<HTMLElement>('[data-action]');
-  if (!target) return;
-  clearHeldMovement();
-  const action = target.dataset.action;
-  const qteAction = action === 'execute-score-special';
-  const qteOutcome = target.dataset.qteOutcome as ExecutionQteOutcome | undefined;
-  if (qteAction && game && screen === 'game' && !qteOutcome) {
-    startExecutionQte(target);
-    return;
-  }
-  if (qteOutcome) delete target.dataset.qteOutcome;
-  if (handleImmersiveAction(action)) return;
+/* ------------------------------------------------------------------ */
+/* 界面动作：动作名 → 处理器                                            */
+/* ------------------------------------------------------------------ */
 
-  // 浏览器要求先有用户交互才允许出声
-  unlockAudio();
+/**
+ * 分发层已保证 `scope === 'game'` 时对局存在，这里只做类型收敛，
+ * 避免每个处理器都重复写 `if (!game) return`。
+ */
+function currentGame(): GameState {
+  if (!game) throw new Error('对局动作在对局之外被触发');
+  return game;
+}
 
-  // 主菜单按钮音：选角色框有专属音效，其余大厅按钮统一一个轻音
-  if (screen === 'menu' && !game && action && action !== 'mute') {
-    if (action === 'killer' || action === 'unlock-killer') playSfx('killerPick');
-    else if (action !== 'start' && action !== 'again') playSfx('menuButton');
-  }
+/** 返回大厅：丢弃对局，并重置只属于表现层的选择状态。 */
+function leaveToMenu(): void {
+  game = null;
+  selectedPersonId = null;
+  lastNewCard = null;
+  session.pendingRun = null;
+  showMenu();
+  rollMenuMap();
+  render();
+}
 
-  if (action === 'display-setting') {
-    const key = target.dataset.setting as keyof DisplaySettings | undefined;
-    if (key === 'interfaceScale' || key === 'fontScale' || key === 'mapScale') cycleDisplaySetting(key);
-    return;
-  }
-
-  if (action === 'mute') {
-    toggleMute();
-    afterAction();
-    return;
-  }
-
-  if (action === 'ante') {
-    anteArmed = !anteArmed;
-    render();
-    return;
-  }
-  if (action === 'start' || action === 'again' || action === 'free-hunt') {
-    // 出发前先选配件：带入即消耗，所以每次开局都要经过这一步。
-    pendingRun = action === 'free-hunt' ? 'free' : 'contract';
-    accessoryDraft = loadoutForRun(save, save.killer ?? '迈克尔·迈尔斯');
-    accessoryOpen = true;
-    render();
-    return;
-  }
-
-  if (action === 'accessories') {
-    pendingRun = null;
-    accessoryDraft = sanitizeAccessoryLoadout(save.accessoryLoadout, save.killer ?? '迈克尔·迈尔斯');
-    accessoryOpen = true;
-    shopOpen = false;
-    editorOpen = false;
-    render();
-    return;
-  }
-
-  if (action === 'acc-equip') {
-    const id = target.dataset.id;
-    if (id && !accessoryDraft.includes(id) && accessoryDraft.length < ACCESSORY_SLOTS && (save.accessories?.[id] ?? 0) > 0) {
-      accessoryDraft = [...accessoryDraft, id];
-      playSfx('pickup');
-      render();
-    }
-    return;
-  }
-
-  if (action === 'acc-remove') {
-    const index = Number(target.dataset.index);
-    if (Number.isInteger(index) && index >= 0 && index < accessoryDraft.length) {
-      accessoryDraft = accessoryDraft.filter((_, i) => i !== index);
-      render();
-    }
-    return;
-  }
-
-  if (action === 'acc-buy') {
-    const id = target.dataset.id;
-    const next = id ? buyAccessory(save, id) : null;
-    if (next) {
-      save = next;
-      writeSave(save);
-      playSfx('pickup');
-    }
-    render();
-    return;
-  }
-
-  if (action === 'acc-close') {
-    accessoryOpen = false;
-    pendingRun = null;
-    accessoryDraft = [];
-    render();
-    return;
-  }
-
-  if (action === 'acc-confirm') {
-    const killer = save.killer ?? '迈克尔·迈尔斯';
-    // 装配栏里可能留着已用完的配件：进局前按库存再过滤一次。
-    const loadout = sanitizeAccessoryLoadout(accessoryDraft, killer)
-      .filter((id) => (save.accessories?.[id] ?? 0) > 0);
-    const mode = pendingRun;
-    if (mode) {
-      save = consumeAccessories(save, loadout);
-      writeSave(save);
-      accessoryOpen = false;
-      pendingRun = null;
-      accessoryDraft = [];
-      startGame(mode === 'free', loadout);
-    } else {
-      save = { ...save, accessoryLoadout: loadout };
-      writeSave(save);
-      accessoryOpen = false;
-      accessoryDraft = [];
-      render();
-    }
-    return;
-  }
-
-  if (action === 'menu') {
-    selectedPersonId = null;
-    screen = 'menu';
-    game = null;
-    editorOpen = false;
-    shopOpen = false;
-    adminOpen = false;
-    accessoryOpen = false;
-    pendingRun = null;
-    lastNewCard = null;
-    rollMenuMap();
-    render();
-    return;
-  }
-
-  if (action === 'admin') {
-    adminOpen = true;
-    render();
-    return;
-  }
-
-  if (action === 'admin-tab') {
-    const tab = target.dataset.tab;
-    if (tab === 'cards' || tab === 'powers' || tab === 'addons') setAdminTab(tab as AdminTab);
-    render();
-    return;
-  }
-
-  if (action === 'admin-close') {
-    adminOpen = false;
-    render();
-    return;
-  }
-
-  if (action === 'admin-card-new') { createCustomCard(); render(); return; }
-  if (action === 'admin-card-copy' || action === 'admin-card-delete') {
-    const id = target.dataset.card; if (!id) return;
-    if (action === 'admin-card-copy') duplicateCard(id);
-    else if (window.confirm('删除这张卡牌？删除后会从卡池和编辑器中移除。')) deleteCard(id);
-    render(); return;
-  }
-
-  if (action === 'admin-op-add') {
-    const id = target.dataset.card;
-    const select = id ? document.getElementById(`addEffect-${id}`) as HTMLSelectElement | null : null;
-    if (id && select && addCardOp(id, select.value)) render();
-    return;
-  }
-  if (action === 'admin-op-remove' || action === 'admin-op-move') {
-    const id = target.dataset.card, index = Number(target.dataset.index);
-    const ok = id && Number.isInteger(index) && (action === 'admin-op-remove' ? removeCardOp(id, index) : moveCardOp(id, index, Number(target.dataset.direction) as -1 | 1));
-    if (ok) render();
-    return;
-  }
-
-  if (action === 'cloud-login') {
-    const input = document.getElementById('githubToken') as HTMLInputElement | null;
-    const status = document.getElementById('cloudStatus');
-    const token = input?.value.trim();
-    if (!token || !status) return;
-    status.textContent = '正在验证 GitHub 密钥……';
-    void verifyGitHubToken(token).then((login) => {
-      if (input) input.value = '';
-      status.textContent = '授权成功：GitHub 账号 ' + login + '。现在可以上传配置。';
-    }).catch((error: unknown) => {
-      if (status) status.textContent = error instanceof Error ? error.message : '密钥验证失败。';
-    });
-    return;
-  }
-  if (action === 'cloud-logout') {
-    clearGitHubToken();
-    const status = document.getElementById('cloudStatus');
-    if (status) status.textContent = '已退出 GitHub 管理员授权。';
-    return;
-  }
-  if (action === 'cloud-load') {
-    const status = document.getElementById('cloudStatus');
-    if (status) status.textContent = '正在读取云端配置……';
-    void loadCloudConfig().then(async (config) => {
-      if (!config) throw new Error('云端还没有配置，请先上传一次。');
-      const tuningModule = await import('./game/tuning');
-      if (!tuningModule.importTuning(JSON.stringify(config))) throw new Error('云端配置结构无效，未覆盖本地配置。');
-      if (status) status.textContent = '云端配置已读取并应用。';
-      render();
-    }).catch((error: unknown) => { if (status) status.textContent = error instanceof Error ? error.message : '读取云端配置失败。'; });
-    return;
-  }
-  if (action === 'cloud-save') {
-    const status = document.getElementById('cloudStatus');
-    if (status) status.textContent = '正在上传当前配置……';
-    void saveCloudConfig(JSON.parse(exportTuning())).then(() => { if (status) status.textContent = '上传成功：其他玩家刷新游戏后会读取这份配置。'; })
-      .catch((error: unknown) => { if (status) status.textContent = error instanceof Error ? error.message : '上传失败。'; });
-    return;
-  }
-
-  if (action === 'admin-reset') {
-    resetTuning();
-    render();
-    return;
-  }
-
-  if (action === 'admin-import') {
-    const input = document.getElementById('adminImportText') as HTMLTextAreaElement | null;
-    const status = document.getElementById('adminImportStatus');
-    if (!input || !status) return;
-    const ok = importTuning(input.value);
-    status.textContent = ok
-      ? '导入成功，配置已保存。'
-      : '导入失败：JSON 格式或数据结构不合法，当前配置未改变。';
-    status.setAttribute('class', ok ? 'tune-import-success' : 'tune-import-error');
-    if (ok) render();
-    return;
-  }
-
-  if (action === 'admin-export') {
-    const box = document.getElementById('adminExport') as HTMLElement | null;
-    const text = document.getElementById('adminExportText') as HTMLTextAreaElement | null;
-    if (box) box.hidden = false;
-    if (text) {
-      text.value = exportTuning();
-      text.focus();
-      text.select();
-    }
-    return;
-  }
-
-  if (action === 'admin-hide-export') {
-    const box = document.getElementById('adminExport') as HTMLElement | null;
-    if (box) box.hidden = true;
-    return;
-  }
-
-  if (action === 'admin-copy') {
-    const text = document.getElementById('adminExportText') as HTMLTextAreaElement | null;
-    if (text) {
-      text.select();
-      void navigator.clipboard?.writeText(text.value);
-    }
-    return;
-  }
-
-  if (action === 'discard') {
-    if (!game || screen !== 'game') return;
-    const cardUid = target.dataset.uid;
-    if (cardUid) discardCard(game, cardUid);
-    afterAction();
-    return;
-  }
-
-  if (action === 'guide') {
-    guideOpen = true;
-    render();
-    return;
-  }
-
-  if (action === 'guide-close') {
-    guideOpen = false;
-    render();
-    return;
-  }
-
-  if (action === 'shop') {
-    shopOpen = true;
-    render();
-    return;
-  }
-
-  if (action === 'shop-back') {
-    shopOpen = false;
-    render();
-    return;
-  }
-
-  if (action === 'buy') {
-    const id = target.dataset.id;
-    const price = id ? shopPrice(CARD_MAP[id]?.cost ?? 0) : Infinity;
-    if (id && CARD_MAP[id] && !save.unlockedCards.includes(id) && save.credits >= price) {
-      save = {
-        ...save,
-        credits: save.credits - price,
-        unlockedCards: [...save.unlockedCards, id],
-      };
-      writeSave(save);
-    }
-    render();
-    return;
-  }
-
-  if (action === 'killer') {
-    const owner = target.dataset.owner;
-    if (owner && STARTER_KILLERS.includes(owner)) {
-      const allowed = new Set(deckCardsForKiller(owner).map((card) => card.id));
-      const compatibleDeck = save.deck.filter((id) => allowed.has(id));
-      save = {
-        ...save,
-        killer: owner,
-        deck: compatibleDeck.length >= 10 ? compatibleDeck : [...STARTING_DECK],
-        accessoryLoadout: sanitizeAccessoryLoadout(save.accessoryLoadout, owner),
-      };
-      writeSave(save);
-      render();
-    }
-    return;
-  }
-
-  if (action === 'unlock-killer') {
-    const owner = target.dataset.owner;
-    if (owner && STARTER_KILLERS.includes(owner) && !save.unlockedKillers.includes(owner) && save.darkCells >= 2) {
-      save = {
-        ...save,
-        darkCells: save.darkCells - 2,
-        unlockedKillers: [...save.unlockedKillers, owner],
-        killer: owner,
-      };
-      writeSave(save);
-    }
-    render();
-    return;
-  }
-
-  if (action === 'deck') {
-    editorDeck = [...save.deck];
-    editorOpen = true;
-    render();
-    return;
-  }
-
-  if (action === 'deck-add' || action === 'deck-remove') {
-    const id = target.dataset.id;
-    if (!id) return;
-    if (action === 'deck-add') {
-      const count = editorDeck.filter((c) => c === id).length;
-      const allowed = deckCardsForKiller(save.killer ?? '迈克尔·迈尔斯').some((card) => card.id === id);
-      if (allowed && save.unlockedCards.includes(id) && count < 3 && editorDeck.length < 15) editorDeck.push(id);
-    } else {
-      const index = editorDeck.indexOf(id);
-      if (index >= 0) editorDeck.splice(index, 1);
-    }
-    render();
-    return;
-  }
-
-  if (action === 'deck-save') {
-    if (editorDeck.length >= 10 && editorDeck.length <= 15) {
-      save = { ...save, deck: [...editorDeck] };
-      writeSave(save);
-      editorOpen = false;
-      render();
-    }
-    return;
-  }
-
-  if (action === 'deck-cancel') {
-    editorOpen = false;
-    render();
-    return;
-  }
-
+/**
+ * 对局动作的附加校验：手牌超限、以及四种「选目标」模式期间只放行各自的动作。
+ * 这些规则原先散落在 if 链中段，现在集中在一个函数里，处理器不必重复判断。
+ */
+function blockedByGameMode(action: string): boolean {
+  if (!game) return true;
   // 超过手牌上限时，必须先逐张选择弃牌；禁止用结束回合或其他动作绕过。
-  if (game && screen === 'game' && game.hand.length > 6 && action !== 'discard' && action !== 'mute') {
-    return;
-  }
-  // 目标选择模式期间锁定其他操作，避免闪现/瞄准时误触移动或卡牌。
-  if (game && screen === 'game' && game.nurseBlinkTargeting &&
-      !['blink-select', 'power', 'mute', 'guide'].includes(action ?? '')) return;
-  if (game && screen === 'game' && game.huntressAiming &&
-      !['hatchet-target', 'power', 'mute', 'guide'].includes(action ?? '')) return;
-  // 查看选房期间只接受选房或取消，避免误触卡牌、移动等其他行动。
-  if (game && screen === 'game' && game.lookingAround &&
-      !['look-select', 'look-cancel', 'mute', 'guide'].includes(action ?? '')) return;
-  if (game && screen === 'game' && game.auraTargeting &&
-      !['aura-select', 'aura-cancel', 'mute', 'guide'].includes(action ?? '')) return;
+  if (game.hand.length > 6) return action !== 'discard';
+  if (game.nurseBlinkTargeting) return !['blink-select', 'power'].includes(action);
+  if (game.huntressAiming) return !['hatchet-target', 'power'].includes(action);
+  if (game.lookingAround) return !['look-select', 'look-cancel'].includes(action);
+  if (game.auraTargeting) return !['aura-select', 'aura-cancel'].includes(action);
+  return false;
+}
 
-  if (action === 'person') {
-    const personId = target.dataset.personId;
-    if (personId && game && screen === 'game') {
+/** 当前杀手的处决演出文案。 */
+function executionStyleOf(state: GameState): ExecutionStyle {
+  return EXECUTION_STYLES[state.killer] ?? EXECUTION_STYLES['设陷者'];
+}
+
+function createGameActions(): ActionTable {
+  const handlers: Record<string, (ctx: ActionContext) => void> = {
+    person: ({ target }) => {
+      const game = currentGame();
+      const personId = target.dataset.personId;
+      if (!personId) return;
       const panel = document.getElementById('cardDetail');
       selectedPersonId = personId;
       if (panel) panel.innerHTML = personDetailHtml(game, personId);
       openIntelDrawer();
       detailCardUid = null;
-    }
-    return;
-  }
+    },
 
-  if (action === 'close-person-detail') {
-    selectedPersonId = null;
-    detailCardUid = null;
-    const panel = document.getElementById('cardDetail');
-    if (panel) panel.innerHTML = defaultDetailHtml();
-    return;
-  }
+    'close-person-detail': () => {
+      selectedPersonId = null;
+      detailCardUid = null;
+      const panel = document.getElementById('cardDetail');
+      if (panel) panel.innerHTML = defaultDetailHtml();
+    },
 
-  if (action === 'attack-target') {
-    if (!game || screen !== 'game') return;
-    const personId = target.dataset.personId;
-    if (personId) {
+    'attack-target': ({ target }) => {
+      const game = currentGame();
+      const personId = target.dataset.personId;
+      if (!personId) return;
       const ghosts = captureAttackGhosts();
       const victimIsSurvivor = game.people.some((person) => person.id === personId && person.role !== 'police');
       const killsBefore = game.kills;
@@ -1260,20 +875,320 @@ app.addEventListener('click', (event) => {
       playKillerAttackSound(game);
       if (game.kills > killsBefore) playSurvivorDeath(SURVIVOR_MAP[personId]?.gender ?? 'male');
       lastLogHead = game.log[0] ?? '';
-    }
-    afterAction();
-    return;
-  }
+      afterAction();
+    },
 
-  if (action === 'execute' || action === 'execute-target') {
-    if (!game || screen !== 'game') return;
+    execute: (ctx) => runExecute(ctx),
+    'execute-target': (ctx) => runExecute(ctx),
+
+    'execute-score-special': ({ target, qteOutcome }) => {
+      const game = currentGame();
+      const personId = target.dataset.personId;
+      const ghosts = captureAttackGhosts();
+      const executed = !!personId && executeScoreSpecial(game, personId);
+      if (executed && personId) {
+        pendingMapAttackTarget = personId;
+        pendingMapAttackGhost = ghosts.get(personId) ?? null;
+        const style = executionStyleOf(game);
+        const perfect = qteOutcome === 'perfect';
+        applyExecutionQteOutcome(perfect ? 'perfect' : 'miss', style);
+        pendingExecutionScene = {
+          roomId: game.playerRoom,
+          title: style.title + ' · 分数处决' + (perfect ? ' · 完美 QTE' : ''),
+          description: style.action + '。' + style.line + (perfect ? ' 分数处决完成，QTE 完美，额外获得 25 分。' : ' 分数处决仍然完成，但 QTE 失误，没有额外分数。'),
+          style: style.motion,
+          success: true,
+        };
+        playSfx('execute');
+        playSfx(SURVIVOR_MAP[personId]?.gender === 'female' ? 'voiceFScream' : 'voiceMScream', 0.96);
+        window.setTimeout(() => playSfx('wipe'), 260);
+        lastLogHead = game.log[0] ?? '';
+      }
+      afterAction();
+    },
+
+    'drop-carried': () => {
+      const game = currentGame();
+      if (dropCarriedPerson(game)) playSfx('click');
+      afterAction();
+    },
+
+    carry: ({ target }) => {
+      const game = currentGame();
+      const personId = target.dataset.personId;
+      if (personId) carryPerson(game, personId);
+      afterAction();
+    },
+
+    'execute-special': ({ target }) => {
+      const game = currentGame();
+      playSfx('executionSite');
+      const method = target.dataset.method as ExecutionMethodId | undefined;
+      const methodInfo = method ? getExecutionMethod(method) : undefined;
+      const carriedId = game.carryPersonId;
+      const carried = carriedId ? game.people.find((person) => person.id === carriedId) : undefined;
+      if (method && executeCarriedPerson(game, method)) {
+        const style = executionStyleOf(game);
+        if (methodInfo && carried) {
+          pendingExecutionScene = {
+            roomId: game.playerRoom,
+            title: style.title + ' · 地点处决 · ' + methodInfo.name,
+            description: style.action + '。' + methodInfo.flavor(carried.name) + ' ' + style.line,
+            style: style.motion,
+            success: true,
+          };
+        }
+        playSfx('execute');
+        if (carried) playSfx(SURVIVOR_MAP[carried.id]?.gender === 'female' ? 'voiceFScream' : 'voiceMScream', 0.96);
+        window.setTimeout(() => playSfx('wipe'), 260);
+        lastLogHead = game.log[0] ?? '';
+      }
+      afterAction();
+    },
+
+    power: ({ target }) => {
+      const game = currentGame();
+      const powerId = target.dataset.power;
+      const wasPossessed = game.possessed;
+      const used = powerId ? usePower(game, powerId) : false;
+      if (used && powerId === 'trap_set') playSfx('trapSet');
+      if (used && (powerId === 'wraith_bell' || powerId === 'wraith_rush')) playSfx('wraithPower');
+      if (!wasPossessed && game.possessed && game.killer === '迈克尔·迈尔斯') {
+        playSfx('possess');
+        if ((game.log[0] ?? '').includes('恶魔附身：')) lastLogHead = game.log[0];
+      }
+      afterAction();
+    },
+
+    'blink-select': ({ target }) => {
+      const game = currentGame();
+      const room = target.dataset.room as RoomId | undefined;
+      if (room && blinkPlayer(game, room)) playSfx('nurseBlink');
+      afterAction();
+    },
+
+    'hatchet-target': ({ target }) => {
+      const game = currentGame();
+      const personId = target.dataset.personId;
+      const ghosts = captureAttackGhosts();
+      const victimIsSurvivor = !!personId && game.people.some((person) => person.id === personId && person.role !== 'police');
+      const killsBefore = game.kills;
+      if (personId && throwHuntressHatchet(game, personId)) {
+        pendingMapAttackTarget = personId;
+        pendingMapAttackGhost = ghosts.get(personId) ?? null;
+        updateAttackGhostEscapeDirection(pendingMapAttackGhost, personId);
+        playSfx('huntressAxe');
+        if (victimIsSurvivor) playSurvivorHit(personId ? SURVIVOR_MAP[personId]?.gender ?? 'male' : 'male');
+        if (game.kills > killsBefore) playSurvivorDeath(SURVIVOR_MAP[personId]?.gender ?? 'male');
+        lastLogHead = game.log[0] ?? '';
+      }
+      afterAction();
+    },
+
+    'collect-trap': () => {
+      collectTrapCache(currentGame());
+      afterAction();
+    },
+
+    'recover-trap': () => {
+      recoverBearTrap(currentGame());
+      afterAction();
+    },
+
+    'refill-hatchets': () => {
+      refillHuntressHatchets(currentGame());
+      afterAction();
+    },
+
+    draw: () => {
+      drawCardAction(currentGame());
+      afterAction();
+    },
+
+    move: ({ target }) => {
+      const game = currentGame();
+      const room = target.dataset.room as RoomId | undefined;
+      if (!room) return;
+      // 走不过去时说清楚原因，而不是静默失败；只有真的走成了才播放脚步声，
+      // 否则「有脚步声但画面没动」会被当成渲染 bug。
+      const reason = moveBlockReason(game, room);
+      if (reason) {
+        noteToPlayer(game, reason);
+      } else {
+        movePlayer(game, room);
+        playStep();
+      }
+      afterAction();
+    },
+
+    attack: () => {
+      const game = currentGame();
+      const ghosts = captureAttackGhosts();
+      const survivorIdsBefore = new Set(game.people.filter((person) => person.role !== 'police').map((person) => person.id));
+      const kills = game.kills;
+      const hit = attack(game);
+      if (hit) {
+        pendingMapAttackTarget = game.lastAttackedId ?? null;
+        pendingMapAttackGhost = pendingMapAttackTarget ? ghosts.get(pendingMapAttackTarget) ?? null : null;
+        if (pendingMapAttackTarget) updateAttackGhostEscapeDirection(pendingMapAttackGhost, pendingMapAttackTarget);
+        if (pendingMapAttackTarget && survivorIdsBefore.has(pendingMapAttackTarget)) playSurvivorHit(SURVIVOR_MAP[pendingMapAttackTarget]?.gender ?? 'male');
+      }
+      playKillerAttackSound(game);
+      if (game.kills > kills) playSurvivorDeath(SURVIVOR_MAP[game.lastAttackedId ?? '']?.gender ?? 'male');
+      lastLogHead = game.log[0] ?? '';
+      afterAction();
+    },
+
+    wipe: () => {
+      wipeBlade(currentGame());
+      playSfx('wipe');
+      afterAction();
+    },
+
+    'toggle-breaker': ({ target }) => {
+      const game = currentGame();
+      togglePowerCircuit(game, target.dataset.circuitId);
+      playSfx('breaker');
+      afterAction();
+    },
+
+    sabotage: () => {
+      sabotageSiteItem(currentGame());
+      playSfx('sabotage');
+      afterAction();
+    },
+
+    search: () => {
+      searchRoom(currentGame());
+      playSfx('click');
+      afterAction();
+    },
+
+    look: () => {
+      lookAround(currentGame());
+      playSfx('click');
+      render();
+    },
+
+    'look-cancel': () => {
+      cancelLookSelection(currentGame());
+      playSfx('click');
+      render();
+    },
+
+    'look-select': ({ target }) => {
+      const game = currentGame();
+      const room = target.dataset.room as RoomId | undefined;
+      if (room) {
+        lookAtRoom(game, room);
+        scene?.faceToward(room);
+      }
+      playSfx('click');
+      afterAction();
+    },
+
+    'aura-select': ({ target }) => {
+      const game = currentGame();
+      const room = target.dataset.room as RoomId | undefined;
+      if (room) selectAuraRoom(game, room);
+      playSfx('click');
+      render();
+    },
+
+    'aura-cancel': () => {
+      cancelAuraSelection(currentGame());
+      playSfx('click');
+      render();
+    },
+
+    'cabinet-interact': () => {
+      interactCabinet(currentGame());
+      playSfx('cabinet');
+      afterAction();
+    },
+
+    'totem-draw': (ctx) => runTotem(ctx, 'draw'),
+    'totem-energy': (ctx) => runTotem(ctx, 'energy'),
+
+    'break-barricade': ({ target }) => {
+      const game = currentGame();
+      const room = target.dataset.room as RoomId | undefined;
+      if (room && breakBarricade(game, room)) playSfx('barricadeSmash');
+      afterAction();
+    },
+
+    play: ({ target }) => {
+      const game = currentGame();
+      const ghosts = captureAttackGhosts();
+      const killsBefore = game.kills;
+      const survivorIdsBefore = new Set(game.people.filter((person) => person.role !== 'police').map((person) => person.id));
+      const oldLogs = new Set(game.log);
+      const cardUid = target.dataset.uid;
+      if (cardUid) playCard(game, cardUid);
+      if (game.kills > killsBefore) {
+        const deadId = [...survivorIdsBefore].find((id) => !game.people.some((person) => person.id === id));
+        if (deadId) playSurvivorDeath(SURVIVOR_MAP[deadId]?.gender ?? 'male');
+        lastLogHead = game.log[0] ?? '';
+      }
+      const newLogs = game.log.filter((line) => !oldLogs.has(line));
+      if (game.lastAttackedId && newLogs.some((line) => line.includes('你挥刀砍向') || line.includes('你俯身补上一刀'))) {
+        pendingMapAttackTarget = game.lastAttackedId;
+        pendingMapAttackGhost = ghosts.get(game.lastAttackedId) ?? null;
+        updateAttackGhostEscapeDirection(pendingMapAttackGhost, game.lastAttackedId);
+        if (survivorIdsBefore.has(game.lastAttackedId)) playSurvivorHit(SURVIVOR_MAP[game.lastAttackedId]?.gender ?? 'male');
+        playKillerAttackSound(game);
+      }
+      playSfx('click');
+      afterAction();
+    },
+
+    wait: () => {
+      waitAction(currentGame());
+      afterAction();
+    },
+
+    'finish-contract': () => {
+      finishContract(currentGame());
+      afterAction();
+    },
+
+    'end-turn': () => {
+      endTurn(currentGame());
+      playSfx('endturn');
+      afterAction();
+    },
+
+    'finish-free-hunt': () => {
+      if (finishFreeHunt(currentGame())) playSfx('win');
+      afterAction();
+    },
+
+    'give-up': () => {
+      giveUp(currentGame());
+      afterAction();
+    },
+
+    discard: ({ target }) => {
+      const game = currentGame();
+      const cardUid = target.dataset.uid;
+      if (cardUid) discardCard(game, cardUid);
+      afterAction();
+    },
+  };
+
+  /** 普通处决与指定目标处决只差一个 data-person-id。 */
+  function runExecute({ target, action }: ActionContext): void {
+    const game = currentGame();
     const personId = action === 'execute-target' ? target.dataset.personId : undefined;
     const ghosts = captureAttackGhosts();
-    const downedId = personId ?? game.people.find((person) => person.role !== 'police' && person.hp <= 0 && person.room === game?.playerRoom)?.id;
+    const downedId = personId ?? game.people.find((person) => person.role !== 'police' && person.hp <= 0 && person.room === game.playerRoom)?.id;
     const executed = executeDownedPerson(game, personId);
     if (executed) {
-      if (downedId) { pendingMapAttackTarget = downedId; pendingMapAttackGhost = ghosts.get(downedId) ?? null; }
-      const style = EXECUTION_STYLES[game.killer] ?? EXECUTION_STYLES['设陷者'];
+      if (downedId) {
+        pendingMapAttackTarget = downedId;
+        pendingMapAttackGhost = ghosts.get(downedId) ?? null;
+      }
+      const style = executionStyleOf(game);
       pendingExecutionScene = {
         roomId: game.playerRoom,
         title: style.title + ' · 普通处决',
@@ -1287,384 +1202,94 @@ app.addEventListener('click', (event) => {
       lastLogHead = game.log[0] ?? '';
     }
     afterAction();
-    return;
   }
 
-  if (action === 'execute-score-special') {
-    if (!game || screen !== 'game') return;
-    const personId = target.dataset.personId;
-    const ghosts = captureAttackGhosts();
-    const executed = !!personId && executeScoreSpecial(game, personId);
-    if (executed && personId) {
-      pendingMapAttackTarget = personId;
-      pendingMapAttackGhost = ghosts.get(personId) ?? null;
-      const style = EXECUTION_STYLES[game.killer] ?? EXECUTION_STYLES['设陷者'];
-      const perfect = qteOutcome === 'perfect';
-      applyExecutionQteOutcome(perfect ? 'perfect' : 'miss', style);
-      pendingExecutionScene = {
-        roomId: game.playerRoom,
-        title: style.title + ' · 分数处决' + (perfect ? ' · 完美 QTE' : ''),
-        description: style.action + '。' + style.line + (perfect ? ' 分数处决完成，QTE 完美，额外获得 25 分。' : ' 分数处决仍然完成，但 QTE 失误，没有额外分数。'),
-        style: style.motion,
-        success: true,
-      };
-      playSfx('execute');
-      playSfx(SURVIVOR_MAP[personId]?.gender === 'female' ? 'voiceFScream' : 'voiceMScream', 0.96);
-      window.setTimeout(() => playSfx('wipe'), 260);
-      lastLogHead = game.log[0] ?? '';
-    }
-    afterAction();
-    return;
-  }
-
-  if (action === 'drop-carried') {
-    if (!game || screen !== 'game') return;
-    if (dropCarriedPerson(game)) playSfx('click');
-    afterAction();
-    return;
-  }
-
-  if (action === 'carry') {
-    if (!game || screen !== 'game') return;
-    const personId = target.dataset.personId;
-    if (personId) carryPerson(game, personId);
-    afterAction();
-    return;
-  }
-
-  if (action === 'execute-special') {
-    if (!game || screen !== 'game') return;
-    playSfx('executionSite');
-    const method = target.dataset.method as ExecutionMethodId | undefined;
-    const methodInfo = method ? getExecutionMethod(method) : undefined;
-    const carriedId = game.carryPersonId;
-    const carried = carriedId ? game.people.find((person) => person.id === carriedId) : undefined;
-    if (method && executeCarriedPerson(game, method)) {
-      const style = EXECUTION_STYLES[game.killer] ?? EXECUTION_STYLES['设陷者'];
-      if (methodInfo && carried) {
-        pendingExecutionScene = {
-          roomId: game.playerRoom,
-          title: style.title + ' · 地点处决 · ' + methodInfo.name,
-          description: style.action + '。' + methodInfo.flavor(carried.name) + ' ' + style.line,
-          style: style.motion,
-          success: true,
-        };
-      }
-      playSfx('execute');
-      if (carried) playSfx(SURVIVOR_MAP[carried.id]?.gender === 'female' ? 'voiceFScream' : 'voiceMScream', 0.96);
-      window.setTimeout(() => playSfx('wipe'), 260);
-      lastLogHead = game.log[0] ?? '';
-    }
-    afterAction();
-    return;
-  }
-
-  if (action === 'power') {
-    if (!game || screen !== 'game') return;
-    const powerId = target.dataset.power;
-    const wasPossessed = game.possessed;
-    const used = powerId ? usePower(game, powerId) : false;
-    if (used && powerId === 'trap_set') playSfx('trapSet');
-    if (used && (powerId === 'wraith_bell' || powerId === 'wraith_rush')) playSfx('wraithPower');
-    if (!wasPossessed && game.possessed && game.killer === '迈克尔·迈尔斯') {
-      playSfx('possess');
-      if ((game.log[0] ?? '').includes('恶魔附身：')) lastLogHead = game.log[0];
-    }
-    afterAction();
-    return;
-  }
-
-  if (action === 'blink-select') {
-    if (!game || screen !== 'game') return;
-    const room = target.dataset.room as RoomId | undefined;
-    if (room && blinkPlayer(game, room)) playSfx('nurseBlink');
-    afterAction();
-    return;
-  }
-
-  if (action === 'hatchet-target') {
-    if (!game || screen !== 'game') return;
-    const personId = target.dataset.personId;
-    const ghosts = captureAttackGhosts();
-    const victimIsSurvivor = !!personId && game.people.some((person) => person.id === personId && person.role !== 'police');
-    const killsBefore = game.kills;
-    if (personId && throwHuntressHatchet(game, personId)) {
-      pendingMapAttackTarget = personId;
-      pendingMapAttackGhost = ghosts.get(personId) ?? null;
-      updateAttackGhostEscapeDirection(pendingMapAttackGhost, personId);
-      playSfx('huntressAxe');
-      if (victimIsSurvivor) playSurvivorHit(personId ? SURVIVOR_MAP[personId]?.gender ?? 'male' : 'male');
-      if (game.kills > killsBefore) playSurvivorDeath(SURVIVOR_MAP[personId]?.gender ?? 'male');
-      lastLogHead = game.log[0] ?? '';
-    }
-    afterAction();
-    return;
-  }
-
-  if (action === 'collect-trap') {
-    if (!game || screen !== 'game') return;
-    collectTrapCache(game);
-    afterAction();
-    return;
-  }
-
-  if (action === 'recover-trap') {
-    if (!game || screen !== 'game') return;
-    recoverBearTrap(game);
-    afterAction();
-    return;
-  }
-
-  if (action === 'refill-hatchets') {
-    if (!game || screen !== 'game') return;
-    refillHuntressHatchets(game);
-    afterAction();
-    return;
-  }
-
-  if (!game || screen !== 'game') return;
-
-  if (action === 'draw') {
-    drawCardAction(game);
-    afterAction();
-    return;
-  }
-
-  if (action === 'move') {
-    const room = target.dataset.room as RoomId | undefined;
-    if (!room) return;
-    // 走不过去时说清楚原因，而不是静默失败；只有真的走成了才播放脚步声，
-    // 否则「有脚步声但画面没动」会被当成渲染 bug。
-    const reason = moveBlockReason(game, room);
-    if (reason) {
-      noteToPlayer(game, reason);
-    } else {
-      movePlayer(game, room);
-      playStep();
-    }
-    afterAction();
-    return;
-  }
-
-  if (action === 'attack') {
-    const ghosts = captureAttackGhosts();
-    const survivorIdsBefore = new Set(game.people.filter((person) => person.role !== 'police').map((person) => person.id));
-    const kills = game.kills;
-    const hit = attack(game);
-    if (hit) {
-      pendingMapAttackTarget = game.lastAttackedId ?? null;
-      pendingMapAttackGhost = pendingMapAttackTarget ? ghosts.get(pendingMapAttackTarget) ?? null : null;
-      if (pendingMapAttackTarget) updateAttackGhostEscapeDirection(pendingMapAttackGhost, pendingMapAttackTarget);
-      if (pendingMapAttackTarget && survivorIdsBefore.has(pendingMapAttackTarget)) playSurvivorHit(SURVIVOR_MAP[pendingMapAttackTarget]?.gender ?? 'male');
-    }
-    playKillerAttackSound(game);
-    if (game.kills > kills) playSurvivorDeath(SURVIVOR_MAP[game.lastAttackedId ?? '']?.gender ?? 'male');
-    lastLogHead = game.log[0] ?? '';
-    afterAction();
-    return;
-  }
-
-  if (action === 'wipe') {
-    wipeBlade(game);
-    playSfx('wipe');
-    afterAction();
-    return;
-  }
-
-  if (action === 'toggle-breaker') {
-    const circuitId = target.dataset.circuitId;
-    togglePowerCircuit(game, circuitId);
-    playSfx('breaker');
-    afterAction();
-    return;
-  }
-
-  if (action === 'sabotage') {
-    sabotageSiteItem(game);
-    playSfx('sabotage');
-    afterAction();
-    return;
-  }
-
-  if (action === 'search') {
-    searchRoom(game);
+  /** 图腾互动：抽牌或补能量。 */
+  function runTotem(_ctx: ActionContext, reward: 'draw' | 'energy'): void {
+    interactTotem(currentGame(), reward);
     playSfx('click');
     afterAction();
-    return;
   }
 
-  if (action === 'look') {
-    lookAround(game);
-    playSfx('click');
-    render();
-    return;
-  }
+  const table: ActionTable = {};
+  for (const [name, run] of Object.entries(handlers)) table[name] = { scope: 'game', run };
+  return table;
+}
 
-  if (action === 'look-cancel') {
-    cancelLookSelection(game);
-    playSfx('click');
-    render();
-    return;
-  }
-
-  if (action === 'look-select') {
-    const room = target.dataset.room as RoomId | undefined;
-    if (room) { lookAtRoom(game, room); scene?.faceToward(room); }
-    playSfx('click');
+const registry = new ActionRegistry();
+registry.register('菜单与面板', createMenuActions({
+  getSave: () => save,
+  setSave: (next) => { save = next; },
+  render,
+  startGame,
+  leaveToMenu,
+}));
+registry.register('平衡面板', createAdminActions({ render }));
+registry.register('对局', createGameActions());
+registry.register('通用', {
+  mute: () => {
+    toggleMute();
     afterAction();
-    return;
-  }
-
-  if (action === 'aura-select') {
-    const room = target.dataset.room as RoomId | undefined;
-    if (room) selectAuraRoom(game, room);
-    playSfx('click');
-    render();
-    return;
-  }
-
-  if (action === 'aura-cancel') {
-    cancelAuraSelection(game);
-    playSfx('click');
-    render();
-    return;
-  }
-
-  if (action === 'cabinet-interact') {
-    interactCabinet(game);
-    playSfx('cabinet');
-    afterAction();
-    return;
-  }
-
-  if (action === 'totem-draw' || action === 'totem-energy') {
-    interactTotem(game, action === 'totem-draw' ? 'draw' : 'energy');
-    playSfx('click');
-    afterAction();
-    return;
-  }
-
-  if (action === 'break-barricade') {
-    const room = target.dataset.room as RoomId | undefined;
-    if (room && breakBarricade(game, room)) playSfx('barricadeSmash');
-    afterAction();
-    return;
-  }
-
-  if (action === 'play') {
-    const currentGame = game;
-    if (!currentGame || screen !== 'game') return;
-    const ghosts = captureAttackGhosts();
-    const killsBefore = currentGame.kills;
-    const survivorIdsBefore = new Set(currentGame.people.filter((person) => person.role !== 'police').map((person) => person.id));
-    const oldLogs = new Set(currentGame.log);
-    const cardUid = target.dataset.uid;
-    if (cardUid) playCard(currentGame, cardUid);
-    if (currentGame.kills > killsBefore) {
-      const deadId = [...survivorIdsBefore].find((id) => !currentGame.people.some((person) => person.id === id));
-      if (deadId) playSurvivorDeath(SURVIVOR_MAP[deadId]?.gender ?? 'male');
-      lastLogHead = currentGame.log[0] ?? '';
-    }
-    const newLogs = currentGame.log.filter((line) => !oldLogs.has(line));
-    if (currentGame.lastAttackedId && newLogs.some((line) => line.includes('你挥刀砍向') || line.includes('你俯身补上一刀'))) {
-      pendingMapAttackTarget = currentGame.lastAttackedId;
-      pendingMapAttackGhost = ghosts.get(currentGame.lastAttackedId) ?? null;
-      updateAttackGhostEscapeDirection(pendingMapAttackGhost, currentGame.lastAttackedId);
-      if (survivorIdsBefore.has(currentGame.lastAttackedId)) playSurvivorHit(SURVIVOR_MAP[currentGame.lastAttackedId]?.gender ?? 'male');
-      playKillerAttackSound(currentGame);
-    }
-    playSfx('click');
-    afterAction();
-    return;
-  }
-
-  if (action === 'wait') { waitAction(game); afterAction(); return; }
-  if (action === 'finish-contract') { finishContract(game); afterAction(); return; }
-
-  if (action === 'end-turn') {
-    endTurn(game);
-    playSfx('endturn');
-    afterAction();
-    return;
-  }
-
-  if (action === 'finish-free-hunt') {
-    if (!game || screen !== 'game') return;
-    if (finishFreeHunt(game)) playSfx('win');
-    afterAction();
-    return;
-  }
-
-  if (action === 'give-up') {
-    giveUp(game);
-    afterAction();
-  }
+  },
+  'display-setting': ({ target }) => {
+    const key = target.dataset.setting as keyof DisplaySettings | undefined;
+    if (key === 'interfaceScale' || key === 'fontScale' || key === 'mapScale') cycleDisplaySetting(key);
+  },
 });
 
-/* 平衡调整：任何输入/下拉变化都直接写回运行中的数据 */
+app.addEventListener('click', (event) => {
+  const target = (event.target as HTMLElement).closest<HTMLElement>('[data-action]');
+  if (!target) return;
+  clearHeldMovement();
+  const action = target.dataset.action;
+  if (!action) return;
+
+  // 分数处决：先在按钮上挂 QTE；QTE 结束后再次点击同一个按钮，这次才真正结算。
+  const qteOutcome = target.dataset.qteOutcome as ExecutionQteOutcome | undefined;
+  if (action === 'execute-score-special' && game && inGame() && !qteOutcome) {
+    startExecutionQte(target);
+    return;
+  }
+  if (qteOutcome) delete target.dataset.qteOutcome;
+
+  if (handleImmersiveAction(action)) return;
+
+  // 浏览器要求先有用户交互才允许出声
+  unlockAudio();
+
+  // 主菜单按钮音：选角色框有专属音效，其余大厅按钮统一一个轻音
+  if (ui().screen === 'menu' && !game && action !== 'mute') {
+    if (action === 'killer' || action === 'unlock-killer') playSfx('killerPick');
+    else if (action !== 'start' && action !== 'again') playSfx('menuButton');
+  }
+
+  const spec = registry.get(action);
+  if (!spec) {
+    // 渲染层产出了没人接的按钮时留下证据，而不是静默无响应。
+    console.warn('未注册的界面动作：', action);
+    return;
+  }
+
+  if ((spec.scope ?? 'any') === 'game') {
+    if (!game || !inGame()) return;
+    if (blockedByGameMode(action)) return;
+  }
+
+  spec.run({ target, action, qteOutcome });
+});
+
+/* 平衡调整：任何输入/下拉变化都直接写回运行中的数据（写回逻辑见 adminActions） */
 app.addEventListener('change', (event) => {
   const el = (event.target as HTMLElement).closest<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>('[data-tune],[data-addon]');
   if (!el) return;
-  const key = el.dataset.tune ?? '';
-  const addonKey = el.dataset.addon ?? '';
-  const parts = key.split('|');
-  const raw = el.value;
-  const isNumber = el instanceof HTMLInputElement && el.type === 'number';
-  const isCheckbox = el instanceof HTMLInputElement && el.type === 'checkbox';
-  // 数字框被清空时不写回，避免把可选字段（如 maxHp）误设成 0
-  if (isNumber && raw.trim() === '') return;
-  const value: number | string | boolean = isCheckbox ? el.checked : isNumber ? Number(raw) : raw;
-  let ok = false;
-
-  if (addonKey) {
-    const [id, path] = addonKey.split('|');
-    if (path === 'desc') {
-      setAddonDesc(id, String(value));
-      ok = true;
-    } else {
-      setAddonModValue(id, path as AccessoryModKey, Number(value));
-      ok = true;
-    }
-  } else if (parts[0] === 'card' && parts.length >= 3) {
-    const id = parts[1];
-    const path = parts[2];
-    if (path === 'name') { setCardName(id, String(value)); ok = true;
-    } else if (path === 'type') { setCardType(id, String(value) as 'attack' | 'skill' | 'tactic' | 'setup'); ok = true;
-    } else if (path === 'flavor') { setCardFlavor(id, String(value)); ok = true;
-    } else if (path === 'precheck') { setCardPrecheck(id, String(value)); ok = true;
-    } else if (path === 'cost') {
-      setCardCost(id, Number(value));
-      ok = true;
-    } else if (path === 'desc') {
-      setCardDesc(id, String(value));
-      ok = true;
-    } else if (path === 'noAction') {
-      setCardNoAction(id, Boolean(value));
-      ok = true;
-    } else {
-      ok = setCardOpValue(id, path, value);
-    }
-  } else if (parts[0] === 'power' && parts.length >= 4) {
-    const owner = parts[1];
-    const powerId = parts[2];
-    const path = parts.slice(3).join('|');
-    if (path === 'cooldown') {
-      setPowerCooldown(owner, powerId, Number(value));
-      ok = true;
-    } else {
-      ok = setPowerOpValue(owner, powerId, path, value);
-    }
-  }
-
-  if (ok) {
-    el.classList.add('tune-saved');
-    window.setTimeout(() => el.classList.remove('tune-saved'), 700);
-  }
+  if (!applyTuneChange(el)) return;
+  el.classList.add('tune-saved');
+  window.setTimeout(() => el.classList.remove('tune-saved'), 700);
 });
 
 /* 卡牌详情：鼠标悬停、键盘聚焦、触屏点按都能看见 */
 app.addEventListener('pointerover', (event) => {
-  if (!game || screen !== 'game') return;
+  if (!game || !inGame()) return;
   const card = (event.target as HTMLElement).closest<HTMLElement>('[data-card-uid]');
   if (card) {
     showCardDetail(card.dataset.cardUid ?? null);
@@ -1682,7 +1307,7 @@ app.addEventListener('pointerout', (event) => {
 });
 
 app.addEventListener('focusin', (event) => {
-  if (!game || screen !== 'game') return;
+  if (!game || !inGame()) return;
   const card = (event.target as HTMLElement).closest<HTMLElement>('[data-card-uid]');
   if (card) {
     showCardDetail(card.dataset.cardUid ?? null);
@@ -1701,7 +1326,7 @@ app.addEventListener('focusout', (event) => {
 
 
 window.addEventListener('keydown', (event) => {
-  if (!game || screen !== 'game' || event.altKey || event.ctrlKey || event.metaKey) return;
+  if (!game || !inGame() || event.altKey || event.ctrlKey || event.metaKey) return;
   const target = event.target as HTMLElement | null;
   if (target && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))) return;
   const key = event.key.toLowerCase();
