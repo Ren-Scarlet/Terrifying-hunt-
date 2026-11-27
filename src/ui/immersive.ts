@@ -290,6 +290,10 @@ export function installImmersiveKeys(): void {
     const target = event.target as HTMLElement | null;
     if (target && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))) return;
     const key = event.key.toLowerCase();
+    if (/^[1-4]$/.test(key) && !event.repeat) {
+      const ability = root?.querySelectorAll<HTMLButtonElement>('.killer-power-grid .btn.power')[Number(key) - 1];
+      if (ability && !ability.disabled) { event.preventDefault(); ability.click(); }
+    }
     if (key === '+' || key === '=') { event.preventDefault(); setZoom(zoom + 0.12); }
     else if (key === '-') { event.preventDefault(); setZoom(zoom - 0.12); }
     else if (key === '0') { event.preventDefault(); handleImmersiveAction('camera-global'); }
