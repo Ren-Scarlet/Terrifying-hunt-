@@ -343,10 +343,6 @@ export function executeOps(state: GameState, ops: Op[], runtime: EffectRuntime):
               : '恐惧释放：相邻房间没有可回应低语的人。');
             break;
           }
-          case 'hexRuin':
-            state.hexRuinActive = true;
-            log(state, '粉碎希望已启用：首次破坏设施会额外倒退团队进度。');
-            break;
           case 'stealthNext':
             state.stealthActions = Math.max(state.stealthActions, Number(op.value ?? 2));
             break;
