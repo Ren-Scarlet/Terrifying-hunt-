@@ -610,6 +610,7 @@ function caseMyersStalkingAndFearRadius(): void {
   hatchetTarget.room = huntress.playerRoom;
   hatchetTarget.hidden = false;
   huntress.energy = 4;
+  hatchetTarget.fear = 80;
   check('女猎手：开局携带 3 把飞斧并可进入瞄准状态',
     huntress.hatchets === 3 && usePower(huntress, 'huntress_axe') && huntress.huntressAiming);
   check('女猎手：投掷飞斧消耗 1 把、造成伤害，并使幸存者恐慌逃离',
