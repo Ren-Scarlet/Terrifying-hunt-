@@ -32,6 +32,7 @@ interface View {
 
 export interface SceneHandle {
   update(state: GameState): void;
+  faceToward(roomId: RoomId): void;
   destroy(): void;
 }
 
@@ -1195,6 +1196,14 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
 
   const handle: SceneInstance = {
     update,
+    faceToward(roomId: RoomId): void {
+      const from = rectOf(state.playerRoom, view);
+      const to = rectOf(roomId, view);
+      const dx = to.x + to.w / 2 - (from.x + from.w / 2);
+      const dy = to.y + to.h / 2 - (from.y + from.h / 2);
+      if (Math.abs(dx) + Math.abs(dy) > 1) facing = Math.atan2(dy, dx);
+      if (reduced) drawFrame(performance.now());
+    },
     attach(nextHost: HTMLElement, nextState: GameState): SceneHandle {
       const nextAnchor = resolveSceneAnchor(nextHost);
       if (nextAnchor !== anchor) {
