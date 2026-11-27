@@ -2186,3 +2186,25 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
 }
 
 /* Make the preview deployment update with the HUD branch, without merging it into main. */
+
+
+/* Preserve survivor-held item markers as a small badge on the portrait. */
+#app.immersive-game .floorplan .room-people .person-chip .chip-item {
+  position: absolute !important; z-index: 34 !important;
+  right: -7px !important; bottom: -4px !important;
+  display: inline-flex !important; align-items: center !important; gap: 2px !important;
+  max-width: 52px !important; padding: 2px 4px !important;
+  overflow: hidden !important; border: 1px solid rgba(210,190,150,.6) !important;
+  border-radius: 8px !important; color: #f0e3ce !important;
+  background: rgba(8,10,12,.96) !important; font-size: 7px !important;
+  white-space: nowrap !important;
+}
+#app.immersive-game .floorplan .room-people .person-chip .chip-item .item-icon {
+  width: 11px !important; height: 11px !important; object-fit: contain !important;
+}
+#app.immersive-game .killer-frenzy-meter > div:first-child > span {
+  display: inline-flex !important; align-items: center !important; gap: 4px !important;
+}
+#app.immersive-game .killer-frenzy-icon {
+  width: 14px !important; height: 14px !important; object-fit: contain !important;
+}
