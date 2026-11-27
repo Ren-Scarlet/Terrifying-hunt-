@@ -431,8 +431,9 @@ function forwardRoom(state: GameState): RoomId | null {
  * 其他相邻房间只显示轮廓，不会白送人物位置。
  */
 export function isRoomVisible(state: GameState, room: RoomId): boolean {
+  // 玩家只能看见当前房间与朝向前方的相邻房间；刚离开的房间不再保留在视野中。
+  // watchedRoom 仅供能力/追踪逻辑记录，不代表玩家仍能看见身后。
   if (room === state.playerRoom || room === forwardRoom(state)) return true;
-  if (room === state.watchedRoom && ROOM_MAP[state.playerRoom].neighbors.includes(room) && !isLocked(state, room) && !isLocked(state, state.playerRoom)) return true;
   return (state.scouted[room] ?? 0) > 0;
 }
 
