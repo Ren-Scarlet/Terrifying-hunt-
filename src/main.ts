@@ -679,6 +679,20 @@ let freshSightings = 0;
 /** 上一次「气场显形」的幸存者签名与全局气场计数：心跳只在气场出现/刷新时响一次。 */
 let lastAuraSignature = '';
 let lastPalletDropCount = 0;
+let lastCrowAlertCount = 0;
+
+/** 事件音效：用计数器触发，不依赖日志位置。 */
+function flushEventSounds(): void {
+  if (!game) return;
+  if ((game.palletDropCount ?? 0) > lastPalletDropCount) {
+    lastPalletDropCount = game.palletDropCount ?? 0;
+    playSfx('palletDrop');
+  }
+  if ((game.crowAlertCount ?? 0) > lastCrowAlertCount) {
+    lastCrowAlertCount = game.crowAlertCount ?? 0;
+    playSfx('crow');
+  }
+}
 let lastAuraActions = 0;
 
 /**
@@ -722,10 +736,7 @@ function announceNewSightings(): void {
 
 function afterAction(): void {
   pulseFeedback();
-  if (game && (game.palletDropCount ?? 0) > lastPalletDropCount) {
-    lastPalletDropCount = game.palletDropCount ?? 0;
-    playSfx('palletDrop');
-  }
+  flushEventSounds();
   announceNewSightings();
   pulseAuraHeartbeat();
   sfxFromLogs();
@@ -773,6 +784,7 @@ function startGame(freeHunt = false, loadout: string[] = []): void {
   lastAuraSignature = '';
   lastAuraActions = 0;
   lastPalletDropCount = 0;
+  lastCrowAlertCount = 0;
   if (qte) {
     window.clearTimeout(qte.timer);
     qte = null;

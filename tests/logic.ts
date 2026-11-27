@@ -2649,8 +2649,13 @@ function caseHexPhonesAndAlarm(): void {
   bird.sneaky = false;
   endTurn(crowGame);
   check('乌鸦：幸存者在乌鸦房间行动会发出动静',
-    crowGame.log.some((line) => line.includes('乌鸦')) || crowGame.disturbances.some((d) => d.label.includes('乌鸦')),
-    `crowRooms=${crowGame.crows.join(',')} log=${crowGame.log.slice(0, 2).join(' / ')}`);
+    (crowGame.log.some((line) => line.includes('乌鸦')) || crowGame.disturbances.some((d) => d.label.includes('乌鸦')))
+      && (crowGame.crowAlertCount ?? 0) >= 1,
+    `crowRooms=${crowGame.crows.join(',')} count=${crowGame.crowAlertCount} log=${crowGame.log.slice(0, 2).join(' / ')}`);
+
+  // 每局都应该有 3 间乌鸦房（用新局测，避免上面手动改过 crows）
+  const crowLayout = createGame(STARTING_DECK, undefined, '设陷者');
+  check('乌鸦：每局随机布置 3 间乌鸦房', crowLayout.crows.length === 3, `crows=${crowLayout.crows.join(',')}`);
 
   // 破门：相邻且上锁的门，1 AP 撞开
   const doorGame = createGame(STARTING_DECK, undefined, '设陷者');

@@ -607,6 +607,8 @@ export interface GameState {
   crows: RoomId[];
   /** 幸存者放下木板的累计次数（表现层用来放音效） */
   palletDropCount: number;
+  /** 乌鸦被惊动的累计次数（表现层用来放音效） */
+  crowAlertCount: number;
   /** 每间屋上次乌鸦被惊动的行动计数，用来做冷却 */
   crowAlerts: Record<string, number>;
   /** 本局随机布置的电话所在房间 */

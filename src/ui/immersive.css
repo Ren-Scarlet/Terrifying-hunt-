@@ -3233,3 +3233,85 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
 #app.immersive-game .floorplan .room-people {
   inset: 5px !important;
 }
+
+
+/* ------------------------------------------------------------------ */
+/* 互动标记贴着目标图标（木板 / 电话 / 门锁 / 图腾同一套）              */
+/* ------------------------------------------------------------------ */
+#app.immersive-game .floorplan .feature-anchor {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+#app.immersive-game .floorplan .feature-anchor .feature-action {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 6px);
+  transform: translateX(-50%);
+  z-index: 9;
+  min-height: 22px;
+  padding: 3px 8px;
+  border: 1px solid rgba(235, 200, 96, .75);
+  border-radius: 6px;
+  background: rgba(30, 24, 10, .96);
+  color: #ffe9a8;
+  font-size: 9px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  pointer-events: auto;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .85);
+}
+#app.immersive-game .floorplan .feature-anchor .feature-action:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+/* 状态图标随头像放大 */
+#app.immersive-game .floorplan .room.room-size-small .room-people .person-chip .chip-state .chip-state-icon {
+  width: 20px !important; height: 20px !important;
+}
+#app.immersive-game .floorplan .room.room-size-medium .room-people .person-chip .chip-state .chip-state-icon {
+  width: 26px !important; height: 26px !important;
+}
+#app.immersive-game .floorplan .room.room-size-large .room-people .person-chip .chip-state .chip-state-icon,
+#app.immersive-game .floorplan .room.room-size-open .room-people .person-chip .chip-state .chip-state-icon {
+  width: 32px !important; height: 32px !important;
+}
+
+/* 不再有任何红色边框/光晕 */
+#app.immersive-game .floorplan .map-person-wrap,
+#app.immersive-game .floorplan .map-person-wrap:hover,
+#app.immersive-game .floorplan .person-avatar {
+  border: 0 !important;
+  box-shadow: none !important;
+  outline: none !important;
+  filter: none !important;
+  animation: none !important;
+  background: none !important;
+}
+
+/* 木板高亮：只在相邻房间提示，不再全图亮 */
+#app.immersive-game .floorplan .room.board-near {
+  box-shadow: inset 0 0 0 2px rgba(231, 161, 93, .85), inset 0 0 22px rgba(231, 120, 60, .3) !important;
+}
+#app.immersive-game .floorplan .room.board-near .room-feature.pallet {
+  filter: drop-shadow(0 0 6px rgba(255, 150, 70, .9)) !important;
+}
+
+
+/* 去掉幸存者身上的红光方框（相邻房间 / 血祭品都不要再发光） */
+#app.immersive-game .floorplan .room-people.adjacent-survivors .person-chip .person-avatar-wrap,
+#app.immersive-game .floorplan .room-people .person-chip.blood-sacrifice .person-avatar-wrap {
+  border: 0 !important;
+  box-shadow: none !important;
+  outline: none !important;
+  background: none !important;
+  filter: none !important;
+}
+#app.immersive-game .floorplan .room-people.adjacent-survivors .person-chip .person-avatar-wrap .person-avatar {
+  filter: none !important;
+}
+#app.immersive-game .floorplan .room-people {
+  inset: 8px 6px 16px !important;
+}

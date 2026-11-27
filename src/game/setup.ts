@@ -36,9 +36,10 @@ function log(state: GameState, message: string): void {
  * 幸存者在这间屋做任何动作都会惊起乌鸦，给玩家一个不带技能的动静提示。
  */
 function pickCrowRooms(state: GameState, phones: RoomId[]): RoomId[] {
-  const pool = ROOMS
-    .filter((room) => room.id !== 'garden' && !phones.includes(room.id) && room.size !== 'small')
-    .map((room) => room.id);
+  const all = ROOMS.filter((room) => room.id !== 'garden').map((room) => room.id);
+  const preferred = all.filter((room) => !phones.includes(room));
+  // 先避开电话房，房间不够时再补上，保证每局都有 3 间乌鸦房
+  const pool = preferred.length >= 3 ? preferred : [...preferred, ...all.filter((room) => phones.includes(room))];
   const seedText = `crow|${state.mapId}|${state.mission.title}|${state.people.length}`;
   let seed = 2166136261;
   for (const ch of seedText) {
@@ -227,6 +228,7 @@ export function createGame(
     phones: [],
     crows: [],
     palletDropCount: 0,
+    crowAlertCount: 0,
     crowAlerts: {},
     brokenPhones: [],
     totemInteractions: [],

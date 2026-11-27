@@ -138,7 +138,11 @@ function roomFeatures(state: GameState, roomId: RoomId): string {
   // 电话只在已探索过的房间显示：没进去过就不该知道那儿有线
   if (state.explored.includes(roomId) && (state.phones ?? []).includes(roomId)) {
     const phoneBroken = (state.brokenPhones ?? []).includes(roomId) || state.phoneCut;
-    if (phoneBroken) parts.push(`<span class="room-feature telephone broken" title="电话已被砸坏：这间屋子没法报警了"><b>电话已坏</b></span>`);
+    if (phoneBroken) {
+      parts.push(`<span class="room-feature telephone broken" title="电话已被砸坏：这间屋子没法报警了"><b>电话已坏</b></span>`);
+    } else if (state.playerRoom === roomId) {
+      parts.push(`<span class="feature-anchor"><span class="room-feature telephone on" title="这间屋子的电话还能用：幸存者会来这里报警">${icon('phone', 'ui-icon tiny')}<b>电话</b></span><button type="button" class="feature-action" data-action="break-phone" ${state.energy < 1 ? 'disabled' : ''} title="砸坏这间屋子的电话：1 AP">砸坏电话 · 1 AP</button></span>`);
+    }
   }
   if (RADIO_ROOMS.includes(roomId)) {
     const radioBroken = state.sabotage.includes('radio');
@@ -158,7 +162,13 @@ function roomFeatures(state: GameState, roomId: RoomId): string {
       parts.push(`<span class="room-feature execution-site ${state.executionSiteHint === roomId ? 'nearest' : ''}" title="地点处决地点：${executionSites.map((method) => escape(method.name)).join(' / ')}"><img class="execution-site-icon" src="${uiIcon('executionSite')}" alt="" aria-hidden="true" onerror="this.style.display='none'"><b>处决点 ${executionSites.length}</b></span>`);
     }
   }
+  if ((state.crows ?? []).includes(roomId) && state.explored.includes(roomId)) {
+    parts.push(`<span class="room-feature crow-room" title="这间屋里有乌鸦：幸存者在这里行动会惊起它们">${icon('crow', 'ui-icon tiny')}<b>乌鸦</b></span>`);
+  }
   if (roomId === EXIT_ROOM) parts.push(`<span class="room-feature escape" title="撤离点：任务完成的撤离位置">${icon('escape', 'ui-icon tiny')}</span>`);
+  if (state.playerRoom !== roomId && ROOM_MAP[state.playerRoom].neighbors.includes(roomId) && isLocked(state, roomId)) {
+    parts.push(`<span class="feature-anchor"><span class="room-feature door-lock" title="电子门锁：切断对应区域电力可解除，也可在门外强行破门">🔒<b>电子门锁</b></span><button type="button" class="feature-action" data-action="break-door" data-room="${roomId}" ${state.energy < 1 ? 'disabled' : ''} title="强行撞开这扇电子门锁：1 AP">破门 · 1 AP</button></span>`);
+  }
   if (state.escapeRooms.includes(roomId)) parts.push(`<span class="room-feature escape-npc" title="警报达到阈值后开放的逃生点">${icon('escape', 'ui-icon tiny')}</span>`);
   if (TOTEM_ROOMS.includes(roomId) || state.totems.includes(roomId)) {
     const alive = state.totems.includes(roomId);
@@ -179,9 +189,11 @@ function roomFeatures(state: GameState, roomId: RoomId): string {
   const boardBlocksRoom = state.barricades.includes(roomId) || (OBSTACLE_ROOMS.includes(roomId) && !cleared && !state.possessed);
   if (boardBlocksRoom) {
     const canBreak = ROOM_MAP[state.playerRoom].neighbors.includes(roomId);
+    const label = state.barricades.includes(roomId) ? '幸存者木板封门' : '堵路木板';
+    const inner = `<span class="room-feature pallet" title="木板封门：靠近后可花费 1 AP 破坏">${icon('obstacle', 'ui-icon tiny')}<b>${label}</b></span>`;
     parts.push(canBreak
-      ? `<button type="button" class="room-feature pallet barricade-action" data-action="break-barricade" data-room="${roomId}" ${state.energy < 1 ? 'disabled' : ''} title="幸存者放下的木板：花费 1 AP 破坏，破坏后即可通过">${icon('obstacle', 'ui-icon tiny')}<b>破坏木板 · 1 AP</b></button>`
-      : `<span class="room-feature pallet" title="幸存者刚刚放下木板封住入口；靠近后可花费 1 AP 破坏">${icon('obstacle', 'ui-icon tiny')}<b>幸存者木板封门</b></span>`);
+      ? `<span class="feature-anchor">${inner}<button type="button" class="feature-action" data-action="break-barricade" data-room="${roomId}" ${state.energy < 1 ? 'disabled' : ''} title="砸碎这扇门上的木板：1 AP">破坏木板 · 1 AP</button></span>`
+      : inner);
   }
 
   return parts.join('');
@@ -460,9 +472,9 @@ function roomActionsHtml(state: GameState, roomId: RoomId): string {
 function personSlot(roomId: RoomId, personId: string, index: number): { x: number; y: number } {
   let hash = 0;
   for (const ch of roomId + personId) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
-  const x = 37 + (hash % 26) + (index % 3) * 3;
-  const y = 45 + ((hash >> 9) % 15) + Math.floor(index / 3) * 4;
-  return { x: Math.min(63, x), y: Math.min(60, y) };
+  const x = 42 + (hash % 18) + (index % 3) * 3;
+  const y = 52 + ((hash >> 9) % 13) + Math.floor(index / 3) * 4;
+  return { x: Math.min(61, x), y: Math.min(66, y) };
 }
   const rooms = ROOMS.map((room) => {
     const visible = isRoomVisible(state, room.id);
@@ -508,7 +520,7 @@ function personSlot(roomId: RoomId, personId: string, index: number): { x: numbe
     const r = room.rect;
     const style = `left:${r.left}%;top:${r.top}%;width:${r.width}%;height:${r.height}%`;
     return `
-      <div class="room ${isPlayer ? 'current' : ''} ${reachable ? 'reachable' : 'disabled'} ${adjacent ? 'adjacent' : ''} ${state.lookingAround && adjacent ? 'look-target' : ''} ${state.auraTargeting ? 'aura-target' : ''} ${blinkSelectable ? 'blink-target' : ''} ${obstacleOpen ? 'obstacle' : ''} ${darkRoom ? 'dark-room' : 'lit-room'} ${room.id === 'garden' ? 'outdoor' : ''} room-size-${room.size} ${locked ? 'locked' : ''} ${barricaded ? 'barricaded' : ''} ${explored ? 'explored' : 'unexplored'} ${visible ? 'in-sight' : 'fogged'}"
+      <div class="room ${isPlayer ? 'current' : ''} ${reachable ? 'reachable' : 'disabled'} ${adjacent ? 'adjacent' : ''} ${state.lookingAround && adjacent ? 'look-target' : ''} ${state.auraTargeting ? 'aura-target' : ''} ${blinkSelectable ? 'blink-target' : ''} ${obstacleOpen ? 'obstacle' : ''} ${darkRoom ? 'dark-room' : 'lit-room'} ${room.id === 'garden' ? 'outdoor' : ''} room-size-${room.size} ${locked ? 'locked' : ''} ${barricaded ? 'barricaded' : ''} ${adjacent && barricaded ? 'board-near' : ''} ${explored ? 'explored' : 'unexplored'} ${visible ? 'in-sight' : 'fogged'}"
         style="${style}" data-room="${room.id}" data-aura-count="${sensed}" title="${escape(room.name)}${explored ? `：${escape(room.desc)}` : '：还没进去过'}">
         ${state.auraTargeting
           ? `<button type="button" class="room-hit aura-hit" data-action="aura-select" data-room="${room.id}" aria-label="选择${escape(room.name)}，显示其中人类的气场">显形</button>`
@@ -564,7 +576,6 @@ function personSlot(roomId: RoomId, personId: string, index: number): { x: numbe
           ${ghosts.map(() => '<span class="ghost-chip" title="最后确认位置：人可能已经走了">?</span>').join('')}
         </div>
         ${sensed ? `<div class="room-shadows" title="你感觉到这里有人，但看不清是谁">${shadowFigures(sensed)}</div>` : ''}
-        ${roomActionsHtml(state, room.id)}
       </div>
     `;
   }).join('');
