@@ -3768,6 +3768,8 @@ export function blinkPlayer(state: GameState, room: RoomId): boolean {
   state.energy -= 1;
   state.playerRoom = room;
   markExplored(state, room);
+  // 闪现同样属于进入房间：屋内幸存者会察觉护士，并在门锁被闯入后尝试逃跑。
+  npcOnPlayerEnter(state);
   state.nurseBlinkTargeting = false;
   state.nurseFollowUp = true;
   state.nurseFatiguePending = true;
