@@ -47,6 +47,8 @@ import {
   breakerBlockReason,
   BREAKER_SWITCH_COST,
   missionTaskProgress,
+  scoreExecutionBlockReason,
+  SCORE_EXECUTION_THRESHOLD,
   isRoomLit,
 } from '../../game/engine';
 import { roomDistance } from '../../game/navigation';
@@ -137,7 +139,7 @@ function roomFeatures(state: GameState, roomId: RoomId): string {
     }
   }
   if (roomId === EXIT_ROOM) parts.push(`<span class="room-feature escape" title="撤离点：任务完成的撤离位置">${icon('escape', 'ui-icon tiny')}</span>`);
-  if (state.escapeRooms.includes(roomId)) parts.push(`<span class="room-feature escape-npc" title="团队第4阶段开启的逃生点">${icon('escape', 'ui-icon tiny')}</span>`);
+  if (state.escapeRooms.includes(roomId)) parts.push(`<span class="room-feature escape-npc" title="警报达到阈值后开放的逃生点">${icon('escape', 'ui-icon tiny')}</span>`);
   if (TOTEM_ROOMS.includes(roomId)) {
     if (state.totems.includes(roomId) && state.playerRoom === roomId && !state.totemInteractions.includes(roomId)) {
       parts.push(`<div class="room-feature totem totem-interaction">${icon('totem', 'ui-icon tiny')}<b>图腾</b><button type="button" data-action="totem-draw" title="本局仅可从这座图腾领取一次奖励">抽 1 张牌</button><button type="button" data-action="totem-energy" title="本局仅可从这座图腾领取一次奖励">+1 行动点</button></div>`);
@@ -493,7 +495,8 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
             ? `<div class="map-person-wrap">${personChip(p, false, false, undefined, !isRoomLit(state, p.room))}
                 <div class="person-world-actions">
                   <button class="btn" data-action="carry" data-person-id="${p.id}" ${state.energy < 1 ? 'disabled' : ''}>抱起</button>
-                  <button class="btn execute" data-action="execute-target" data-person-id="${p.id}" ${executeBlockReason(state) ? 'disabled' : ''}>处决</button>
+                  <button class="btn execute" data-action="execute-target" data-person-id="${p.id}" ${executeBlockReason(state, p.id) ? 'disabled' : ''} title="普通处决：消耗 1 AP，立即击杀倒地目标">普通处决</button>
+                  ${currentScore(state) >= SCORE_EXECUTION_THRESHOLD ? `<button class="btn score-execution-btn" data-action="execute-score-special" data-person-id="${p.id}" ${scoreExecutionBlockReason(state, p.id) ? 'disabled' : ''} title="分数处决：猎杀评分达到 ${SCORE_EXECUTION_THRESHOLD} 分后解锁，消耗 1 AP 并触发 QTE">✦ 分数处决 · QTE</button>` : ''}
                 </div>
               </div>`
             : personChip(
@@ -633,7 +636,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
     if (carriedPerson) guidanceDetail += ` 当前搬运目标：${carriedPerson.name}。`;
   } else if (downedHereNow) {
     guidanceTitle = '猎物已经倒地';
-    guidanceDetail = '现在可以立即处决，或花行动点搬运到特殊场地，尝试不同的处决方式；若拖延，同伴可能赶来救援。';
+    guidanceDetail = '普通处决可以立即完成；也可以抱起目标，搬运到指定地点执行地点处决。猎杀评分达到 ' + SCORE_EXECUTION_THRESHOLD + ' 分后，倒地目标头顶还会出现独立的「分数处决」QTE 按钮。若拖延，同伴可能赶来救援。';
   } else if (markedAlive) {
     const targetVisible = isPersonVisible(state, markedAlive);
     guidanceRoom = targetVisible ? markedAlive.room : markedAlive.lastSeenRoom;
