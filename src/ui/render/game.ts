@@ -47,7 +47,6 @@ import {
   BREAKER_SWITCH_COST,
   missionTaskProgress,
   isRoomLit,
-  getHuntOpportunities,
 } from '../../game/engine';
 import { roomDistance } from '../../game/navigation';
 import { executionMethodsAtRoom } from '../../game/executions';
@@ -861,10 +860,6 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
           <div id="cardDetail" class="detail-wrap">${defaultDetailHtml()}</div>
         </section>
 
-        <div class="panel hunt-opportunities-panel">
-        <div class="panel-heading"><h2>猎杀机会</h2><span>只显示当前视野中可利用的窗口</span></div>
-        ${huntOpportunityHtml(state)}
-        </div>
         </div>
         </details>
       </aside>
