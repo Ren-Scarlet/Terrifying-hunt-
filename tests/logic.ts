@@ -4,12 +4,16 @@
  */
 import { CARD_MAP, CARDS, STARTING_DECK, deckCardsForKiller } from '../src/game/data/cards';
 import { ACTIVE_KILLERS, KILLERS, STARTER_KILLERS } from '../src/game/data/killers';
+import { generateMission } from '../src/game/missions';
 import {
   ARCH_LABEL,
   BASE_AP,
   BLEEDOUT_TURNS,
   blinkPlayer,
   canPlaceBarricade,
+  executeScoreSpecial,
+  scoreExecutionBlockReason,
+  SCORE_EXECUTION_THRESHOLD,
   collectTrapCache,
   refillHuntressHatchets,
   throwHuntressHatchet,
@@ -606,6 +610,16 @@ function caseMyersStalkingAndFearRadius(): void {
     attack(nurseAttack, nurseAttackTarget.id) && nurseAttack.huntStats.nurseBlinkAttacks === 1 && !nurseAttack.nurseFollowUp);
 
   const huntress = createGame(STARTING_DECK, undefined, '女猎手');
+  const scoreExecution = createGame(STARTING_DECK, undefined, '设陷者');
+  const scoreTarget = player(scoreExecution);
+  scoreTarget.room = scoreExecution.playerRoom;
+  scoreTarget.hp = 0;
+  scoreExecution.mission.reward = SCORE_EXECUTION_THRESHOLD;
+  scoreExecution.energy = 4;
+  check('分数处决：达到评分门槛后可对同屋倒地目标发动独立处决',
+    scoreExecutionBlockReason(scoreExecution, scoreTarget.id) === '' && executeScoreSpecial(scoreExecution, scoreTarget.id) &&
+    scoreExecution.scoreExecutions === 1 && scoreExecution.executions === 1 && scoreExecution.specialExecutionBonus === 25);
+
   const hatchetTarget = player(huntress);
   hatchetTarget.room = huntress.playerRoom;
   hatchetTarget.hidden = false;
@@ -1626,6 +1640,12 @@ function caseAidAndPressure(): void {
 }
 
 caseAidAndPressure();
+
+const generatedKinds = new Set<string>();
+withRandomSource(createSeededRandom(20261127), () => {
+  for (let i = 0; i < 120; i += 1) generatedKinds.add(generateMission('设陷者').kind);
+});
+check('随机契约：准备开始后可随机抽取多种不同主目标', generatedKinds.size >= 5, `types=${generatedKinds.size}`);
 
 
 /** AB：组合契约、独立电闸联动、搬运与地形处决 */
