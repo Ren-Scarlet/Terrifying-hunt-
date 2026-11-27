@@ -439,6 +439,8 @@ export interface GameState {
   executionMethodsUsed: string[];
   npcAlarmed: boolean;
   carryPersonId: string | null;
+  /** 欣喜若狂标出的最近特殊处决地点。 */
+  executionSiteHint: RoomId | null;
   /** 当前搬运已走过的房间数；前 3 格安全，继续搬运需要 D6 检定。 */
   carryDistance: number;
   markedKilled: number;
