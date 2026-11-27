@@ -70,9 +70,7 @@
   }
 
   #app.immersive-game .objective {
-    top: calc(48px + env(safe-area-inset-top));
-    left: 9px;
-    max-width: calc(100vw - 18px);
+    display: none !important;
   }
 
   #app.immersive-game .objective span {
@@ -101,12 +99,12 @@
   /* Keep the resource readout clear of the left ability panel and right tools. */
   #app.immersive-game .statusline {
     z-index: 17;
-    top: calc(104px + env(safe-area-inset-top)) !important;
+    top: calc(54px + env(safe-area-inset-top)) !important;
     right: 51px !important;
     bottom: auto !important;
     left: auto !important;
     width: auto !important;
-    max-width: min(48vw, 220px) !important;
+    max-width: calc(50vw - 58px) !important;
     padding: 6px 7px;
     border: 1px solid rgba(205, 222, 231, .16);
     border-radius: 7px;
@@ -139,12 +137,12 @@
   /* Ability panel sits above the bottom controls instead of covering the cards. */
   #app.immersive-game .killer-ability-panel {
     z-index: 22;
-    top: calc(104px + env(safe-area-inset-top)) !important;
+    top: calc(54px + env(safe-area-inset-top)) !important;
     right: auto !important;
     bottom: auto !important;
     left: 7px !important;
-    width: min(190px, 47vw) !important;
-    max-width: 47vw !important;
+    width: min(190px, 45vw) !important;
+    max-width: 45vw !important;
     max-height: 29dvh !important;
     padding: 6px !important;
     overflow: auto !important;
