@@ -708,7 +708,11 @@ function exitsOf(room: RoomId, blocked?: RoomId): number {
   ).length;
 }
 
-const player = (s: GameState) => s.people.find((p) => p.role !== 'police')!;
+// 用函数声明而不是 const：下面有顶层的用例在声明之前就调用它，
+// const 会落进暂时性死区，模块一加载就抛 "player is not a function"。
+function player(s: GameState) {
+  return s.people.find((p) => p.role !== 'police')!;
+}
 
 /** A：已经起疑的人，不打卡牌直接推门 → 当场跑掉 */
 function caseBoltOnEnter(): void {
