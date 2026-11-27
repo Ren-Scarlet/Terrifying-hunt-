@@ -70,7 +70,6 @@ import {
 
 
 import { isCardTuned } from '../../game/tuning';
-import { PROPS } from '../scene/config';
 import { isMuted, playHeartbeat, playSfx, playTrapScream } from '../audio';
 import { escape, icon, itemBadge, itemIconHtml, personChip, shadowFigures, perkIconHtml, TYPE_NAMES, killerFaceHtml, defaultDetailHtml, cardTextHtml } from './shared';
 import type { GameState, Person, RoomId, SaveData } from '../../game/types';
@@ -79,15 +78,6 @@ let lastRenderedTrapTriggerCount: number | null = null;
 let lastRedFigureSignature = '';
 let lastDiscoveryMissionId: string | null = null;
 const discoveredSurvivorIds = new Set<string>();
-const POWER_GLYPHS: Record<string, string> = {
-  trap_set: '⌗', wraith_bell: '♧', wraith_rush: '➤', nurse_blink: '✧',
-  huntress_axe: '╱', ghost_stalk: '◉', ghost_nightfall: '☾', myers_gaze: '◎',
-  sadako_deluge: '〰', sadako_tape: '▤', freddy_sleep: 'Z', freddy_nightmare: '◌',
-  cannibal_sprint: '↗', cannibal_slaughter: '✕', executioner_chain: '⛓',
-  executioner_judge: '⚖', demogorgon_portal: '◉', demogorgon_maul: '⌁',
-  doctor_shock: 'ϟ', doctor_madness: '⌁', pig_ambush: '⌄', pig_baptism: '☠',
-};
-
 function roomFeatures(state: GameState, roomId: RoomId): string {
   const parts: string[] = [];
   const cleared = state.clearedObstacles.includes(roomId);
@@ -165,54 +155,6 @@ function roomFeatures(state: GameState, roomId: RoomId): string {
   return parts.join('');
 }
 
-const PROP_HINTS: Record<string, string> = {
-  bed: '床铺：幸存者可能躲在床底；发现藏匿者后可在当前房间搜索。',
-  wardrobe: '衣柜：可供幸存者藏匿；若有人藏在本房间，靠近后可搜索。',
-  desk: '书桌：留下匆忙翻找过的痕迹，通常没有直接互动。',
-  chair: '椅子：普通家具，可用于判断房间布局与遮挡。',
-  shelf: '架子 / 书架：堆放杂物的家具，没有直接互动。',
-  counter: '操作台：厨房或工作区域的台面，没有直接互动。',
-  fridge: '冰柜：特殊处决设施。抱起倒地幸存者并来到厨房后，可执行「冰柜封存」。',
-  stove: '炉灶：厨房设备，能提供环境线索，没有直接互动。',
-  table: '桌子：普通家具，桌面物品可能留下现场线索。',
-  rug: '地毯：普通地面装饰，可能遮住地板上的细小痕迹。',
-  fireplace: '壁炉：环境设施，没有直接互动。',
-  stairs: '楼梯：连接不同区域的通道装饰。',
-  car: '汽车：车库特殊处决场景的一部分。',
-  boiler: '锅炉：老旧供暖设备，没有直接互动。',
-  pipes: '管道：环境设施，能提示房间用途。',
-  crate: '木箱：堆放的杂物，没有直接互动。',
-  candles: '蜡烛：微弱光源，能提示房间内的照明状况。',
-  tree: '树木：户外遮挡物。',
-  bush: '灌木：户外遮挡物。',
-  fence: '围栏：限制户外区域边界。',
-  trash: '垃圾堆：杂物，没有直接互动。',
-  tires: '轮胎：车库杂物，没有直接互动。',
-  bench: '长凳：普通家具。',
-  lamp: '台灯：局部照明来源。',
-  plant: '盆栽：装饰物。',
-  sheet: '布帘 / 床单：遮挡视线的布料。',
-  puddle: '积水：地面湿滑痕迹，可能留下环境线索。',
-  clutter: '散落杂物：凌乱的现场物品。',
-};
-
-function roomPropHotspots(state: GameState, roomId: RoomId, explored: boolean): string {
-  if (!explored) return '';
-  const carried = state.carryPersonId ? state.people.find((person) => person.id === state.carryPersonId) : undefined;
-  const canExecuteHere = !!carried && carried.hp <= 0 && state.playerRoom === roomId;
-  const hiddenHere = state.people.some((person) => person.room === roomId && person.role !== 'police' && person.hidden);
-  return (PROPS[roomId] ?? []).map((prop) => {
-    let action = 'prop-info';
-    let attrs = '';
-    let hint = PROP_HINTS[prop.k] ?? '场景物品：没有直接互动。';
-    if (prop.k === 'fridge' && canExecuteHere) { action = 'execute-special'; attrs = 'data-method="fridge"'; hint = '冰柜封存：点击执行特殊处决。'; }
-    else if ((prop.k === 'wardrobe' || prop.k === 'bed') && state.playerRoom === roomId && hiddenHere) { action = 'search'; hint += ' 点击搜索当前房间。'; }
-    const left = (prop.x - prop.w / 2) * 100;
-    const top = (prop.y - prop.h / 2) * 100;
-    return '<button type="button" class="room-prop-hotspot" data-action="' + action + '" data-room="' + roomId + '" data-prop="' + prop.k + '" ' + attrs +
-      ' style="left:' + left.toFixed(2) + '%;top:' + top.toFixed(2) + '%;width:' + (prop.w * 100).toFixed(2) + '%;height:' + (prop.h * 100).toFixed(2) + '%" title="' + escape(hint) + '" aria-label="' + escape(hint) + '"></button>';
-  }).join('');
-};
 function doorMarkersHtml(state: GameState): string {
   const seen = new Set<string>();
   return ROOMS.flatMap((room) => room.neighbors.map((neighborId) => {
@@ -277,7 +219,7 @@ function powerButtonHtml(state: GameState, killer: KillerProfile): string {
     return `<button class="btn power ${power.ultimate ? 'ultimate' : 'main'} ${ok ? '' : 'cooling'} ${power.id === 'myers_gaze' && state.stalkMeter >= 100 ? 'possessed-ready' : ''}"
       data-action="power" data-power="${power.id}" ${ok ? '' : 'disabled'}
       title="${escape(power.desc)}${reason ? ` · ${escape(reason)}` : ''}">
-      <span class="power-art" aria-hidden="true"><span class="power-symbol">${POWER_GLYPHS[power.id] ?? '◆'}</span></span>
+      <span class="power-art" aria-hidden="true"><img class="power-icon" src="${killer.icon}" alt="" onerror="this.style.display='none'"></span>
       <span class="power-body"><b>${escape(label)}</b><small>${escape(actionHint)}</small></span>
       <span class="power-pips">${pips}</span>
     </button>`;
@@ -513,7 +455,6 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
             : !state.lookingAround && !state.huntressAiming && reachable
               ? `<button type="button" class="room-hit" data-action="move" data-room="${room.id}" aria-label="移动到${escape(room.name)}（需 ${cost} 点行动点）"></button>`
               : ''}
-        <div class="room-prop-hotspots">${roomPropHotspots(state, room.id, explored)}</div>
         <div class="room-head">
           <span class="room-name">${explored ? escape(room.name) : '？？？'}</span>
           ${noise ? `<span class="room-tag noise" title="${escape(noise.label)}">${icon('crow', 'crow-icon tiny')}动静</span>` : ''}
@@ -537,7 +478,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
              <div class="room-features">${roomFeatures(state, room.id)}</div>`
           : `<div class="room-unknown">未探索</div>
              <div class="room-features">${roomFeatures(state, room.id)}</div>`}
-        <div class="room-people">
+        <div class="room-people ${adjacent && people.length ? 'adjacent-survivors' : ''}">
           ${people.map((p) => p.hp <= 0 && p.room === state.playerRoom && !state.carryPersonId
             ? `<div class="map-person-wrap">${personChip(p, false, false, undefined, !isRoomLit(state, p.room))}
                 <div class="person-world-actions">
