@@ -25,7 +25,11 @@ import {
   lookAround,
   lookAtRoom,
   cancelLookSelection,
+  cancelAuraSelection,
   selectAuraRoom,
+  interactCabinet,
+  interactTotem,
+  breakBarricade,
   movePlayer,
   playCard,
   searchRoom,
@@ -80,7 +84,7 @@ import {
 import { renderAdmin } from './ui/admin';
 import { initCloudAuth, loadCloudConfig, saveCloudConfig, verifyGitHubToken, clearGitHubToken } from './game/cloud';
 import { mountFloorplanScene, type SceneHandle } from './ui/scene';
-import { playSfx, playSurvivorHit, setMusic, toggleMute, unlockAudio } from './ui/audio';
+import { playSfx, playSurvivorHit, playSurvivorDeath, setMusic, toggleMute, unlockAudio } from './ui/audio';
 import type { SfxName } from './ui/audio';
 import { currentMenuMap, rollMenuMap } from './ui/mapArt';
 
@@ -490,7 +494,7 @@ function sfxFromLogs(): void {
     playSfx('execute');
     window.setTimeout(() => playSfx('wipe'), 260);
   }
-  else if (/你杀死了/.test(head)) playSfx('kill');
+  else if (/你杀死了/.test(head)) { playSfx('kill'); playVoice(head, 'Scream'); }
   else if (/砸毁|断电|控制箱|电闸/.test(head)) {
     playSfx('breaker');
     window.setTimeout(() => playSfx('spark'), 150);
@@ -505,7 +509,7 @@ function sfxFromLogs(): void {
   else if (/受伤了（|在流血/.test(head)) playVoice(head, 'Hurt');
   else if (/喊了一声|警觉升到|尖叫/.test(head)) playVoice(head, 'Scream');
   else if (/猛一回头|忽然抬头|察觉到异常|发抖/.test(head)) playVoice(head, 'Startle');
-  else if (/停止了呼吸/.test(head)) playSfx('kill');
+  else if (/停止了呼吸/.test(head)) { playSfx('kill'); playVoice(head, 'Scream'); }
   else if (/致盲|击晕|手电筒|逼退/.test(head)) playSfx('stun');
   else if (/乌鸦|动静/.test(head)) playSfx('crow');
   else if (/翻出了|拾起|拿到了武器/.test(head)) playSfx('pickup');
@@ -931,6 +935,8 @@ app.addEventListener('click', (event) => {
   // 查看选房期间只接受选房或取消，避免误触卡牌、移动等其他行动。
   if (game && screen === 'game' && game.lookingAround &&
       !['look-select', 'look-cancel', 'mute', 'guide'].includes(action ?? '')) return;
+  if (game && screen === 'game' && game.auraTargeting &&
+      !['aura-select', 'aura-cancel', 'mute', 'guide'].includes(action ?? '')) return;
 
   if (action === 'person') {
     const personId = target.dataset.personId;
@@ -967,7 +973,7 @@ app.addEventListener('click', (event) => {
         if (victimIsSurvivor) playSurvivorHit(SURVIVOR_MAP[personId]?.gender ?? 'male');
       }
       playKillerAttackSound(game);
-      if (game.kills > killsBefore) playSfx('kill');
+      if (game.kills > killsBefore) playSurvivorDeath(SURVIVOR_MAP[personId]?.gender ?? 'male');
       lastLogHead = game.log[0] ?? '';
     }
     afterAction();
@@ -983,6 +989,7 @@ app.addEventListener('click', (event) => {
     if (executed) {
       if (downedId) { pendingMapAttackTarget = downedId; pendingMapAttackGhost = ghosts.get(downedId) ?? null; }
       playSfx('execute');
+      if (downedId) playSfx(SURVIVOR_MAP[downedId]?.gender === 'female' ? 'voiceFScream' : 'voiceMScream', 0.96);
       window.setTimeout(() => playSfx('wipe'), 260);
       lastLogHead = game.log[0] ?? '';
     }
@@ -1020,6 +1027,7 @@ app.addEventListener('click', (event) => {
         };
       }
       playSfx('execute');
+      if (carried) playSfx(SURVIVOR_MAP[carried.id]?.gender === 'female' ? 'voiceFScream' : 'voiceMScream', 0.96);
       window.setTimeout(() => playSfx('wipe'), 260);
       lastLogHead = game.log[0] ?? '';
     }
@@ -1193,6 +1201,34 @@ app.addEventListener('click', (event) => {
     if (room) selectAuraRoom(game, room);
     playSfx('click');
     render();
+    return;
+  }
+
+  if (action === 'aura-cancel') {
+    cancelAuraSelection(game);
+    playSfx('click');
+    render();
+    return;
+  }
+
+  if (action === 'cabinet-interact') {
+    interactCabinet(game);
+    playSfx('click');
+    afterAction();
+    return;
+  }
+
+  if (action === 'totem-draw' || action === 'totem-energy') {
+    interactTotem(game, action === 'totem-draw' ? 'draw' : 'energy');
+    playSfx('click');
+    afterAction();
+    return;
+  }
+
+  if (action === 'break-barricade') {
+    const room = target.dataset.room as RoomId | undefined;
+    if (room && breakBarricade(game, room)) playSfx('smash');
+    afterAction();
     return;
   }
 
