@@ -46,6 +46,7 @@ import {
   SITE_ITEM_LABEL,
   SURVIVOR_ITEM_LABEL,
   sabotageBlockReason,
+  phoneWorks,
   breakerBlockReason,
   BREAKER_SWITCH_COST,
   missionTaskProgress,
@@ -63,7 +64,6 @@ import {
   CABINET_ROOMS,
   EXIT_ROOM,
   OBSTACLE_ROOMS,
-  PHONE_ROOMS,
   RADIO_ROOMS,
   ROOM_MAP,
   ROOMS,
@@ -136,8 +136,12 @@ function roomFeatures(state: GameState, roomId: RoomId): string {
   if (state.trapCaches.includes(roomId)) {
     parts.push('<span class="room-feature trap-cache" title="捕兽夹补给：设陷者可在此收集额外捕兽夹">＋<b>陷阱补给</b></span>');
   }
-  if (PHONE_ROOMS.includes(roomId)) {
-    parts.push(`<span class="room-feature telephone ${state.phoneCut ? 'broken' : 'on'}" title="电话：${state.phoneCut ? '线路已中断，跨区域协调受限' : '线路正常，可进行远程求救协调'}">☎<b>电话</b></span>`);
+  // 电话只在已探索过的房间显示：没进去过就不该知道那儿有线
+  if (state.explored.includes(roomId) && (state.phones ?? []).includes(roomId)) {
+    const phoneBroken = (state.brokenPhones ?? []).includes(roomId) || state.phoneCut;
+    parts.push(phoneBroken
+      ? `<span class="room-feature telephone broken" title="电话已被砸坏：这间屋子没法报警了"><b>电话已坏</b></span>`
+      : `<button type="button" class="room-feature telephone on phone-action" data-action="break-phone" title="这间屋子的电话还能用，幸存者会来这里报警。点此砸坏它（1 AP）"><b>砸坏电话 · 1 AP</b></button>`);
   }
   if (RADIO_ROOMS.includes(roomId)) {
     const radioBroken = state.sabotage.includes('radio');
@@ -292,7 +296,7 @@ function facilityOverviewHtml(state: GameState): string {
       <span class="facility-pill"><i>▣</i><b>道具箱</b><strong>${boxes.filter((item) => !item.broken && item.charges > 0).length}/${boxes.length}</strong></span>
       <span class="facility-pill">${icon('generator', 'ui-icon tiny')}<b>电闸</b><strong>${darkCircuits} 组断电</strong></span>
       
-      <span class="facility-pill ${state.phoneCut ? 'offline' : ''}"><i>☎</i><b>电话线</b><strong>${state.phoneCut ? '中断' : '正常'}</strong></span>
+      <span class="facility-pill ${state.phoneCut || (state.brokenPhones ?? []).length >= (state.phones ?? []).length ? 'offline' : ''}"><b>电话线</b><strong>${state.phoneCut ? '中断' : '正常'}</strong></span>
       <span class="facility-pill ${radioBroken ? 'offline' : ''}"><i>▤</i><b>备用无线电</b><strong>${radioBroken ? '已破坏' : '可用'}</strong></span>
       ${killerSupplies}
     </div>
@@ -481,8 +485,9 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
     const r = room.rect;
     const style = `left:${r.left}%;top:${r.top}%;width:${r.width}%;height:${r.height}%`;
     return `
-      <div class="room ${isPlayer ? 'current' : ''} ${reachable ? 'reachable' : 'disabled'} ${adjacent ? 'adjacent' : ''} ${state.lookingAround && adjacent ? 'look-target' : ''} ${state.auraTargeting ? 'aura-target' : ''} ${blinkSelectable ? 'blink-target' : ''} ${obstacleOpen ? 'obstacle' : ''} ${darkRoom ? 'dark-room' : 'lit-room'} ${room.id === 'garden' ? 'outdoor' : ''} room-size-${room.size} ${locked ? 'locked' : ''} ${barricaded ? 'barricaded' : ''} ${explored ? 'explored' : 'unexplored'} ${visible ? 'in-sight' : 'fogged'}"
+      <div class="room ${isPlayer ? 'current' : ''} ${reachable ? 'reachable' : 'disabled'} ${adjacent ? 'adjacent' : ''} ${state.lookingAround && adjacent ? 'look-target' : ''} ${state.auraTargeting ? 'aura-target' : ''} ${blinkSelectable ? 'blink-target' : ''} ${obstacleOpen ? 'obstacle' : ''} ${state.totems.includes(room.id) ? 'totem-lit' : ''} ${darkRoom ? 'dark-room' : 'lit-room'} ${room.id === 'garden' ? 'outdoor' : ''} room-size-${room.size} ${locked ? 'locked' : ''} ${barricaded ? 'barricaded' : ''} ${explored ? 'explored' : 'unexplored'} ${visible ? 'in-sight' : 'fogged'}"
         style="${style}" data-room="${room.id}" data-aura-count="${sensed}" title="${escape(room.name)}${explored ? `：${escape(room.desc)}` : '：还没进去过'}">
+        ${state.totems.includes(room.id) ? '<span class="totem-aura" aria-hidden="true"></span>' : ''}
         ${state.auraTargeting
           ? `<button type="button" class="room-hit aura-hit" data-action="aura-select" data-room="${room.id}" aria-label="选择${escape(room.name)}，显示其中人类的气场">显形</button>`
           : state.nurseBlinkTargeting
@@ -700,7 +705,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
   const possessed = state.possessed;
   const sabotageReason = sabotageBlockReason(state);
   const lockedDoor = ROOM_MAP[state.playerRoom].neighbors.find((room) => isLocked(state, room));
-  const sabotageHere = state.powerCircuits.some((c) => c.breakerRoom === state.playerRoom && !c.broken) || state.siteItems.some((item) => item.room === state.playerRoom && !item.broken) ? '破坏现场设施' : PHONE_ROOMS.includes(state.playerRoom) && !state.phoneCut ? '剪断电话线' : RADIO_ROOMS.includes(state.playerRoom) && !state.sabotage.includes('radio') ? '破坏备用无线电' : lockedDoor ? `撞开通往${roomName(lockedDoor)}的门锁` : '破坏现场设施';
+  const sabotageHere = state.powerCircuits.some((c) => c.breakerRoom === state.playerRoom && !c.broken) || state.siteItems.some((item) => item.room === state.playerRoom && !item.broken) ? '破坏现场设施' : phoneWorks(state, state.playerRoom) ? '砸坏电话' : RADIO_ROOMS.includes(state.playerRoom) && !state.sabotage.includes('radio') ? '破坏备用无线电' : lockedDoor ? `撞开通往${roomName(lockedDoor)}的门锁` : '破坏现场设施';
   const sabotageTitle = sabotageReason ?? `${sabotageHere}。消耗 ${SABOTAGE_COST} 点行动点；强行破门会惊动屋内的人。`;
   const sabotageMeta = sabotageReason ? escape(sabotageReason) : `${SABOTAGE_COST} 点 · ${sabotageHere}`;
   const sabotageBtn = `<button class="btn sabotage ${sabotageReason ? 'spent' : ''}" data-action="sabotage" ${sabotageReason ? 'disabled' : ''}

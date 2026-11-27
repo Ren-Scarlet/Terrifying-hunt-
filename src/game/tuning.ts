@@ -422,7 +422,7 @@ const REQUIRED_OP_FIELDS: Record<string, string[]> = {
   alert: ['who', 'amount'], block: ['who', 'turns'], status: ['who', 'status', 'turns'], pin: ['who'],
   move: ['who', 'to'], teleportPlayer: ['to'], lockRoom: ['room', 'turns'], track: ['who', 'turns'],
   lure: ['to', 'count'], alarm: ['amount'], sabotage: ['key'], draw: ['amount'], energy: ['amount'],
-  fearFlee: ['amount'], revealExecutionSite: ['turns'],
+  fearFlee: ['amount'], revealExecutionSite: ['turns'], revealPanicked: ['turns'],
   steps: ['amount'], stun: ['amount'], discount: ['amount'], bonusDamage: ['amount'], arrestThreshold: ['amount'],
   heal: ['who', 'amount'], rescue: ['who'], bleed: ['who', 'amount'], stalk: ['amount'],
   silenceAlarm: ['turns'], flag: ['key'], log: ['text'], if: ['cond', 'then'],

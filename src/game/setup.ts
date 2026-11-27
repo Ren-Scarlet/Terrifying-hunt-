@@ -1,4 +1,4 @@
-import { random, randomOf, shuffle } from './random';
+import { createSeededRandom, random, randomOf, shuffle } from './random';
 import { CARD_MAP } from './cards';
 import { KILLER_MAP } from './killers';
 import { ACCESSORY_MAP, sanitizeAccessoryLoadout } from './accessories';
@@ -12,7 +12,7 @@ import {
 import {
   ENTRY_ROOM, EXIT_ROOM, OBSTACLE_ROOMS, ROOM_MAP, ROOMS, TOTEM_ROOMS, buildLayout,
 } from './rooms';
-import type { CardInstance, GameState, Mission, SiteItem } from './types';
+import type { CardInstance, GameState, Mission, SiteItem, RoomId } from './types';
 import { drawCards } from './deck';
 import { roomDistance } from './navigation';
 import { applyHuntingGround, getHuntingGround, type HuntingGroundId } from './maps';
@@ -23,6 +23,32 @@ const uid = (prefix: string) => `${prefix}-${Date.now()}-${cardUidCounter++}`;
 function log(state: GameState, message: string): void {
   state.log.unshift(`[第 ${state.turn} 回合] ${message}`);
   if (state.log.length > 60) state.log.length = 60;
+}
+
+
+/**
+ * 电话位置每局随机：从非逃生、非后院的房间里抽 2 间。
+ * 用固定种子之外的随机源，保证每局位置不同；太小的房间不放电话。
+ */
+function pickPhoneRooms(state: GameState): RoomId[] {
+  const candidates = ROOMS
+    .filter((room) => room.id !== 'garden' && !ESCAPE_ROOMS.includes(room.id) && room.size !== 'small')
+    .map((room) => room.id);
+  const pool = candidates.length >= 2 ? candidates : ROOMS.map((room) => room.id);
+  // 独立种子：只由这一局的布局 / 契约 / 人数决定，不消耗全局随机序列。
+  const seedText = `${state.mapId}|${state.mission.title}|${state.playerRoom}|${state.people.length}`;
+  let seed = 2166136261;
+  for (const ch of seedText) {
+    seed ^= ch.codePointAt(0) ?? 0;
+    seed = Math.imul(seed, 16777619) >>> 0;
+  }
+  const pick = createSeededRandom(seed);
+  const picked: RoomId[] = [];
+  while (picked.length < 2 && pool.length) {
+    const index = Math.floor(pick() * pool.length);
+    picked.push(pool.splice(index, 1)[0]);
+  }
+  return picked;
 }
 
 export function createGame(
@@ -173,6 +199,8 @@ export function createGame(
     hexNoedBonusGranted: false,
     distressingActive: false,
     totems: [...TOTEM_ROOMS],
+    phones: [],
+    brokenPhones: [],
     totemInteractions: [],
     bonusEnergyNextTurn: 0,
     clearedObstacles: [],
@@ -261,6 +289,8 @@ export function createGame(
     : '本局没有携带配件。想带配件的话，下次出发前在装配界面选好两件。');
   log(state, '留意每个人的恐惧值与警戒值：恐惧会使人崩溃，警戒会促使人报警或逃跑。');
   log(state, `屋里有 ${items.length} 个道具箱；照明由各区域电闸独立控制。`);
+  // 电话放在最后抽：不改变前面布局 / NPC / 物品的随机序列，避免影响既有对局与测试。
+  state.phones = pickPhoneRooms(state);
   return state;
 }
 

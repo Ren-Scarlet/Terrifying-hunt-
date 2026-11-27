@@ -601,6 +601,10 @@ export interface GameState {
   hexNoedBonusGranted: boolean;
   distressingActive: boolean;
   totems: RoomId[];
+  /** 本局随机布置的电话所在房间 */
+  phones: RoomId[];
+  /** 已经被玩家砸坏的电话（按房间记） */
+  brokenPhones: RoomId[];
   /** 本局已经从哪些图腾领取过一次性互动奖励，防止反复刷取。 */
   totemInteractions: RoomId[];
   /** 图腾提供的下回合额外行动点 */

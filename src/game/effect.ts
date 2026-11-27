@@ -219,6 +219,8 @@ export type Op =
   | { op: 'arrestThreshold'; amount: number }
   /** 暴露全场所有人的位置（写进日志 + 地图上显示意图） */
   | { op: 'reveal' }
+  /** 只显露一名「恐惧（60+）」以上的幸存者气场，持续 turns 次行动 */
+  | { op: 'revealPanicked'; turns: number }
   | { op: 'heal'; who: Who; amount: number }
   /** 救援倒地的人：倒地 → 受伤 */
   | { op: 'rescue'; who: Who }

@@ -44,6 +44,7 @@ export const SABOTAGE_OPTIONS = [
 export const EFFECT_OPS: Record<Op['op'], EffectOpMeta> = {
   attack: { label: '发动攻击（命中后效果）', fields: [['who', 'who'], ['bleedTurns', 'num'], ['status', 'status'], ['statusTurns', 'num']] },
   damage: { label: '伤害', fields: [['who', 'who'], ['amount', 'num'], ['maxHp', 'num']] },
+  revealPanicked: { label: '恐慌显形', fields: [['turns', 'num']] },
   down: { label: '击倒', fields: [['who', 'who']] },
   execute: { label: '处决', fields: [['who', 'who']] },
   kill: { label: '即死', fields: [['who', 'who']] },

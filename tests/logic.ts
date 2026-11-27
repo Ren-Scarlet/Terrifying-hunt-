@@ -32,6 +32,10 @@ import {
   calculateHuntStyleRating,
   triggerBearTrapForPerson,
   sabotageSiteItem,
+  breakPhone,
+  addAlarm,
+  workingPhones,
+  phoneWorks,
   togglePowerCircuit,
   breakerBlockReason,
   BREAKER_SWITCH_COST,
@@ -81,7 +85,7 @@ import {
 import { CABINET_ROOMS, OBSTACLE_ROOMS, PHONE_ROOMS, RADIO_ROOMS, ROOM_MAP, ROOMS, buildLayout, doorMarkerPosition, layoutAspect } from '../src/game/rooms';
 import { cardImage } from '../src/game/assetMap';
 import { readdirSync } from 'node:fs';
-import { personChip, personDetailHtml } from '../src/ui/render/shared';
+import { getKiller, personChip, personDetailHtml } from '../src/ui/render/shared';
 import { SURVIVOR_MAP } from '../src/game/survivors';
 import { generateMission, generateFreeHunt, withAnte } from '../src/game/missions';
 import {
@@ -934,15 +938,18 @@ function caseFinisher(): void {
 /** G：猎杀动作必须明确区分，人物档案必须展示背景与实时状态。 */
 function caseHuntActionAndDossierUi(): void {
   const s = newGame();
-  const victim = player(s);
+  // 随机生成的住客不一定在图鉴里有 bio，挑一个确实有背景的那位来断言
+  const victim = s.people
+    .filter((person) => person.role !== 'police')
+    .find((person) => SURVIVOR_MAP[person.id]?.bio) ?? player(s);
   victim.room = s.playerRoom;
   victim.hp = 0;
   victim.downedTurns = 0;
   victim.activity = '倒在地上，试图呼救';
   s.energy = 3;
   const dossier = personDetailHtml(s, victim.id);
-  check('G 人物档案显示角色背景',
-    dossier.includes(SURVIVOR_MAP[victim.id].bio));
+  const bio = SURVIVOR_MAP[victim.id]?.bio;
+  check('G 人物档案显示角色背景', !bio || dossier.includes(bio));
   check('G 人物档案显示当前状态与正在做的事',
     dossier.includes('倒地') && dossier.includes('倒在地上，试图呼救'));
 }
@@ -1304,13 +1311,14 @@ function caseWitnessFearAndUnifiedSabotage(): void {
     `alert=${inside.alert} fear=${inside.fear}`);
 
   const phone = newGame();
-  phone.playerRoom = PHONE_ROOMS[0];
+  phone.playerRoom = phone.phones[0];
   phone.phoneCut = false;
   phone.powerCircuits = phone.powerCircuits.filter((circuit) => circuit.breakerRoom !== phone.playerRoom);
   phone.siteItems = phone.siteItems.filter((item) => item.room !== phone.playerRoom);
   phone.energy = 4;
   const phoneBroken = sabotageSiteItem(phone);
-  check('统一破坏：电话房可直接剪断电话线', phoneBroken && phone.phoneCut);
+  check('统一破坏：电话房里可以砸坏这一部电话（只影响这间房）',
+    phoneBroken && phone.brokenPhones.includes(phone.playerRoom) && !phoneWorks(phone, phone.playerRoom));
 }
 
 /** 恐惧满值后再次受到攻击会直接倒地；警戒与恐惧保持独立。 */
@@ -2033,10 +2041,21 @@ function caseNewPerkSystem(): void {
   noedTarget.hp = 4;
   noed.energy = 6;
   noed.attackReady = true;
+  // 警报没满时不应一刀倒地（这是玩家反馈的回归点）
+  const noedEarly = attack(noed, noedTarget.id);
+  check('难逃一死：警报未满时只是一次普通命中（1 点伤害）',
+    noedPlayed && noed.alarm < 100 && noedEarly && noedTarget.hp === 3,
+    `alarm=${noed.alarm} hp=${noedTarget.hp} totems=${noed.totems.length}`);
+
+  noed.alarm = 100;
+  noedTarget.hp = 4;
+  noed.energy = 6;
+  noed.attackReady = true;
+  noedTarget.room = noed.playerRoom;
   const noedAttack = attack(noed, noedTarget.id);
-  check('难逃一死：只要厄咒图腾仍在，攻击命中就直接击倒而非处决',
-    noedPlayed && noed.totems.length > 0 && noedAttack && noed.people.some((person) => person.id === noedTarget.id && person.hp === 0),
-    `played=${noedPlayed} attacked=${noedAttack} totems=${noed.totems.length} targetPresent=${noed.people.some((person) => person.id === noedTarget.id)} hp=${noedTarget.hp}`);
+  check('难逃一死：警报拉满且图腾仍在时，攻击命中直接倒地',
+    noed.totems.length > 0 && noedAttack && noed.people.some((person) => person.id === noedTarget.id && person.hp === 0),
+    `alarm=${noed.alarm} attacked=${noedAttack} totems=${noed.totems.length} hp=${noedTarget.hp}`);
 
   const bitter = createGame(['bitter_murmur'], undefined, '迈克尔·迈尔斯');
   const bitterTarget = bitter.people.find((person) => person.role !== 'police')!;
@@ -2225,8 +2244,10 @@ check('苦涩低语：出牌后会等待下一次人类死亡，再触发全场�
 // 点击走不进去时必须给出原因，而不是静默失败
 {
   const mv = newGame();
-  const target = ROOM_MAP[mv.playerRoom].neighbors[0];
   mv.energy = BASE_AP;
+  const target = ROOM_MAP[mv.playerRoom].neighbors.find((id) =>
+    !OBSTACLE_ROOMS.includes(id) && !isLocked(mv, id) && !mv.barricades.includes(id),
+  ) ?? ROOM_MAP[mv.playerRoom].neighbors[0];
   check('移动提示：行动点够、房间相邻时可以走', moveBlockReason(mv, target) === null, String(moveBlockReason(mv, target)));
   mv.energy = 0;
   const blocked = moveBlockReason(mv, target);
@@ -2480,25 +2501,22 @@ check('苦涩低语：出牌后会等待下一次人类死亡，再触发全场�
     puttee.maxEnergy === BASE_AP + 1 && puttee.energy === BASE_AP + 1 && puttee.hatchets === 2,
     `ap=${puttee.maxEnergy} axes=${puttee.hatchets}`);
 
-  const nurse = createGame(STARTING_DECK, undefined, '护士', 'lampkin', ['campbells_last_breath']);
-  let farPair: [RoomId, RoomId] | null = null;
-  for (const from of ROOMS) {
-    for (const to of ROOMS) {
-      if (roomDistance(from.id, to.id) === 4) { farPair = [from.id, to.id]; break; }
+  const blinkAtDistance = (state: ReturnType<typeof createGame>, distance: number): boolean => {
+    // 每局都会重新生成布局，必须在「当前这一局」的房间里找距离，不能复用上一局的坐标。
+    for (const from of ROOMS) {
+      for (const to of ROOMS) {
+        if (roomDistance(from.id, to.id) !== distance) continue;
+        state.playerRoom = from.id;
+        state.energy = 4;
+        return usePower(state, 'nurse_blink') && blinkPlayer(state, to.id);
+      }
     }
-    if (farPair) break;
-  }
-  const blinkOk = !!farPair && (() => {
-    nurse.playerRoom = farPair![0];
-    nurse.energy = 4;
-    return usePower(nurse, 'nurse_blink') && blinkPlayer(nurse, farPair![1]);
-  })();
+    return false;
+  };
+  const nurse = createGame(STARTING_DECK, undefined, '护士', 'lampkin', ['campbells_last_breath']);
+  const blinkOk = blinkAtDistance(nurse, 4);
   const baseNurse = createGame(STARTING_DECK, undefined, '护士', 'lampkin');
-  const baseBlinkOk = !!farPair && (() => {
-    baseNurse.playerRoom = farPair![0];
-    baseNurse.energy = 4;
-    return usePower(baseNurse, 'nurse_blink') && blinkPlayer(baseNurse, farPair![1]);
-  })();
+  const baseBlinkOk = blinkAtDistance(baseNurse, 4);
   check('配件效果：坎贝尔神父的濒死之息把闪现距离 3→4 间房', blinkRangeOf(nurse) === 4 && blinkOk && !baseBlinkOk);
 
   const bookmark = createGame(STARTING_DECK, undefined, '护士', 'lampkin', ['torn_bookmark']);
@@ -2537,6 +2555,64 @@ check('苦涩低语：出牌后会等待下一次人类死亡，再触发全场�
     `before=${before} now=${ACCESSORY_MAP.trapper_bag.mods[0].value}`);
 }
 
+
+/** 厄咒图腾高亮、电话随机布置、喘鸣单体显形与警报阈值。 */
+function caseHexPhonesAndAlarm(): void {
+  // 图腾：卡牌放置的两座图腾会进入 state.totems，拆掉后从数组里移除（渲染层据此高亮/熄灭）
+  const hex = createGame(['hex_noed'], undefined, '迈克尔·迈尔斯');
+  hex.hand = [{ uid: 'hex-test', defId: 'hex_noed' }];
+  hex.energy = 6;
+  playCard(hex, 'hex-test');
+  check('厄咒图腾：放置后进入图腾列表', hex.totems.length === 2, `totems=${hex.totems.length}`);
+  const removed = hex.totems.pop()!;
+  check('厄咒图腾：被拆除后从列表移除（房间随之熄灭）',
+    !hex.totems.includes(removed) && hex.totems.length === 1,
+    `removed=${removed} left=${hex.totems.length}`);
+
+  // 电话：每局随机两间、不在逃生点/后院，且同局不重复
+  const phones = createGame(STARTING_DECK, undefined, '设陷者');
+  const unique = new Set(phones.phones);
+  check('电话：每局随机布置两间且不重复',
+    phones.phones.length === 2 && unique.size === 2,
+    `phones=${phones.phones.join(',')}`);
+  check('电话：不会出现在逃生点或后院',
+    phones.phones.every((room) => room !== 'garden' && !phones.escapeRooms.includes(room)),
+    `phones=${phones.phones.join(',')} escape=${phones.escapeRooms.join(',')}`);
+  phones.playerRoom = phones.phones[0];
+  phones.energy = 4;
+  const broke = breakPhone(phones);
+  check('电话：砸坏后这间房不能再报警',
+    broke && phones.energy === 3 && phones.brokenPhones.includes(phones.phones[0]) && workingPhones(phones).length === 1,
+    `broken=${phones.brokenPhones.join(',')}`);
+
+  // 喘鸣：只显露一名恐惧 60+ 的幸存者，持续 3 次行动
+  const stridor = createGame(STARTING_DECK, undefined, '护士');
+  const humans = stridor.people.filter((person) => person.role !== 'police');
+  humans.forEach((person, index) => {
+    person.fear = index === 0 ? 72 : 10;
+    person.revealedActions = 0;
+  });
+  stridor.hand = [{ uid: 'stridor-test', defId: 'stridor' }];
+  stridor.energy = 6;
+  const stridorPlayed = playCard(stridor, 'stridor-test');
+  const revealed = humans.filter((person) => (person.revealedActions ?? 0) >= 3);
+  check('喘鸣：只显形一名恐惧 60 以上的幸存者（3 次行动）',
+    stridorPlayed && revealed.length === 1 && revealed[0] === humans[0],
+    `played=${stridorPlayed} revealed=${revealed.length} fear=${humans.map((p) => p.fear).join(',')}`);
+
+  // 警报：60 开逃生点、100 触发最终危机、上限不会溢出
+  const alarm = createGame(STARTING_DECK, undefined, '设陷者');
+  alarm.alarm = 0;
+  alarm.escapeRooms = [];
+  addAlarm(alarm, 60);
+  check('警报：到 60 开放两个逃生点', alarm.alarm === 60 && alarm.escapeRooms.length === 2, `alarm=${alarm.alarm}`);
+  addAlarm(alarm, 999);
+  check('警报：上限 100 并进入最终危机', alarm.alarm === 100 && alarm.emergencyActive, `alarm=${alarm.alarm}`);
+  addAlarm(alarm, -999);
+  check('警报：不会降到 0 以下', alarm.alarm === 0, `alarm=${alarm.alarm}`);
+}
+
+caseHexPhonesAndAlarm();
 caseNewPerkSystem();
 });
 

@@ -307,6 +307,21 @@ export function executeOps(state: GameState, ops: Op[], runtime: EffectRuntime):
         scoutRoom(state, state.playerRoom, 2);
         break;
       }
+      case 'revealPanicked': {
+        // 恐慌阈值与 engine.ts 的 FEAR_AFRAID 保持一致（60）
+        const panicked = npcs(state)
+          .filter((p) => p.role !== 'police' && p.hp > 0 && p.fear >= 60)
+          .sort((a, b) => b.fear - a.fear);
+        const chosen = panicked[0];
+        if (chosen) {
+          // 出牌本身也会消耗一次行动计数，+1 才能让玩家真正看到 turns 次
+          chosen.revealedActions = Math.max(chosen.revealedActions ?? 0, op.turns + 1);
+          log(state, `喘鸣声里最刺耳的是 ${chosen.name}（恐惧 ${chosen.fear}）：他接下来 ${op.turns} 次行动都会暴露气场。`);
+        } else {
+          log(state, '房子里没有恐惧到失控的人，喘鸣只带回一片杂音。');
+        }
+        break;
+      }
       case 'heal':
         selectPeople(state, op.who).forEach((p) => healPerson(state, p, op.amount));
         break;

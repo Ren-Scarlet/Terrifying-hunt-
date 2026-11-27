@@ -31,7 +31,6 @@ import {
   ENTRY_ROOM,
   EXIT_ROOM,
   OBSTACLE_ROOMS,
-  PHONE_ROOMS,
   POLICE_START,
   RADIO_ROOMS,
   ROOM_MAP,
@@ -376,6 +375,45 @@ function witnessWanted(state: GameState, base: number): number {
 }
 
 export { roomName };
+
+/**
+ * 本局随机布置的电话：只有「这间房有电话 + 没被砸坏 + 线路没被整体切断」时可用。
+ * 电话位置在 setup.ts 里每局随机抽取，不再写死 study/hall。
+ */
+export function phoneWorks(state: GameState, room: RoomId): boolean {
+  return (state.phones ?? []).includes(room)
+    && !(state.brokenPhones ?? []).includes(room)
+    && !state.phoneCut;
+}
+
+/** 所有还能用的电话房间 */
+export function workingPhones(state: GameState): RoomId[] {
+  return (state.phones ?? []).filter((room) => phoneWorks(state, room));
+}
+
+/** 玩家砸坏当前房间的电话：1 AP，只影响这一部，不封死全图通讯。 */
+export function breakPhone(state: GameState): boolean {
+  if (state.phase !== 'playing') return false;
+  if (!phoneWorks(state, state.playerRoom)) {
+    log(state, '这里没有还能用的电话。');
+    return false;
+  }
+  if (state.energy < 1) {
+    log(state, '行动点不足：砸电话需要 1 点。');
+    return false;
+  }
+  state.energy -= 1;
+  state.brokenPhones ??= [];
+  state.brokenPhones.push(state.playerRoom);
+  state.huntStats.environmentActions += 1;
+  log(state, `你砸烂了${roomName(state.playerRoom)}的电话，这间屋子暂时没法报警了。`);
+  addAlarm(state, 2);
+  state.attackReady = true;
+  afterPlayerAction(state);
+  checkImmediateWin(state);
+  return true;
+}
+
 
 /* ==================================================================== */
 /*  视野：三层战争迷雾                                                   */
@@ -1203,7 +1241,7 @@ function checkCond(state: GameState, cond: Cond): boolean {
       const room = state.playerRoom;
       return state.powerCircuits.some((circuit) => circuit.breakerRoom === room && !circuit.broken)
         || state.siteItems.some((item) => item.room === room && !item.broken && item.charges > 0)
-        || (PHONE_ROOMS.includes(room) && !state.phoneCut)
+        || phoneWorks(state, room)
         || (RADIO_ROOMS.includes(room) && !state.sabotage.includes('radio'));
     }
     case 'flag':
@@ -1259,7 +1297,7 @@ export function runOps(state: GameState, ops: Op[]): void {
       const room = current.playerRoom;
       const hasObject = current.powerCircuits.some((circuit) => circuit.breakerRoom === room && !circuit.broken)
         || current.siteItems.some((item) => item.room === room && !item.broken && item.charges > 0)
-        || (PHONE_ROOMS.includes(room) && !current.phoneCut)
+        || phoneWorks(current, room)
         || (RADIO_ROOMS.includes(room) && !current.sabotage.includes('radio'));
       return hasObject && sabotageSiteItem(current, { free: true, suppressAfterAction: true });
     },
@@ -1684,7 +1722,7 @@ function tryAidRun(state: GameState, person: Person): boolean {
 /** 求救型：打电话（1 回合）或用无线电（2 回合）报警 */
 function tryCall(state: GameState, person: Person): boolean {
   if (person.blockedTurns > 0) return false;
-  const canPhone = !state.phoneCut && PHONE_ROOMS.includes(person.room);
+  const canPhone = phoneWorks(state, person.room);
   const canRadio = !state.sabotage.includes('radio') && RADIO_ROOMS.includes(person.room);
 
   if (canPhone) {
@@ -1795,7 +1833,7 @@ function actByArchetype(state: GameState, person: Person): void {
     person.activity = '房门被封锁，无法离开';
     return;
   }
-  if (person.alert >= 85 && !state.phoneCut && PHONE_ROOMS.includes(person.room) && person.hp > 0) {
+  if (person.alert >= 85 && phoneWorks(state, person.room) && person.hp > 0) {
     tryCall(state, person);
     log(state, `${person.name}因高度警戒，正在尝试报警！`);
     return;
@@ -1829,12 +1867,12 @@ function actByArchetype(state: GameState, person: Person): void {
       return;
     }
     case 'caller': {
-      if (!state.phoneCut && PHONE_ROOMS.includes(person.room)) {
+      if (phoneWorks(state, person.room)) {
         tryCall(state, person);
         return;
       }
       const target = !state.phoneCut
-        ? nearestOf(person.room, PHONE_ROOMS)
+        ? nearestOf(person.room, workingPhones(state))
         : !state.sabotage.includes('radio')
           ? RADIO_ROOMS[0]
           : ESCAPE_ROOMS[0];
@@ -1955,7 +1993,7 @@ function actByArchetype(state: GameState, person: Person): void {
       return;
     }
     case 'alert': {
-      const goalRoom = person.goal === 'phone' && !state.phoneCut ? PHONE_ROOMS[0] : ESCAPE_ROOMS[0];
+      const goalRoom = person.goal === 'phone' && workingPhones(state).length ? workingPhones(state)[0] : ESCAPE_ROOMS[0];
       if (person.goal === 'exit' || person.goal === 'panic') {
         const step = nextStepToward(state, person.room, ESCAPE_ROOMS[0], [state.playerRoom]);
         if (step) {
@@ -2310,7 +2348,7 @@ function npcTurn(state: GameState): void {
             : person.goal === 'supply'
               ? usableItemBoxes(state).map((i) => i.room)
               : person.goal === 'phone'
-                ? PHONE_ROOMS
+                ? workingPhones(state)
                 : person.goal === 'weapon' || person.goal === 'gather'
                   ? WEAPON_ROOMS
                   : person.goal === 'hide'
@@ -2387,10 +2425,10 @@ export function updateNpcDialogue(state: GameState): void {
 
 /** 打电话的人真的把消息送出去了吗 */
 function callPhase(state: GameState): void {
-  if (state.phoneCut) return;
+  if (!workingPhones(state).length) return;
   if (alarmSuppressed(state)) return;
   npcs(state)
-    .filter((p) => p.intent === 'call' && p.hp > 0 && PHONE_ROOMS.includes(p.room))
+    .filter((p) => p.intent === 'call' && p.hp > 0 && phoneWorks(state, p.room))
     .forEach((person) => finishCall(state, person, '电话'));
 }
 
@@ -2475,7 +2513,7 @@ function policeNextStep(state: GameState, police: Person): RoomId {
 
   // 没有报警或犯罪线索时，警员不再随机游荡，而是巡查电话、无线电、电闸与逃生点。
   const patrolPoints = [...new Set<RoomId>([
-    ...PHONE_ROOMS,
+    ...workingPhones(state),
     ...RADIO_ROOMS,
     ...state.powerCircuits.map((circuit) => circuit.breakerRoom),
     ...ESCAPE_ROOMS,
@@ -3201,7 +3239,8 @@ export function attack(state: GameState, targetId?: string, options: { costOverr
     person.id === target.id || person.room !== state.playerRoom || person.hp <= 0,
   );
   const ambushStrike = ambushActive(state) && target.role !== 'police' && target.alert < 100 && alone;
-  const noedActive = state.hexNoedActive && state.totems.length > 0;
+  // 难逃一死：警报拉满（最终危机）之后才生效；图腾被拆光也会失效。
+  const noedActive = state.hexNoedActive && state.alarm >= ALARM_MAX && state.totems.length > 0;
   // 带手电筒的人可能从隔壁冲进来照你：这一刀落空，两个人都趁机跑掉
   const flasher = npcs(state).find(
     (p) =>
@@ -3689,7 +3728,7 @@ function triggerEnvironmentalEvent(state: GameState): void {
     }
   }
 
-  if (event === 'phone' && !state.phoneCut) {
+  if (event === 'phone' && workingPhones(state).length) {
     const callers = npcs(state).filter((person) =>
       person.hp > 0 && !person.hidden && person.archetype === 'alert' && person.goal !== 'phone',
     );
@@ -3769,11 +3808,11 @@ export function togglePowerCircuit(state: GameState, circuitId?: string): boolea
 }
 
 /** 统一破坏入口：相邻门锁、电话线、无线电、电闸与道具箱。 */
-function sabotageTarget(state: GameState): { kind: 'door'; room: RoomId } | { kind: 'phone' | 'radio' } | { kind: 'facility' } | null {
+function sabotageTarget(state: GameState): { kind: 'door'; room: RoomId } | { kind: 'phone'; room: RoomId } | { kind: 'radio' } | { kind: 'facility' } | null {
   const breaker = state.powerCircuits.some((c) => c.breakerRoom === state.playerRoom && !c.broken);
   const item = state.siteItems.some((i) => i.room === state.playerRoom && !i.broken && i.charges > 0);
   if (breaker || item) return { kind: 'facility' };
-  if (PHONE_ROOMS.includes(state.playerRoom) && !state.phoneCut) return { kind: 'phone' };
+  if (phoneWorks(state, state.playerRoom)) return { kind: 'phone', room: state.playerRoom };
   if (RADIO_ROOMS.includes(state.playerRoom) && !state.sabotage.includes('radio')) return { kind: 'radio' };
   const lockedNeighbor = ROOM_MAP[state.playerRoom].neighbors.find((room) => isLocked(state, room));
   if (lockedNeighbor) return { kind: 'door', room: lockedNeighbor };
@@ -3807,8 +3846,9 @@ export function sabotageSiteItem(state: GameState, options: { free?: boolean; su
     });
     addAlarm(state, 5);
   } else if (target.kind === 'phone') {
-    state.phoneCut = true;
-    log(state, '你扯断了电话线，电话求救暂时中断。');
+    state.brokenPhones ??= [];
+    state.brokenPhones.push(target.room);
+    log(state, `你砸烂了${roomName(target.room)}的电话，这间屋子暂时没法报警了。`);
     addAlarm(state, 2);
   } else if (target.kind === 'radio') {
     state.sabotage.push('radio');

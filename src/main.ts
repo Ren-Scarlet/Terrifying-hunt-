@@ -39,6 +39,7 @@ import {
   playCard,
   searchRoom,
   sabotageSiteItem,
+  breakPhone,
   togglePowerCircuit,
   usePower,
   wipeBlade,
@@ -1074,6 +1075,12 @@ function createGameActions(): ActionTable {
       const game = currentGame();
       togglePowerCircuit(game, target.dataset.circuitId);
       playSfx('breaker');
+      afterAction();
+    },
+
+    'break-phone': () => {
+      breakPhone(currentGame());
+      playSfx('smash');
       afterAction();
     },
 
