@@ -34,8 +34,6 @@ function pickArchetype(survivor: (typeof SURVIVORS)[number]): Archetype {
       return 'caller';
     case 'lead':
       return 'alert';
-    case 'team':
-      return 'brave';
     case 'spiritual':
       return random() < 0.5 ? 'hider' : 'defiant';
     default:
