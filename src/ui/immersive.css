@@ -2441,3 +2441,85 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
   border-bottom: 1px solid rgba(205,190,170,.45);
   transform: translateX(-50%) rotate(45deg);
 }
+
+
+/* 2026-11-27 playtest fixes: show the full killer portrait, restore red glowing trails,
+   and keep the original obsession emblem for the blood sacrifice. */
+#app.immersive-game .killer-hud-portrait { overflow: visible !important; }
+#app.immersive-game .killer-face.ability-portrait {
+  overflow: visible !important;
+  clip-path: none !important;
+}
+#app.immersive-game .killer-face.ability-portrait img {
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+  object-fit: contain !important;
+  object-position: bottom center !important;
+  transform: none !important;
+}
+#app.immersive-game .floorplan .footprint {
+  width: 28px !important;
+  height: 36px !important;
+  object-fit: contain !important;
+  filter: brightness(0) saturate(100%) invert(17%) sepia(93%) saturate(5880%) hue-rotate(350deg) brightness(96%) contrast(112%)
+    drop-shadow(0 0 4px rgba(255,28,22,.92)) drop-shadow(0 0 10px rgba(220,12,12,.66)) !important;
+}
+#app.immersive-game .floorplan .footprint.age-1 {
+  filter: brightness(0) saturate(100%) invert(17%) sepia(93%) saturate(5880%) hue-rotate(350deg) brightness(90%) contrast(108%)
+    drop-shadow(0 0 3px rgba(255,28,22,.7)) drop-shadow(0 0 7px rgba(220,12,12,.42)) !important;
+}
+#app.immersive-game .floorplan .footprint.age-2 {
+  filter: brightness(0) saturate(100%) invert(17%) sepia(93%) saturate(5880%) hue-rotate(350deg) brightness(76%) contrast(100%)
+    drop-shadow(0 0 2px rgba(220,12,12,.36)) !important;
+}
+#app.immersive-game .floorplan .footprint.age-3 {
+  filter: brightness(0) saturate(100%) invert(17%) sepia(93%) saturate(5880%) hue-rotate(350deg) brightness(62%) contrast(92%) !important;
+}
+#app.immersive-game .room-feature.execution-site .execution-site-icon {
+  width: 52px !important;
+  height: 52px !important;
+  flex: 0 0 52px !important;
+  object-fit: contain !important;
+}
+#app.immersive-game .room-features .room-feature.execution-action {
+  min-width: 82px !important;
+  min-height: 84px !important;
+  padding: 5px !important;
+}
+#app.immersive-game .floorplan .room-people .person-chip .chip-sacrifice-mark {
+  width: 26px !important;
+  height: 26px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: 0 0 7px rgba(255,35,35,.55) !important;
+  object-fit: contain !important;
+}
+#app.immersive-game .room-feature.cabinet-action,
+#app.immersive-game .room-feature.barricade-action {
+  cursor: pointer !important;
+  border-color: rgba(201,154,103,.8) !important;
+}
+#app.immersive-game .room-feature.totem-interaction {
+  flex-direction: column !important;
+  justify-content: center !important;
+  gap: 3px !important;
+}
+#app.immersive-game .room-feature.totem-interaction button {
+  border: 1px solid rgba(190,155,111,.62);
+  border-radius: 4px;
+  padding: 3px 5px;
+  color: #f0dfc4;
+  background: rgba(12,12,14,.9);
+  font-size: 10px;
+  line-height: 1.1;
+  cursor: pointer;
+}
+#app.immersive-game .room-feature.totem-interaction button:hover {
+  border-color: #e6bd80;
+  background: rgba(66,42,28,.95);
+}
