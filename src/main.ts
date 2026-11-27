@@ -659,8 +659,7 @@ function sfxFromLogs(): void {
   else if (/成功逃离|已经不在房子里了/.test(head)) playSfx('flee');
   else if (/发电机重新亮了起来|用钥匙捅开|联系上了外面|修发电机/.test(head)) playSfx('objective');
   else if (/地图出现两个逃生点|第四阶段完成/.test(head)) playSfx('gate');
-  else if (/幸存者团队完成第/.test(head)) playSfx('stage');
-  else if (/【NPC目击】|发现了捕兽夹|发现并拆除了|忽然抬头|猛一回头|察觉到异常|发现了你/.test(head)) playVoice(head, 'Startle');
+    else if (/【NPC目击】|发现了捕兽夹|发现并拆除了|忽然抬头|猛一回头|察觉到异常|发现了你/.test(head)) playVoice(head, 'Startle');
   else if (/恶魔附身：/.test(head)) playSfx('possess');
   else if (/打倒在地上|受到 \d+ 点伤害/.test(head)) playVoice(head, 'Hit');
   else if (/受伤了（|在流血/.test(head)) playVoice(head, 'Hurt');
