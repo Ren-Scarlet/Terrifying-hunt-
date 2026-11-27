@@ -571,7 +571,7 @@ export interface GameState {
   survivorTotal: number;
   /** 这局他们要做的事，用于日志与任务条 */
   teamGoalLabel: string;
-  /** 本局随机摆下的道具箱 / 发电机：杀手用不了，但能砸 */
+  /** 本局随机摆放的道具箱：幸存者可领取补给，杀手可以破坏 */
   siteItems: SiteItem[];
   /** 独立区域电闸及其供电范围 */
   powerCircuits: PowerCircuit[];
