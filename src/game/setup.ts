@@ -115,7 +115,7 @@ export function createGame(
       trapTriggers: 0,
       hatchetHits: 0,
       nurseBlinks: 0,
-      nurseGrabs: 0,
+      nurseBlinkAttacks: 0,
       myersBurstHits: 0,
       quietKills: 0,
     },
@@ -185,12 +185,8 @@ export function createGame(
     sabotage: [],
     frenzyStreak: 0,
     disturbances: [],
-    objectiveRooms: [],
-    teamProgress: 0,
-    teamStage: 0,
     escapeRooms: [],
     survivorTotal: people.filter((person) => person.role !== 'police').length,
-    teamGoalLabel: '',
     siteItems: [],
     powerCircuits: [
       { id: 'main-floor', name: '主楼照明', breakerRoom: 'basement', affectedRooms: ['basement', 'hall', 'kitchen', 'dining', 'study'], broken: false, enabled: true },
@@ -199,22 +195,17 @@ export function createGame(
       { id: 'service-wing', name: '服务区照明', breakerRoom: 'laundry', affectedRooms: ['laundry', 'corridor', 'storage', 'wine', 'chapel', 'stairwell', 'bathroom', 'library'], broken: false, enabled: true },
     ],
   };
-  // 团队目标：随机挑 3 间房作为「电闸 / 钥匙柜」，再给每个人派一个个人目的。
-  // 不定死：有人修装置、有人找钥匙，也有人只是想报警或躲起来。
-  const objPool = ROOMS.map((r) => r.id).filter(
-    (id) => id !== ENTRY_ROOM && id !== EXIT_ROOM && !ESCAPE_ROOMS.includes(id) && !OBSTACLE_ROOMS.includes(id),
-  );
-  state.objectiveRooms = shuffle(objPool).slice(0, 3);
   // 少数幸存者开局会躲在上锁房间；断开对应区域电力可令电子门锁失效。
   const lockedHomes = shuffle([...new Set(state.people.filter((person) => person.role !== 'police').map((person) => person.room))])
     .filter((room) => ROOM_MAP[room].neighbors.length >= 2 && state.powerCircuits.some((circuit) => circuit.affectedRooms.includes(room) && !circuit.broken))
     .slice(0, 2);
   lockedHomes.forEach((room) => { state.roomLocks[room] = state.mission.turns; });
-  state.teamGoalLabel = '';
 
   // 场地只保留道具箱；照明由独立电闸控制，不再依赖发电机。
   const breakerRooms = state.powerCircuits.map((circuit) => circuit.breakerRoom);
-  const sitePool = shuffle(objPool.filter((id) => !state.objectiveRooms.includes(id) && !breakerRooms.includes(id)));
+  const sitePool = shuffle(ROOMS.map((room) => room.id).filter(
+    (id) => id !== ENTRY_ROOM && id !== EXIT_ROOM && !ESCAPE_ROOMS.includes(id) && !OBSTACLE_ROOMS.includes(id) && !breakerRooms.includes(id),
+  ));
   const items: SiteItem[] = [];
   for (let i = 0; i < ITEM_BOX_COUNT; i++) {
     const room = sitePool.pop();
@@ -225,7 +216,6 @@ export function createGame(
     const occupied = new Set([
       ...items.map((item) => item.room),
       ...breakerRooms,
-      ...state.objectiveRooms,
       ENTRY_ROOM,
       EXIT_ROOM,
     ]);
