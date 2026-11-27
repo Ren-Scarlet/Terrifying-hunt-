@@ -4,7 +4,7 @@ import { KILLER_MAP } from './killers';
 import { generateMission } from './missions';
 import { createPeople } from './npc/factory';
 import {
-  BASE_AP, ESCAPE_ROOMS, GENERATOR_MAX, GENERATOR_MIN, ITEM_BOX_CHARGES,
+  BASE_AP, ESCAPE_ROOMS, ITEM_BOX_CHARGES,
   ITEM_BOX_COUNT, SABOTAGE_COST,
 } from './constants';
 import {
@@ -210,23 +210,13 @@ export function createGame(
   lockedHomes.forEach((room) => { state.roomLocks[room] = state.mission.turns; });
   state.teamGoalLabel = '';
 
-  // 场地物品：道具箱固定 2 个，发电机随机 1~2 台，撒在能走的房间里。
-  // 杀手用不了它们，但能砸——去哪边、什么时候砸，多了一层取舍。
+  // 场地只保留道具箱；照明由独立电闸控制，不再依赖发电机。
   const breakerRooms = state.powerCircuits.map((circuit) => circuit.breakerRoom);
   const sitePool = shuffle(objPool.filter((id) => !state.objectiveRooms.includes(id) && !breakerRooms.includes(id)));
-  const genCount = GENERATOR_MIN + Math.floor(random() * (GENERATOR_MAX - GENERATOR_MIN + 1));
   const items: SiteItem[] = [];
   for (let i = 0; i < ITEM_BOX_COUNT; i++) {
     const room = sitePool.pop();
-    if (room) {
-      items.push({ id: `box-${i}`, kind: 'itemBox', room, broken: false, charges: ITEM_BOX_CHARGES, progress: 0, charged: false, jammedTurns: 0 });
-    }
-  }
-  for (let i = 0; i < genCount; i++) {
-    const room = sitePool.pop();
-    if (room) {
-      items.push({ id: `gen-${i}`, kind: 'generator', room, broken: false, charges: 0, progress: 0, charged: false, jammedTurns: 0 });
-    }
+    if (room) items.push({ id: `box-${i}`, kind: 'itemBox', room, broken: false, charges: ITEM_BOX_CHARGES });
   }
   state.siteItems = items;
   if (killerId === '设陷者') {
@@ -239,13 +229,7 @@ export function createGame(
     ]);
     state.trapCaches = shuffle(objPool.filter((room) => !occupied.has(room) && ROOM_MAP[room].neighbors.length >= 2)).slice(0, 2);
   }
-  const generators = items.filter((item) => item.kind === 'generator');
-  state.powerCircuits.forEach((circuit) => {
-    const source = generators
-      .slice()
-      .sort((left, right) => roomDistance(circuit.breakerRoom, left.room) - roomDistance(circuit.breakerRoom, right.room))[0];
-    if (source) circuit.generatorId = source.id;
-  });
+
 
   state.people
     .filter((p) => p.role !== 'police')
@@ -263,7 +247,7 @@ export function createGame(
   if (sacrifice) log(state, `血祭品已标记：${sacrifice.name}。此标记本身没有额外效果。`);
   log(state, `你以「${killerId}」的身份行动。每回合 ${BASE_AP} 点行动点：走路、挥刀、出牌、搜索柜子都从这里扣。`);
   log(state, '留意每个人的恐惧值与警戒值：恐惧会使人崩溃，警戒会促使人报警或逃跑。');
-  log(state, `屋里有 ${items.filter((i) => i.kind === 'itemBox').length} 个道具箱、${genCount} 台发电机：他们会靠这些翻盘，你只能砸掉它们（${SABOTAGE_COST} 点行动点）。`);
+  log(state, `屋里有 ${items.length} 个道具箱；照明由各区域电闸独立控制。`);
   return state;
 }
 
