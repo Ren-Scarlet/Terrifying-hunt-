@@ -1670,7 +1670,7 @@ function caseContractsPowerAndCarry(): void {
   check('AB 契约只使用新任务类型且包含可选奖励目标',
     actualKinds.every((kind) => allowedKinds.includes(kind)) && (contract.mission.tasks ?? []).some((task) => task.optional && (task.reward ?? 0) > 0),
     '实际类型=' + actualKinds.join(','));
-  check('AB 新契约回合上限延长到 40 且不生成限时击杀任务', contract.mission.turns === 40 && !(contract.mission.tasks ?? []).some((task) => task.kind === 'kill_count_before_turn'));
+  check('AB 新契约回合上限为 20 且不生成限时击杀任务', contract.mission.turns === 20 && !(contract.mission.tasks ?? []).some((task) => task.kind === 'kill_count_before_turn'));
   const myersContract = generateMission('迈克尔·迈尔斯');
   check('AB 迈尔斯契约含尾随不同幸存者的专属奖励任务', myersContract.tasks?.some((task) => task.kind === 'killer_stat' && task.metric === 'myers_stalk') === true);
   const trapperContract = generateMission('设陷者');
@@ -2216,6 +2216,26 @@ check('苦涩低语：出牌后会等待下一次人类死亡，再触发全场�
     const far = ROOMS.map((r) => r.id).find((id) => id !== mv.playerRoom && !ROOM_MAP[mv.playerRoom].neighbors.includes(id));
     return !!far && (moveBlockReason(mv, far) ?? '').includes('相邻');
   })());
+}
+
+// 天亮压力：每 5 回合跨一次阶段，最后 5 回合持续收网
+{
+  const dawn = newGame();
+  dawn.turn = 5;
+  dawn.alarm = 0;
+  const alertBefore = dawn.people.filter((p) => p.role !== 'police').reduce((sum, p) => sum + p.alert, 0);
+  endTurn(dawn);
+  const alertAfter = dawn.people.filter((p) => p.role !== 'police').reduce((sum, p) => sum + p.alert, 0);
+  check('天亮：跨过阶段边界时警报与警觉上升',
+    dawn.turn === 6 && dawn.alarm > 0 && alertAfter > alertBefore,
+    `turn=${dawn.turn} alarm=${dawn.alarm} alert=${alertBefore}→${alertAfter}`);
+}
+{
+  const late = newGame();
+  late.turn = 16;
+  late.alarm = 0;
+  endTurn(late);
+  check('天亮：最后五回合每回合持续加压', late.alarm >= 2, `alarm=${late.alarm}`);
 }
 
 caseNewPerkSystem();

@@ -88,6 +88,13 @@ export const TRAIL_TURNS = 3;
  * 痕迹保留最近五次「玩家行动」（不是按回合），给玩家足够时间追踪路线。
  */
 const TRAIL_ACTION_WINDOW = 5;
+/** 天亮阶段：每 5 回合推进一次，共 4 个阶段。 */
+const DAWN_PHASE_TURNS = 5;
+/** 每次跨阶段：警报 +4，全场幸存者警觉 +5。 */
+const DAWN_ALARM_GAIN = 4;
+const DAWN_ALERT_GAIN = 5;
+/** 最后 5 回合的收网：每回合额外警报 +2。 */
+const DAWN_LATE_ALARM = 2;
 /** 动静（乌鸦叫）也只留最近这么多次行动：短线索，不是常驻雷达 */
 const DISTURBANCE_WINDOW = 3;
 /** 杀戮值上限 / 激活阈值：满值后每回合多 2 行动点，由玩家自己决定怎么走 */
@@ -494,6 +501,33 @@ function snapshotRooms(state: GameState): Map<string, RoomId> {
 /** 脚印在多少步行动后淡出：室内 5 步，奥蒙德雪地额外 +3。 */
 export function trailActionWindow(state: GameState): number {
   return TRAIL_ACTION_WINDOW + (state.mapId === 'ormond' ? 3 : 0);
+}
+
+/**
+ * 天亮阶段（0–3）：每 5 回合推进一次。
+ *
+ * 这是给玩家的"外部时钟"：不从回合上限直接判负，而是逐步收紧——
+ * 跨阶段时警报抬升、所有人更警觉；最后 5 回合每回合持续加压。
+ * 玩家是超自然存在，威胁来自"天要亮了"，而不是幸存者的拳头。
+ */
+export function dawnPhase(state: GameState): number {
+  return Math.min(3, Math.floor((Math.max(1, state.turn) - 1) / DAWN_PHASE_TURNS));
+}
+
+function applyDawnPressure(state: GameState, previousPhase: number): void {
+  const phase = dawnPhase(state);
+  if (phase > previousPhase) {
+    addAlarm(state, DAWN_ALARM_GAIN);
+    state.people.forEach((person) => {
+      if (person.role === 'police' || person.hp <= 0) return;
+      person.alert = clamp(person.alert + DAWN_ALERT_GAIN, 0, 100);
+    });
+    log(state, `天光又亮了一分（第 ${phase + 1} 阶段）：屋里的人开始躁动，警报 +${DAWN_ALARM_GAIN}。`);
+  }
+  const remaining = state.mission.turns - state.turn;
+  if (remaining >= 0 && remaining < DAWN_PHASE_TURNS) {
+    addAlarm(state, DAWN_LATE_ALARM);
+  }
 }
 
 function pruneTrails(state: GameState): void {
@@ -4282,7 +4316,9 @@ export function endTurn(state: GameState): void {
   }
 
   // 手牌保留；每个新回合只补 1 张，不再整手弃掉重抽。
+  const dawnBefore = dawnPhase(state);
   state.turn += 1;
+  applyDawnPressure(state, dawnBefore);
   triggerEnvironmentalEvent(state);
   // 杀戮满值 = 移动力提升：每回合多 2 点行动点，但绝不替玩家走第二步
   const frenzyBonus = state.frenzy >= FRENZY_THRESHOLD ? FRENZY_AP_BONUS : 0;

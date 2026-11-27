@@ -127,7 +127,7 @@ export function generateMission(killer = '迈克尔·迈尔斯', kind?: MissionK
     kind: definition.kind,
     title: definition.title,
     desc: definition.desc,
-    turns: 40,
+    turns: 20,
     reward: definition.reward,
     targetCount: definition.targetCount,
     tasks,
