@@ -2742,3 +2742,311 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
   55%{opacity:1;transform:translate(-50%,-45%) rotate(-10deg) scale(.92)}
   100%{opacity:0;transform:translate(-50%,8%) rotate(20deg) scale(.75)}
 }
+
+
+/* 2026-11-27 playtest: reliable activity log, reachable task tooltip, cleaner killer HUD. */
+#app.immersive-game .activity-log-panel {
+  order:5!important;
+  position:relative!important;
+  display:block!important;
+  flex:0 0 118px!important;
+  width:118px!important;
+  min-width:118px!important;
+  margin:0 0 2px!important;
+  border:1px solid rgba(205,222,231,.2)!important;
+  border-radius:7px!important;
+  background:rgba(7,10,13,.9)!important;
+  color:#d5dfe4!important;
+  font-size:10px!important;
+  pointer-events:auto!important;
+  overflow:visible!important;
+}
+#app.immersive-game .activity-log-toggle {
+  display:block!important;
+  width:100%!important;
+  min-height:38px!important;
+  padding:8px 7px!important;
+  border:0!important;
+  border-radius:6px!important;
+  color:#e5edf0!important;
+  background:transparent!important;
+  cursor:pointer!important;
+  white-space:nowrap!important;
+  text-align:center!important;
+  font-size:10px!important;
+}
+#app.immersive-game .activity-log-toggle:hover,
+#app.immersive-game .activity-log-panel.open .activity-log-toggle {
+  color:#fff!important;
+  background:rgba(105,25,31,.65)!important;
+}
+#app.immersive-game .activity-log-list[hidden] { display:none!important; }
+#app.immersive-game .activity-log-panel.open .activity-log-list {
+  display:block!important;
+  position:absolute!important;
+  z-index:80!important;
+  right:0!important;
+  bottom:calc(100% + 10px)!important;
+  width:min(330px,calc(100vw - 32px))!important;
+  max-height:min(38vh,340px)!important;
+  overflow-y:auto!important;
+  padding:8px 10px!important;
+  border:1px solid rgba(205,222,231,.22)!important;
+  border-radius:8px!important;
+  background:rgba(6,10,13,.97)!important;
+  box-shadow:0 12px 36px rgba(0,0,0,.72)!important;
+  backdrop-filter:blur(14px)!important;
+}
+#app.immersive-game .activity-log-list>div {
+  padding:5px 0!important;
+  border-bottom:1px solid rgba(205,222,231,.08)!important;
+  color:#c5d0d5!important;
+  font-size:10px!important;
+  line-height:1.45!important;
+}
+#app.immersive-game .right-tools .tool em {
+  left:46px!important;
+  right:auto!important;
+  max-width:min(180px,calc(100vw - 92px))!important;
+  white-space:normal!important;
+  overflow-wrap:anywhere!important;
+  line-height:1.35!important;
+  text-align:left!important;
+}
+#app.immersive-game .right-tools .tool.task-tool {
+  width:48px!important;
+  height:48px!important;
+  border:1px solid rgba(220,91,91,.58)!important;
+  color:#ffe2d9!important;
+  background:linear-gradient(145deg,rgba(104,27,34,.86),rgba(24,10,13,.9))!important;
+  box-shadow:0 0 18px rgba(155,24,34,.25),inset 0 0 12px rgba(180,50,55,.12)!important;
+}
+#app.immersive-game .right-tools .tool.task-tool>span { font-size:21px!important; }
+#app.immersive-game .right-tools .tool.task-tool em {
+  color:#ffe8dd!important;
+  font-size:11px!important;
+  font-weight:700!important;
+}
+#app.immersive-game .task-pop {
+  top:184px!important;
+  max-height:min(54vh,500px)!important;
+  overflow-y:auto!important;
+}
+@media(max-width:700px) {
+  #app.immersive-game .task-pop { top:148px!important; max-height:50vh!important; }
+  #app.immersive-game .activity-log-panel { flex-basis:104px!important; width:104px!important; min-width:104px!important; }
+}
+
+/* One portrait on the left; ability, kill meter and AP form three clear rows on the right. */
+#app.immersive-game .killer-ability-panel {
+  position:fixed!important;
+  left:20px!important;
+  right:auto!important;
+  bottom:18px!important;
+  display:grid!important;
+  grid-template-columns:156px minmax(190px,220px)!important;
+  grid-template-rows:auto auto auto!important;
+  align-items:center!important;
+  column-gap:14px!important;
+  row-gap:8px!important;
+  width:max-content!important;
+  max-width:calc(100vw - 40px)!important;
+  padding:0!important;
+  border:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+  overflow:visible!important;
+}
+#app.immersive-game .killer-hud-portrait {
+  grid-column:1!important;
+  grid-row:1 / span 3!important;
+  align-self:end!important;
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:center!important;
+  gap:5px!important;
+}
+#app.immersive-game .killer-face.ability-portrait {
+  display:block!important;
+  flex:0 0 194px!important;
+  width:156px!important;
+  height:194px!important;
+}
+#app.immersive-game .killer-hud-portrait>b {
+  max-width:156px!important;
+  color:#f0e4d9!important;
+  font-size:12px!important;
+  text-align:center!important;
+  text-shadow:0 2px 7px #000!important;
+}
+#app.immersive-game .killer-hud-abilities {
+  grid-column:2!important;
+  grid-row:1!important;
+  min-width:0!important;
+}
+#app.immersive-game .killer-power-grid {
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:stretch!important;
+  gap:7px!important;
+}
+#app.immersive-game .killer-power-grid .btn.power {
+  display:grid!important;
+  grid-template-columns:48px minmax(0,1fr)!important;
+  grid-template-rows:auto!important;
+  align-items:center!important;
+  justify-content:start!important;
+  gap:9px!important;
+  width:100%!important;
+  min-width:0!important;
+  min-height:54px!important;
+  height:auto!important;
+  padding:4px 8px!important;
+  border:1px solid rgba(204,168,143,.35)!important;
+  border-radius:7px!important;
+  background:rgba(7,10,13,.82)!important;
+  box-shadow:0 4px 15px rgba(0,0,0,.42)!important;
+}
+#app.immersive-game .killer-power-grid .btn.power:hover:not(:disabled) {
+  border-color:rgba(236,158,132,.82)!important;
+  background:rgba(47,20,22,.94)!important;
+}
+#app.immersive-game .killer-power-grid .power-art {
+  display:block!important;
+  position:relative!important;
+  width:46px!important;
+  height:46px!important;
+  flex:0 0 46px!important;
+}
+#app.immersive-game .killer-power-grid .power-art .power-icon-bg {
+  display:block!important;
+  position:absolute!important;
+  inset:0!important;
+  width:100%!important;
+  height:100%!important;
+  object-fit:contain!important;
+}
+#app.immersive-game .killer-power-grid .power-art .power-icon {
+  display:block!important;
+  position:absolute!important;
+  inset:6px!important;
+  width:calc(100% - 12px)!important;
+  height:calc(100% - 12px)!important;
+  object-fit:contain!important;
+  filter:drop-shadow(0 2px 5px rgba(0,0,0,.95))!important;
+}
+#app.immersive-game .killer-power-grid .power-art::after { display:none!important; content:none!important; }
+#app.immersive-game .killer-power-grid .power-body {
+  display:flex!important;
+  min-width:0!important;
+  align-items:flex-start!important;
+  justify-content:center!important;
+}
+#app.immersive-game .killer-power-grid .power-body>b {
+  display:block!important;
+  color:#f3e7df!important;
+  font-size:13px!important;
+  font-weight:750!important;
+  line-height:1.35!important;
+  text-align:left!important;
+  white-space:normal!important;
+}
+#app.immersive-game .killer-power-grid .power-body>small,
+#app.immersive-game .killer-power-grid .power-pips { display:none!important; }
+#app.immersive-game .killer-hud-resources {
+  grid-column:2!important;
+  grid-row:2!important;
+  display:flex!important;
+  flex-direction:column!important;
+  gap:7px!important;
+  width:100%!important;
+  min-width:0!important;
+  margin:0!important;
+  padding:8px 10px!important;
+  border:1px solid rgba(205,222,231,.2)!important;
+  border-radius:7px!important;
+  background:rgba(7,10,13,.86)!important;
+}
+#app.immersive-game .killer-hud-resources .killer-frenzy-meter { width:100%!important; margin:0!important; }
+#app.immersive-game .killer-resource-line {
+  display:flex!important;
+  align-items:center!important;
+  gap:7px!important;
+  color:#f0e5dc!important;
+  font-size:12px!important;
+  white-space:nowrap!important;
+}
+#app.immersive-game .killer-resource-line .killer-frenzy-icon {
+  width:30px!important;
+  height:30px!important;
+  flex:0 0 30px!important;
+  object-fit:contain!important;
+}
+#app.immersive-game .killer-resource-line>span { font-weight:650!important; }
+#app.immersive-game .killer-resource-line>b {
+  margin-left:auto!important;
+  color:#fff1e9!important;
+  font-size:15px!important;
+  font-weight:850!important;
+  font-variant-numeric:tabular-nums!important;
+}
+#app.immersive-game .killer-frenzy-track { height:7px!important; margin-top:5px!important; }
+#app.immersive-game .killer-special-resources { width:100%!important; margin:0!important; }
+#app.immersive-game .killer-ap-display {
+  grid-column:2!important;
+  grid-row:3!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:flex-start!important;
+  gap:8px!important;
+  width:100%!important;
+  min-width:0!important;
+  height:46px!important;
+  min-height:46px!important;
+  padding:5px 10px!important;
+  border:1px solid rgba(205,222,231,.2)!important;
+  border-radius:7px!important;
+  background:rgba(7,10,13,.86)!important;
+}
+#app.immersive-game .killer-ap-icon {
+  display:block!important;
+  width:34px!important;
+  height:34px!important;
+  flex:0 0 34px!important;
+  object-fit:contain!important;
+  filter:grayscale(1) brightness(0) invert(1) drop-shadow(0 0 4px rgba(255,255,255,.32))!important;
+}
+#app.immersive-game .killer-ap-display>span {
+  color:#e4edf0!important;
+  font-size:12px!important;
+  font-weight:700!important;
+}
+#app.immersive-game .killer-ap-display>b {
+  margin-left:auto!important;
+  color:#fff!important;
+  font-size:18px!important;
+  font-weight:850!important;
+  font-variant-numeric:tabular-nums!important;
+}
+#app.immersive-game .killer-ap-display>b>i { color:#aab8bf!important; font-size:12px!important; font-style:normal!important; }
+@media(max-width:1100px) {
+  #app.immersive-game .killer-ability-panel { grid-template-columns:126px minmax(170px,200px)!important; column-gap:10px!important; }
+  #app.immersive-game .killer-face.ability-portrait { flex-basis:158px!important; width:126px!important; height:158px!important; }
+}
+@media(max-width:700px) {
+  #app.immersive-game .killer-ability-panel { left:8px!important; bottom:8px!important; grid-template-columns:76px minmax(120px,1fr)!important; width:min(58vw,260px)!important; column-gap:7px!important; row-gap:5px!important; }
+  #app.immersive-game .killer-face.ability-portrait { flex-basis:106px!important; width:76px!important; height:106px!important; }
+  #app.immersive-game .killer-hud-portrait>b { max-width:76px!important; font-size:9px!important; }
+  #app.immersive-game .killer-power-grid .btn.power { grid-template-columns:36px minmax(0,1fr)!important; min-height:42px!important; gap:6px!important; padding:3px 5px!important; }
+  #app.immersive-game .killer-power-grid .power-art { width:34px!important; height:34px!important; flex-basis:34px!important; }
+  #app.immersive-game .killer-power-grid .power-art .power-icon { inset:4px!important; width:calc(100% - 8px)!important; height:calc(100% - 8px)!important; }
+  #app.immersive-game .killer-power-grid .power-body>b { font-size:10px!important; }
+  #app.immersive-game .killer-resource-line .killer-frenzy-icon { width:24px!important; height:24px!important; flex-basis:24px!important; }
+  #app.immersive-game .killer-resource-line { gap:5px!important; font-size:10px!important; }
+  #app.immersive-game .killer-resource-line>b { font-size:12px!important; }
+  #app.immersive-game .killer-ap-display { height:38px!important; min-height:38px!important; gap:5px!important; padding:4px 6px!important; }
+  #app.immersive-game .killer-ap-icon { width:26px!important; height:26px!important; flex-basis:26px!important; }
+  #app.immersive-game .killer-ap-display>span { font-size:10px!important; }
+  #app.immersive-game .killer-ap-display>b { font-size:14px!important; }
+  #app.immersive-game .activity-log-panel { display:none!important; }
+}
