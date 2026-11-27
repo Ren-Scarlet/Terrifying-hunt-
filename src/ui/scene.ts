@@ -944,10 +944,10 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
 
     // 环境漫反射：照到墙面和地板上的宽阔暗红色光晕。
     const halo = cc.createRadialGradient(coneLen * 0.42, 0, coneLen * 0.02, coneLen * 0.42, 0, coneLen * 0.92);
-    halo.addColorStop(0, 'rgba(255,38,48,.29)');
-    halo.addColorStop(0.28, 'rgba(224,18,34,.22)');
-    halo.addColorStop(0.56, 'rgba(176,9,25,.13)');
-    halo.addColorStop(0.78, 'rgba(124,4,18,.045)');
+    halo.addColorStop(0, 'rgba(116,0,15,.42)');
+    halo.addColorStop(0.28, 'rgba(92,0,12,.34)');
+    halo.addColorStop(0.56, 'rgba(66,0,9,.22)');
+    halo.addColorStop(0.78, 'rgba(42,0,7,.10)');
     halo.addColorStop(1, 'rgba(70,0,8,0)');
     cc.fillStyle = halo;
     cc.beginPath();
@@ -956,10 +956,10 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
 
     // 主光束采用弧形边缘与渐隐，不会出现机械的直线三角边。
     const beamGradient = cc.createLinearGradient(0, 0, coneLen, 0);
-    beamGradient.addColorStop(0, 'rgba(255,54,64,.58)');
-    beamGradient.addColorStop(0.18, 'rgba(230,24,38,.42)');
-    beamGradient.addColorStop(0.42, 'rgba(198,12,29,.24)');
-    beamGradient.addColorStop(0.68, 'rgba(150,6,22,.11)');
+    beamGradient.addColorStop(0, 'rgba(142,0,18,.72)');
+    beamGradient.addColorStop(0.18, 'rgba(112,0,15,.58)');
+    beamGradient.addColorStop(0.42, 'rgba(82,0,12,.38)');
+    beamGradient.addColorStop(0.68, 'rgba(54,0,9,.22)');
     beamGradient.addColorStop(0.86, 'rgba(110,3,15,.025)');
     beamGradient.addColorStop(1, 'rgba(80,0,8,0)');
     cc.fillStyle = beamGradient;
@@ -975,8 +975,8 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
 
     // 光束中心的漫射热点，边缘逐渐融入黑暗。
     const hot = cc.createRadialGradient(coneLen * 0.52, 0, coneLen * 0.025, coneLen * 0.52, 0, coneLen * 0.32);
-    hot.addColorStop(0, 'rgba(255,68,72,.30)');
-    hot.addColorStop(0.48, 'rgba(218,18,34,.18)');
+    hot.addColorStop(0, 'rgba(142,0,18,.42)');
+    hot.addColorStop(0.48, 'rgba(88,0,13,.28)');
     hot.addColorStop(1, 'rgba(125,0,14,0)');
     cc.fillStyle = hot;
     cc.beginPath();
@@ -985,8 +985,8 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
 
     // 手电筒发光口附近的红色溢光。
     const emitter = cc.createRadialGradient(0, 0, 1, 0, 0, coneLen * 0.19);
-    emitter.addColorStop(0, 'rgba(255,90,92,.52)');
-    emitter.addColorStop(0.38, 'rgba(224,18,32,.28)');
+    emitter.addColorStop(0, 'rgba(164,0,20,.62)');
+    emitter.addColorStop(0.38, 'rgba(104,0,14,.42)');
     emitter.addColorStop(1, 'rgba(120,0,10,0)');
     cc.fillStyle = emitter;
     cc.beginPath();
