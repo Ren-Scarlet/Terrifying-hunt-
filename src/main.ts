@@ -806,7 +806,7 @@ app.addEventListener('click', (event) => {
   if (!target) return;
   clearHeldMovement();
   const action = target.dataset.action;
-  const qteAction = action === 'execute' || action === 'execute-target' || action === 'execute-special' || action === 'execute-score-special';
+  const qteAction = action === 'execute-score-special';
   const qteOutcome = target.dataset.qteOutcome as ExecutionQteOutcome | undefined;
   if (qteAction && game && screen === 'game' && !qteOutcome) {
     startExecutionQte(target);
@@ -1155,14 +1155,12 @@ app.addEventListener('click', (event) => {
     if (executed) {
       if (downedId) { pendingMapAttackTarget = downedId; pendingMapAttackGhost = ghosts.get(downedId) ?? null; }
       const style = EXECUTION_STYLES[game.killer] ?? EXECUTION_STYLES['设陷者'];
-      const perfect = qteOutcome === 'perfect';
-      applyExecutionQteOutcome(perfect ? 'perfect' : 'miss', style);
       pendingExecutionScene = {
         roomId: game.playerRoom,
-        title: style.title + (perfect ? ' · 完美处决' : ' · 残酷处决'),
-        description: style.action + '。' + style.line + (perfect ? ' 你的动作干净利落，恐惧传遍猎场。' : ' 动作稍有迟滞，附近的人听见了动静。'),
+        title: style.title + ' · 普通处决',
+        description: style.action + '。' + style.line,
         style: style.motion,
-        success: perfect,
+        success: true,
       };
       playSfx('execute');
       if (downedId) playSfx(SURVIVOR_MAP[downedId]?.gender === 'female' ? 'voiceFScream' : 'voiceMScream', 0.96);
@@ -1224,15 +1222,13 @@ app.addEventListener('click', (event) => {
     const carried = carriedId ? game.people.find((person) => person.id === carriedId) : undefined;
     if (method && executeCarriedPerson(game, method)) {
       const style = EXECUTION_STYLES[game.killer] ?? EXECUTION_STYLES['设陷者'];
-      const perfect = qteOutcome === 'perfect';
-      applyExecutionQteOutcome(perfect ? 'perfect' : 'miss', style);
       if (methodInfo && carried) {
         pendingExecutionScene = {
           roomId: game.playerRoom,
-          title: style.title + ' · ' + methodInfo.name + (perfect ? ' · 完美处决' : ''),
-          description: style.action + '。' + methodInfo.flavor(carried.name) + ' ' + style.line + (perfect ? ' 完美完成，额外获得 25 分。' : ' 动作失误，但处决仍然完成。'),
+          title: style.title + ' · 地点处决 · ' + methodInfo.name,
+          description: style.action + '。' + methodInfo.flavor(carried.name) + ' ' + style.line,
           style: style.motion,
-          success: perfect,
+          success: true,
         };
       }
       playSfx('execute');
