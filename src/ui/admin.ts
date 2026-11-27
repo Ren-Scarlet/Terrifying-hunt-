@@ -96,7 +96,7 @@ function cardBlock(): string {
       <label class="tune-no-action"><input type="checkbox" data-tune="card|${card.id}|noAction" ${card.noAction ? 'checked' : ''}> 不推进幸存者行动（不消耗世界行动）</label>
       <div class="tune-ops">${opsHtml(card.ops, `card|${card.id}|`, card.id)}</div>
       <div class="tune-add-row"><select aria-label="选择要添加的效果" id="addEffect-${card.id}">${effectOptionsHtml()}</select><button type="button" class="btn mini" data-action="admin-op-add" data-card="${card.id}">＋ 添加效果</button></div>
-      <label class="tune-description">出牌条件<select data-tune="card|${card.id}|precheck">${options([['none','无条件'],['victimHere','当前房间有可攻击目标'],['downedHere','当前房间有倒地目标'],['injuredHere','当前房间有受伤目标'],['targetAway','有目标在其他房间'],['visibleSurvivor','视野内有存活幸存者']], card.precheck?.cond.c ?? 'none')}</select></label>
+      <label class="tune-description">出牌条件<select data-tune="card|${card.id}|precheck">${options([['none','无条件'],['victimHere','当前房间有可攻击目标'],['downedHere','当前房间有倒地目标'],['injuredHere','当前房间有受伤目标'],['targetAway','有目标在其他房间'],['visibleSurvivor','视野内有存活幸存者'],['survivorNearby','当前或相邻房间有幸存者'],['carryingPerson','正在抱着幸存者'],['currentDestructible','当前房间有可破坏物品']], card.precheck?.cond.c ?? 'none')}</select></label>
       ${card.precheck ? `<div class="tune-pre">条件提示：${escape(card.precheck.hint)}</div>` : ''}
     </div>`;
   }).join('');
