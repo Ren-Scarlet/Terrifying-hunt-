@@ -3388,6 +3388,6 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
   top: 28px !important;
 }
 @media (max-width: 700px) {
-  #app.immersive-game .map-person-wrap.score-unlocked { padding-top: 56px !important; }
-  #app.immersive-game .map-person-wrap.score-unlocked .person-world-actions { top: 24px !important; }
+  #app.immersive-game .map-person-wrap.score-unlocked { padding-top: 58px !important; }
+  #app.immersive-game .map-person-wrap.score-unlocked .person-world-actions { top: 26px !important; }
 }
