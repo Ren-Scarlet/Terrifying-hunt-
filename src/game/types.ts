@@ -222,6 +222,8 @@ export interface Person {
   itemUses: number;
   /** 医疗包慢速治疗进度：攒满 MEDKIT_TURNS 才真正回血 / 拉人 */
   healTurns: number;
+  /** 医疗包开始治疗的回合：防止在同一回合内被多次 NPC 行动瞬间治好。 */
+  healLastTurn?: number;
   /** 鬼面「夜幕」对这名幸存者的监视值 0–100 */
   watchValue: number;
   /** 监视完成：持续透视，下一刀可以直接击倒 */
