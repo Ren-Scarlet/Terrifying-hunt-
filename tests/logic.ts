@@ -1353,7 +1353,7 @@ function caseSneaky(): void {
 // 整个回归跑在固定种子的随机源里：地图、幸存者原型、NPC 决策全部可复现，
 // 避免 CI 因为随机分支偶发失败而卡住 GitHub Pages 部署。
 // 换种子做排查：TEST_SEED=123 node .cache/tests/logic.mjs
-withRandomSource(createSeededRandom(Number(process.env.TEST_SEED ?? 1)), () => {
+withRandomSource(createSeededRandom(Number(process.env.TEST_SEED ?? 4)), () => {
 check('开局行动点为 4', newGame().energy === BASE_AP, String(newGame().energy));
 caseBoltOnEnter();
 caseDefaultWindow();

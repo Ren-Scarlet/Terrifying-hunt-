@@ -365,7 +365,7 @@ const REQUIRED_OP_FIELDS: Record<string, string[]> = {
   fearFlee: ['amount'], revealExecutionSite: ['turns'],
   steps: ['amount'], stun: ['amount'], discount: ['amount'], bonusDamage: ['amount'], arrestThreshold: ['amount'],
   heal: ['who', 'amount'], rescue: ['who'], bleed: ['who', 'amount'], stalk: ['amount'],
-  silenceAlarm: ['turns'], pursue: ['who'], flag: ['key'], log: ['text'], if: ['cond', 'then'],
+  silenceAlarm: ['turns'], flag: ['key'], log: ['text'], if: ['cond', 'then'],
 };
 const OPTIONAL_DYNAMIC_FIELDS: Record<string, string[]> = {
   damage: ['maxHp'], move: ['clearAlert'], scout: ['to', 'all', 'adj', 'turns'],

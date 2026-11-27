@@ -219,7 +219,9 @@ export function createGame(
       ENTRY_ROOM,
       EXIT_ROOM,
     ]);
-    state.trapCaches = shuffle(objPool.filter((room) => !occupied.has(room) && ROOM_MAP[room].neighbors.length >= 2)).slice(0, 2);
+    state.trapCaches = shuffle(
+      ROOMS.map((room) => room.id).filter((room) => !occupied.has(room) && ROOM_MAP[room].neighbors.length >= 2),
+    ).slice(0, 2);
   }
 
 
