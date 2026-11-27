@@ -362,7 +362,6 @@ export function executeOps(state: GameState, ops: Op[], runtime: EffectRuntime):
             }
             break;
           }
-          case 'revealWorkers':
           case 'bitterMurmur':
             state.bitterMurmurReady = true;
             log(state, '苦涩低语已埋下：下一次有人死亡时，回声会显露其余所有人。');
