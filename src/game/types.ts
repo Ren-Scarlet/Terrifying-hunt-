@@ -157,6 +157,7 @@ export interface BearTrap {
   armed: boolean;
   discovered: boolean;
   triggeredBy?: string;
+  triggeredTurn?: number;
 }
 
 /** 健康 / 受伤 / 倒地。死亡等于从 people 里移除，所以没有第四态。 */
