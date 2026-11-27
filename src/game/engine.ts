@@ -1363,6 +1363,7 @@ function npcOnPlayerEnter(state: GameState, barricadedEntry = false): void {
     if (threat === 'spiritual') gain = 65;
     else if (threat === 'alarm') gain = 55;
     else if (threat === 'lead') gain = 42;
+    else if (threat === 'brave') gain = 38;
     if (threat !== 'spiritual') {
       if (hidden) gain = Math.round(gain * 0.4);
       // 黑暗会显著削弱幸存者对入侵者的辨认能力。
