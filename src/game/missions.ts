@@ -5,7 +5,7 @@ const pick = <T,>(arr: T[]): T => arr[Math.floor(random() * arr.length)];
 function killerBonusTask(killer: string): MissionTask | null {
   if (killer === '迈克尔·迈尔斯') return { id: 'bonus-myers-stalk', kind: 'killer_stat', metric: 'myers_stalk', label: '额外挑战：尾随 3 名不同幸存者', target: 3, reward: 55, optional: true };
   if (killer === '设陷者') return { id: 'bonus-trap-trigger', kind: 'killer_stat', metric: 'trap_triggers', label: '额外挑战：让 2 名人类踩中捕兽夹', target: 2, reward: 55, optional: true };
-  if (killer === '护士') return { id: 'bonus-nurse-blink-attack', kind: 'killer_stat', metric: 'nurse_grabs', label: '额外挑战：闪现后攻击 1 名幸存者', target: 1, reward: 60, optional: true };
+  if (killer === '护士') return { id: 'bonus-nurse-blink-attack', kind: 'killer_stat', metric: 'nurse_blink_attacks', label: '额外挑战：闪现后用普通攻击命中 1 名幸存者', target: 1, reward: 60, optional: true };
   if (killer === '女猎手') return { id: 'bonus-huntress-hatchet', kind: 'killer_stat', metric: 'hatchet_hits', label: '额外挑战：用飞斧命中 2 名幸存者', target: 2, reward: 55, optional: true };
   return null;
 }
