@@ -155,7 +155,7 @@ export function personChip(person: Person, attackable = false, carryable = false
     ? '<span class="chip-contract-target" title="本局契约指定击杀目标">★ 契约目标</span>'
     : '';
   const avatarHtml = img
-    ? `<span class="person-avatar-wrap"><img class="person-avatar" src="${img}" alt="" onerror="this.style.display='none'">${person.bloodSacrifice ? '<span class="chip-sacrifice-mark" title="本局血祭品">🩸</span>' : ''}</span>`
+    ? `<span class="person-avatar-wrap"><img class="person-avatar" src="${img}" alt="" onerror="this.style.display='none'">${person.bloodSacrifice ? `<img class="chip-sacrifice-mark" src="${uiIcon('obsession')}" alt="血祭品" title="本局血祭品">` : ''}</span>`
     : '';
   const trapHitMark = person.trapTriggered
     ? '<span class="shadow-figure trap-hit-figure" title="刚刚踩中捕兽夹并发出尖叫"></span>'
