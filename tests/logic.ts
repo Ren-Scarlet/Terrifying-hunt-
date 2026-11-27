@@ -637,8 +637,10 @@ function caseMyersStalkingAndFearRadius(): void {
   check('卡牌图标：每张卡都有图标文件，且直接使用以卡牌 id 命名的专属图标（不借用其他卡牌图案）',
     (() => {
       const files = new Set(readdirSync('public/assets/dbd/perks'));
-      return Object.keys(CARD_MAP).every((id) =>
-        files.has(`${id}.png`) && (cardImage(id)?.endsWith(`/${id}.png`) ?? false));
+      return Object.keys(CARD_MAP).every((id) => {
+        const extension = id.startsWith('trapper_') ? '.svg' : '.png';
+        return files.has(`${id}${extension}`) && (cardImage(id)?.endsWith(`/${id}${extension}`) ?? false);
+      });
     })());
   const normal = createGame(['silent_step'], undefined, '设陷者');
   check('恐惧范围：其他杀手仍保持默认 1', normal.fearRadius === 1);
