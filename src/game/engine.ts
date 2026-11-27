@@ -1546,16 +1546,20 @@ function witnessInRoom(state: GameState, person: Person): boolean {
   return true;
 }
 
-function barricadeRoom(state: GameState, person: Person): void {
+export function canPlaceBarricade(state: GameState, person: Person): boolean {
+  return !state.possessed && OBSTACLE_ROOMS.includes(person.room) &&
+    !state.clearedObstacles.includes(person.room) &&
+    !state.barricades.includes(person.room);
+}
+
+function barricadeRoom(state: GameState, person: Person): boolean {
+  if (!canPlaceBarricade(state, person)) return false;
   person.intent = 'barricade';
   person.activity = '放下木板堵住入口';
-  if (!state.barricades.includes(person.room)) {
-    state.barricades.push(person.room);
-    log(state, `${person.name} 猛地放下木板，封住了${roomName(person.room)}的入口！`);
-  } else {
-    log(state, `${person.name} 缩在堵死的门后发抖，已经没有退路。`);
-  }
+  state.barricades.push(person.room);
+  log(state, person.name + ' 在原有障碍房间放下木板，封住了' + roomName(person.room) + '的入口！地图已标记木板位置。');
   addAlarm(state, 2);
+  return true;
 }
 
 /** 同屋有倒地同伴就拉起他：任何人都会救，只是意愿不同；玩家在场时没人敢动手 */
@@ -1665,7 +1669,7 @@ function actByArchetype(state: GameState, person: Person): void {
       }
     }
   }
-  if (counterArchetype && inPursuit && !state.barricades.includes(person.room) && random() < 0.72) {
+  if (counterArchetype && inPursuit && canPlaceBarricade(state, person) && random() < 0.72) {
     const blockedRoom = person.room;
     const alertBeforeEscape = person.alert;
     barricadeRoom(state, person);
@@ -1755,7 +1759,11 @@ function actByArchetype(state: GameState, person: Person): void {
           return;
         }
       }
-      barricadeRoom(state, person);
+      if (canPlaceBarricade(state, person)) {
+        barricadeRoom(state, person);
+        return;
+      }
+      fleeAway(state, person);
       return;
     }
     case 'rescuer': {
@@ -2092,7 +2100,7 @@ function npcTurn(state: GameState): void {
         person.movesThisTurn = Math.min(REACT_MOVE_CAP, person.movesThisTurn + 1);
         continue;
       }
-      if (person.archetype === 'defiant' && person.movesThisTurn < REACT_MOVE_CAP) {
+      if (person.archetype === 'defiant' && person.movesThisTurn < REACT_MOVE_CAP && canPlaceBarricade(state, person)) {
         barricadeRoom(state, person);
       } else {
         person.intent = 'wary';
