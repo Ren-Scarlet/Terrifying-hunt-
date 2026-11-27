@@ -179,7 +179,7 @@ export function personChip(person: Person, attackable = false, carryable = false
   const bleedLeft = Math.max(0, BLEEDOUT_TURNS - person.downedTurns);
   const stateMark =
     health === 'downed'
-      ? `<span class="chip-state downed" title="倒地：可以立即处决；若暂时放过，同伴仍可能救起，${bleedLeft} 回合后流血死亡"><img class="chip-state-icon" src="${uiIcon('statusDowned')}" alt="倒地" onerror="this.src='assets/ui/无法行动.webp'"><b>${bleedLeft}</b></span>`
+      ? `<span class="chip-state downed" title="倒地：可以立即处决；若暂时放过，同伴仍可能救起，${bleedLeft} 回合后流血死亡"><img class="chip-state-icon" src="${uiIcon('statusDowned')}" alt="倒地" onerror="this.src='assets/ui/倒地状态.webp'"><b>${bleedLeft}</b></span>`
       : health === 'injured'
         ? `<span class="chip-state injured" title="受伤：再挨一下就会倒地"><img class="chip-state-icon" src="${uiIcon('statusInjured')}" alt="受伤" onerror="this.style.display='none'"></span>`
         : '';
