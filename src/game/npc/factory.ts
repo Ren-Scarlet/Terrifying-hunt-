@@ -115,7 +115,7 @@ function makePerson(
 }
 
 export function createPeople(mission: Mission): Person[] {
-  const markedCount = mission.mode === 'free' ? 0 : mission.kind === 'assassinate' ? mission.targetCount ?? 2 : 1;
+  const markedCount = mission.mode === 'free' ? 0 : (mission.tasks ?? []).some((task) => !task.optional && task.kind === 'marked_kill') ? mission.targetCount ?? 1 : 0;
 
   // 每局至少安排两名知名角色，他们具备会改变局势的威胁能力。
   const featured = shuffle(SPECIAL_SURVIVORS).slice(0, 2);
