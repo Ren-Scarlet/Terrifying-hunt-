@@ -2165,7 +2165,12 @@ function npcTurn(state: GameState): void {
 
     const routine = ROUTINE_PROFILE[person.archetype];
     const routineRoom = routine.rooms[(person.routineIndex ?? 0) % routine.rooms.length];
-    const goalTargets: RoomId[] =
+    const toolboxCircuitRooms = person.item === 'toolbox'
+      ? state.powerCircuits.filter((circuit) => circuit.broken || circuit.enabled === false).map((circuit) => circuit.breakerRoom)
+      : [];
+    const goalTargets: RoomId[] = toolboxCircuitRooms.length
+      ? toolboxCircuitRooms
+      : (
       person.goal === 'routine'
         ? [routineRoom]
         : person.goal === 'objective'
@@ -2184,11 +2189,11 @@ function npcTurn(state: GameState): void {
                       ? [nearestOf(person.room, cabinetRoomsFor(state))]
                       : person.goal === 'exit' || person.goal === 'panic'
                         ? ESCAPE_ROOMS
-                        : [person.room];
+                        : [person.room]);
     const target = nearestOf(person.room, goalTargets.length ? goalTargets : [person.room]);
     if (target === person.room) {
 else if ((person.goal === 'objective' || person.goal === 'key') && state.teamProgress < TEAM_GOAL_MAX) {
-        // 工具箱：按你的设计，推进团队目标也更快（不只是修发电机）
+        // 工具箱：按你的设计，推进团队目标也更快。
         const hasToolbox = person.item === 'toolbox' && person.itemUses > 0;
         const gain = teamWorkGain(state, person) * (hasToolbox ? 2 : 1);
         if (hasToolbox) consumeItem(state, person);
@@ -2426,7 +2431,7 @@ function usableItemBoxes(state: GameState): SiteItem[] {
 
 /**
  * 幸存者不是随手乱抓：他会看场上缺什么再决定拿哪件。
- * 有人倒地 → 医疗包；发电机还能修 → 工具箱；想报警 → 信号弹；
+ * 有人倒地 → 医疗包；电闸损坏或断电 → 工具箱；想报警 → 信号弹；
  * 想跑 → 钥匙；要挡你 → 武器；被盯上 → 烟雾弹。留两成随机，人也会慌。
  */
 function pickSupply(state: GameState, person: Person): SurvivorItem {
