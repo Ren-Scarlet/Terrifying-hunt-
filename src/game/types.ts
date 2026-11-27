@@ -131,8 +131,6 @@ export type NpcGoal =
   | 'key'
   /** 去道具箱翻一件能用的东西 */
   | 'supply'
-  /** 去把发电机修好 */
-  | 'generator'
   /** 按个人习惯在常去地点之间活动 */
   | 'routine';
 
@@ -140,7 +138,7 @@ export type NpcGoal =
 export type SurvivorItem = 'medkit' | 'toolbox' | 'flare' | 'key' | 'weapon' | 'smoke' | 'flashlight';
 
 /** 场地物品：杀手用不了，但可以砸掉 */
-export type SiteItemKind = 'itemBox' | 'generator';
+export type SiteItemKind = 'itemBox';
 
 export interface SiteItem {
   id: string;
@@ -150,12 +148,6 @@ export interface SiteItem {
   broken: boolean;
   /** 还能发几件道具 */
   charges: number;
-  /** 发电机修复进度 0–100 */
-  progress: number;
-  /** 已经修好并给过团队进度 */
-  charged: boolean;
-  /** 被砸后停机的剩余回合 */
-  jammedTurns: number;
 }
 
 /** 设陷者放置的捕兽夹；触发或被幸存者拆除后会变成未武装状态。 */
@@ -361,8 +353,6 @@ export interface PowerCircuit {
   broken: boolean;
   /** 控制箱的开关状态；未定义的旧状态按开启处理。 */
   enabled?: boolean;
-  /** 为这组照明供电的发电机；未绑定时按旧版独立电路处理。 */
-  generatorId?: string;
   /** 环境事件造成的临时熄灯回合数，不等于电闸被破坏。 */
   flickerTurns?: number;
 }
