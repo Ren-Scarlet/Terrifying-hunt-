@@ -524,7 +524,7 @@ export interface GameState {
   /* ---------- NPC 逃跑系统 ---------- */
   /** 已经逃出这栋房子的人数 */
   escaped: number;
-  /** 堵门的房间：玩家进入要多花 1 行动点，需「所向无敌」清除 */
+  /** 幸存者放下木板封住入口；强行冲门会被砸晕，也可花行动点主动破坏。 */
   barricades: RoomId[];
   /** 逃生点被封锁的剩余回合 */
   exitBlockedTurns: number;
