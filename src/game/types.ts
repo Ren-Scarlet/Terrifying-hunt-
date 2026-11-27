@@ -514,6 +514,8 @@ export interface GameState {
   hexRuinActive: boolean;
   hexRuinUsed: boolean;
   totems: RoomId[];
+  /** 本局已经从哪些图腾领取过一次性互动奖励，防止反复刷取。 */
+  totemInteractions: RoomId[];
   /** 图腾提供的下回合额外行动点 */
   bonusEnergyNextTurn: number;
   /** 已被破坏的障碍物房间 */
