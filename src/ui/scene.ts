@@ -927,7 +927,7 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
     const torchOffset = Math.min(pr.w, pr.h) * 0.22;
     const px = markerX + Math.cos(facing) * torchOffset;
     const py = markerY + Math.sin(facing) * torchOffset;
-    const coneLen = Math.min(Math.max(w, h) * 0.34, Math.hypot(pr.w, pr.h) * 0.78);
+    const coneLen = Math.min(Math.max(w, h) * 0.29, Math.hypot(pr.w, pr.h) * 0.70);
     const k = view.dpr * DARK_SCALE;
     const cc = refs.coneCtx;
     cc.setTransform(1, 0, 0, 1, 0, 0);
@@ -951,7 +951,7 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
     halo.addColorStop(1, 'rgba(120,0,10,0)');
     cc.fillStyle = halo;
     cc.beginPath();
-    cc.ellipse(coneLen * 0.42, 0, coneLen * 0.82, coneLen * 0.48, 0, 0, Math.PI * 2);
+    cc.ellipse(coneLen * 0.42, 0, coneLen * 0.72, coneLen * 0.42, 0, 0, Math.PI * 2);
     cc.fill();
 
     // 主光束采用弧形边缘与渐隐，不会出现机械的直线三角边。
@@ -980,7 +980,7 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
     hot.addColorStop(1, 'rgba(180,0,20,0)');
     cc.fillStyle = hot;
     cc.beginPath();
-    cc.ellipse(coneLen * 0.52, 0, coneLen * 0.43, coneLen * 0.19, 0, 0, Math.PI * 2);
+    cc.ellipse(coneLen * 0.52, 0, coneLen * 0.36, coneLen * 0.16, 0, 0, Math.PI * 2);
     cc.fill();
 
     // 手电筒发光口附近的红色溢光。
@@ -990,7 +990,7 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
     emitter.addColorStop(1, 'rgba(180,0,16,0)');
     cc.fillStyle = emitter;
     cc.beginPath();
-    cc.arc(0, 0, coneLen * 0.19, 0, Math.PI * 2);
+    cc.arc(0, 0, coneLen * 0.16, 0, Math.PI * 2);
     cc.fill();
     cc.restore();
 
