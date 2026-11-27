@@ -895,6 +895,28 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
       }
     }
 
+    // 暴雨中的闪电：短促双闪只照亮有窗户的房间，不改变任何照明或玩法状态。
+    const stormPhase = t % 23;
+    const lightning = Math.max(
+      0,
+      1 - Math.abs(stormPhase - 8.2) / 0.12,
+      0.78 - Math.abs(stormPhase - 8.48) / 0.075,
+    );
+    if (lightning > 0) {
+      for (const room of ROOMS) {
+        const wins = WINDOWS[room.id];
+        if (!wins?.length || !isRoomExplored(state, room.id)) continue;
+        const r = rectOf(room.id, view);
+        for (const win of wins) {
+          const horizontal = win.side === 'top' || win.side === 'bottom';
+          const along = (horizontal ? r.x : r.y) + win.p * (horizontal ? r.w : r.h);
+          const gx = horizontal ? along : win.side === 'left' ? r.x : r.x + r.w;
+          const gy = horizontal ? (win.side === 'top' ? r.y : r.y + r.h) : along;
+          cutLight(d, gx, gy, Math.max(r.w, r.h) * 0.95, 0.9 * lightning);
+        }
+      }
+    }
+
     // 玩家：手电筒光锥（裁剪到当前房间，光不穿墙）
     const pr = rectOf(state.playerRoom, view);
     // The DOM player marker is centered on this exact room center. Move the
@@ -1138,6 +1160,26 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
     ctx.fill();
 
     // 不再把尘埃粒子贴在玩家周围；保持人物标记干净，空气层由柔和雾气承担。
+
+    // 持续细雨：稀疏斜向雨丝作为纯视觉天气层，不遮挡交互、不影响移动。
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.strokeStyle = 'rgba(175,195,215,.13)';
+    ctx.lineWidth = Math.max(0.7, view.dpr * 0.55);
+    for (let i = 0; i < 88; i++) {
+      const x = (i * 137 + t * 74) % w;
+      const y = (i * 211 + t * 238) % h;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x - 3.5, y + 10);
+      ctx.stroke();
+    }
+    // 闪电在窗边留下冷白反光，形成房间内部短暂的一明一暗。
+    if (lightning > 0) {
+      ctx.fillStyle = `rgba(190,215,245,${0.035 * lightning})`;
+      ctx.fillRect(0, 0, w, h);
+    }
+    ctx.restore();
 
     ctx.globalCompositeOperation = 'source-over';
   }
