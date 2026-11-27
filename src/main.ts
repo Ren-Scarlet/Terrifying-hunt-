@@ -1019,7 +1019,8 @@ app.addEventListener('click', (event) => {
     if (!game || screen !== 'game') return;
     const method = target.dataset.method as ExecutionMethodId | undefined;
     const methodInfo = method ? getExecutionMethod(method) : undefined;
-    const carried = game.carryPersonId ? game.people.find((person) => person.id === game.carryPersonId) : undefined;
+    const carriedId = game.carryPersonId;
+    const carried = carriedId ? game.people.find((person) => person.id === carriedId) : undefined;
     if (method && executeCarriedPerson(game, method)) {
       if (methodInfo && carried) {
         pendingExecutionScene = {
