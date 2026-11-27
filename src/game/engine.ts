@@ -951,10 +951,8 @@ function damagePerson(state: GameState, person: Person, amount: number, suppress
   state.frenzy = 0;
 
   const before = person.hp;
-  const wasAlreadyPanicked = person.fear >= 100;
   person.fear = clamp(person.fear + Math.max(28, dmg * 24), 0, 100);
-  // 恐惧是在本次命中中刚好达到 100：先受伤并逃跑；只有命中前已经满恐惧，才会被这次攻击直接击倒。
-  if (wasAlreadyPanicked) dmg = Math.max(dmg, before);
+  if (person.fear >= 100) dmg = Math.max(dmg, before);
   person.hidden = false;
   person.blockedTurns = 0;
 
@@ -1284,7 +1282,7 @@ function wantsToLeave(state: GameState, person: Person): boolean {
  * 这时候只留地面上的痕迹，让玩家自己看地板。
  */
 function fleeAway(state: GameState, person: Person, quiet = false): boolean {
-  if (state.pinnedPeople.includes(person.id) || person.blockedTurns > 0 || person.hp <= 0) return false;
+  if (state.pinnedPeople.includes(person.id) || person.blockedTurns > 0 || person.hp <= 0 || person.fear >= 100) return false;
   if (person.room !== state.playerRoom && person.hp <= SURVIVOR_INJURED_HP && person.movesThisTurn % 2 === 1) {
     person.activity = '重伤拖慢了脚步，踉跄着停了一下';
     return false;
@@ -3817,7 +3815,12 @@ export function throwHuntressHatchet(state: GameState, targetId: string): boolea
   state.huntStats.hatchetHits += 1;
   state.huntressAiming = false;
   log(state, `女猎手掷出狩猎飞斧，命中${target.name}（剩余飞斧 ${state.hatchets}/3）。`);
+  // 飞斧命中本身不应把「本次刚达到恐惧上限」当成第二次受击；
+  // 临时留在 99 点完成受伤与逃跑，再恢复显示值 100，后续命中才会击倒。
+  const hatchetCausesPanic = target.fear < 100 && target.fear + 28 >= 100;
+  if (hatchetCausesPanic) target.fear = 71;
   damagePerson(state, target, 1);
+  if (hatchetCausesPanic && target.hp > 0) target.fear = 100;
   state.attackReady = true;
   afterPlayerAction(state);
   checkImmediateWin(state);
