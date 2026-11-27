@@ -1,6 +1,7 @@
 import './style.css';
 import './ui/immersive.css';
-import './ui/mobile-redesign.css';
+import './ui/mobile-shell.css';
+import { applyMobileGameLayout } from './ui/mobile-layout';
 import { handleImmersiveAction, installImmersiveKeys, openIntelDrawer, syncImmersiveCamera } from './ui/immersive';
 import { CARD_MAP, deckCardsForKiller, STARTING_DECK } from './game/cards';
 import {
@@ -592,6 +593,7 @@ function render(): void {
   const immersiveActive = Boolean(game && screen === 'game');
   app.classList.toggle('immersive-game', immersiveActive);
   document.body.classList.toggle('immersive-hunt', immersiveActive);
+  applyMobileGameLayout(app, immersiveActive);
   applyDisplaySettings();
   detailCardUid = null;
   if (game && screen === 'game' && selectedPersonId) {
