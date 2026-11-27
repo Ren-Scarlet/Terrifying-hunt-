@@ -1501,7 +1501,7 @@ function interruptPlayer(state: GameState, reason: string, actorId: string): voi
   survivorsActOnce(state, actorId);
 }
 
-/** 打断时幸存者的一次额外行动：能跑的跑，跑不了的替团队把活往前推 */
+/** 打断时幸存者的一次额外行动：能跑的跑，无法移动时改为处理个人事务 */
 function survivorsActOnce(state: GameState, actorId: string): void {
   const before = snapshotRooms(state);
   for (const p of npcs(state)) {
