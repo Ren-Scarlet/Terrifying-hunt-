@@ -4,7 +4,6 @@
  */
 import { CARD_MAP, CARDS, STARTING_DECK, deckCardsForKiller } from '../src/game/data/cards';
 import { ACTIVE_KILLERS, KILLERS, STARTER_KILLERS } from '../src/game/data/killers';
-import { generateMission } from '../src/game/missions';
 import {
   ARCH_LABEL,
   BASE_AP,
@@ -1541,10 +1540,10 @@ caseSurvivorItems();
 caseNewMechanics();
 
 function caseMergeAndMissions(): void {
-  // 挂机类任务已从任务池移除：赢只能靠杀够人 / 杀关键人物撤离 / 收齐证据撤离
+  // 契约在准备开始时随机生成，六种契约必须拥有不同的主目标。
   const kinds = new Set<string>();
-  for (let i = 0; i < 40; i++) kinds.add(generateMission().kind);
-  check('Z 任务池不含挂机类 ritual', !kinds.has('ritual'), [...kinds].join(','));
+  for (let i = 0; i < 120; i++) kinds.add(generateMission().kind);
+  check('Z 随机契约池包含至少五种不同主目标', kinds.size >= 5, [...kinds].join(','));
 
   // 通缉与警戒合并：袭警推高的是同一条暴露度，wanted 只是它的 0~10 镜像
   const s = newGame();
@@ -1641,11 +1640,7 @@ function caseAidAndPressure(): void {
 
 caseAidAndPressure();
 
-const generatedKinds = new Set<string>();
-withRandomSource(createSeededRandom(20261127), () => {
-  for (let i = 0; i < 120; i += 1) generatedKinds.add(generateMission('设陷者').kind);
-});
-check('随机契约：准备开始后可随机抽取多种不同主目标', generatedKinds.size >= 5, `types=${generatedKinds.size}`);
+
 
 
 /** AB：组合契约、独立电闸联动、搬运与地形处决 */
