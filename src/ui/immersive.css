@@ -2632,3 +2632,15 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
 @media(max-width:900px){
   #app.immersive-game .map-event-feed{right:6px!important;top:6px!important;width:min(240px,52%)!important;max-height:30%!important;}
 }
+
+/* 警报提示修复：状态栏整体 pointer-events:none，导致 hover 永远不触发。
+   只给警报格单独开启指针事件，其余格子仍然穿透，不会挡住地图点击。 */
+#app.immersive-game .alarm-stat{pointer-events:auto!important;cursor:help!important;}
+#app.immersive-game .alarm-stat .alarm-tooltip-content{
+  width:min(272px,calc(100vw - 48px))!important;
+  left:0!important;right:auto!important;top:calc(100% + 8px)!important;
+}
+/* 悬浮时把状态栏整体抬到任务弹窗/侧栏之上，提示卡才不会被 z-index:28 的面板压住；
+   不悬浮时保持原来的 19 层，不影响任何其他面板。 */
+#app.immersive-game .statusline:has(.alarm-stat:hover),
+#app.immersive-game .statusline:has(.alarm-stat:focus-within){z-index:46!important;}
