@@ -170,9 +170,8 @@ function updateAttackGhostEscapeDirection(ghost: AttackGhost | null, personId: s
   if (!ghost || !game) return;
   const person = game.people.find((candidate) => candidate.id === personId);
   if (!person) return;
-  const freshTrails = game.trails
-    .filter((trail) => trail.clock >= ghost.trailClock && trail.to === person.room)
-    .sort((a, b) => b.clock - a.clock);
+  const freshTrails = [...game.trails].reverse()
+    .filter((trail) => trail.clock >= ghost.trailClock && trail.to === person.room);
   const trail = freshTrails.find((candidate) => candidate.room === ghost.roomId) ?? freshTrails[0];
   if (!trail) return;
   const from = ROOM_MAP[trail.room].rect;
@@ -270,12 +269,16 @@ function renderMarkupPreservingMap(html: string): void {
       ghost.style.top = `${pendingMapAttackGhost.top}px`;
       ghost.style.width = `${pendingMapAttackGhost.width}px`;
       ghost.style.height = `${pendingMapAttackGhost.height}px`;
-      const escapeX = Math.cos(pendingMapAttackGhost.escapeAngle) * 10;
-      const escapeY = Math.sin(pendingMapAttackGhost.escapeAngle) * 10;
+      const escapeX = Math.cos(pendingMapAttackGhost.escapeAngle) * 18;
+      const escapeY = Math.sin(pendingMapAttackGhost.escapeAngle) * 18;
       ghost.style.setProperty('--escape-x', `${escapeX.toFixed(1)}px`);
       ghost.style.setProperty('--escape-y', `${escapeY.toFixed(1)}px`);
       ghost.style.setProperty('--escape-back-x', `${(-escapeX * 0.55).toFixed(1)}px`);
       ghost.style.setProperty('--escape-back-y', `${(-escapeY * 0.55).toFixed(1)}px`);
+      ghost.style.setProperty('--escape-mid-x', `${(escapeX * 0.5).toFixed(1)}px`);
+      ghost.style.setProperty('--escape-mid-y', `${(escapeY * 0.5).toFixed(1)}px`);
+      ghost.style.setProperty('--escape-near-x', `${(escapeX * 0.9).toFixed(1)}px`);
+      ghost.style.setProperty('--escape-near-y', `${(escapeY * 0.9).toFixed(1)}px`);
       ghost.classList.add('blood-hit');
       people.appendChild(ghost);
       window.setTimeout(() => ghost.remove(), 760);
@@ -932,7 +935,7 @@ app.addEventListener('click', (event) => {
         pendingMapAttackTarget = personId;
         pendingMapAttackGhost = ghosts.get(personId) ?? null;
         updateAttackGhostEscapeDirection(pendingMapAttackGhost, personId);
-        if (victimIsSurvivor) playSurvivorHit();
+        if (pendingMapAttackTarget && survivorIdsBefore.has(pendingMapAttackTarget)) playSurvivorHit();
       }
       playKillerAttackSound(game);
       if (game.kills > killsBefore) playSfx('kill');
@@ -1079,8 +1082,7 @@ app.addEventListener('click', (event) => {
 
   if (action === 'attack') {
     const ghosts = captureAttackGhosts();
-    const victimId = game.people.find((person) => person.room === game?.playerRoom && person.role !== 'police' && person.hp > 0 && !person.hidden)?.id ?? null;
-    const victimIsSurvivor = !!victimId;
+    const survivorIdsBefore = new Set(game.people.filter((person) => person.role !== 'police').map((person) => person.id));
     const kills = game.kills;
     const hit = attack(game);
     if (hit) {
