@@ -265,7 +265,7 @@ function startHeldCameraPan(key: string): void {
     if (!heldPanKeys.size || !mapElement) { heldPanFrame = 0; return; }
     const elapsed = heldPanLastTime ? Math.min(0.05, (now - heldPanLastTime) / 1000) : 0;
     heldPanLastTime = now;
-    const speed = 560;
+    const speed = 680;
     let dx = 0;
     let dy = 0;
     if (heldPanKeys.has('arrowleft')) dx += speed * elapsed;
