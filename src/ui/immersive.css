@@ -1495,7 +1495,7 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
     width: 76px !important;
     min-width: 76px !important;
   }
-  #app.immersive-game .statusline { top: 112px !important; left: 12px !important; }
+  #app.immersive-game .statusline { top: 124px !important; left: 12px !important; }
 }
 @media (max-width: 700px) {
   #app.immersive-game .bottom-hud {
@@ -2305,7 +2305,7 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
 #app.immersive-game .task-pop {
   left: 23px !important;
   right: auto !important;
-  top: 126px !important;
+  top: 138px !important;
   width: min(360px, calc(100vw - 46px)) !important;
   max-height: min(58vh, 560px) !important;
   overflow: auto !important;
