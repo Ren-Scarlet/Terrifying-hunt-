@@ -61,6 +61,7 @@ import {
   isSensing,
   moveCost,
   movePlayer,
+  breakBarricade,
   playCard,
   runOps,
   searchRoom,
@@ -1080,7 +1081,7 @@ function casePickTarget(): void {
   );
 }
 
-/** N：障碍房不再是死路——多花 1 点行动点能撞开进去 */
+/** N：地图固定木板必须先花 1 点行动点破坏，不能直接撞门进入 */
 function caseObstacleEnter(): void {
   const s = newGame();
   const obstacle = OBSTACLE_ROOMS.find((id) => ROOM_MAP[id].neighbors.length > 0)!;
@@ -1088,13 +1089,15 @@ function caseObstacleEnter(): void {
   s.playerRoom = from;
   s.energy = 9;
   s.freeMove = false;
-  const cost = moveCost(s, obstacle);
-  const can = canMoveTo(s, obstacle);
+  const blocked = !canMoveTo(s, obstacle);
+  const refused = !movePlayer(s, obstacle);
+  const broken = breakBarricade(s, obstacle);
+  const canEnter = canMoveTo(s, obstacle);
   const moved = movePlayer(s, obstacle);
   check(
-    'N 障碍房能撞开进去（多花 1 点）',
-    can && moved && cost === 2 && s.playerRoom === obstacle && s.clearedObstacles.includes(obstacle),
-    `cost=${cost} can=${can} at=${s.playerRoom}`,
+    'N 木板封门：先破坏再进入，不能直接冲门',
+    blocked && refused && broken && canEnter && moved && s.playerRoom === obstacle && s.clearedObstacles.includes(obstacle),
+    `blocked=${blocked} broken=${broken} canEnter=${canEnter} at=${s.playerRoom}`,
   );
 }
 
