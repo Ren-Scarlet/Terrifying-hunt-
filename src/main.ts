@@ -195,14 +195,15 @@ function startExecutionQte(button: HTMLElement): void {
   overlay.className = 'execution-qte-overlay';
   overlay.setAttribute('role', 'dialog');
   overlay.setAttribute('aria-modal', 'true');
-  overlay.setAttribute('aria-label', '处决快速反应挑战');
+  const scoreSpecial = button.dataset.action === 'execute-score-special';
+  overlay.setAttribute('aria-label', scoreSpecial ? '分数处决快速反应挑战' : '处决快速反应挑战');
   const panel = document.createElement('div');
   panel.className = 'execution-qte-panel';
   const heading = document.createElement('b');
   heading.className = 'execution-qte-heading';
-  heading.textContent = style.title + ' · 处决时机';
+  heading.textContent = style.title + (scoreSpecial ? ' · 分数处决' : ' · 处决时机');
   const sub = document.createElement('p');
-  sub.textContent = style.action + '。按顺序输入屏幕上的四个数字！';
+  sub.textContent = scoreSpecial ? '猎杀评分已达到解锁门槛。完成这次 QTE，执行独立的分数处决！按顺序输入屏幕上的四个数字。' : style.action + '。按顺序输入屏幕上的四个数字！';
   const sequence = document.createElement('div');
   sequence.className = 'execution-qte-sequence';
   const cells = digits.map((digit, index) => {
