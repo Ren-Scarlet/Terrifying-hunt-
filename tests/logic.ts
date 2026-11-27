@@ -601,7 +601,11 @@ function caseMyersStalkingAndFearRadius(): void {
   nurseAttack.energy = 4;
   usePower(nurseAttack, 'nurse_blink');
   blinkPlayer(nurseAttack, nurseAttackTarget.room);
+  nurseAttackTarget.room = nurseAttack.playerRoom;
+  nurseAttackTarget.alert = 0;
+  nurseAttackTarget.fear = 0;
   nurseAttack.energy = 4;
+  nurseAttack.attackReady = true;
   check('护士：闪现后使用普通攻击也能完成专属额外任务',
     attack(nurseAttack, nurseAttackTarget.id) && nurseAttack.huntStats.nurseGrabs === 1 && !nurseAttack.nurseFollowUp);
 
