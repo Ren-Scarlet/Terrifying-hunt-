@@ -31,6 +31,7 @@ let animationFrom = { x: 0, y: 0, zoom: 1.18 };
 let animationTo = { x: 0, y: 0, zoom: 1.18 };
 let hasCamera = false;
 let taskDrawerOpen = false;
+let activityLogOpen = false;
 let intelDrawerOpen = false;
 let hudHidden = false;
 let handOpen = true;
@@ -252,6 +253,12 @@ export function syncImmersiveCamera(nextRoot: HTMLElement): void {
   playerY = point.y;
 
   root.querySelector<HTMLElement>('.task-detail-drawer')?.classList.toggle('open', taskDrawerOpen);
+  const activityPanel = root.querySelector<HTMLElement>('.activity-log-panel');
+  const activityButton = root.querySelector<HTMLButtonElement>('[data-action="toggle-activity-log"]');
+  const activityList = root.querySelector<HTMLElement>('.activity-log-list');
+  activityPanel?.classList.toggle('open', activityLogOpen);
+  if (activityButton) activityButton.setAttribute('aria-expanded', String(activityLogOpen));
+  if (activityList) activityList.hidden = !activityLogOpen;
   const intel = root.querySelector<HTMLDetailsElement>('.intel-drawer');
   if (intel) intel.open = intelDrawerOpen;
   bindIntelPanelDrag();
@@ -348,6 +355,16 @@ export function handleImmersiveAction(action: string | undefined): boolean {
     }
     return true;
   }
+  if (action === 'toggle-activity-log') {
+    activityLogOpen = !activityLogOpen;
+    const panel = root?.querySelector<HTMLElement>('.activity-log-panel');
+    const button = root?.querySelector<HTMLButtonElement>('[data-action="toggle-activity-log"]');
+    const list = root?.querySelector<HTMLElement>('.activity-log-list');
+    panel?.classList.toggle('open', activityLogOpen);
+    if (button) button.setAttribute('aria-expanded', String(activityLogOpen));
+    if (list) list.hidden = !activityLogOpen;
+    return true;
+  }
   if (action === 'toggle-intel-drawer') {
     const drawer = root?.querySelector<HTMLDetailsElement>('.intel-drawer');
     if (drawer) { intelDrawerOpen = !intelDrawerOpen; drawer.open = intelDrawerOpen; }
@@ -434,8 +451,16 @@ export function installImmersiveKeys(): void {
     else if (key === ' ') { event.preventDefault(); root?.querySelector<HTMLButtonElement>('[data-action="end-turn"]:not(:disabled)')?.click(); }
     else if (key === 'escape') {
       const task = root?.querySelector<HTMLElement>('.task-detail-drawer');
+      const activity = root?.querySelector<HTMLElement>('.activity-log-panel');
       const intel = root?.querySelector<HTMLDetailsElement>('.intel-drawer');
-      if (task?.classList.contains('open')) { task.classList.remove('open'); taskDrawerOpen = false; }
+      if (activityLogOpen) {
+        activityLogOpen = false;
+        activity?.classList.remove('open');
+        const button = root?.querySelector<HTMLButtonElement>('[data-action="toggle-activity-log"]');
+        const list = root?.querySelector<HTMLElement>('.activity-log-list');
+        if (button) button.setAttribute('aria-expanded', 'false');
+        if (list) list.hidden = true;
+      } else if (task?.classList.contains('open')) { task.classList.remove('open'); taskDrawerOpen = false; }
       else if (intel?.open) { intel.open = false; intelDrawerOpen = false; }
     } else if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
       event.preventDefault();
