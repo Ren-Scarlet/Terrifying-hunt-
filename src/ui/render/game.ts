@@ -70,6 +70,7 @@ import {
 
 
 import { isCardTuned } from '../../game/tuning';
+import { PROPS } from '../scene/config';
 import { isMuted, playHeartbeat, playSfx, playTrapScream } from '../audio';
 import { escape, icon, itemBadge, itemIconHtml, personChip, shadowFigures, perkIconHtml, TYPE_NAMES, killerFaceHtml, defaultDetailHtml, cardTextHtml } from './shared';
 import type { GameState, Person, RoomId, SaveData } from '../../game/types';
@@ -78,6 +79,14 @@ let lastRenderedTrapTriggerCount: number | null = null;
 let lastRedFigureSignature = '';
 let lastDiscoveryMissionId: string | null = null;
 const discoveredSurvivorIds = new Set<string>();
+const POWER_GLYPHS: Record<string, string> = {
+  trap_set: '⌗', wraith_bell: '♧', wraith_rush: '➤', nurse_blink: '✧',
+  huntress_axe: '╱', ghost_stalk: '◉', ghost_nightfall: '☾', myers_gaze: '◎',
+  sadako_deluge: '〰', sadako_tape: '▤', freddy_sleep: 'Z', freddy_nightmare: '◌',
+  cannibal_sprint: '↗', cannibal_slaughter: '✕', executioner_chain: '⛓',
+  executioner_judge: '⚖', demogorgon_portal: '◉', demogorgon_maul: '⌁',
+  doctor_shock: 'ϟ', doctor_madness: '⌁', pig_ambush: '⌄', pig_baptism: '☠',
+};
 
 function roomFeatures(state: GameState, roomId: RoomId): string {
   const parts: string[] = [];
@@ -214,7 +223,7 @@ function powerButtonHtml(state: GameState, killer: KillerProfile): string {
     return `<button class="btn power ${power.ultimate ? 'ultimate' : 'main'} ${ok ? '' : 'cooling'} ${power.id === 'myers_gaze' && state.stalkMeter >= 100 ? 'possessed-ready' : ''}"
       data-action="power" data-power="${power.id}" ${ok ? '' : 'disabled'}
       title="${escape(power.desc)}${reason ? ` · ${escape(reason)}` : ''}">
-      <span class="power-art"><img class="power-glyph" src="${killer.icon}" alt="" onerror="this.style.display='none'"></span>
+      <span class="power-art" aria-hidden="true"><span class="power-symbol">${POWER_GLYPHS[power.id] ?? '◆'}</span></span>
       <span class="power-body"><b>${escape(label)}</b><small>${escape(actionHint)}</small></span>
       <span class="power-pips">${pips}</span>
     </button>`;
@@ -734,7 +743,6 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
       <i class="dot"></i>
       <div><b>${escape(m.title)}</b><span>${escape(ground.name)} · ${state.people.filter((p) => p.role !== 'police' && p.hp > 0).length} 名幸存者仍存活 · 奖励 ${m.reward}</span></div>
     </div>
-    <div class="left-hud"><div class="portrait">${killerFaceHtml(killer, 'chip')}</div><div class="meter"><i style="height:${Math.round(state.energy / Math.max(1, state.maxEnergy) * 100)}%"></i></div><div class="tiny-stat">屠夫 · ${state.energy}/${state.maxEnergy} AP</div></div>
     <div class="right-tools">
       <button class="tool" data-action="toggle-task-drawer" aria-label="任务详情"><span>☷</span><em>任务详情 · T</em></button>
       <button class="tool" data-action="toggle-intel-drawer" aria-label="现场情报"><span>⌕</span><em>现场情报</em></button>
@@ -836,13 +844,12 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
           </div>
         </section>
       </div>
-      <aside class="hunt-sidebar hunt-sidebar-right">
+      <aside class="hunt-sidebar hunt-sidebar-left">
         <details class="intel-drawer">
-        <summary>
-        <span>现场情报</span>
-        <small>${known.length} 人已确认 · ${state.siteItems.length} 处设施 · ${state.log.length} 条记录</small>
-        <em>展开 / 收起</em>
-        </summary>
+        <div class="intel-drag-handle">
+          <div><b>现场情报</b><small>${known.length} 人已确认 · ${state.siteItems.length} 处设施 · ${state.log.length} 条记录</small></div>
+          <button type="button" class="intel-close" data-action="toggle-intel-drawer" aria-label="关闭现场情报">×</button>
+        </div>
         <div class="intel-grid">
         <section class="panel person-dossier-panel">
           <div class="panel-heading"><h2>人物详情</h2><span>点击地图人物或悬停卡牌</span></div>
@@ -852,10 +859,6 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
         <div class="panel hunt-opportunities-panel">
         <div class="panel-heading"><h2>猎杀机会</h2><span>只显示当前视野中可利用的窗口</span></div>
         ${huntOpportunityHtml(state)}
-        </div>
-        <div class="panel threat-panel">
-        <div class="panel-heading"><h2>现场威胁动态</h2><span>只显示当前正在发生的风险</span></div>
-        ${threatRowsHtml(state)}
         </div>
         </div>
         </details>
