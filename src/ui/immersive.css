@@ -2610,3 +2610,135 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
   0%,100% { opacity:.42; filter:brightness(.8); box-shadow:0 0 7px rgba(150,0,18,.35),0 0 16px rgba(110,0,12,.2); }
   50% { opacity:1; filter:brightness(1.5); box-shadow:0 0 13px rgba(210,0,24,.78),0 0 34px rgba(150,0,18,.58),0 0 58px rgba(110,0,12,.28); }
 }
+
+
+/* Execution QTE: four random digits, short input window, and killer-specific presentation. */
+#app.immersive-game .execution-qte-overlay {
+  position:fixed; inset:0; z-index:5000; display:flex; align-items:center; justify-content:center;
+  padding:18px; background:radial-gradient(ellipse at center,rgba(54,0,7,.78),rgba(2,3,5,.96) 72%);
+  backdrop-filter:blur(7px); animation:executionQteIn .22s ease-out both;
+}
+#app.immersive-game .execution-qte-panel {
+  width:min(430px,94vw); padding:22px 22px 18px; border:1px solid rgba(184,53,58,.72);
+  border-radius:12px; background:linear-gradient(155deg,rgba(31,13,16,.98),rgba(6,8,11,.98));
+  box-shadow:0 18px 65px #000,0 0 32px rgba(155,0,18,.32); text-align:center;
+}
+#app.immersive-game .execution-qte-heading { display:block; color:#ffe3d8; font-size:18px; letter-spacing:.08em; }
+#app.immersive-game .execution-qte-panel p { margin:9px 0 16px; color:#c6aaa5; font-size:12px; line-height:1.6; }
+#app.immersive-game .execution-qte-sequence { display:flex; justify-content:center; gap:12px; margin:15px 0 10px; }
+#app.immersive-game .execution-qte-sequence span {
+  display:grid; place-items:center; width:54px; height:60px; border:1px solid rgba(177,112,103,.42);
+  border-radius:8px; color:#e5d5d1; background:rgba(18,19,22,.95); font-size:27px; font-weight:800;
+  text-shadow:0 2px 8px #000;
+}
+#app.immersive-game .execution-qte-sequence span.current { border-color:#ff5860; color:#fff; box-shadow:0 0 17px rgba(210,0,24,.6); }
+#app.immersive-game .execution-qte-sequence span.done { color:#ff9b8c; border-color:rgba(208,45,55,.7); background:rgba(75,10,16,.75); }
+#app.immersive-game .execution-qte-status { min-height:20px; color:#d7b9ae; font-size:11px; }
+#app.immersive-game .execution-qte-timer { height:5px; margin:12px 0 16px; overflow:hidden; border-radius:6px; background:#392326; }
+#app.immersive-game .execution-qte-timer i { display:block; width:100%; height:100%; transform-origin:left; background:linear-gradient(90deg,#8e0718,#ed3844,#ffb19a); animation:executionQteTimer 4.2s linear forwards; }
+#app.immersive-game .execution-qte-pad { display:grid; grid-template-columns:repeat(5,1fr); gap:7px; }
+#app.immersive-game .execution-qte-pad button {
+  min-height:39px; border:1px solid rgba(190,116,105,.35); border-radius:6px; color:#f0ded8;
+  background:rgba(41,27,29,.9); font-size:15px; font-weight:700; cursor:pointer;
+}
+#app.immersive-game .execution-qte-pad button:hover { border-color:#ff6970; background:rgba(100,15,23,.85); }
+#app.immersive-game .execution-qte-panel.wrong { animation:executionQteWrong .2s ease-in-out; }
+@keyframes executionQteIn { from{opacity:0;transform:scale(1.025)} to{opacity:1;transform:scale(1)} }
+@keyframes executionQteTimer { from{transform:scaleX(1)} to{transform:scaleX(0)} }
+@keyframes executionQteWrong { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-7px)} 75%{transform:translateX(7px)} }
+@media(max-width:520px) {
+  #app.immersive-game .execution-qte-panel { padding:17px 12px 14px; }
+  #app.immersive-game .execution-qte-sequence { gap:7px; }
+  #app.immersive-game .execution-qte-sequence span { width:46px; height:52px; }
+}
+
+/* The existing execution silhouette changes motion language by killer. */
+#app.immersive-game .execution-style-myers .execution-scene-figure {
+  width:30px; height:56px; animation:executionLiftAndStab 1.65s cubic-bezier(.2,.7,.25,1) both;
+}
+#app.immersive-game .execution-style-myers .execution-scene-figure::before { width:19px; height:19px; }
+#app.immersive-game .execution-style-huntress .execution-scene-figure { animation:executionAxeDrop 1.5s ease-in both; }
+#app.immersive-game .execution-style-wraith .execution-scene-figure { animation:executionGhostStrike 1.5s steps(5,end) both; }
+#app.immersive-game .execution-style-nurse .execution-scene-figure { animation:executionBlinkStrike 1.5s ease-in-out both; }
+#app.immersive-game .execution-style-ghostface .execution-scene-figure { animation:executionMaskLunge 1.5s cubic-bezier(.15,.8,.2,1) both; }
+#app.immersive-game .execution-style-sadako .execution-scene-figure { animation:executionGlitch 1.6s steps(6,end) both; }
+#app.immersive-game .execution-style-freddy .execution-scene-figure { filter:blur(1px); animation:executionNightmare 1.6s ease-in both; }
+#app.immersive-game .execution-style-cannibal .execution-scene-figure { animation:executionChainsawRush 1.5s cubic-bezier(.2,.8,.2,1) both; }
+#app.immersive-game .execution-style-executioner .execution-scene-figure { width:34px; height:62px; animation:executionHeavyDrop 1.7s ease-in both; }
+#app.immersive-game .execution-style-doctor .execution-scene-flash { background:radial-gradient(ellipse,rgba(220,230,255,.75),rgba(95,12,20,.45) 38%,transparent 74%); }
+#app.immersive-game .execution-style-doctor .execution-scene-figure { animation:executionElectric 1.6s steps(7,end) both; }
+#app.immersive-game .execution-style-demon .execution-scene-figure { width:42px; height:70px; box-shadow:0 0 30px rgba(170,0,24,.8); animation:executionDemonCrush 1.7s ease-in both; }
+#app.immersive-game .execution-style-trapper .execution-scene-figure { animation:executionTrapClamp 1.55s ease-in-out both; }
+#app.immersive-game .execution-style-pig .execution-scene-figure { animation:executionMaskLunge 1.45s ease-in both; }
+#app.immersive-game .execution-qte-miss .execution-scene-flash { filter:saturate(.65); }
+#app.immersive-game .execution-qte-success .execution-scene-flash { animation-duration:1.45s; }
+@keyframes executionLiftAndStab {
+  0%{opacity:0;transform:translate(-50%,10%) scale(.85)}
+  22%{opacity:1;transform:translate(-50%,-38%) scale(1.08)}
+  48%{opacity:1;transform:translate(-50%,-48%) scale(1.04) rotate(-5deg)}
+  66%{opacity:1;transform:translate(-50%,-28%) scale(1.02) rotate(9deg)}
+  100%{opacity:0;transform:translate(-50%,12%) scale(.72) rotate(28deg)}
+}
+@keyframes executionAxeDrop {
+  0%{opacity:0;transform:translate(-50%,-35%) rotate(-20deg)}
+  28%{opacity:1;transform:translate(-50%,-52%) rotate(-20deg)}
+  55%{opacity:1;transform:translate(-50%,-5%) rotate(42deg)}
+  100%{opacity:0;transform:translate(-50%,8%) rotate(78deg)}
+}
+@keyframes executionGhostStrike {
+  0%,18%,42%,100%{opacity:0}
+  22%,35%{opacity:1;transform:translate(-50%,-50%) scale(1.2)}
+  52%,65%{opacity:1;transform:translate(-50%,-50%) scale(.9)}
+}
+@keyframes executionBlinkStrike {
+  0%,28%,100%{opacity:0;filter:blur(8px)}
+  38%{opacity:1;filter:blur(0);transform:translate(-50%,-50%) scale(1.18)}
+  62%{opacity:1;filter:blur(0);transform:translate(-50%,-25%) scale(.9)}
+}
+@keyframes executionMaskLunge {
+  0%{opacity:0;transform:translate(-50%,30%) scale(.45)}
+  35%{opacity:1;transform:translate(-50%,-35%) scale(1.35)}
+  58%{opacity:1;transform:translate(-50%,-40%) scale(1.15)}
+  100%{opacity:0;transform:translate(-50%,8%) scale(.7)}
+}
+@keyframes executionGlitch {
+  0%,100%{opacity:0;transform:translate(-50%,-50%) skew(0)}
+  18%,30%,48%,62%{opacity:1;transform:translate(-54%,-48%) skew(8deg)}
+  24%,54%{opacity:.25;transform:translate(-45%,-52%) skew(-10deg)}
+  75%{opacity:1;transform:translate(-50%,-20%) skew(0)}
+}
+@keyframes executionNightmare {
+  0%{opacity:0;transform:translate(-50%,0) scale(.4);filter:blur(10px)}
+  45%{opacity:1;transform:translate(-50%,-35%) scale(1.25);filter:blur(0)}
+  100%{opacity:0;transform:translate(-50%,-15%) scale(1.6);filter:blur(8px)}
+}
+@keyframes executionChainsawRush {
+  0%{opacity:0;transform:translate(-50%,35%) rotate(-25deg) scale(.7)}
+  35%{opacity:1;transform:translate(-50%,-10%) rotate(8deg) scale(1.25)}
+  62%{opacity:1;transform:translate(-50%,-38%) rotate(-5deg) scale(1.1)}
+  100%{opacity:0;transform:translate(-50%,15%) rotate(22deg) scale(.75)}
+}
+@keyframes executionHeavyDrop {
+  0%{opacity:0;transform:translate(-50%,-80%) scale(1.2)}
+  45%{opacity:1;transform:translate(-50%,-50%) scale(1.25)}
+  70%{opacity:1;transform:translate(-50%,0) scale(.9)}
+  100%{opacity:0;transform:translate(-50%,20%) scale(.7)}
+}
+@keyframes executionElectric {
+  0%,100%{opacity:0;filter:brightness(1)}
+  12%,28%,46%,63%{opacity:1;filter:brightness(2.4)}
+  20%,37%,55%{opacity:.2;filter:brightness(.5)}
+  78%{opacity:1;filter:brightness(1.3);transform:translate(-50%,-45%) rotate(8deg)}
+}
+@keyframes executionDemonCrush {
+  0%{opacity:0;transform:translate(-50%,-65%) scale(.5)}
+  42%{opacity:1;transform:translate(-50%,-50%) scale(1.5)}
+  68%{opacity:1;transform:translate(-50%,-5%) scale(1.1)}
+  100%{opacity:0;transform:translate(-50%,18%) scale(.7)}
+}
+@keyframes executionTrapClamp {
+  0%{opacity:0;transform:translate(-50%,-15%) rotate(-12deg)}
+  30%{opacity:1;transform:translate(-50%,-50%) rotate(0)}
+  55%{opacity:1;transform:translate(-50%,-45%) rotate(-10deg) scale(.92)}
+  100%{opacity:0;transform:translate(-50%,8%) rotate(20deg) scale(.75)}
+}
