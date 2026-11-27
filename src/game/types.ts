@@ -272,9 +272,9 @@ export interface Disturbance {
   label: string;
 }
 
-export type MissionKind = 'assassinate' | 'bodyCount' | 'escape';
+export type MissionKind = 'assassinate' | 'bodyCount' | 'execution' | 'sabotage' | 'silent' | 'scoreExecution';
 
-export type MissionTaskKind = 'kill_count' | 'kill_count_before_turn' | 'marked_kill' | 'execute' | 'special_execute' | 'no_alarm' | 'break_circuit' | 'alarm_below' | 'killer_stat';
+export type MissionTaskKind = 'kill_count' | 'kill_count_before_turn' | 'marked_kill' | 'execute' | 'special_execute' | 'score_execute' | 'no_alarm' | 'break_circuit' | 'alarm_below' | 'killer_stat';
 export type MissionTaskMetric = 'myers_stalk' | 'trap_triggers' | 'nurse_blink_attacks' | 'hatchet_hits';
 
 export interface MissionTask {
@@ -430,6 +430,8 @@ export interface GameState {
   kills: number;
   killsThisTurn: number;
   executions: number;
+  /** 达到猎杀评分门槛后，通过头顶独立按钮完成的分数处决次数。 */
+  scoreExecutions: number;
   survivorKills: number;
   specialExecutionBonus: number;
   /** 本局使用过的特殊处决方式；用于结算与永久图鉴记录。 */
