@@ -1430,7 +1430,7 @@ caseFrenzy();
 caseFrenzyMobility();
 caseSneaky();
 
-/** X：道具箱 / 发电机随机摆放；杀手能砸，砸完幸存者就少了这条路 */
+/** X：道具箱固定摆放；杀手能砸，砸完幸存者就少了这条补给路 */
 function caseSiteItems(): void {
   const s = newGame();
   const boxes = s.siteItems.filter((item) => item.kind === 'itemBox');
