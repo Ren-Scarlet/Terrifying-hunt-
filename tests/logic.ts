@@ -1012,7 +1012,7 @@ function caseTrailDecay(): void {
     p.movesThisTurn = 0;
   });
   const now = visibleTrails(s).length;
-  for (let i = 0; i < 4; i++) s.trailClock += 1;
+  for (let i = 0; i < 5; i++) s.trailClock += 1;
   const later = visibleTrails(s).length;
   s.trailClock += 1;
   const expired = visibleTrails(s).length;
@@ -1720,11 +1720,18 @@ function caseContractsPowerAndCarry(): void {
     while (frontier.length && !route.length) {
       const current = frontier.shift()!;
       if (current.path.length === 4) { route = current.path; break; }
-      for (const next of ROOM_MAP[current.room].neighbors) if (!seen.has(next)) { seen.add(next); frontier.push({ room: next, path: [...current.path, next] }); }
+      if (isLocked(carry, current.room)) continue;
+      for (const next of ROOM_MAP[current.room].neighbors) {
+        if (seen.has(next) || OBSTACLE_ROOMS.includes(next) || isLocked(carry, next) || carry.barricades.includes(next)) continue;
+        seen.add(next); frontier.push({ room: next, path: [...current.path, next] });
+      }
     }
     carry.freeMove = true;
-    for (const room of route.slice(0, 3)) movePlayer(carry, room);
-    const safeCarry = route.length === 4 && carry.playerRoom === route[2] && carry.carryDistance === 3;
+    let firstThreeMoved = route.length === 4;
+    for (const room of route.slice(0, 3)) {
+      if (!movePlayer(carry, room)) { firstThreeMoved = false; break; }
+    }
+    const safeCarry = firstThreeMoved && carry.playerRoom === route[2] && carry.carryDistance === 3;
     const failedCheck = route.length === 4 && withRandomSource(() => 0, () => movePlayer(carry, route[3]));
     check('AB 搬运前三格安全，第四格检定失败会挣脱并恢复受伤状态',
       safeCarry && !failedCheck && carry.carryPersonId === null && victim.hp === 2 && victim.intent === 'flee',
@@ -1823,11 +1830,14 @@ function caseNpcLocksAndPersistentTrails(): void {
 
   const tracks = newGame();
   const routeStart = Object.values(ROOM_MAP).find((room) =>
-    room.neighbors.some((next) => ROOM_MAP[next].neighbors.some((exit) => exit !== room.id && !OBSTACLE_ROOMS.includes(exit))),
+    !OBSTACLE_ROOMS.includes(room.id) && !isLocked(tracks, room.id) &&
+    room.neighbors.some((next) => !OBSTACLE_ROOMS.includes(next) && !isLocked(tracks, next) &&
+      ROOM_MAP[next].neighbors.some((exit) => exit !== room.id && !OBSTACLE_ROOMS.includes(exit) && !isLocked(tracks, exit))),
   );
   if (routeStart) {
     const next = routeStart.neighbors.find((candidate) =>
-      ROOM_MAP[candidate].neighbors.some((exit) => exit !== routeStart.id && !OBSTACLE_ROOMS.includes(exit)),
+      !OBSTACLE_ROOMS.includes(candidate) && !isLocked(tracks, candidate) &&
+      ROOM_MAP[candidate].neighbors.some((exit) => exit !== routeStart.id && !OBSTACLE_ROOMS.includes(exit) && !isLocked(tracks, exit)),
     )!;
     const walker = player(tracks);
     tracks.playerRoom = routeStart.id;
@@ -1836,6 +1846,9 @@ function caseNpcLocksAndPersistentTrails(): void {
     walker.alert = 100;
     walker.hp = 4;
     walker.sneaky = true;
+    walker.awareness = 2;
+    walker.archetype = 'kiter';
+    walker.fear = 0;
     walker.movesThisTurn = 0;
     tracks.trails = [];
     tracks.energy = 9;
