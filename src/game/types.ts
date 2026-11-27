@@ -210,7 +210,7 @@ export interface Person {
   hidden: boolean;
   /** 找到武器：反抗时能让玩家掉行动点 */
   armed: boolean;
-  /** 老练的幸存者：有时能悄无声息地移动，不留脚印也不惊动乌鸦 */
+  /** 老练的幸存者：有时能悄无声息地移动，仍会留下脚印，但不会惊动乌鸦 */
   sneaky: boolean;
   /** 从道具箱翻到的东西：用完即弃，是他这一回合多出来的一条路 */
   item: SurvivorItem | null;
