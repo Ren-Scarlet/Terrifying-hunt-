@@ -3182,7 +3182,7 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
   bottom: 150px !important;
   z-index: 28 !important;
   display: grid !important;
-  grid-template-columns: 104px minmax(0, 218px) !important;
+  grid-template-columns: 96px minmax(0, 1fr) !important;
   grid-template-rows: auto auto !important;
   align-items: center !important;
   column-gap: 10px !important;
