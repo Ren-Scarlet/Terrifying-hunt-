@@ -3993,6 +3993,7 @@ export function missionTaskProgress(state: GameState, task: MissionTask): number
     case 'execute': return state.executions;
     case 'special_execute': return state.executionMethodsUsed.length;
     case 'score_execute': return state.scoreExecutions;
+    case 'score_threshold': return currentScore(state);
     case 'no_alarm': return state.npcAlarmed ? 0 : 1;
     case 'break_circuit': return state.powerCircuits.filter((c) => c.broken).length;
     case 'alarm_below': return state.alarm <= (task.limit ?? 35) ? 1 : 0;
