@@ -256,6 +256,12 @@ function setZoom(next: number, anchorX?: number, anchorY?: number): void {
   }
 }
 
+export function openIntelDrawer(): void {
+  intelDrawerOpen = true;
+  const drawer = root?.querySelector<HTMLDetailsElement>('.intel-drawer');
+  if (drawer) drawer.open = true;
+}
+
 export function handleImmersiveAction(action: string | undefined): boolean {
   if (!action) return false;
   if (action === 'camera-zoom-in') { setZoom(zoom + 0.12); return true; }
