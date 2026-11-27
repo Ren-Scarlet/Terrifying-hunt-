@@ -561,7 +561,7 @@ export interface GameState {
   /** 消防斧/电闸这类设施被破坏后的标记 */
   sabotage: string[];
 
-  /** 警报升高后开放的实际逃生点；与已废弃的团队进度系统无关 */
+  /** 警报升高后开放的实际逃生点 */
   escapeRooms: RoomId[];
   /** 本局幸存者总人数（不包含警察），用于判定是否全部逃离 */
   survivorTotal: number;
