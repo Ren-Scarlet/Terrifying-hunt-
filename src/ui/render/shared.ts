@@ -179,7 +179,7 @@ export function personChip(person: Person, attackable = false, carryable = false
     ...(darkRoom || (effects.blind ?? 0) > 0 ? [['statusBlind', '障目', '障目：在黑暗中无法察觉杀手']] : []),
     ...((effects.undetectable ?? 0) > 0 ? [['statusUndetectable', '无法侦测', '无法侦测：明亮房间也无法发现杀手']] : []),
     ...(person.blockedTurns > 0 ? [['statusBlocked', '无法行动', '无法行动：被限制移动']] : []),
-    ...((effects.danger ?? 0) > 0 ? [['statusDanger', '危险', '危险：下一次受到攻击立即倒地']] : []),
+    ...(person.fear >= 100 || (effects.danger ?? 0) > 0 ? [['statusDanger', '危险', '危险状态：恐慌值已满，下一次受到攻击立即倒地']] : []),
     ...((effects.deepWound ?? 0) > 0 ? [['statusDeepWound', '深度伤口', '深度伤口：持续流血，需治疗处理']] : []),
     ...(person.bleed > 0 ? [['statusBleed', '流血', '流血：回合结束持续失去生命']] : []),
     ...((effects.oblivious ?? 0) > 0 ? [['statusOblivious', '浑然不觉', '浑然不觉：暂时不会主动察觉危险']] : []),
