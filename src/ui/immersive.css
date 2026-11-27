@@ -1662,3 +1662,33 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
   68% { opacity: .92; filter: brightness(.62) sepia(.8) saturate(2); transform: translate(calc(var(--escape-x,8px) * .35),calc(var(--escape-y,0px) * .35)) scale(1); }
   100% { opacity: 0; filter: brightness(.5) sepia(1) saturate(2); transform: translate(var(--escape-x,8px),var(--escape-y,0px)) translateY(7px) scale(.94); }
 }
+
+/* Distinct monochrome glyphs keep the ability buttons readable at HUD scale. */
+#app.immersive-game .killer-power-grid .power-art { display: grid; place-items: center; }
+#app.immersive-game .killer-power-grid .power-art img { display: none !important; }
+#app.immersive-game .killer-power-grid .power-art::after {
+  color: #ead9ca; font-family: Georgia,serif; font-size: 27px; line-height: 1;
+  text-shadow: 0 1px 6px rgba(0,0,0,.9);
+}
+#app.immersive-game .killer-power-grid [data-power="trap_set"] .power-art::after { content: '⌗'; }
+#app.immersive-game .killer-power-grid [data-power="wraith_bell"] .power-art::after { content: '♧'; }
+#app.immersive-game .killer-power-grid [data-power="wraith_rush"] .power-art::after { content: '➤'; }
+#app.immersive-game .killer-power-grid [data-power="nurse_blink"] .power-art::after { content: '✧'; }
+#app.immersive-game .killer-power-grid [data-power="huntress_axe"] .power-art::after { content: '╱'; }
+#app.immersive-game .killer-power-grid [data-power="ghost_stalk"] .power-art::after { content: '◉'; }
+#app.immersive-game .killer-power-grid [data-power="ghost_nightfall"] .power-art::after { content: '☾'; }
+#app.immersive-game .killer-power-grid [data-power="myers_gaze"] .power-art::after { content: '◎'; }
+#app.immersive-game .killer-power-grid [data-power="sadako_deluge"] .power-art::after { content: '〰'; }
+#app.immersive-game .killer-power-grid [data-power="sadako_tape"] .power-art::after { content: '▤'; }
+#app.immersive-game .killer-power-grid [data-power="freddy_sleep"] .power-art::after { content: 'Z'; }
+#app.immersive-game .killer-power-grid [data-power="freddy_nightmare"] .power-art::after { content: '◌'; }
+#app.immersive-game .killer-power-grid [data-power="cannibal_sprint"] .power-art::after { content: '↗'; }
+#app.immersive-game .killer-power-grid [data-power="cannibal_slaughter"] .power-art::after { content: '✕'; }
+#app.immersive-game .killer-power-grid [data-power="executioner_chain"] .power-art::after { content: '⛓'; }
+#app.immersive-game .killer-power-grid [data-power="executioner_judge"] .power-art::after { content: '⚖'; }
+#app.immersive-game .killer-power-grid [data-power="demogorgon_portal"] .power-art::after { content: '◉'; }
+#app.immersive-game .killer-power-grid [data-power="demogorgon_maul"] .power-art::after { content: '⌁'; }
+#app.immersive-game .killer-power-grid [data-power="doctor_shock"] .power-art::after { content: 'ϟ'; }
+#app.immersive-game .killer-power-grid [data-power="doctor_madness"] .power-art::after { content: '⌁'; }
+#app.immersive-game .killer-power-grid [data-power="pig_ambush"] .power-art::after { content: '⌄'; }
+#app.immersive-game .killer-power-grid [data-power="pig_baptism"] .power-art::after { content: '☠'; }
