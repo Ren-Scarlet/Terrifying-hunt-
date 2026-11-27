@@ -927,7 +927,7 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
     const torchOffset = Math.min(pr.w, pr.h) * 0.22;
     const px = markerX + Math.cos(facing) * torchOffset;
     const py = markerY + Math.sin(facing) * torchOffset;
-    const coneLen = Math.min(Math.max(w, h) * 0.24, Math.hypot(pr.w, pr.h) * 0.58);
+    const coneLen = Math.min(Math.max(w, h) * 0.19, Math.hypot(pr.w, pr.h) * 0.50);
     const k = view.dpr * DARK_SCALE;
     const cc = refs.coneCtx;
     cc.setTransform(1, 0, 0, 1, 0, 0);
@@ -944,8 +944,8 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
 
     // 1. 低强度环境反射：先形成宽而柔和的红色反射，不出现可辨认的椭圆边界。
     const redSpill = cc.createRadialGradient(
-      coneLen * 0.52, 0, coneLen * 0.04,
-      coneLen * 0.52, 0, coneLen * 0.82,
+      coneLen * 0.44, 0, coneLen * 0.04,
+      coneLen * 0.44, 0, coneLen * 0.70,
     );
     redSpill.addColorStop(0, 'rgba(184,8,24,.24)');
     redSpill.addColorStop(0.34, 'rgba(132,4,18,.16)');
@@ -953,16 +953,16 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
     redSpill.addColorStop(1, 'rgba(70,0,8,0)');
     cc.fillStyle = redSpill;
     cc.beginPath();
-    cc.ellipse(coneLen * 0.50, 0, coneLen * 0.72, coneLen * 0.39, 0, 0, Math.PI * 2);
+    cc.ellipse(coneLen * 0.42, 0, coneLen * 0.58, coneLen * 0.31, 0, 0, Math.PI * 2);
     cc.fill();
 
     // 2. 主照明区：光线从窄到宽扩散，距离越远照度越低，边缘采用连续弧线过渡。
     cc.save();
     cc.beginPath();
     cc.moveTo(0, 0);
-    cc.bezierCurveTo(coneLen * 0.22, -coneLen * 0.075, coneLen * 0.64, -coneLen * 0.285, coneLen, -coneLen * 0.12);
-    cc.bezierCurveTo(coneLen * 1.035, -coneLen * 0.025, coneLen * 1.035, coneLen * 0.025, coneLen, coneLen * 0.12);
-    cc.bezierCurveTo(coneLen * 0.64, coneLen * 0.285, coneLen * 0.22, coneLen * 0.075, 0, 0);
+    cc.bezierCurveTo(coneLen * 0.22, -coneLen * 0.052, coneLen * 0.64, -coneLen * 0.19, coneLen, -coneLen * 0.082);
+    cc.bezierCurveTo(coneLen * 1.03, -coneLen * 0.017, coneLen * 1.03, coneLen * 0.017, coneLen, coneLen * 0.082);
+    cc.bezierCurveTo(coneLen * 0.64, coneLen * 0.19, coneLen * 0.22, coneLen * 0.052, 0, 0);
     cc.closePath();
     cc.clip();
 
@@ -974,25 +974,25 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
     beamFalloff.addColorStop(0.84, 'rgba(92,2,13,.085)');
     beamFalloff.addColorStop(1, 'rgba(70,0,8,0)');
     cc.fillStyle = beamFalloff;
-    cc.fillRect(0, -coneLen * 0.34, coneLen * 1.08, coneLen * 0.68);
+    cc.fillRect(0, -coneLen * 0.24, coneLen * 1.06, coneLen * 0.48);
 
     // 光束中心的窄幅亮度核心：只增强中心，不把整束光涂成同一亮度。
     const core = cc.createRadialGradient(
-      coneLen * 0.48, 0, coneLen * 0.015,
-      coneLen * 0.48, 0, coneLen * 0.34,
+      coneLen * 0.46, 0, coneLen * 0.015,
+      coneLen * 0.46, 0, coneLen * 0.26,
     );
     core.addColorStop(0, 'rgba(255,42,54,.34)');
     core.addColorStop(0.32, 'rgba(220,18,36,.22)');
     core.addColorStop(0.72, 'rgba(166,7,24,.075)');
     core.addColorStop(1, 'rgba(130,0,16,0)');
     cc.fillStyle = core;
-    cc.fillRect(0, -coneLen * 0.34, coneLen, coneLen * 0.68);
+    cc.fillRect(0, -coneLen * 0.24, coneLen, coneLen * 0.48);
     cc.restore();
 
     // 3. 前方落点：形成更集中的红色照明区，中心亮、外围迅速衰减。
     const pool = cc.createRadialGradient(
-      coneLen * 0.73, 0, coneLen * 0.012,
-      coneLen * 0.73, 0, coneLen * 0.255,
+      coneLen * 0.66, 0, coneLen * 0.012,
+      coneLen * 0.66, 0, coneLen * 0.21,
     );
     pool.addColorStop(0, 'rgba(255,34,48,.48)');
     pool.addColorStop(0.24, 'rgba(218,12,30,.34)');
@@ -1000,17 +1000,17 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
     pool.addColorStop(1, 'rgba(110,0,12,0)');
     cc.fillStyle = pool;
     cc.beginPath();
-    cc.ellipse(coneLen * 0.73, 0, coneLen * 0.31, coneLen * 0.19, 0, 0, Math.PI * 2);
+    cc.ellipse(coneLen * 0.66, 0, coneLen * 0.26, coneLen * 0.15, 0, 0, Math.PI * 2);
     cc.fill();
 
     // 4. 光源附近的微弱溢光，避免出现过曝的红色圆点。
-    const emitter = cc.createRadialGradient(0, 0, 1, 0, 0, coneLen * 0.15);
+    const emitter = cc.createRadialGradient(0, 0, 1, 0, 0, coneLen * 0.13);
     emitter.addColorStop(0, 'rgba(255,66,72,.48)');
     emitter.addColorStop(0.32, 'rgba(210,14,30,.30)');
     emitter.addColorStop(1, 'rgba(150,0,16,0)');
     cc.fillStyle = emitter;
     cc.beginPath();
-    cc.arc(0, 0, coneLen * 0.13, 0, Math.PI * 2);
+    cc.arc(0, 0, coneLen * 0.11, 0, Math.PI * 2);
     cc.fill();
     cc.restore();
 
@@ -1110,15 +1110,15 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
     ctx.translate(px, py);
     ctx.rotate(facing);
     const volume = ctx.createRadialGradient(
-      coneLen * 0.30, 0, coneLen * 0.02,
-      coneLen * 0.30, 0, coneLen * 0.78,
+      coneLen * 0.26, 0, coneLen * 0.02,
+      coneLen * 0.26, 0, coneLen * 0.64,
     );
     volume.addColorStop(0, 'rgba(220,12,28,.075)');
     volume.addColorStop(0.42, 'rgba(170,6,20,.038)');
     volume.addColorStop(1, 'rgba(110,0,12,0)');
     ctx.fillStyle = volume;
     ctx.beginPath();
-    ctx.ellipse(coneLen * 0.36, 0, coneLen * 0.70, coneLen * 0.32, 0, 0, Math.PI * 2);
+    ctx.ellipse(coneLen * 0.32, 0, coneLen * 0.58, coneLen * 0.26, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
 
