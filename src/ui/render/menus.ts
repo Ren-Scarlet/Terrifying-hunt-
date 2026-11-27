@@ -52,7 +52,7 @@ export function renderMenu(save: SaveData): string {
           <div class="menu-mission">
             ${icon('mission', 'ui-icon large')}
             <div><small>本局流程</small><b>随机契约 → 潜入布局 → 完成主目标</b></div>
-            <p>点击准备开始后，系统才会随机发放本局契约；不会提前展示任务供你针对性改牌组。房子里的人会报警、躲藏、救援和寻找补给，跑掉太多人就输了。</p>
+            <p>点击准备开始后，系统才会随机发放本局契约；不会提前展示任务供你针对性改牌组。房子里的人会报警、躲藏、救援和寻找补给，所有幸存者成功逃离会导致失败。</p>
           </div>
         </div>
 
