@@ -6,7 +6,7 @@ import {
   giveUp, interactCabinet, interactTotem, isPersonVisible, isRoomVisible,
   knownPeople, moveBlockReason, movePlayer, playCard, powerBlockReason,
   searchRoom, throwHuntressHatchet, usePower, waitAction, wipeBlade,
-  lookAround, lookAtRoom, cancelLookSelection, executeDownedPerson,
+  lookAround, lookAtRoom, cancelLookSelection, cancelAuraSelection, selectAuraRoom, executeDownedPerson,
 } from '../game/engine';
 import { createGame } from '../game/setup';
 import { generateFreeHunt, generateMission } from '../game/missions';
