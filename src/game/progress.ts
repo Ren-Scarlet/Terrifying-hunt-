@@ -88,36 +88,23 @@ export type BloodwebOffer =
   | { kind: 'card'; id: string; name: string; desc: string }
   | { kind: 'credits'; id: string; name: string; desc: string };
 
-/** 一次血网三选一：配件 / 卡牌 / 血点。 */
-export function rollBloodweb(killer: string, unlockedCards: string[], owned: Record<string, number>): BloodwebOffer[] {
-  const offers: BloodwebOffer[] = [];
-  const accessoryPool = shuffle(accessoriesForKiller(killer).map((def) => def.id));
-  const accessory = accessoryPool[0];
-  if (accessory && ACCESSORY_MAP[accessory]) {
-    const def = ACCESSORY_MAP[accessory];
-    offers.push({ kind: 'accessory', id: accessory, name: def.name, desc: `${def.desc}（库存 +1）` });
+/** 一次血网三选一：只从该杀手的配件池里随机 3 件，选一件进库存。 */
+export function rollBloodweb(killer: string): BloodwebOffer[] {
+  const pool = shuffle(accessoriesForKiller(killer).map((def) => def.id));
+  const picks: string[] = [];
+  for (let i = 0; i < 3; i += 1) {
+    if (!pool.length) break;
+    picks.push(pool[i % pool.length]);
   }
-  const cardPool = shuffle(
-    deckCardsForKiller(killer)
-      .map((card) => card.id)
-      .filter((id) => !unlockedCards.includes(id)),
-  )[0];
-  if (cardPool && CARD_MAP[cardPool]) {
-    const card = CARD_MAP[cardPool];
-    offers.push({ kind: 'card', id: cardPool, name: card.name, desc: `${card.desc}（永久解锁）` });
-  }
-  const credits = 40 + Math.floor(random() * 4) * 10;
-  offers.push({ kind: 'credits', id: `credits_${credits}`, name: `${credits} 血点`, desc: '直接进账户，用来解锁卡牌与配件' });
-
-  // 配件池小（每位杀手 3 件），保证至少有一条配件路线
-  if (offers.length < 3) {
-    const extra = accessoryPool[1];
-    if (extra && ACCESSORY_MAP[extra]) {
-      const def = ACCESSORY_MAP[extra];
-      offers.push({ kind: 'accessory', id: extra, name: def.name, desc: `${def.desc}（库存 +1）` });
-    }
-  }
-  return offers.slice(0, 3);
+  return picks.map((id) => {
+    const def = ACCESSORY_MAP[id];
+    return {
+      kind: 'accessory' as const,
+      id,
+      name: def?.name ?? id,
+      desc: `${def?.desc ?? ''}（库存 +1）`,
+    };
+  });
 }
 
 /**

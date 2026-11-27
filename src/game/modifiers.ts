@@ -16,7 +16,7 @@ import type { AccessoryModKey, AccessoryMods, GameState, RoomId } from './types'
  *    · 同一个键在多件配件上出现时相加。
  */
 
-const MOD_KEYS: AccessoryModKey[] = [
+export const MOD_KEYS: AccessoryModKey[] = [
   'ap', 'attackDamage', 'fearRadius', 'fearOnHit', 'startAlarm', 'lootPct', 'cooldown',
   'trapCount', 'trapDamage', 'trapHold', 'hatchetCount', 'hatchetDamage', 'blinkRange',
   'stalkGain', 'possessCost', 'startStealth',

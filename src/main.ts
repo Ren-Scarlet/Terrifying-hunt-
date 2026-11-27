@@ -46,6 +46,8 @@ import {
   wipeBlade,
 } from './game/engine';
 import { loadSave, writeSave } from './game/save';
+import { bootCustomAccessories, importCustomAccessories, isCustomAccessory, removeCustomAccessory, upsertCustomAccessory } from './game/customContent';
+import { ACCESSORY_MAP } from './game/data/accessories';
 import { generateFreeHunt, generateMission, withAnte } from './game/missions';
 import { applyTuning } from './game/tuning';
 import { advanceRogue, applyRogueFloor, rollRogueOffers, startRogueRun } from './game/rogue';
@@ -73,6 +75,10 @@ import {
   renderShop,
 } from './ui/render';
 import { renderAdmin } from './ui/admin';
+import {
+  addDraftMod, downloadJson, duplicateAsDraft, exportCustomAccessories, renderWorkshop, removeDraftMod,
+  startEditDraft, startNewDraft, updateDraftField, updateDraftMod, workshopState,
+} from './ui/workshop';
 import { initCloudAuth, loadCloudConfig } from './game/cloud';
 import { mountFloorplanScene, type SceneHandle } from './ui/scene';
 import { playHeartbeat, playSfx, playStep, playSurvivorHit, playSurvivorDeath, setMusic, toggleMute, unlockAudio } from './ui/audio';
@@ -82,7 +88,7 @@ import { ActionRegistry, type ActionContext, type ActionTable } from './ui/actio
 import { applyTuneChange, createAdminActions } from './ui/adminActions';
 import { createMenuActions } from './ui/menuActions';
 import { session } from './ui/session';
-import { inGame, openPanel, showGame, showMenu, showResult, ui } from './ui/viewState';
+import { closePanel, inGame, openPanel, showGame, showMenu, showResult, ui } from './ui/viewState';
 
 // 从当前浏览器读取本地卡牌覆盖；没有个人配置时仍使用仓库默认数值。
 applyTuning();
@@ -97,6 +103,7 @@ void initCloudAuth().then(async () => {
   if (ui().panel === 'admin') render();
 });
 
+bootCustomAccessories();
 let save: SaveData = loadSave();
 let game: GameState | null = null;
 // `?admin=1` 是平衡面板唯一的启动入口；其余界面切换全部走 viewState 的具名迁移。
@@ -529,7 +536,9 @@ function render(): void {
   setMusic(view.screen === 'menu' || !game ? 'menu' : 'bgm');
   let html = '';
   // 面板最多只有一个（viewState 保证互斥），因此这里不需要再比较哪个布尔量优先。
-  if (view.panel === 'admin') {
+  if (view.panel === 'workshop') {
+    html = renderWorkshop();
+  } else if (view.panel === 'admin') {
     html = renderAdmin();
   } else if (view.panel === 'accessories') {
     html = renderAccessoryLoadout(save, session.accessoryDraft, session.pendingRun !== null);
@@ -1590,6 +1599,41 @@ registry.register('菜单与面板', createMenuActions({
   leaveToMenu,
 }));
 registry.register('平衡面板', createAdminActions({ render }));
+registry.register('配件工坊', {
+  'workshop-open': () => { openPanel('workshop'); render(); },
+  'workshop-close': () => { workshopState.editing = null; closePanel(); render(); },
+  'workshop-new': () => { startNewDraft(); render(); },
+  'workshop-edit': ({ target }) => { const id = target.dataset.id; if (id) { startEditDraft(id); render(); } },
+  'workshop-duplicate': ({ target }) => { const id = target.dataset.id; if (id) { duplicateAsDraft(id); render(); } },
+  'workshop-delete': ({ target }) => {
+    const id = target.dataset.id;
+    if (!id) return;
+    removeCustomAccessory(id);
+    workshopState.message = `已删除 ${id}`;
+    render();
+  },
+  'workshop-save': () => {
+    const def = workshopState.editing;
+    if (!def) return;
+    if (!/^[a-z0-9_]{2,40}$/.test(def.id)) { workshopState.message = 'id 只能用小写字母/数字/下划线，2-40 位'; render(); return; }
+    if (!def.name.trim()) { workshopState.message = '名称不能为空'; render(); return; }
+    if (!def.mods.length) { workshopState.message = '至少留一条效果'; render(); return; }
+    if (ACCESSORY_MAP[def.id] && !isCustomAccessory(def.id)) { workshopState.message = '这个 id 和内置配件重名了，换一个'; render(); return; }
+    upsertCustomAccessory({ ...def, name: def.name.trim(), desc: def.desc.trim() });
+    workshopState.message = `已保存 ${def.name}`;
+    workshopState.editing = null;
+    render();
+  },
+  'workshop-cancel': () => { workshopState.editing = null; render(); },
+  'workshop-mod-add': () => { addDraftMod(); render(); },
+  'workshop-mod-remove': ({ target }) => { removeDraftMod(Number(target.dataset.index) || 0); render(); },
+  'workshop-icon-clear': () => { if (workshopState.editing) { delete workshopState.editing.iconData; render(); } },
+  'workshop-export': () => {
+    downloadJson(exportCustomAccessories());
+    workshopState.message = '已导出 custom-accessories.json';
+    render();
+  },
+});
 registry.register('血网', {
   bloodweb: () => {
     bloodwebKiller = save.killer ?? '迈克尔·迈尔斯';
@@ -1621,7 +1665,7 @@ registry.register('血网', {
     };
     writeSave(save);
     playSfx('stage');
-    bloodwebOffers = rollBloodweb(killer, save.unlockedCards, save.accessories ?? {});
+    bloodwebOffers = rollBloodweb(killer);
     render();
   },
   'bloodweb-pick': ({ target }) => {
@@ -1791,6 +1835,45 @@ window.addEventListener('keyup', (event) => {
 });
 window.addEventListener('blur', clearHeldMovement);
 // 窗口尺寸变化时底部动作条高度会变，杀手面板的位置跟着重新量一次。
+// 配件工坊：文本框、效果行、图标与 JSON 导入
+document.addEventListener('input', (event) => {
+  const el = event.target as HTMLInputElement | HTMLSelectElement | null;
+  if (!el || !document.querySelector('.workshop-modal')) return;
+  const field = el.getAttribute('data-acc');
+  if (field) { updateDraftField(field as never, el.value); return; }
+  const modKey = el.getAttribute('data-acc-mod-key');
+  if (modKey !== null) { updateDraftMod(Number(modKey), { key: el.value as never }); return; }
+  const modValue = el.getAttribute('data-acc-mod-value');
+  if (modValue !== null) { updateDraftMod(Number(modValue), { value: Number(el.value) || 0 }); }
+});
+document.addEventListener('change', (event) => {
+  const el = event.target as HTMLInputElement | null;
+  if (!el || !document.querySelector('.workshop-modal')) return;
+  if (el.id === 'wsIconInput' && el.files?.[0] && workshopState.editing) {
+    const file = el.files[0];
+    if (file.size > 300 * 1024) { workshopState.message = '图标太大（>300KB），请压缩后再传'; render(); return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (workshopState.editing) workshopState.editing.iconData = String(reader.result);
+      render();
+    };
+    reader.readAsDataURL(file);
+    return;
+  }
+  if (el.id === 'wsImportInput' && el.files?.[0]) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const list = importCustomAccessories(String(reader.result));
+        workshopState.message = `导入成功：${list.length} 件`;
+      } catch (error) {
+        workshopState.message = `导入失败：${error instanceof Error ? error.message : '格式不对'}`;
+      }
+      render();
+    };
+    reader.readAsText(el.files[0]);
+  }
+});
 window.addEventListener('resize', () => publishBottomHudHeight());
 
 installImmersiveKeys();

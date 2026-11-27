@@ -166,6 +166,7 @@ export function renderAdmin(): string {
           <span class="admin-state ${hasTuning() ? 'dirty' : ''}">${hasTuning() ? '正在使用本地改动' : '使用原始数值'}</span>
           <button class="btn mini" data-action="admin-export">导出数据</button>
           <button class="btn mini ghost" data-action="admin-reset">恢复默认</button>
+          <button class="btn" data-action="workshop-open">配件工坊</button>
           <button class="btn primary" data-action="admin-close">返回菜单</button>
         </div>
         <div class="admin-cloud"><h2>云端同步</h2><p id="cloudStatus" role="status">${isCloudSignedIn() ? "GitHub 管理员已授权" : "尚未验证 GitHub 管理密钥"}</p><div class="admin-cloud-actions"><input id="githubToken" type="password" autocomplete="off" placeholder="粘贴 Fine-grained Personal Access Token"><button class="btn mini" data-action="cloud-login">验证密钥</button><button class="btn mini ghost" data-action="cloud-logout">退出授权</button><button class="btn mini" data-action="cloud-load">读取云端配置</button><button class="btn mini primary" data-action="cloud-save">上传当前配置</button></div><p>密钥只保存在当前页面内存中，刷新页面后需要重新验证。玩家无需密钥即可读取公开配置。</p></div><div class="admin-export admin-import">

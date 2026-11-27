@@ -1,4 +1,5 @@
 import { CARD_MAP } from './cards';
+import { ACCESSORY_MAP } from './data/accessories';
 import { SURVIVOR_MAP, survivorPortrait } from './survivors';
 import type { AccessoryRarity } from './types';
 
@@ -99,6 +100,9 @@ export function characterImage(id: string): string | undefined {
 
 /** 配件图标：与卡牌同一套约定——文件 basename = 配件 id。 */
 export function accessoryImage(id: string): string {
+  // 工坊做的自定义配件直接用上传的图（dataURL）；内置的仍按 id 推导路径。
+  const custom = ACCESSORY_MAP[id]?.iconData;
+  if (custom) return custom;
   return `assets/dbd/addons/${id}.png`;
 }
 

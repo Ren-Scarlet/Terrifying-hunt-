@@ -15,7 +15,7 @@
 export type Screen = 'menu' | 'game' | 'result';
 
 /** 面板：同一时刻最多只能开一个，打开即覆盖主屏幕。 */
-export type Panel = 'deck' | 'shop' | 'accessories' | 'admin';
+export type Panel = 'deck' | 'shop' | 'accessories' | 'admin' | 'workshop';
 
 export interface UiState {
   readonly screen: Screen;

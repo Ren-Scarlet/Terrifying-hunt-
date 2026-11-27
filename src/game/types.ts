@@ -157,6 +157,8 @@ export interface AccessoryDef {
   sourceText?: string;
   /** 供统一修正层汇总的数值 */
   mods: AccessoryMod[];
+  /** 作者自定义配件：上传图标后以 dataURL 存这里（内置配件为空） */
+  iconData?: string;
 }
 
 export type PersonRole = 'target' | 'civilian' | 'police';

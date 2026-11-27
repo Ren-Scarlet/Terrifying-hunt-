@@ -124,6 +124,7 @@ export function renderMenu(save: SaveData, ante = false): string {
           ${save.rogue ? '<button class="btn ghost" data-action="rogue-abandon">放弃肉鸽进度</button>' : ''}
           <button class="btn" data-action="deck">编辑牌组</button>
           <button class="btn" data-action="accessories">配件装配</button>
+          ${new URLSearchParams(location.search).get('admin') === '1' ? '<button class="btn ghost" data-action="workshop-open">配件工坊</button>' : ''}
           <button class="btn" data-action="bloodweb">血网升级</button>
           <button class="btn" data-action="shop">卡牌商店</button>
           <button class="btn ghost" data-action="guide">玩法指引</button>
@@ -327,11 +328,11 @@ export function renderBloodweb(
         ${offers
           ? `<div class="bloodweb-offers">${offers.map((offer, index) => `
               <button class="bloodweb-offer ${offer.kind}" data-action="bloodweb-pick" data-index="${index}">
-                <small>${offer.kind === 'accessory' ? '配件' : offer.kind === 'card' ? '卡牌' : '血点'}</small>
+                <small>配件</small>
                 <b>${escape(offer.name)}</b>
                 <span>${escape(offer.desc)}</span>
               </button>`).join('')}</div>`
-          : '<p class="bloodweb-empty">花血点升一级，就能从下面三条随机路线里领一个：配件库存 / 永久解锁卡牌 / 返还血点。每位杀手等级独立，血点想给谁花就给谁花。</p>'}
+          : '<p class="bloodweb-empty">花血点升一级，下面会随机出现该杀手的 3 件配件，选一件进库存。每位杀手等级独立，血点想给谁花就给谁花。</p>'}
         <div class="bloodweb-note">每 100 级自动转生（等级回 1、转生 +1）；每累计 30 级把该杀手一张专属卡放进公共池，其他杀手也能构筑。</div>
         <div class="actions">
           <button class="btn ghost" data-action="bloodweb-close">关闭</button>
