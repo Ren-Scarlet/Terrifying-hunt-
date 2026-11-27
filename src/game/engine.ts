@@ -1736,6 +1736,18 @@ function actByArchetype(state: GameState, person: Person): void {
       return;
     }
   }
+  // 阻滞（轻量）：冷静的人先躲，不先慌。他们不会硬扛伤害，
+  // 只是让你多花 1 AP 搜索这间屋子——增加的是"找人"的成本，不是"砍人"的成本。
+  if (band === 'calm' && !person.hidden && person.alert >= 50 && person.hp > 0
+    && cabinetRoomsFor(state).includes(person.room)
+    && roomDistance(person.room, state.playerRoom) <= 1
+    && random() < 0.5) {
+    person.hidden = true;
+    person.intent = 'hide';
+    person.activity = '听见脚步，先躲进柜子里';
+    log(state, `${person.name} 听见门外的脚步声，悄悄钻进了柜子。`);
+    return;
+  }
   const seeksTotemThisTurn = (person.id.charCodeAt(0) + state.turn + (person.routineIndex ?? 0)) % 6 === 0;
   if (!inPursuit && state.totems.length && (person.awareness >= 1 || person.alert >= 25) && seeksTotemThisTurn) {
     const targetTotem = nearestOf(person.room, state.totems);
@@ -3232,9 +3244,11 @@ export function attack(state: GameState, targetId?: string, options: { costOverr
   // 卡牌联动：定位、控制、伏击都能转化成真正的猎杀优势，而不是只提供一段说明文字。
   const trackingCombo = target.role !== 'police' && target.trackedTurns > 0;
   const controlCombo = target.role !== 'police' && target.blockedTurns > 0;
+  // 基础挥刀 2 点：一刀受伤、两刀倒地，再补一次处决。
+  // 猎杀本身要干脆，难点应该在于「怎么拿更高分」，而不是站桩砍四刀。
   const baseDamage = noedActive || (heavy && state.killer === '迈克尔·迈尔斯')
     ? SURVIVOR_MAX_HP
-    : heavy || nightfallKill || ambushStrike ? 2 : 1;
+    : 2;
   const comboDamage = controlCombo && baseDamage < SURVIVOR_MAX_HP ? 1 : 0;
   if (noedActive && target.role !== 'police') {
     damagePerson(state, target, SURVIVOR_MAX_HP);

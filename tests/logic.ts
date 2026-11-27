@@ -946,7 +946,7 @@ function caseSwingGate(): void {
 
   s.energy = 3;
   const first = attack(s);
-  check('H 默认挥刀造成 1 点伤害', first && v.hp === 3 && conditionOf(v) === 'healthy', `hp ${v.hp}，行动点 ${s.energy}`);
+  check('H 默认挥刀造成 2 点伤害（一刀受伤）', first && v.hp === 2 && conditionOf(v) === 'injured', `hp ${v.hp}，行动点 ${s.energy}`);
 
   const second = attack(s);
   check('H 不能连续挥刀', !second && !s.attackReady, attackBlockReason(s));
@@ -969,7 +969,7 @@ function casePanicRun(): void {
   v.sneaky = false;
   s.energy = 3;
   const ok = attack(s);
-  check('I 再受 1 点伤害后进入受伤状态', ok && v.hp === 2 && conditionOf(v) === 'injured', `hp ${v.hp}`);
+  check('I 再受 2 点伤害后接近倒地', ok && v.hp === 1 && conditionOf(v) === 'injured', `hp ${v.hp}`);
   check(
     'I 被砍伤的人会立即逃跑并留下血迹',
     v.movesThisTurn >= 1 && v.room !== s.playerRoom,
