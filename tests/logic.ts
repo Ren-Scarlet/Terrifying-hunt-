@@ -287,8 +287,10 @@ function caseHuntingGroundsAndFreeHunt(): void {
   free.survivorKills = 3;
   free.executions = 2;
   free.executionMethodsUsed.push('fridge');
+  const specialExecuteTask = free.mission.tasks!.find((task) => task.kind === 'special_execute');
   check('自由猎杀：特殊处决挑战能正确累计',
-    missionTaskProgress(free, free.mission.tasks!.find((task) => task.kind === 'special_execute')!) === 1);
+    !!specialExecuteTask && missionTaskProgress(free, specialExecuteTask) === 1,
+    '当前挑战类型=' + (free.mission.tasks ?? []).map((task) => task.kind).join(','));
   endTurn(free);
   check('自由猎杀：完成挑战不会自动结束，玩家保留自主决定权',
     free.phase === 'playing' && free.result === null);
