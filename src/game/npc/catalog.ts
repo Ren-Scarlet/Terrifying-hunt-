@@ -13,7 +13,6 @@ export const SURVIVOR_ITEM_LABEL: Record<SurvivorItem, string> = {
 
 export const SITE_ITEM_LABEL: Record<SiteItemKind, string> = {
   itemBox: '道具箱',
-  generator: '发电机',
 };
 
 export const INTENT_LABEL: Record<NpcIntent, string> = {
@@ -41,7 +40,6 @@ export const GOAL_LABEL: Record<NpcGoal, string> = {
   objective: '在修电闸 / 凑钥匙',
   key: '在找后门钥匙',
   supply: '想去道具箱找点能用的',
-  generator: '想去把发电机修好',
   routine: '按自己的习惯活动',
 };
 
