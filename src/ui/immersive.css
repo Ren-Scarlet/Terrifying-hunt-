@@ -13,8 +13,7 @@ body.immersive-hunt { overflow: hidden; min-height: 100dvh; }
 #app.immersive-game .map-panel > .hunt-plan,
 #app.immersive-game .map-panel > .facility-overview,
 #app.immersive-game .map-panel > .look-prompt,
-#app.immersive-game .map-legend,
-#app.immersive-game .intel-log-panel { display: none !important; }
+#app.immersive-game .map-legend { display: none !important; }
 #app.immersive-game .map-viewport {
   position: fixed; inset: 0; z-index: 0; display: block; overflow: hidden;
   width: 100vw; height: 100dvh; margin: 0; padding: 0; background: #080d11;
@@ -2549,3 +2548,32 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
   border-color: #e6bd80;
   background: rgba(66,42,28,.95);
 }
+
+
+/* 2026-11-27: readable killer HUD and logs beside the hand. */
+#app.immersive-game .killer-ability-panel { width:min(350px,29vw)!important; grid-template-columns:166px minmax(0,1fr)!important; max-height:min(58vh,560px)!important; }
+#app.immersive-game .killer-face.ability-portrait { width:166px!important; height:204px!important; flex-basis:204px!important; }
+#app.immersive-game .killer-hud-portrait b { max-width:166px!important; font-size:12px!important; }
+#app.immersive-game .killer-frenzy-meter>div:first-child { font-size:14px!important; }
+#app.immersive-game .killer-frenzy-meter>div:first-child b { font-size:17px!important; font-weight:800!important; color:#fff0e8!important; }
+#app.immersive-game .killer-frenzy-track { height:10px!important; }
+#app.immersive-game .killer-power-grid { grid-template-columns:1fr!important; gap:5px!important; }
+#app.immersive-game .killer-power-grid .btn.power { display:grid!important; grid-template-columns:34px minmax(0,1fr)!important; grid-template-rows:1fr!important; flex-direction:row!important; align-items:center!important; justify-content:start!important; width:100%!important; min-width:0!important; height:42px!important; min-height:42px!important; padding:4px 7px!important; gap:7px!important; }
+#app.immersive-game .killer-power-grid .power-art { width:30px!important; height:30px!important; }
+#app.immersive-game .killer-power-grid .power-body { display:flex!important; min-width:0!important; align-items:center!important; }
+#app.immersive-game .killer-power-grid .power-body b { font-size:11px!important; line-height:1.2!important; white-space:nowrap!important; }
+#app.immersive-game .killer-power-grid .power-body small { display:none!important; }
+#app.immersive-game .bottom-hud .map-event-feed { order:4!important; position:relative!important; left:auto!important; right:auto!important; bottom:auto!important; top:auto!important; width:190px!important; max-width:190px!important; max-height:116px!important; overflow:hidden!important; margin:0 0 2px!important; padding:7px 9px!important; border:1px solid rgba(190,45,52,.38)!important; border-radius:7px!important; background:rgba(7,10,13,.82)!important; backdrop-filter:blur(12px)!important; pointer-events:auto!important; }
+#app.immersive-game .bottom-hud .map-event-feed-title { font-size:10px!important; }
+#app.immersive-game .bottom-hud .map-event { font-size:9px!important; line-height:1.35!important; }
+#app.immersive-game .activity-log-panel { order:5!important; position:relative!important; width:118px!important; flex:0 0 118px!important; margin:0 0 2px!important; border:1px solid rgba(205,222,231,.2)!important; border-radius:7px!important; background:rgba(7,10,13,.82)!important; color:#d5dfe4!important; font-size:10px!important; pointer-events:auto!important; }
+#app.immersive-game .activity-log-panel summary { cursor:pointer!important; padding:9px 7px!important; list-style:none!important; white-space:nowrap!important; text-align:center!important; }
+#app.immersive-game .activity-log-panel[open] { position:absolute!important; right:0!important; bottom:100%!important; width:min(330px,38vw)!important; max-height:42vh!important; }
+#app.immersive-game .activity-log-list { max-height:34vh!important; overflow:auto!important; padding:7px 9px!important; border-top:1px solid rgba(205,222,231,.14)!important; }
+#app.immersive-game .activity-log-list>div { padding:4px 0!important; border-bottom:1px solid rgba(205,222,231,.08)!important; color:#b9c5cb!important; font-size:9px!important; line-height:1.35!important; }
+#app.immersive-game .mission-task-list { display:grid; gap:7px; margin:12px 0; }
+#app.immersive-game .mission-task-heading { display:block; color:#ead8c7; font-size:12px; margin-bottom:3px; }
+#app.immersive-game .mission-task-list .task-row,#app.immersive-game .mission-task-list .mission-task { display:block; padding:6px 7px; border:1px solid rgba(205,222,231,.12); border-radius:5px; color:#d1dbe0; font-size:11px; line-height:1.4; }
+#app.immersive-game .killer-face.ability-portrait img { object-fit:contain!important; object-position:bottom center!important; transform:none!important; }
+@media(max-width:1100px){#app.immersive-game .killer-ability-panel{width:300px!important;grid-template-columns:128px minmax(0,1fr)!important}#app.immersive-game .killer-face.ability-portrait{width:128px!important;height:158px!important;flex-basis:158px!important}}
+@media(max-width:700px){#app.immersive-game .killer-ability-panel{width:218px!important;grid-template-columns:86px minmax(0,1fr)!important}#app.immersive-game .killer-face.ability-portrait{width:86px!important;height:112px!important;flex-basis:112px!important}#app.immersive-game .bottom-hud .map-event-feed,#app.immersive-game .activity-log-panel{display:none!important}}
