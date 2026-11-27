@@ -6,6 +6,7 @@ type CameraMode = 'center' | 'smooth';
 let root: HTMLElement | null = null;
 let mapElement: HTMLElement | null = null;
 let viewportElement: HTMLElement | null = null;
+let wheelBoundViewport: HTMLElement | null = null;
 let zoom = 1.18;
 let mode: CameraMode = 'smooth';
 let globalView = false;
@@ -129,6 +130,18 @@ export function syncImmersiveCamera(nextRoot: HTMLElement): void {
   mapElement = root.querySelector<HTMLElement>('.floorplan');
   const marker = root.querySelector<HTMLElement>('.player-marker');
   if (!viewportElement || !mapElement || !marker) return;
+  if (wheelBoundViewport !== viewportElement) {
+    wheelBoundViewport = viewportElement;
+    viewportElement.addEventListener('wheel', (event: WheelEvent) => {
+      if (!root?.classList.contains('immersive-game')) return;
+      event.preventDefault();
+      const rect = viewportElement?.getBoundingClientRect();
+      if (!rect) return;
+      const direction = event.deltaY > 0 ? -1 : 1;
+      const step = Math.max(0.06, Math.min(0.16, Math.abs(event.deltaY) * 0.0012));
+      setZoom(zoom + direction * step, event.clientX - rect.left, event.clientY - rect.top);
+    }, { passive: false });
+  }
 
   // Measure once per render/resize, never inside the animation frame.
   mapWidth = mapElement.offsetWidth;
@@ -168,17 +181,19 @@ function pan(dx: number, dy: number): void {
   updateCamera(true);
 }
 
-function setZoom(next: number): void {
+function setZoom(next: number, anchorX?: number, anchorY?: number): void {
   const oldZoom = zoom;
   const nextZoom = clamp(next, 0.55, 2.15);
   if (following) {
     zoom = nextZoom;
   } else {
-    const centerWorldX = (viewportWidth / 2 - cameraX) / Math.max(0.01, cameraZoom);
-    const centerWorldY = (viewportHeight / 2 - cameraY) / Math.max(0.01, cameraZoom);
+    const focusX = anchorX ?? viewportWidth / 2;
+    const focusY = anchorY ?? viewportHeight / 2;
+    const focusWorldX = (focusX - cameraX) / Math.max(0.01, cameraZoom);
+    const focusWorldY = (focusY - cameraY) / Math.max(0.01, cameraZoom);
     zoom = nextZoom;
-    panX = viewportWidth / 2 - centerWorldX * zoom;
-    panY = viewportHeight / 2 - centerWorldY * zoom;
+    panX = focusX - focusWorldX * zoom;
+    panY = focusY - focusWorldY * zoom;
   }
   if (oldZoom !== zoom) {
     globalView = false;
