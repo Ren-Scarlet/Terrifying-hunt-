@@ -2648,9 +2648,8 @@ export function effectiveCost(defId: string, state: GameState): number {
  */
 export function moveCost(state: GameState, room: RoomId): number {
   // 恶魔附身能直接撞开障碍物，不额外花行动点
-  const obstacle = isObstacle(room) && !state.clearedObstacles.includes(room) && !state.possessed ? 1 : 0;
   const stalkingSlowdown = state.killer === '迈克尔·迈尔斯' && state.myersStalking ? 1 : 0;
-  return 1 + obstacle + stalkingSlowdown;
+  return 1 + stalkingSlowdown;
 }
 
 export function canMoveTo(state: GameState, room: RoomId): boolean {
@@ -2660,6 +2659,7 @@ export function canMoveTo(state: GameState, room: RoomId): boolean {
   const cost = state.freeMove ? 0 : moveCost(state, room);
   if (state.energy < cost) return false;
   if (state.barricades.includes(room)) return false;
+  if (isObstacle(room) && !state.clearedObstacles.includes(room) && !state.possessed) return false;
   if (state.freeMove) return !isLocked(state, room) && !isLocked(state, state.playerRoom);
   if (isLocked(state, room) || isLocked(state, state.playerRoom)) return false;
   return ROOM_MAP[state.playerRoom].neighbors.includes(room);
@@ -2696,10 +2696,13 @@ export function rollD6Check(state: GameState, label: string, successOn = 4): boo
 }
 
 export function breakBarricade(state: GameState, room: RoomId): boolean {
-  if (state.phase !== 'playing' || !state.barricades.includes(room) || !ROOM_MAP[state.playerRoom].neighbors.includes(room)) return false;
+  const dynamicBoard = state.barricades.includes(room);
+  const fixedBoard = isObstacle(room) && !state.clearedObstacles.includes(room) && !state.possessed;
+  if (state.phase !== 'playing' || (!dynamicBoard && !fixedBoard) || !ROOM_MAP[state.playerRoom].neighbors.includes(room)) return false;
   if (state.energy < 1) { log(state, '行动点不足：破坏木板需要 1 点。'); return false; }
   state.energy -= 1;
-  state.barricades = state.barricades.filter((r) => r !== room);
+  if (dynamicBoard) state.barricades = state.barricades.filter((r) => r !== room);
+  if (fixedBoard) state.clearedObstacles.push(room);
   log(state, `你花费 1 点行动点，将${roomName(room)}入口的木板砸碎。`);
   state.attackReady = true;
   afterPlayerAction(state);
@@ -2752,6 +2755,11 @@ export function movePlayer(state: GameState, room: RoomId): boolean {
     afterPlayerAction(state);
     checkImmediateWin(state);
     return true;
+  }
+  const staticBoard = isObstacle(room) && !state.clearedObstacles.includes(room) && !state.possessed;
+  if (staticBoard && ROOM_MAP[state.playerRoom].neighbors.includes(room) && !isLocked(state, room) && !isLocked(state, state.playerRoom)) {
+    log(state, `${roomName(room)}入口被木板封住了；点击地图上的「破坏木板」花费 1 点行动点。`);
+    return false;
   }
   const cost = state.freeMove ? 0 : moveCost(state, room);
   if (!canMoveTo(state, room)) {
