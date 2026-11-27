@@ -3493,3 +3493,64 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
 #app.immersive-game .panel,
 #app.immersive-game .killer-ability-panel,
 #app.immersive-game .btn{border-radius:3px!important;}
+
+/* ==========================================================================
+   杀手面板：硬重置（旧规则用 absolute 定位资源行，导致杀戮值/行动点叠在一起）
+   ========================================================================== */
+#app.immersive-game .killer-hud-resources{
+  position:static!important;inset:auto!important;
+  display:flex!important;flex-direction:column!important;justify-content:flex-end!important;
+  gap:7px!important;min-width:0!important;width:auto!important;
+}
+#app.immersive-game .killer-hud-resources>*{
+  position:static!important;inset:auto!important;float:none!important;transform:none!important;
+  margin:0!important;width:100%!important;max-width:100%!important;
+}
+#app.immersive-game .killer-hud-resources .killer-frenzy-meter{display:block!important;}
+#app.immersive-game .killer-hud-resources .killer-ap-display{
+  display:flex!important;align-items:center!important;gap:7px!important;
+  height:auto!important;min-height:0!important;padding:0!important;
+  border:0!important;background:none!important;box-shadow:none!important;
+}
+#app.immersive-game .killer-hud-resources img{
+  position:static!important;float:none!important;
+  width:16px!important;height:16px!important;flex:0 0 16px!important;object-fit:contain!important;
+}
+#app.immersive-game .killer-hud-resources .killer-resource-line,
+#app.immersive-game .killer-hud-resources .killer-ap-display{
+  display:flex!important;align-items:center!important;gap:7px!important;
+  font-size:11px!important;line-height:1.1!important;
+}
+#app.immersive-game .killer-hud-resources b{
+  font-size:17px!important;color:#f2ddd0!important;font-weight:800!important;
+}
+#app.immersive-game .killer-hud-resources b>i{
+  font-size:11px!important;color:#a6958a!important;font-style:normal!important;
+}
+
+/* ==========================================================================
+   恐怖片调色：整体压饱和、提对比、加暗角与颗粒，让画面从「网页示意」变成「片场」
+   ========================================================================== */
+#app.immersive-game .map-viewport{position:relative!important;filter:contrast(1.12) saturate(.72) brightness(.9)!important;}
+#app.immersive-game .map-viewport::after{
+  content:'';position:absolute;inset:0;pointer-events:none;z-index:2;
+  background:radial-gradient(118% 96% at 50% 42%,rgba(0,0,0,0) 38%,rgba(0,0,0,.62) 100%);
+}
+#app.immersive-game .floorplan{filter:none!important;}
+#app.immersive-game .room{
+  border-color:rgba(122,96,72,.14)!important;
+  box-shadow:inset 0 0 70px rgba(0,0,0,.42)!important;
+}
+#app.immersive-game .room.current{
+  box-shadow:inset 0 0 80px rgba(0,0,0,.55),0 0 0 1px rgba(196,128,84,.55),0 0 26px rgba(150,40,26,.22)!important;
+}
+#app.immersive-game .panel,
+#app.immersive-game .bottom-hud,
+#app.immersive-game .killer-ability-panel{
+  border-radius:2px!important;backdrop-filter:none!important;
+  background:linear-gradient(166deg,rgba(16,13,12,.97),rgba(4,6,8,.97))!important;
+  border:1px solid rgba(140,86,60,.3)!important;
+  box-shadow:0 10px 30px rgba(0,0,0,.72),inset 0 0 44px rgba(96,22,16,.09)!important;
+}
+#app.immersive-game .stat b,
+#app.immersive-game .killer-hud-resources b{font-variant-numeric:tabular-nums!important;}
