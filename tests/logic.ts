@@ -21,7 +21,6 @@ import {
   SEARCH_COST,
   TEAM_STAGE_COUNT,
   conditionOf,
-  GENERATOR_JAM_TURNS,
   SABOTAGE_COST,
   addAlarm,
   currentScore,
@@ -179,14 +178,13 @@ function caseRoutineHuntOpportunities(): void {
     dossier.includes('data-action="close-person-detail"'));
 }
 
-function caseGeneratorBreakerNetwork(): void {
+function caseIndependentBreakerNetwork(): void {
   const s = newGame();
   const circuit = s.powerCircuits[0];
-  const source = s.siteItems.find((item) => item.id === circuit.generatorId);
   const room = circuit.affectedRooms[0];
-  check('供电网络：每组电闸都绑定到实际发电机',
-    s.powerCircuits.every((item) => !!item.generatorId && s.siteItems.some((site) => site.id === item.generatorId && site.kind === 'generator')));
-  check('供电网络：发电机正常时区域照明开启', isRoomLit(s, room));
+  check('电力系统：现场只生成道具箱，不再生成发电机',
+    s.siteItems.length === 2 && s.siteItems.every((item) => item.kind === 'itemBox'));
+  check('电闸：每组电路独立供电，不依赖发电机', isRoomLit(s, room) && !('generatorId' in circuit));
   s.playerRoom = circuit.breakerRoom;
   const before = s.energy;
   const pulled = togglePowerCircuit(s, circuit.id);
@@ -194,20 +192,9 @@ function caseGeneratorBreakerNetwork(): void {
     pulled && s.energy === before - BREAKER_SWITCH_COST && !isRoomLit(s, room) && s.huntStats.environmentActions === 1);
   const closed = togglePowerCircuit(s, circuit.id);
   check('电闸：合闸恢复照明', closed && isRoomLit(s, room) && s.huntStats.environmentActions === 2);
-  if (source) {
-    source.jammedTurns = 1;
-    check('发电机：停机时其供电区域自动熄灭', !isRoomLit(s, room));
-    circuit.enabled = false;
-    const blockReason = breakerBlockReason(s, circuit.id);
-    check('发电机：供电源停机时禁止合闸', !!blockReason && blockReason.includes('发电机'));
-    source.jammedTurns = 0;
-    const restored = togglePowerCircuit(s, circuit.id);
-    check('发电机：恢复后允许合闸并重新供电', restored && isRoomLit(s, room));
-  }
   circuit.broken = true;
   check('电闸：控制箱损坏后所属区域保持断电', !isRoomLit(s, room));
 }
-
 function casePhoneLineCoordination(): void {
   const s = newGame();
   const farRoom = ROOMS.map((room) => room.id)
@@ -296,7 +283,7 @@ function caseHuntingGroundsAndFreeHunt(): void {
 caseHuntingGroundsAndFreeHunt();
 
 caseRoutineHuntOpportunities();
-caseGeneratorBreakerNetwork();
+caseIndependentBreakerNetwork();
 casePhoneLineCoordination();
 
 function caseEnvironmentalEvents(): void {
@@ -1446,13 +1433,12 @@ caseSneaky();
 /** X：道具箱 / 发电机随机摆放；杀手能砸，砸完幸存者就少了这条路 */
 function caseSiteItems(): void {
   const s = newGame();
-  const boxes = s.siteItems.filter((i) => i.kind === 'itemBox');
-  const gens = s.siteItems.filter((i) => i.kind === 'generator');
-  const rooms = s.siteItems.map((i) => i.room);
+  const boxes = s.siteItems.filter((item) => item.kind === 'itemBox');
+  const rooms = s.siteItems.map((item) => item.room);
   check(
-    'X 道具箱 2 个、发电机 1~2 台且位置不重叠',
-    boxes.length === 2 && gens.length >= 1 && gens.length <= 2 && new Set(rooms).size === rooms.length,
-    `箱 ${boxes.length} / 机 ${gens.length}`,
+    'X 只生成 2 个道具箱且位置不重叠，不再生成发电机',
+    boxes.length === 2 && s.siteItems.every((item) => item.kind === 'itemBox') && new Set(rooms).size === rooms.length,
+    `箱 ${boxes.length}`,
   );
 
   const box = boxes[0];
@@ -1465,20 +1451,6 @@ function caseSiteItems(): void {
     `broken=${box.broken} charges=${box.charges}`,
   );
   check('X 破坏消耗 1 点行动点', s.energy === BASE_AP - SABOTAGE_COST, `energy=${s.energy}`);
-
-  const gen = gens[0];
-  gen.progress = 80;
-  gen.charged = true;
-  s.teamProgress = 50;
-  s.playerRoom = gen.room;
-  s.energy = BASE_AP;
-  const teamBefore = s.teamProgress;
-  const ok2 = sabotageSiteItem(s);
-  check(
-    'X 砸发电机只影响设施本身，不再修改团队进度',
-    ok2 && gen.progress === 35 && gen.jammedTurns === GENERATOR_JAM_TURNS && !gen.charged && s.teamProgress === teamBefore,
-    `progress=${gen.progress} jam=${gen.jammedTurns}`,
-  );
 }
 
 /** Y：幸存者真的会从道具箱拿道具，并按局势用掉 */
