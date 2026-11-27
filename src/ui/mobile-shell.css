@@ -697,9 +697,14 @@
   }
 
   #app.immersive-game.mobile-game-active .floorplan .room-feature,
-  #app.immersive-game.mobile-game-active .floorplan .person-chip,
-  #app.immersive-game.mobile-game-active .floorplan .score-execution-btn {
+  #app.immersive-game.mobile-game-active .floorplan .person-chip {
     pointer-events: none !important;
+  }
+
+  /* 分数处决是明确的操作按钮，必须能点 */
+  #app.immersive-game.mobile-game-active .floorplan .score-execution-btn {
+    pointer-events: auto !important;
+    z-index: 9 !important;
   }
 
   /* 电话是可互动点：例外放行，并盖在移动热区之上 */

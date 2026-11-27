@@ -783,16 +783,14 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
 }
 #app.immersive-game .floorplan .room-people .person-chip,
 #app.immersive-game .floorplan .room.room-size-small .room-people .person-chip {
-  min-width: 84px;
-  min-height: 92px;
-  padding: 5px 10px;
-  gap: 6px;
-  font-size: 15px;
+  min-width: 0;
+  min-height: 0;
+  padding: 1px 2px;
+  gap: 2px;
+  font-size: 10px;
 }
 #app.immersive-game .floorplan .room-people .person-chip .person-avatar-wrap,
-#app.immersive-game .floorplan .room.room-size-small .room-people .person-chip .person-avatar-wrap,
 #app.immersive-game .floorplan .room-people .person-chip .person-avatar-wrap .person-avatar,
-#app.immersive-game .floorplan .room.room-size-small .room-people .person-chip .person-avatar-wrap .person-avatar,
 #app.immersive-game .floorplan .room-people .person-chip > img {
   flex: 0 0 72px !important;
   width: 72px !important;
@@ -1850,8 +1848,16 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
 
 
 /* 2026-11-27: make in-world props hoverable/clickable instead of letting the room title steal pointer events. */
-#app.immersive-game .floorplan .room-features { pointer-events: auto !important; }
-#app.immersive-game .floorplan .room-features .room-feature { pointer-events: auto !important; }
+/* 房间是移动热区：只有真正的按钮接点击，装饰图标不要抢走整行热区 */
+#app.immersive-game .floorplan .room-features { pointer-events: none !important; }
+#app.immersive-game .floorplan .room-features .room-feature { pointer-events: none !important; }
+#app.immersive-game .floorplan .room-features .room-feature.cabinet-action,
+#app.immersive-game .floorplan .room-features .room-feature.barricade-action,
+#app.immersive-game .floorplan .room-features .room-feature.phone-action,
+#app.immersive-game .floorplan .room-features .room-feature.totem-interaction,
+#app.immersive-game .floorplan .room-features .room-feature > button {
+  pointer-events: auto !important;
+}
 #app.immersive-game .floorplan .room-features button.room-feature { cursor: pointer; }
 #app.immersive-game .floorplan .room-features button.room-feature:disabled { cursor: help; opacity: .72; }
 /* Remove the obsolete AP strip; the live AP counter remains beside the hand. */
@@ -2817,4 +2823,101 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
 #app.immersive-game .floorplan .room-feature.pallet,
 #app.immersive-game .floorplan .room-feature.obstacle {
   opacity: 1 !important;
+}
+
+/* ------------------------------------------------------------------ */
+/* 人物头像随房间大小收缩，避免小房间里溢出到房间外                     */
+/* ------------------------------------------------------------------ */
+/* 头像尺寸由外层 wrap 决定（内部 img 固定 100%），所以按房间大小调 wrap */
+#app.immersive-game .floorplan .room-people .person-chip .person-avatar-wrap {
+  width: 46px !important; height: 46px !important; flex-basis: 46px !important;
+}
+#app.immersive-game .floorplan .room.room-size-medium .room-people .person-chip .person-avatar-wrap {
+  width: 38px !important; height: 38px !important; flex-basis: 38px !important;
+}
+#app.immersive-game .floorplan .room.room-size-small .room-people .person-chip .person-avatar-wrap {
+  width: 28px !important; height: 28px !important; flex-basis: 28px !important;
+}
+#app.immersive-game .floorplan .room.room-size-small .room-people .person-chip {
+  max-width: 44px;
+}
+#app.immersive-game .floorplan .room.room-size-small .room-people {
+  gap: 2px !important;
+}
+#app.immersive-game .floorplan .room-people {
+  overflow: visible !important;
+  max-height: none !important;
+}
+
+/* 分数处决按钮：固定在倒地目标上方，避免被小房间裁掉或被人像盖住 */
+#app.immersive-game .map-person-wrap .score-execution-btn {
+  position: absolute !important;
+  left: 50% !important;
+  top: -36px !important;
+  transform: translateX(-50%) !important;
+  z-index: 36 !important;
+  display: inline-flex !important;
+  align-items: center; justify-content: center;
+  min-width: 104px !important;
+  min-height: 28px !important;
+  padding: 4px 9px !important;
+  border: 1px solid rgba(235, 200, 96, .9) !important;
+  border-radius: 7px !important;
+  background: rgba(58, 44, 10, .96) !important;
+  color: #ffe9a8 !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  pointer-events: auto !important;
+  box-shadow: 0 0 12px rgba(235, 200, 96, .3) !important;
+}
+#app.immersive-game .map-person-wrap .score-execution-btn:disabled {
+  opacity: .55 !important;
+  cursor: not-allowed !important;
+}
+
+/* 头像图片必须跟随 wrap：后面有 72px 的旧规则会把它撑出房间 */
+#app.immersive-game .floorplan .room-people .person-chip .person-avatar-wrap .person-avatar {
+  width: 100% !important;
+  height: 100% !important;
+  flex-basis: auto !important;
+  object-fit: cover !important;
+}
+
+/* ------------------------------------------------------------------ */
+/* 头像按房间大小缩放（放在最后并带上 .room，压过前面的 62/72px 放大规则） */
+/* ------------------------------------------------------------------ */
+#app.immersive-game .floorplan .room.room-size-small .room-people .person-chip .person-avatar-wrap {
+  width: 26px !important; height: 26px !important; flex: 0 0 26px !important;
+}
+#app.immersive-game .floorplan .room.room-size-medium .room-people .person-chip .person-avatar-wrap {
+  width: 36px !important; height: 36px !important; flex: 0 0 36px !important;
+}
+#app.immersive-game .floorplan .room.room-size-large .room-people .person-chip .person-avatar-wrap,
+#app.immersive-game .floorplan .room.room-size-open .room-people .person-chip .person-avatar-wrap {
+  width: 46px !important; height: 46px !important; flex: 0 0 46px !important;
+}
+#app.immersive-game .floorplan .room.room-size-small .room-people .person-chip .person-avatar-wrap .person-avatar,
+#app.immersive-game .floorplan .room.room-size-medium .room-people .person-chip .person-avatar-wrap .person-avatar,
+#app.immersive-game .floorplan .room.room-size-large .room-people .person-chip .person-avatar-wrap .person-avatar,
+#app.immersive-game .floorplan .room.room-size-open .room-people .person-chip .person-avatar-wrap .person-avatar {
+  width: 100% !important; height: 100% !important; flex: 0 0 auto !important;
+  object-fit: cover !important;
+}
+
+/* 小房间里的 chip 本身也不要被撑大 */
+#app.immersive-game .floorplan .room.room-size-small .room-people .person-chip {
+  min-width: 0 !important;
+  min-height: 0 !important;
+  max-width: 44px !important;
+  padding: 0 !important;
+  gap: 0 !important;
+  font-size: 10px !important;
+}
+#app.immersive-game .floorplan .room.room-size-medium .room-people .person-chip {
+  min-width: 0 !important;
+  min-height: 0 !important;
+  max-width: 58px !important;
+  padding: 1px 2px !important;
+  gap: 2px !important;
+  font-size: 11px !important;
 }

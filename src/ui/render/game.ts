@@ -77,7 +77,7 @@ import {
 import { isCardTuned } from '../../game/tuning';
 import { ACCESSORY_MAP, ACCESSORY_SLOTS } from '../../game/accessories';
 import { blinkRangeOf, hatchetMax, modifierSummary } from '../../game/modifiers';
-import { isMuted, playHeartbeat, playSfx, playTrapScream, playSurvivorStartle } from '../audio';
+import { isMuted, playHeartbeat, playSfx, playTrapScream } from '../audio';
 import { addonIconHtml, escape, icon, itemBadge, itemIconHtml, personChip, shadowFigures, perkIconHtml, TYPE_NAMES, killerFaceHtml, defaultDetailHtml, cardTextHtml } from './shared';
 import type { GameState, Person, RoomId, ScoreLine, SaveData } from '../../game/types';
 
@@ -401,12 +401,9 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
     lastDiscoveryMissionId = m.id;
     discoveredSurvivorIds.clear();
   }
+  // 发现幸存者的提示音统一交给 main.ts 的 survivorFound；这里不再额外播受惊尖叫。
   const newlyDiscovered = state.people.filter((person) => person.role !== 'police' && person.hp > 0 && !person.hidden && isRoomVisible(state, person.room) && !discoveredSurvivorIds.has(person.id));
-  if (newlyDiscovered.length) {
-    newlyDiscovered.forEach((person) => discoveredSurvivorIds.add(person.id));
-    const firstFound = newlyDiscovered[0];
-    playSurvivorStartle(SURVIVOR_MAP[firstFound.id]?.gender ?? 'male');
-  }
+  newlyDiscovered.forEach((person) => discoveredSurvivorIds.add(person.id));
   const isMyers = killer.owner === '迈克尔·迈尔斯';
   if (state.turn === 1 && state.trailClock === 0) {
     lastRenderedTrapTriggerCount = state.trapTriggerCount;
