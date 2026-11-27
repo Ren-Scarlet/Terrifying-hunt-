@@ -117,6 +117,8 @@ function renderGame(): void {
         <button data-action="execute" ${target && target.hp<=0 && target.room===game.playerRoom ? '' : 'disabled'}>处决</button>
         <button data-action="search">搜索当前房间</button>
         <button data-action="look">观察周围</button>
+        <button data-action="look-cancel" ${game.lookingAround ? '' : 'disabled'}>取消观察</button>
+        <button data-action="aura-cancel" ${game.auraTargeting ? '' : 'disabled'}>取消选点</button>
         <button data-action="cabinet">检查柜子</button>
         <button data-action="wipe">擦刀</button>
         <button data-action="draw">抽 1 张牌</button>
@@ -165,15 +167,21 @@ root.addEventListener('click', (event) => {
   if (action === 'free') { start(true); return; }
   if (action === 'menu') { game = null; selectedPerson = null; render(); return; }
   if (!game) return;
-  if (action === 'person') { selectedPerson = button.dataset.id ?? null; selectedCard = null; render(); return; }
+  if (action === 'person') {
+    const id = button.dataset.id ?? null;
+    if (game.huntressAiming && id) { const ok = throwHuntressHatchet(game, id); message = ok ? '飞斧已投出。' : '无法命中该目标。'; afterAction(); return; }
+    selectedPerson = id; selectedCard = null; render(); return;
+  }
   if (action === 'card') { selectedCard = selectedCard === button.dataset.id ? null : button.dataset.id ?? null; render(); return; }
   if (action === 'room') {
     const room = button.dataset.room as RoomId | undefined;
     if (!room) return;
     if (game.nurseBlinkTargeting) {
       const ok = blinkPlayer(game, room); message = ok ? '闪现完成。' : '无法闪现到该房间。';
+    } else if (game.auraTargeting) {
+      selectAuraRoom(game, room); message = '目标房间已选择。';
     } else if (game.lookingAround) {
-      lookAtRoom(game, room); message = '观察完成。';
+      lookAtRoom(game, room); message = '观察完成。'
     } else if (ROOM_MAP[game.playerRoom].neighbors.includes(room)) {
       const reason = moveBlockReason(game, room);
       if (reason) message = reason;
@@ -190,6 +198,8 @@ root.addEventListener('click', (event) => {
   if (action === 'execute') { executeDownedPerson(game, selectedPerson ?? undefined); afterAction(); return; }
   if (action === 'search') { searchRoom(game); afterAction(); return; }
   if (action === 'look') { lookAround(game); message = '选择一间相邻房间观察。'; render(); return; }
+  if (action === 'look-cancel') { cancelLookSelection(game); message = '已取消观察。'; render(); return; }
+  if (action === 'aura-cancel') { cancelAuraSelection(game); message = '已取消选点。'; render(); return; }
   if (action === 'cabinet') { interactCabinet(game); afterAction(); return; }
   if (action === 'wipe') { wipeBlade(game); afterAction(); return; }
   if (action === 'draw') { drawCardAction(game); afterAction(); return; }
