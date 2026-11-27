@@ -479,7 +479,7 @@ export interface GameState {
   /** 女猎手瞄准状态与当前剩余飞斧。 */
   huntressAiming: boolean;
   hatchets: number;
-  /** 护士闪现选点、闪现后的抓取窗口与待结算疲惫。 */
+  /** 护士闪现选点、闪现后的普通攻击窗口与待结算疲惫。 */
   nurseBlinkTargeting: boolean;
   nurseFollowUp: boolean;
   nurseFatiguePending: boolean;
