@@ -2620,3 +2620,15 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
 #app.immersive-game .map-viewport{
   filter:contrast(1.05) brightness(.95)!important;
 }
+
+/* 现场动态：从地图左下角挪到右上角，避免压住底部行动面板 */
+#app.immersive-game .map-event-feed{
+  left:auto!important;right:10px!important;top:10px!important;bottom:auto!important;
+  width:min(320px,32%)!important;max-height:38%!important;z-index:9!important;
+  gap:4px!important;
+}
+#app.immersive-game .map-event-feed-title{font-size:9px!important;padding:2px 6px!important;letter-spacing:1.6px!important;}
+#app.immersive-game .map-event{font-size:10px!important;line-height:1.45!important;padding:5px 8px!important;border-radius:0!important;}
+@media(max-width:900px){
+  #app.immersive-game .map-event-feed{right:6px!important;top:6px!important;width:min(240px,52%)!important;max-height:30%!important;}
+}
