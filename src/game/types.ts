@@ -474,6 +474,8 @@ export interface GameState {
   bearTraps: BearTrap[];
   /** 本局捕兽夹触发次数；供界面播放一次尖叫音效。 */
   trapTriggerCount: number;
+  /** 最近一次触发捕兽夹的幸存者 ID，供性别匹配的音效使用。 */
+  lastTrapTriggerId: string | null;
   trapInventory: number;
   trapCaches: RoomId[];
   /** 女猎手瞄准状态与当前剩余飞斧。 */
