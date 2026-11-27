@@ -134,6 +134,22 @@ function splitOptions(region: Region): SplitOption[] {
     const max = region.height - min;
     if (min <= max) options.push({ axis: 'horizontal', min, max });
   }
+
+  // 细长的尾部区域可能已经无法再满足 4 格最小面积。
+  // 需要继续增加房间时，允许沿长轴切成两个至少 2 格的小区域，
+  // 避免随机布局在 23–33 间房的目标数量前卡死。
+  if (!options.length && regionArea(region) > 2) {
+    if (region.width >= 2) {
+      const min = Math.max(1, Math.ceil(2 / region.height));
+      const max = region.width - min;
+      if (min <= max) options.push({ axis: 'vertical', min, max });
+    }
+    if (region.height >= 2) {
+      const min = Math.max(1, Math.ceil(2 / region.width));
+      const max = region.height - min;
+      if (min <= max) options.push({ axis: 'horizontal', min, max });
+    }
+  }
   return options;
 }
 
