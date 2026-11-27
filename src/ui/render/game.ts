@@ -383,8 +383,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
     lastRenderedTrapTriggerCount = state.trapTriggerCount;
     lastRedFigureSignature = '';
   } else if (state.trapTriggerCount > lastRenderedTrapTriggerCount) {
-    const triggeredTrap = [...state.bearTraps].reverse().find((trap) => trap.triggeredTurn === state.turn);
-    const trapGender = triggeredTrap ? SURVIVOR_MAP[triggeredTrap.triggeredBy!]?.gender ?? 'male' : 'male';
+    const trapGender = state.lastTrapTriggerId ? SURVIVOR_MAP[state.lastTrapTriggerId]?.gender ?? 'male' : 'male';
     playTrapScream(trapGender);
     playSfx('trapTrigger');
     playHeartbeat();
