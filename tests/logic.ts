@@ -99,6 +99,7 @@ import {
   loadoutForRun,
   sanitizeAccessoryLoadout,
   starterAccessoryStock,
+  accessoriesForKiller,
 } from '../src/game/accessories';
 import { blinkRangeOf, hatchetMax, modifierSummary, modifierValue, possessCost } from '../src/game/modifiers';
 import { exportTuning, importTuning, resetTuning, setAddonModValue } from '../src/game/tuning';
@@ -107,6 +108,7 @@ import { HUNTING_GROUNDS } from '../src/game/maps';
 import type { GameState, RoomId } from '../src/game/types';
 import { createSeededRandom, random, withRandomSource } from '../src/game/random';
 import { cellDistance, nearestOf, roomDistance } from '../src/game/navigation';
+import { advanceRogue, applyRogueFloor, rollRogueAccessories, rollRogueDeck, rollRogueOffers, startRogueRun } from '../src/game/rogue';
 import { EXECUTION_METHODS } from '../src/game/executions';
 import { awarenessLabel, awarenessStage, myersStalkGain } from '../src/game/npc/awareness';
 import { ROUTINE_PROFILE } from '../src/game/npc/catalog';
@@ -1954,6 +1956,27 @@ function caseNpcAwarenessAndDialogue(): void {
 caseNpcAwarenessAndDialogue();
 
 /** 新版通用卡池、限时情报与迈尔斯专属印记。 */
+
+function caseRogueMode(): void {
+  const rogueDeck = rollRogueDeck('护士');
+  check('肉鸽：开局牌组 12 张且全部属于该杀手卡池',
+    rogueDeck.length === 12 && new Set(rogueDeck).size === 12
+      && rogueDeck.every((id) => deckCardsForKiller('护士').some((card) => card.id === id)),
+    `len=${rogueDeck.length}`);
+  const rogueAcc = rollRogueAccessories('护士');
+  check('肉鸽：开局配件 2 件且只来自该杀手',
+    rogueAcc.length === 2 && rogueAcc.every((id) => accessoriesForKiller('护士').some((def) => def.id === id)),
+    `acc=${rogueAcc.join(',')}`);
+  const run = startRogueRun('护士');
+  const offers = rollRogueOffers(run);
+  check('肉鸽：层间三选一有 3 个选项', offers.length === 3, `offers=${offers.length}`);
+  const next = advanceRogue(run, offers.find((offer) => offer.kind === 'card') ?? offers[0]);
+  check('肉鸽：选完奖励层数 +1', next.depth === run.depth + 1, `depth=${next.depth}`);
+  const state = createGame(run.deck, undefined, '护士', 'lampkin', run.accessories);
+  const apBefore = state.maxEnergy;
+  applyRogueFloor(state, { ...run, depth: 1, buffs: ['ap_up'] });
+  check('肉鸽：猎场规则能改动对局状态', state.maxEnergy === apBefore + 1, `ap=${state.maxEnergy}`);
+}
 function caseNewPerkSystem(): void {
   const freeWipe = createGame(['unbreakable', 'insidious'], undefined, '迈克尔·迈尔斯');
   const freeWipeVictim = freeWipe.people.find((person) => person.role !== 'police')!;
@@ -2700,6 +2723,7 @@ function caseHexPhonesAndAlarm(): void {
     `alert=${cornered.alert} intent=${cornered.intent}`);
 }
 
+caseRogueMode();
 caseHexPhonesAndAlarm();
 caseNewPerkSystem();
 });

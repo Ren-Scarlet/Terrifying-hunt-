@@ -41,6 +41,7 @@ export const ASSET_PATHS: AssetPaths = {
     escape: 'assets/ui/escape.webp',
     totem: 'assets/ui/totem.webp',
     cabinet: 'assets/ui/cabinet.webp',
+    phone: 'assets/ui/phone.svg',
     obstacle: 'assets/ui/obstacle.webp', wall: 'assets/ui/可被破坏的墙壁.webp',
     darkCell: 'assets/ui/dark-cell.webp',
     bloodPoint: 'assets/ui/blood-point.webp',

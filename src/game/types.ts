@@ -686,8 +686,10 @@ export interface SaveData {
   unlockedKillers: string[];
   /** 已经亲自使用过的特殊处决方式，永久收录到处决图鉴。 */
   executionRecords?: string[];
-  /** 配件库存：配件 id → 拥有数量，无上限；带入猎场会永久消耗 1 件。 */
+  /** 配件拥有表：配件 id → 1 表示已解锁（买过即永久拥有，不再消耗）。 */
   accessories: Record<string, number>;
+  /** 肉鸽猎杀：进行中的 run；null / undefined 表示没有在跑。 */
+  rogue?: import('./rogue').RogueRun | null;
   /** 上一次选择带入的配件 id（最多 2 件），作为下局的默认装配。 */
   accessoryLoadout: string[];
   /** 存档里记一下版本，方便以后迁移 */

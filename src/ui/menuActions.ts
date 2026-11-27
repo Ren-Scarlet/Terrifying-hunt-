@@ -9,7 +9,6 @@ import { shopPrice } from './render/menus';
 import {
   ACCESSORY_SLOTS,
   buyAccessory,
-  consumeAccessories,
   loadoutForRun,
   sanitizeAccessoryLoadout,
 } from '../game/accessories';
@@ -39,7 +38,7 @@ export function createMenuActions(deps: MenuActionDeps): ActionTable {
   const save = (): SaveData => deps.getSave();
   const killerOf = (): string => save().killer ?? FALLBACK_KILLER;
 
-  // 出发前先选配件：带入即消耗，所以每次开局都要经过这一步。
+  // 出发前先选配件：配件买过即永久拥有，这一步只是从已拥有里挑两件带上。
   const beginRun = (ctx: ActionContext): void => {
     session.pendingRun = ctx.action === 'free-hunt' ? 'free' : 'contract';
     session.accessoryDraft = loadoutForRun(save(), killerOf());
@@ -102,12 +101,12 @@ export function createMenuActions(deps: MenuActionDeps): ActionTable {
     'acc-confirm': () => {
       const current = save();
       const killer = current.killer ?? FALLBACK_KILLER;
-      // 装配栏里可能留着已用完的配件：进局前按库存再过滤一次。
+      // 装配栏可能留着还没解锁的配件：进局前按「是否已拥有」再过滤一次。
       const loadout = sanitizeAccessoryLoadout(session.accessoryDraft, killer)
         .filter((id) => (current.accessories?.[id] ?? 0) > 0);
       const mode = session.pendingRun;
       if (mode) {
-        deps.setSave(consumeAccessories(current, loadout));
+        deps.setSave({ ...current, accessoryLoadout: loadout });
         writeSave(deps.getSave());
         session.pendingRun = null;
         session.accessoryDraft = [];

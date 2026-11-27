@@ -2,6 +2,8 @@ import { CARDS, CARD_MAP, STARTING_DECK, deckCardsForKiller } from './cards';
 import { KILLER_MAP, STARTER_KILLERS } from './killers';
 import { sanitizeAccessoryLoadout, sanitizeAccessoryStock, starterAccessoryStock } from './accessories';
 import type { SaveData } from './types';
+import { ROGUE_BUFFS } from './rogue';
+import type { RogueRun } from './rogue';
 
 const KEY = 'night-hunt-dossier-save-v1';
 /** v4：切换到新的通用初始卡池与杀手专属构筑池。v5：加入力量配件库存与装配栏。 */
@@ -24,6 +26,7 @@ function defaultSave(): SaveData {
     executionRecords: [],
     accessories: starterAccessoryStock(),
     accessoryLoadout: [],
+    rogue: null,
     version: SAVE_VERSION,
   };
 }
@@ -49,6 +52,31 @@ function sanitizeDeck(raw: unknown, killer: string): string[] {
 
 function toInt(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? Math.floor(value) : fallback;
+}
+
+/** 肉鸽存档只保留还合法的内容，避免旧档/手改档把对局打崩。 */
+function sanitizeRogue(raw: unknown): RogueRun | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const value = raw as Partial<RogueRun>;
+  if (typeof value.killer !== 'string' || !KILLER_MAP[value.killer]) return null;
+  const deck = Array.isArray(value.deck)
+    ? value.deck.filter((id): id is string => typeof id === 'string' && !!CARD_MAP[id]).slice(0, 20)
+    : [];
+  if (!deck.length) return null;
+  const accessories = Array.isArray(value.accessories)
+    ? sanitizeAccessoryLoadout(value.accessories, value.killer)
+    : [];
+  const knownBuffs = new Set(ROGUE_BUFFS.map((buff) => buff.id));
+  const buffs = Array.isArray(value.buffs)
+    ? [...new Set(value.buffs.filter((id): id is string => typeof id === 'string' && knownBuffs.has(id)))]
+    : [];
+  return {
+    depth: Math.max(1, toInt(value.depth, 1)),
+    killer: value.killer,
+    deck,
+    accessories,
+    buffs,
+  };
 }
 
 export function loadSave(): SaveData {
@@ -97,6 +125,7 @@ export function loadSave(): SaveData {
         : [],
       accessories,
       accessoryLoadout,
+      rogue: sanitizeRogue(parsed.rogue),
       version: SAVE_VERSION,
     };
   } catch {

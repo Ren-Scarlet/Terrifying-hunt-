@@ -21,6 +21,7 @@ import { SURVIVOR_MAX_HP } from '../../game/constants';
 import { CONTRACT_TURNS } from '../../game/missions';
 import { ACTIVE_KILLERS } from '../../game/killers';
 import type { SaveData } from '../../game/types';
+import type { RogueOffer, RogueRun } from '../../game/rogue';
 import { currentMenuMap, mapArtSrc } from '../mapArt';
 import { detailCardHtml, addonIconHtml, escape, getKiller, icon, killerFaceHtml, perkIconHtml, powerIconHtml, TYPE_NAMES } from './shared';
 
@@ -75,7 +76,17 @@ export function renderMenu(save: SaveData, ante = false): string {
           </div>
         </div>
 
-        <div class="section-title">选择你的怪物 <small>力量图标取自图鉴 · 全部游戏机制原创</small></div>
+        <div class="mode-row" aria-label="选择模式">
+          <button class="mode-card" data-action="start">
+            <small>主模式</small><b>契约猎杀</b><span>随机契约 · 完成主目标结算</span>
+          </button>
+          <button class="mode-card" data-action="free-hunt">
+            <small>练习</small><b>自由猎杀</b><span>没有强制契约 · 打满 Get 就走</span>
+          </button>
+          <button class="mode-card rogue ${save.rogue ? 'active' : ''}" data-action="rogue-start">
+            <small>独立模式</small><b>肉鸽猎杀</b><span>${save.rogue ? `第 ${save.rogue.depth} 层 · 继续` : '随机卡池 / 随机配件 / 随机规则'}</span>
+          </button>
+        </div>        <div class="section-title">选择你的怪物 <small>力量图标取自图鉴 · 全部游戏机制原创</small></div>
         <div class="killer-picker">${picker}</div>
         <div class="detail-wrap">${detailCardHtml(
           killer.owner,
@@ -102,10 +113,13 @@ export function renderMenu(save: SaveData, ante = false): string {
           <div><small>处决图鉴</small><b>${(save.executionRecords ?? []).length} / 6</b></div>
           <div><small>配件库存</small><b>${Object.values(save.accessories ?? {}).reduce((sum, n) => sum + n, 0)} 件</b></div>
         </div>
+
         <div class="actions">
           <button class="btn primary" data-action="start">准备开始 · 随机契约</button>
           <button class="btn ${ante ? 'primary' : ''}" data-action="ante" title="多接一个高难目标：达成契约分 +60%，未达成 −50%">加注 · ${ante ? '已开启' : '关闭'}</button>
           <button class="btn" data-action="free-hunt">自由猎杀</button>
+          <button class="btn" data-action="rogue-start">${save.rogue ? `肉鸽 · 继续第 ${save.rogue.depth} 层` : '肉鸽猎杀'}</button>
+          ${save.rogue ? '<button class="btn ghost" data-action="rogue-abandon">放弃肉鸽进度</button>' : ''}
           <button class="btn" data-action="deck">编辑牌组</button>
           <button class="btn" data-action="accessories">配件装配</button>
           <button class="btn" data-action="shop">卡牌商店</button>
@@ -220,7 +234,7 @@ export function renderGuide(): string {
           <section class="g-sec">
             <h2>8 · 经济</h2>
             <div class="g-rows">
-              <div class="g-row"><b>血点</b><span>完成任务获得，用于商店解锁卡牌、补货配件</span></div>
+              <div class="g-row"><b>血点</b><span>完成任务获得，用于商店解锁卡牌、解锁配件</span></div>
               <div class="g-row"><b>暗金细胞</b><span>胜利且评分 ≥150 时 +1，用于解锁杀手</span></div>
             </div>
           </section>
@@ -278,7 +292,7 @@ export function renderShop(save: SaveData): string {
 }
 
 /**
- * 出发前的配件装配界面：最多 2 个槽位，进局时永久消耗。
+ * 出发前的配件装配界面：最多 2 个槽位，配件买过即永久拥有。
  * pendingRun=true 时由「准备开始 / 自由猎杀」进入，确认后直接开猎场。
  */
 export function renderAccessoryLoadout(save: SaveData, draft: string[], pendingRun: boolean): string {
@@ -311,13 +325,13 @@ export function renderAccessoryLoadout(save: SaveData, draft: string[], pendingR
         ${addonIconHtml(def.id, def.rarity, 'card')}
         <div class="acc-card-title">
           <b>${escape(def.name)}</b>
-          <small>${ACCESSORY_RARITY_LABEL[def.rarity]} · 库存 ${count}</small>
+          <small>${ACCESSORY_RARITY_LABEL[def.rarity]} · ${count > 0 ? '已拥有' : '未拥有'}</small>
         </div>
       </div>
       <p>${escape(def.desc)}</p>
       <div class="acc-card-actions">
         <button class="btn mini ${equipped ? 'ghost' : ''}" data-action="acc-equip" data-id="${def.id}" ${canEquip || equipped ? '' : 'disabled'}>${equipped ? '已装备' : '装备'}</button>
-        <button class="btn mini ghost" data-action="acc-buy" data-id="${def.id}" ${save.credits >= price ? '' : 'disabled'}>${icon('bloodPoint', 'ui-icon tiny')} ${price} 补货</button>
+        <button class="btn mini ghost" data-action="acc-buy" data-id="${def.id}" ${count > 0 || save.credits < price ? 'disabled' : ''}>${icon('bloodPoint', 'ui-icon tiny')} ${count > 0 ? '已拥有' : `${price} 解锁`}</button>
       </div>
     </div>`;
   }).join('');
@@ -327,10 +341,10 @@ export function renderAccessoryLoadout(save: SaveData, draft: string[], pendingR
       <div class="modal accessory-modal">
         <div class="subtitle">POWER ADD-ONS</div>
         <h1>力量<span>配件</span></h1>
-        <p>当前杀手：<b>${escape(killer)}</b>。每位杀手专属配件，最多带 <b>${ACCESSORY_SLOTS} 件</b>；<b>进入猎场时永久消耗</b>，库存没有上限，可用血点补货。</p>
+        <p>当前杀手：<b>${escape(killer)}</b>。配件<b>买过即永久拥有</b>，出发前从已拥有的里挑最多 <b>${ACCESSORY_SLOTS} 件</b>带上；未拥有的可用血点解锁。</p>
         <div class="acc-resource">
           <span>${icon('bloodPoint')} 血点 <b>${save.credits}</b></span>
-          <span>库存 <b>${defs.reduce((sum, def) => sum + owned(def.id), 0)}</b> 件</span>
+          <span>已拥有 <b>${defs.filter((def) => owned(def.id) > 0).length}/${defs.length}</b> 件</span>
           <span>装配 <b>${draft.length}/${ACCESSORY_SLOTS}</b></span>
         </div>
         <div class="acc-slots">${slots}</div>
@@ -338,7 +352,7 @@ export function renderAccessoryLoadout(save: SaveData, draft: string[], pendingR
         <div class="acc-grid">${cards || '<p style="color:var(--muted)">这位杀手还没有配件。</p>'}</div>
         <div class="actions">
           <button class="btn primary" data-action="acc-confirm">${pendingRun
-            ? (draft.length ? `进入猎场 · 消耗 ${draft.length} 件配件` : '不携带配件进入猎场')
+            ? (draft.length ? `进入猎场 · 携带 ${draft.length} 件配件` : '不携带配件进入猎场')
             : '保存装配 · 返回主菜单'}</button>
           <button class="btn ghost" data-action="acc-close">${pendingRun ? '返回主菜单' : '取消'}</button>
         </div>
@@ -387,3 +401,34 @@ export function renderDeckEditor(deck: string[], unlocked: string[], killer = '�
   `;
 }
 
+
+/** 肉鸽：层间三选一奖励 */
+export function renderRogueReward(run: RogueRun, offers: RogueOffer[]): string {
+  return `
+    <div class="overlay rogue-overlay">
+      <div class="modal rogue-modal">
+        <div class="subtitle">ROGUELIKE HUNT</div>
+        <h1>第 ${run.depth} 层 <span>通过</span></h1>
+        <p>三层随机奖励，选一个带进下一层。层数越高，开局警报越高、契约回合越少。</p>
+        <div class="rogue-offers">
+          ${offers.map((offer, index) => `
+            <button class="rogue-offer ${offer.kind}" data-action="rogue-pick" data-index="${index}">
+              <small>${offer.kind === 'card' ? '卡牌' : '猎场规则'}</small>
+              <b>${escape(offer.name)}</b>
+              <span>${escape(offer.desc)}</span>
+            </button>`).join('')}
+        </div>
+        <div class="rogue-run-info">
+          <span>当前层数 <b>${run.depth}</b></span>
+          <span>牌组 <b>${run.deck.length}</b> 张</span>
+          <span>配件 <b>${run.accessories.length}</b> 件</span>
+          <span>规则 <b>${run.buffs.length}</b> 条</span>
+        </div>
+        <div class="actions">
+          <button class="btn primary" data-action="rogue-next">跳过奖励 · 直接下一层</button>
+          <button class="btn ghost" data-action="rogue-end">结束这次肉鸽</button>
+        </div>
+      </div>
+    </div>
+  `;
+}

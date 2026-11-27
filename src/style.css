@@ -3715,3 +3715,71 @@ button, .room-hit, .hand-row { touch-action: manipulation; }
   font-size: 9px; letter-spacing: 1px; color: var(--faint);
 }
 .tune-mod input { width: 76px; }
+
+/* ==========================================================================
+   肉鸽猎杀：主菜单模式选择 + 层间三选一
+   ========================================================================== */
+.mode-row {
+  display: flex;
+  gap: 10px;
+  margin: 16px 0 12px;
+  flex-wrap: wrap;
+}
+.mode-card {
+  flex: 1 1 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 12px 14px;
+  border: 1px solid #3a322b;
+  border-radius: 6px;
+  background: linear-gradient(160deg, #16120f, #0b0c0e);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .15s ease, transform .15s ease;
+}
+.mode-card:hover { border-color: #8c5a3a; transform: translateY(-2px); }
+.mode-card small { font-size: 9px; letter-spacing: 2px; color: #8a8078; }
+.mode-card b { font-size: 15px; color: #f0e2d4; letter-spacing: 1px; }
+.mode-card span { font-size: 11px; color: #948a80; line-height: 1.4; }
+.mode-card.rogue { border-color: rgba(150, 96, 180, .45); }
+.mode-card.rogue b { color: #e3c8f2; }
+.mode-card.rogue.active { border-color: rgba(190, 120, 220, .85); box-shadow: 0 0 0 1px rgba(190, 120, 220, .35) inset; }
+
+.rogue-modal { width: min(760px, 94vw); }
+.rogue-modal h1 span { color: #b782d6; font-size: .6em; letter-spacing: 3px; }
+.rogue-offers {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 14px 0 12px;
+}
+.rogue-offer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 13px;
+  border: 1px solid #4a3c30;
+  border-radius: 6px;
+  background: linear-gradient(170deg, #191411, #0a0b0d);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .15s ease, transform .15s ease;
+}
+.rogue-offer:hover { border-color: #b98ad8; transform: translateY(-3px); }
+.rogue-offer small { font-size: 9px; letter-spacing: 2px; color: #9a8c80; }
+.rogue-offer b { font-size: 15px; color: #f4e7da; }
+.rogue-offer span { font-size: 11px; color: #a89a8e; line-height: 1.55; }
+.rogue-offer.buff { border-color: rgba(185, 138, 216, .55); }
+.rogue-offer.buff b { color: #e2c4f4; }
+.rogue-run-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 11px;
+  color: #9a8f86;
+}
+.rogue-run-info b { color: #f0e2d4; }
+@media (max-width: 720px) {
+  .rogue-offers { grid-template-columns: 1fr; }
+}

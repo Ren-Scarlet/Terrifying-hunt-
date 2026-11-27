@@ -48,6 +48,8 @@ import {
 import { loadSave, writeSave } from './game/save';
 import { generateFreeHunt, generateMission, withAnte } from './game/missions';
 import { applyTuning } from './game/tuning';
+import { advanceRogue, applyRogueFloor, rollRogueOffers, startRogueRun } from './game/rogue';
+import type { RogueOffer, RogueRun } from './game/rogue';
 import { CABINET_ROOMS, ROOM_MAP } from './game/rooms';
 import { SURVIVOR_MAP } from './game/survivors';
 import { getExecutionMethod } from './game/executions';
@@ -64,6 +66,7 @@ import {
   renderGuide,
   renderMenu,
   renderResult,
+  renderRogueReward,
   renderShop,
 } from './ui/render';
 import { renderAdmin } from './ui/admin';
@@ -105,6 +108,8 @@ let detailCardUid: string | null = null;
 let selectedPersonId: string | null = null;
 /** 杀手面板是否收起（收起后只留立绘与行动点，不挡地图）。 */
 let killerPanelCollapsed = localStorage.getItem('nightfall-panel-collapsed') === '1';
+/** 肉鸽：层间三选一的待选项 */
+let rogueOffers: RogueOffer[] | null = null;
 /** 平面图下方的场景画布 */
 let scene: SceneHandle | null = null;
 /** 上一次的击杀数与暴露度：用来判断这一手是得手还是暴露了 */
@@ -401,7 +406,9 @@ function performHeldMovement(key: string): boolean {
   if (game.lookingAround || game.nurseBlinkTargeting || game.huntressAiming || game.auraTargeting) return false;
   if (game.hand.length > 6) return false;
   const nextRoom = nextRoomInDirection(key);
+  const previousRoom = game.playerRoom;
   if (!nextRoom || !movePlayer(game, nextRoom)) return false;
+  noteRoomEntry(previousRoom);
   pendingMapWalk = true;
   playStep();
   afterAction();
@@ -548,6 +555,7 @@ function render(): void {
   } else {
     html = renderGame(game, getKiller(save.killer));
     if (view.screen === 'result') html += renderResult(game, lastNewCard);
+    if (rogueOffers && save.rogue) html += renderRogueReward(save.rogue, rogueOffers);
   }
   if (view.guide) html += renderGuide();
   renderMarkupPreservingMap(html);
@@ -785,12 +793,12 @@ function sfxFromLogs(): void {
   else if (/成功逃离|已经不在房子里了/.test(head)) playSfx('flee');
   else if (/发电机重新亮了起来|用钥匙捅开|联系上了外面|修发电机/.test(head)) playSfx('objective');
   else if (/地图出现两个逃生点|第四阶段完成/.test(head)) playSfx('gate');
-    else if (freshSightings === 0 && /【NPC目击】|发现了捕兽夹|发现并拆除了|忽然抬头|猛一回头|察觉到异常|发现了你/.test(head)) playVoice(head, 'Startle');
+    else if (!suppressVoiceBeat && freshSightings === 0 && /【NPC目击】|发现了捕兽夹|发现并拆除了|忽然抬头|猛一回头|察觉到异常|发现了你/.test(head)) playVoice(head, 'Startle');
   else if (/恶魔附身：/.test(head)) playSfx('possess');
-  else if (/打倒在地上|受到 \d+ 点伤害/.test(head)) playVoice(head, 'Hit');
-  else if (/受伤了（|在流血/.test(head)) playVoice(head, 'Hurt');
-  else if (/喊了一声|警觉升到|尖叫/.test(head)) playVoice(head, 'Scream');
-  else if (freshSightings === 0 && /猛一回头|忽然抬头|察觉到异常|发抖/.test(head)) playVoice(head, 'Startle');
+  else if (!suppressVoiceBeat && /打倒在地上|受到 \d+ 点伤害/.test(head)) playVoice(head, 'Hit');
+  else if (!suppressVoiceBeat && /受伤了（|在流血/.test(head)) playVoice(head, 'Hurt');
+  else if (!suppressVoiceBeat && /喊了一声|警觉升到|尖叫/.test(head)) playVoice(head, 'Scream');
+  else if (!suppressVoiceBeat && freshSightings === 0 && /猛一回头|忽然抬头|察觉到异常|发抖/.test(head)) playVoice(head, 'Startle');
   else if (/致盲|击晕|手电筒|逼退/.test(head)) playSfx('stun');
   else if (/乌鸦|动静/.test(head)) playSfx('crow');
   else if (/翻出了|拾起|拿到了武器/.test(head)) playSfx('pickup');
@@ -858,12 +866,34 @@ function announceNewSightings(): void {
   if (fresh.length) playSfx('survivorFound');
 }
 
+/**
+ * 屠夫走进有人的房间时：只播「发现幸存者」，不再放幸存者的受惊尖叫/喊叫。
+ * 2026-11-28 作者要求：进房间的叫声换成文件里的「发现幸存者」。
+ */
+let entryWithSurvivors = false;
+let suppressVoiceBeat = false;
+
+function noteRoomEntry(previousRoom: RoomId): void {
+  if (!game || game.playerRoom === previousRoom) return;
+  const room = game.playerRoom;
+  entryWithSurvivors = game.people.some(
+    (person) => person.role !== 'police' && person.hp > 0 && !person.hidden && person.room === room,
+  );
+}
+
 function afterAction(): void {
   pulseFeedback();
   flushEventSounds();
   announceNewSightings();
+  // 走进有人的房间：统一播“发现幸存者”，并压掉这一拍的受惊叫声。
+  if (entryWithSurvivors) {
+    if (freshSightings === 0) playSfx('survivorFound');
+    suppressVoiceBeat = true;
+  }
   pulseAuraHeartbeat();
   sfxFromLogs();
+  entryWithSurvivors = false;
+  suppressVoiceBeat = false;
   freshSightings = 0;
   if (game?.executionMethodsUsed.length) {
     const known = new Set(save.executionRecords ?? []);
@@ -874,6 +904,24 @@ function afterAction(): void {
     }
   }
   if (game && game.phase === 'gameover' && ui().screen !== 'result') {
+    // 肉鸽：过关不结算，先给三选一奖励；失败则清掉本轮进度。
+    if (save.rogue) {
+      if (game.result === 'win') {
+        playSfx('win');
+        rogueOffers = rollRogueOffers(save.rogue);
+        render();
+        return;
+      }
+      playSfx('lose');
+      const depth = save.rogue.depth;
+      save = { ...save, rogue: null };
+      writeSave(save);
+      showResult();
+      resultApplied = true;
+      pushHuntAlert(`肉鸽结束：倒在第 ${depth} 层`, 'danger');
+      render();
+      return;
+    }
     playSfx(game.result === 'win' ? 'win' : 'lose');
     showResult();
     if (!resultApplied) {
@@ -931,6 +979,57 @@ function startGame(freeHunt = false, loadout: string[] = []): void {
 
 let cardPreviewUid: string | null = null;
 let cardPreviewTimer: number | null = null;
+
+/** 进入肉鸽的某一层：用 run 里的随机牌组 / 配件开局，再套上已获得的规则与层数压力。 */
+function startRogueFloor(run: RogueRun): void {
+  playedDeathLogMessages.clear();
+  knownSurvivorIds = new Set();
+  freshSightings = 0;
+  lastAuraSignature = '';
+  lastAuraActions = 0;
+  lastPalletDropCount = 0;
+  lastCrowAlertCount = 0;
+  if (qte) {
+    window.clearTimeout(qte.timer);
+    qte = null;
+  }
+  selectedPersonId = null;
+  rogueOffers = null;
+  save = { ...save, rogue: run };
+  writeSave(save);
+  playSfx('ready');
+  window.setTimeout(() => playSfx('enterMap'), 190);
+  window.setTimeout(() => playSfx('start'), 430);
+  game = createGame(run.deck, generateMission(run.killer), run.killer, currentMenuMap().id, run.accessories);
+  applyRogueFloor(game, run);
+  showGame();
+  lastKills = game.kills;
+  lastWanted = game.wanted;
+  resultApplied = false;
+  lastNewCard = null;
+  render();
+}
+
+/** 肉鸽：开局 / 继续。 */
+function enterRogue(): void {
+  const run = save.rogue ?? startRogueRun(save.killer ?? '迈克尔·迈尔斯');
+  startRogueFloor({ ...run, depth: save.rogue ? run.depth : 1 });
+}
+
+/** 肉鸽：过关后带着奖励进入下一层。 */
+function rogueNextFloor(offer: RogueOffer | null): void {
+  const run = save.rogue;
+  if (!run) { rogueOffers = null; render(); return; }
+  startRogueFloor(advanceRogue(run, offer));
+}
+
+/** 肉鸽：中途结束 / 失败，清掉进度。 */
+function endRogue(): void {
+  rogueOffers = null;
+  save = { ...save, rogue: null };
+  writeSave(save);
+  render();
+}
 
 function hideCardPreview(): void {
   const preview = document.getElementById('card-hover-preview');
@@ -1161,7 +1260,11 @@ function createGameActions(): ActionTable {
     'blink-select': ({ target }) => {
       const game = currentGame();
       const room = target.dataset.room as RoomId | undefined;
-      if (room && blinkPlayer(game, room)) playSfx('nurseBlink');
+      const previousRoom = game.playerRoom;
+      if (room && blinkPlayer(game, room)) {
+        playSfx('nurseBlink');
+        noteRoomEntry(previousRoom);
+      }
       afterAction();
     },
 
@@ -1213,7 +1316,9 @@ function createGameActions(): ActionTable {
       if (reason) {
         noteToPlayer(game, reason);
       } else {
+        const previousRoom = game.playerRoom;
         movePlayer(game, room);
+        noteRoomEntry(previousRoom);
         playStep();
       }
       afterAction();
@@ -1451,6 +1556,22 @@ registry.register('菜单与面板', createMenuActions({
   leaveToMenu,
 }));
 registry.register('平衡面板', createAdminActions({ render }));
+registry.register('肉鸽猎杀', {
+  'rogue-start': () => enterRogue(),
+  'rogue-pick': ({ target }) => {
+    const index = Number(target.dataset.index);
+    rogueNextFloor(Number.isInteger(index) ? rogueOffers?.[index] ?? null : null);
+  },
+  'rogue-next': () => rogueNextFloor(null),
+  'rogue-end': () => {
+    endRogue();
+    leaveToMenu();
+  },
+  'rogue-abandon': () => {
+    endRogue();
+    leaveToMenu();
+  },
+});
 registry.register('对局', createGameActions());
 registry.register('通用', {
   mute: () => {

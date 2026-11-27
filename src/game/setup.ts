@@ -315,7 +315,7 @@ export function createGame(
   const summary = modifierSummary(state);
   if (summary.length) log(state, `配件生效：${summary.join(' · ')}。`);
   log(state, accessories.length
-    ? `随身配件：${accessories.map((id) => ACCESSORY_MAP[id].name).join('、')}。配件带入即永久消耗，本局结束后不会归还。`
+    ? `随身配件：${accessories.map((id) => ACCESSORY_MAP[id].name).join('、')}。配件买过即永久拥有，下次出发前可以重新搭配。`
     : '本局没有携带配件。想带配件的话，下次出发前在装配界面选好两件。');
   log(state, '留意每个人的恐惧值与警戒值：恐惧会使人崩溃，警戒会促使人报警或逃跑。');
   log(state, `屋里有 ${items.length} 个道具箱；照明由各区域电闸独立控制。`);
