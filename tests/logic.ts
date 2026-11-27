@@ -2339,6 +2339,15 @@ check('苦涩低语：出牌后会等待下一次人类死亡，再触发全场�
   check('死亡恐惧：按伤者数量提升全场恐惧', hurt[0].fear === Math.min(100, before + 12), `fear=${hurt[0].fear}`);
 }
 
+// 卡牌 id 与卡名必须唯一：改名/加卡时最容易出现重复
+{
+  const ids = new Set(CARDS.map((card) => card.id));
+  const names = new Set(CARDS.map((card) => card.name));
+  check('卡牌 id 与卡名唯一',
+    ids.size === CARDS.length && names.size === CARDS.length,
+    `ids=${ids.size}/${CARDS.length} names=${names.size}/${CARDS.length}`);
+}
+
 caseNewPerkSystem();
 });
 
