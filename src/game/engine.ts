@@ -1557,10 +1557,10 @@ function witnessInRoom(state: GameState, person: Person): boolean {
 
 function barricadeRoom(state: GameState, person: Person): void {
   person.intent = 'barricade';
-  person.activity = '拖着家具堵住门';
+  person.activity = '放下木板堵住入口';
   if (!state.barricades.includes(person.room)) {
     state.barricades.push(person.room);
-    log(state, `${person.name} 把柜子推到了门前——这间屋子下次要多花一步才能进。`);
+    log(state, `${person.name} 猛地放下木板，封住了${roomName(person.room)}的入口！`);
   } else {
     log(state, `${person.name} 缩在堵死的门后发抖，已经没有退路。`);
   }
@@ -1660,6 +1660,19 @@ function actByArchetype(state: GameState, person: Person): void {
   // 拉扯型、反抗型与英勇型会在近距离追逐中放倒家具，给自己争取逃跑时间。
   const counterArchetype = person.archetype === 'defiant' || person.archetype === 'brave' || person.archetype === 'kiter';
   const inPursuit = (person.alert >= 40 || state.chaseTargetId === person.id) && roomDistance(person.room, state.playerRoom) <= 2;
+  if (!inPursuit && state.totems.length && (person.awareness >= 1 || person.alert >= 25) && random() < 0.16) {
+    const targetTotem = nearestOf(person.room, state.totems);
+    if (targetTotem !== person.room) {
+      const step = nextStepToward(state, person.room, targetTotem, [state.playerRoom]);
+      if (step && !state.barricades.includes(step)) {
+        person.room = step;
+        person.intent = 'work';
+        person.activity = '寻找并拆除厄咒图腾';
+        log(state, `${person.name} 正在寻找图腾，试图解除猎场中的诅咒。`);
+        return;
+      }
+    }
+  }
   if (counterArchetype && inPursuit && !state.barricades.includes(person.room) && random() < 0.72) {
     const blockedRoom = person.room;
     const alertBeforeEscape = person.alert;
@@ -1918,7 +1931,7 @@ function npcTurn(state: GameState): void {
     if (state.result) return;
     if (!state.people.some((p) => p.id === person.id)) continue;
     const totemIndex = state.totems.indexOf(person.room);
-    if (totemIndex >= 0 && person.hp > 0 && person.awareness >= 1 && random() < 0.18) {
+    if (totemIndex >= 0 && person.hp > 0 && (person.awareness >= 1 || person.alert >= 25) && random() < 0.65) {
       state.totems.splice(totemIndex, 1);
       log(state, `${person.name} 在${roomName(person.room)}发现并破坏了图腾。`);
     }
@@ -2638,7 +2651,7 @@ export function moveCost(state: GameState, room: RoomId): number {
   // 恶魔附身能直接撞开障碍物，不额外花行动点
   const obstacle = isObstacle(room) && !state.clearedObstacles.includes(room) && !state.possessed ? 1 : 0;
   const stalkingSlowdown = state.killer === '迈克尔·迈尔斯' && state.myersStalking ? 1 : 0;
-  return (state.barricades.includes(room) ? 2 : 1) + obstacle + stalkingSlowdown;
+  return 1 + obstacle + stalkingSlowdown;
 }
 
 export function canMoveTo(state: GameState, room: RoomId): boolean {
@@ -2647,6 +2660,7 @@ export function canMoveTo(state: GameState, room: RoomId): boolean {
   // freeMove 是卡牌 / 能力买来的特权：无视相邻限制，而且这一步不耗行动点
   const cost = state.freeMove ? 0 : moveCost(state, room);
   if (state.energy < cost) return false;
+  if (state.barricades.includes(room)) return false;
   if (state.freeMove) return !isLocked(state, room) && !isLocked(state, state.playerRoom);
   if (isLocked(state, room) || isLocked(state, state.playerRoom)) return false;
   return ROOM_MAP[state.playerRoom].neighbors.includes(room);
@@ -2680,6 +2694,18 @@ export function rollD6Check(state: GameState, label: string, successOn = 4): boo
   const success = die >= Math.min(6, Math.max(2, successOn));
   log(state, `【D6 检定】${label}：掷出 ${die} 点，${success ? '成功' : '失败'}（需要 ${Math.min(6, Math.max(2, successOn))} 点以上）。`);
   return success;
+}
+
+export function breakBarricade(state: GameState, room: RoomId): boolean {
+  if (state.phase !== 'playing' || !state.barricades.includes(room) || !ROOM_MAP[state.playerRoom].neighbors.includes(room)) return false;
+  if (state.energy < 1) { log(state, '行动点不足：破坏木板需要 1 点。'); return false; }
+  state.energy -= 1;
+  state.barricades = state.barricades.filter((r) => r !== room);
+  log(state, `你花费 1 点行动点，将${roomName(room)}入口的木板砸碎。`);
+  state.attackReady = true;
+  afterPlayerAction(state);
+  checkImmediateWin(state);
+  return true;
 }
 
 export function waitAction(state: GameState): boolean {
@@ -2716,6 +2742,17 @@ export function movePlayer(state: GameState, room: RoomId): boolean {
       afterPlayerAction(state);
       return false;
     }
+  }
+  if (state.barricades.includes(room) && ROOM_MAP[state.playerRoom].neighbors.includes(room) && !isLocked(state, room) && !isLocked(state, state.playerRoom)) {
+    if (state.energy < 1) { log(state, '木板封住了入口；撞开它需要 1 点行动点。'); return false; }
+    state.energy -= 1;
+    state.barricades = state.barricades.filter((r) => r !== room);
+    log(state, `你试图撞开${roomName(room)}入口的木板，木板突然向你砸来！`);
+    interruptPlayer(state, '你撞上幸存者刚放下的木板，被重重砸晕！杀戮值清零。', state.chaseTargetId ?? 'dropped-pallet');
+    state.attackReady = true;
+    afterPlayerAction(state);
+    checkImmediateWin(state);
+    return true;
   }
   const cost = state.freeMove ? 0 : moveCost(state, room);
   if (!canMoveTo(state, room)) {
@@ -2778,6 +2815,13 @@ function precheckFailed(state: GameState, defId: string): string | null {
   const def = CARD_MAP[defId];
   if (!def?.precheck) return null;
   return checkCond(state, def.precheck.cond) ? null : def.precheck.hint;
+}
+
+export function cancelAuraSelection(state: GameState): boolean {
+  if (state.phase !== 'playing' || !state.auraTargeting) return false;
+  state.auraTargeting = false;
+  log(state, '你取消了恶灵低语的选房，没有显现任何人的气场。');
+  return true;
 }
 
 export function selectAuraRoom(state: GameState, room: RoomId): boolean {
@@ -3216,6 +3260,28 @@ export function lookAtRoom(state: GameState, room: RoomId): boolean {
  * 搜索当前房间：把钻进柜子 / 床底的人翻出来。
  * 和走路、挥刀、出牌一样消耗 1 点行动点，也算一次玩家行动（世界跟着动）。
  */
+export function interactCabinet(state: GameState): boolean {
+  if (state.killer === '女猎手') return refillHuntressHatchets(state);
+  return searchRoom(state);
+}
+
+export function interactTotem(state: GameState, reward: 'draw' | 'energy'): boolean {
+  const room = state.playerRoom;
+  if (state.phase !== 'playing' || !state.totems.includes(room) || state.totemInteractions.includes(room)) return false;
+  state.totemInteractions.push(room);
+  if (reward === 'draw') {
+    drawCards(state, 1);
+    log(state, `你从${roomName(room)}的图腾余烬中获得一张卡牌。`);
+  } else {
+    state.energy += 1;
+    log(state, `你汲取图腾的力量，立即获得 1 点行动点。`);
+  }
+  state.attackReady = true;
+  afterPlayerAction(state);
+  checkImmediateWin(state);
+  return true;
+}
+
 export function searchRoom(state: GameState): boolean {
   if (state.phase !== 'playing') return false;
   if (state.energy < SEARCH_COST) {
@@ -4119,7 +4185,7 @@ export function endTurn(state: GameState): void {
     }
   }
 
-  if (TOTEM_ROOMS.includes(state.playerRoom)) {
+  if (state.totems.includes(state.playerRoom)) {
     state.bonusEnergyNextTurn = 1;
     log(state, '图腾余响：下一回合额外获得 1 点行动点。');
   }
