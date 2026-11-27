@@ -57,7 +57,16 @@ const SFX_FILES = {
   crow: 'crow.ogg',
   endturn: 'endturn.mp3',
   start: 'start.ogg',
-  possess: 'possess.ogg',
+  possess: '迈尔斯使用恶魔附身.ogg',
+  survivorFound: '发现幸存者.ogg',
+  huntressAxe: '女猎手成功用出飞斧的声音.ogg',
+  survivorImpact: '幸存者被攻击打击音效.ogg',
+  wraithPower: '幽灵使用能力声音.ogg',
+  nurseAttack: '护士攻击音效.ogg',
+  nurseBlink: '护士瞬移音效.ogg',
+  trapTrigger: '有幸存者踩到陷阱.ogg',
+  trapSet: '设陷者放陷阱.ogg',
+  myersAttack: '迈尔斯攻击音效.ogg',
   win: 'win.ogg',
   lose: 'lose.ogg',
   // 第一批：触发点已接好
@@ -104,6 +113,15 @@ const VOLUME: Partial<Record<SfxName, number>> = {
   endturn: 0.35,
   start: 0.7,
   possess: 0.8,
+  survivorFound: 0.68,
+  huntressAxe: 0.82,
+  survivorImpact: 0.9,
+  wraithPower: 0.76,
+  nurseAttack: 0.82,
+  nurseBlink: 0.78,
+  trapTrigger: 0.88,
+  trapSet: 0.72,
+  myersAttack: 0.86,
   win: 0.8,
   lose: 0.8,
   heartbeat: 0.45,
@@ -145,6 +163,12 @@ export function playHeartbeat(): void {
   if (now - lastHeartbeatAt < 7000) return;
   lastHeartbeatAt = now;
   playSfxRepeat('heartbeat', 3, 0.42);
+}
+
+/** 幸存者被命中时同时播放物理打击声与受伤叫喊，形成明确的双层反馈。 */
+export function playSurvivorHit(): void {
+  playSfx('survivorImpact', 0.9);
+  playSfx(Math.random() < 0.5 ? 'voiceFHurt' : 'voiceMHurt', 0.76);
 }
 
 /** 捕兽夹命中时播放幸存者尖叫；男女音轨随机选择，避免每次听起来完全相同。 */
