@@ -8,7 +8,6 @@ import {
   dropCarriedPerson,
   blinkPlayer,
   collectTrapCache,
-  nurseGrabPerson,
   recoverBearTrap,
   refillHuntressHatchets,
   throwHuntressHatchet,
@@ -1245,25 +1244,6 @@ app.addEventListener('click', (event) => {
       pendingMapAttackGhost = ghosts.get(personId) ?? null;
       updateAttackGhostEscapeDirection(pendingMapAttackGhost, personId);
       playSfx('huntressAxe');
-      if (victimIsSurvivor) playSurvivorHit(personId ? SURVIVOR_MAP[personId]?.gender ?? 'male' : 'male');
-      if (game.kills > killsBefore) playSurvivorDeath(SURVIVOR_MAP[personId]?.gender ?? 'male');
-      lastLogHead = game.log[0] ?? '';
-    }
-    afterAction();
-    return;
-  }
-
-  if (action === 'nurse-grab-target') {
-    if (!game || screen !== 'game') return;
-    const personId = target.dataset.personId;
-    const ghosts = captureAttackGhosts();
-    const victimIsSurvivor = !!personId && game.people.some((person) => person.id === personId && person.role !== 'police');
-    const killsBefore = game.kills;
-    if (personId && nurseGrabPerson(game, personId)) {
-      pendingMapAttackTarget = personId;
-      pendingMapAttackGhost = ghosts.get(personId) ?? null;
-      updateAttackGhostEscapeDirection(pendingMapAttackGhost, personId);
-      playSfx('nurseAttack');
       if (victimIsSurvivor) playSurvivorHit(personId ? SURVIVOR_MAP[personId]?.gender ?? 'male' : 'male');
       if (game.kills > killsBefore) playSurvivorDeath(SURVIVOR_MAP[personId]?.gender ?? 'male');
       lastLogHead = game.log[0] ?? '';
