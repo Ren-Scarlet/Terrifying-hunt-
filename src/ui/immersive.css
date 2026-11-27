@@ -3368,3 +3368,17 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
   #app.immersive-game .killer-hud-resources .killer-ap-display > b { font-size: 11px !important; }
   #app.immersive-game .statusline { top: 98px !important; left: 6px !important; max-width: calc(100vw - 12px) !important; }
 }
+
+#app.immersive-game .killer-hud-portrait,
+#app.immersive-game .killer-hud-abilities,
+#app.immersive-game .killer-hud-resources,
+#app.immersive-game .killer-face.ability-portrait {
+  position: static !important;
+  inset: auto !important;
+  transform: none !important;
+  float: none !important;
+}
+#app.immersive-game .killer-face.ability-portrait {
+  display: block !important;
+  margin: 0 auto !important;
+}
