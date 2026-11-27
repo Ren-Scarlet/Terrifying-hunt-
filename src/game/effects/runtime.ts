@@ -1,6 +1,6 @@
 import { drawCards } from '../deck';
 import { INTENT_LABEL } from '../npc/catalog';
-import { POSSESS_TURNS } from '../constants';
+import { POSSESS_TURNS, SURVIVOR_MAX_HP } from '../constants';
 import { roomDistance } from '../navigation';
 import { EXECUTION_METHODS } from '../executions';
 import { roomName } from '../missions';
@@ -183,6 +183,22 @@ export function executeOps(state: GameState, ops: Op[], runtime: EffectRuntime):
         addAlarm(state, op.amount);
         if (op.amount < 0) log(state, `暴露度降至 ${state.alarm}/100。`);
         break;
+      case 'fearWave': {
+        const wounded = state.people.filter((p) => p.role !== 'police' && p.hp > 0 && p.hp < SURVIVOR_MAX_HP).length;
+        const downed = state.people.filter((p) => p.role !== 'police' && p.hp <= 0).length;
+        const stacks = wounded + downed + state.kills;
+        if (stacks <= 0) {
+          log(state, '死亡恐惧：还没有人受伤，恐惧无从蔓延。');
+          break;
+        }
+        const gain = op.amount * stacks;
+        state.people.forEach((p) => {
+          if (p.role === 'police' || p.hp <= 0) return;
+          p.fear = Math.min(100, p.fear + gain);
+        });
+        log(state, `死亡恐惧：${stacks} 个伤者、倒地者与尸体，让所有人恐惧 +${gain}。`);
+        break;
+      }
       case 'fearFlee': {
         const candidates = standing(state)
           .filter((person) => person.role !== 'police' && !person.hidden && roomDistance(person.room, state.playerRoom) <= 1)

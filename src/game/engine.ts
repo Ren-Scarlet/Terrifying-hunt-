@@ -595,8 +595,8 @@ function npcReact(state: GameState): void {
 
     // 恐惧范围：相邻房间先起疑；范围 2 的杀手会在隔壁直接引发逃跑，两格外也会察觉。
     const distanceToPlayer = roomDistance(person.room, state.playerRoom);
-    // 正在治疗的人一旦进入恐慌（恐惧 70+）或发现杀手逼近，就会立刻中断包扎逃跑。
-    if (person.intent === 'heal' && (person.fear >= 70 || distanceToPlayer <= 1)) {
+    // 正在治疗的人一旦进入恐惧（恐惧 60+）或发现杀手逼近，就会立刻中断包扎逃跑。
+    if (person.intent === 'heal' && (person.fear >= FEAR_AFRAID || distanceToPlayer <= 1)) {
       person.healTurns = 0;
       person.healLastTurn = undefined;
       person.intent = 'flee';

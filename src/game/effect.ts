@@ -200,6 +200,8 @@ export type Op =
   | { op: 'contextSabotage' }
   /** 令当前房间或相邻房间的一名幸存者恐惧上升，并向远离杀手的方向移动一间房。 */
   | { op: 'fearFlee'; amount: number }
+  /** 恐惧波：全场恐惧 + amount × （受伤 + 倒地 + 已死亡 的幸存者数量）。 */
+  | { op: 'fearWave'; amount: number }
   /** 免费破坏杀手当前房间内的一处可破坏设施。 */
   | { op: 'destroyCurrentObject' }
   /** 标记最近的特殊处决地点，并短暂侦查该房间。 */

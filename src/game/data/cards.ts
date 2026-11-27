@@ -287,6 +287,49 @@ export const CARDS: CardDef[] = [
   },
 
   /* ------------------------------------------------------------------ */
+  /* 护士专属：呼吸、显形与死亡带来的恐惧                                */
+  /* ------------------------------------------------------------------ */
+  {
+    id: 'stridor',
+    name: '喘鸣感知',
+    cost: 1,
+    type: 'skill',
+    desc: '整栋房子的呼吸都传进你耳朵：本回合所有房间被点亮，你能看清里面的人。',
+    flavor: '呼吸比脚步更响。',
+    sourceSkill: 'Stridor',
+    unlocked: true,
+    killerOnly: '护士',
+    pool: 'killer',
+    ops: [{ op: 'scout', all: true, turns: 1 }],
+  },
+  {
+    id: 'a_nurses_calling',
+    name: '护士的互换',
+    cost: 1,
+    type: 'skill',
+    desc: '受伤的人藏不住：所有已受伤者的位置显形 2 回合。',
+    flavor: '呻吟就是坐标。',
+    sourceSkill: "A Nurse's Calling",
+    unlocked: true,
+    killerOnly: '护士',
+    pool: 'killer',
+    ops: [{ op: 'track', who: 'injuredAny', turns: 2 }],
+  },
+  {
+    id: 'thanatophobia',
+    name: '死亡恐惧',
+    cost: 2,
+    type: 'skill',
+    desc: '每有一个受伤、倒地或已死亡的人类，全场恐惧 +6。',
+    flavor: '尸体也在数着数。',
+    sourceSkill: 'Thanatophobia',
+    unlocked: true,
+    killerOnly: '护士',
+    pool: 'killer',
+    ops: [{ op: 'fearWave', amount: 6 }],
+  },
+
+  /* ------------------------------------------------------------------ */
   /* 商店卡池：图鉴（迷雾笔记）原图原名，需要用血点解锁                  */
   /* ------------------------------------------------------------------ */
   {
@@ -314,16 +357,16 @@ export const CARDS: CardDef[] = [
     ops: [{ op: 'silenceAlarm', turns: 2 }],
   },
   {
-    id: 'a_nurses_calling',
-    name: '护士的呼唤',
+    id: 'shattered_hope',
+    name: '粉碎希望',
     cost: 1,
-    type: 'skill',
-    desc: '受伤的人藏不住：所有已受伤者的位置显形 2 回合。',
-    flavor: '呻吟就是坐标。',
-    sourceSkill: "A Nurse's Calling",
+    type: 'setup',
+    desc: '免费破坏当前房间的一处设施。',
+    flavor: '这栋房子挡不住你。',
+    sourceSkill: 'Shattered Hope',
     unlocked: false,
     pool: 'shop',
-    ops: [{ op: 'track', who: 'injuredAny', turns: 2 }],
+    ops: [{ op: 'destroyCurrentObject' }],
   },
   {
     id: 'spies_from_the_shadows',

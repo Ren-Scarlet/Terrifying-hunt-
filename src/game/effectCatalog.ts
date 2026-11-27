@@ -63,6 +63,7 @@ export const EFFECT_OPS: Record<Op['op'], EffectOpMeta> = {
   sabotage: { label: '破坏设施', fields: [['key', 'sabotage']] },
   contextSabotage: { label: '当前环境破坏（附带警报降低）', fields: [] },
   fearFlee: { label: '恐惧并向远处逃离', fields: [['amount', 'num']] },
+  fearWave: { label: '恐惧波（按伤者数量）', fields: [['amount', 'num']] },
   destroyCurrentObject: { label: '破坏当前房间物品', fields: [] },
   revealExecutionSite: { label: '标记最近特殊处决地点', fields: [['turns', 'num']] },
   draw: { label: '抽牌', fields: [['amount', 'num']] },

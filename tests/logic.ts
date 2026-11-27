@@ -2326,6 +2326,19 @@ check('苦涩低语：出牌后会等待下一次人类死亡，再触发全场�
   check('战利品：失败只保留三成', lootPayout(lp) === 30, `payout=${lootPayout(lp)}`);
 }
 
+// 护士专属卡与恐惧波
+{
+  const nurseCards = CARDS.filter((card) => card.killerOnly === '护士');
+  check('护士专属卡 3 张', nurseCards.length === 3, nurseCards.map((card) => card.name).join(','));
+  const wave = newGame();
+  const hurt = wave.people.filter((p) => p.role !== 'police').slice(0, 2);
+  hurt[0].hp = 2;
+  hurt[1].hp = 0;
+  const before = hurt[0].fear;
+  runOps(wave, [{ op: 'fearWave', amount: 6 }]);
+  check('死亡恐惧：按伤者数量提升全场恐惧', hurt[0].fear === Math.min(100, before + 12), `fear=${hurt[0].fear}`);
+}
+
 caseNewPerkSystem();
 });
 
