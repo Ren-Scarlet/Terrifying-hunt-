@@ -302,6 +302,10 @@
     bottom: calc(108px + env(safe-area-inset-bottom)) !important;
   }
 
+  #app.immersive-game .map-event-feed {
+    display: none !important;
+  }
+
   #app.immersive-game .hint {
     display: none !important;
   }
@@ -541,6 +545,17 @@
 
   #app.immersive-game .hand-toggle {
     margin-bottom: 8px !important;
+  }
+
+  #app.immersive-game .map-event-feed {
+    display: none !important;
+  }
+
+  #app.immersive-game .activity-log-panel {
+    position: fixed !important;
+    z-index: 30 !important;
+    left: 8px !important;
+    bottom: calc(88px + env(safe-area-inset-bottom)) !important;
   }
 
   #app.immersive-game .task-pop {
