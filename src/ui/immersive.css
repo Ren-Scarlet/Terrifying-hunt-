@@ -3052,32 +3052,18 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
 }
 
 
-/* 2026-11-27: explain the global alarm and keep AP beside kill value in one HUD block. */
-#app.immersive-game .alarm-stat { position:relative!important; cursor:help!important; }
-#app.immersive-game .alarm-stat::after {
-  content:attr(data-tooltip);
-  display:none;
-  position:absolute;
-  z-index:150;
-  left:50%;
-  bottom:calc(100% + 12px);
-  transform:translateX(-50%);
-  width:min(360px,calc(100vw - 36px));
-  padding:11px 13px;
-  border:1px solid rgba(203,166,137,.58);
-  border-radius:8px;
-  color:#f0e6dc;
-  background:rgba(7,9,12,.98);
-  box-shadow:0 10px 30px rgba(0,0,0,.8);
-  font-size:11px;
-  font-weight:500;
-  line-height:1.55;
-  white-space:normal;
-  text-align:left;
-  pointer-events:none;
+/* 独立警报说明层：避免被 HUD / 地图容器的 overflow 裁切。 */
+#app.immersive-game .alarm-stat { position:relative!important; cursor:help!important; outline-offset:3px; }
+#app.immersive-game .alarm-tooltip-content {
+  display:none; position:fixed; z-index:99999; left:50%; bottom:12vh;
+  transform:translateX(-50%); width:min(390px,calc(100vw - 28px)); box-sizing:border-box;
+  padding:13px 15px; border:1px solid rgba(203,166,137,.72); border-radius:8px;
+  color:#f0e6dc; background:rgba(7,9,12,.98); box-shadow:0 12px 34px rgba(0,0,0,.88);
+  font-size:12px; font-weight:500; line-height:1.65; white-space:normal; text-align:left; pointer-events:none;
 }
-#app.immersive-game .alarm-stat:hover::after,
-#app.immersive-game .alarm-stat:focus-within::after { display:block; }
+#app.immersive-game .alarm-tooltip-content strong { display:block; margin-bottom:4px; color:#f1c6a4; font-size:13px; }
+#app.immersive-game .alarm-stat:hover .alarm-tooltip-content,
+#app.immersive-game .alarm-stat:focus .alarm-tooltip-content { display:block; }
 #app.immersive-game .killer-ability-panel {
   grid-template-columns:156px minmax(230px,260px)!important;
   grid-template-rows:auto auto!important;
