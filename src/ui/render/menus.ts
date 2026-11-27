@@ -51,7 +51,7 @@ export function renderMenu(save: SaveData): string {
           </div>
           <div class="menu-mission">
             ${icon('mission', 'ui-icon large')}
-            <div><small>本局流程</small><b>接取契约 → 潜入布局 → 猎杀撤离</b></div>
+            <div><small>本局流程</small><b>随机契约 → 潜入布局 → 完成主目标</b></div>
             <p>点击准备开始后，系统才会随机发放本局契约；不会提前展示任务供你针对性改牌组。房子里的人会报警、躲藏、救援和寻找补给，跑掉太多人就输了。</p>
           </div>
         </div>
@@ -101,17 +101,16 @@ export function renderGuide(): string {
         <div class="subtitle">FIELD MANUAL</div>
         <h1>玩法<span>指引</span></h1>
         <div class="guide-grid">
-          <div class="guide-card">${icon('mission')}<b>1 · 接取契约</b><p>点击准备开始后才会随机抽取契约。每种契约有不同的主目标；牌组在大厅提前构筑，不能预览契约后再针对性换牌。主目标旁会显示${icon('missionTarget', 'ui-icon tiny')}标记，告诉你要击杀谁、要杀几个人，或需要收齐多少证据再撤离。</p></div>
+          <div class="guide-card">${icon('mission')}<b>1 · 接取契约</b><p>点击准备开始后才会随机抽取契约。每种契约有不同的主目标；牌组在大厅提前构筑，不能预览契约后再针对性换牌。主目标可能要求指定击杀、累计猎杀、处决、破坏电闸或阻止报警；任务栏会持续显示目标和实时进度。</p></div>
           <div class="guide-card">${icon('darkCell')}<b>2 · 现场布局</b><p>布局牌（绿色）在行动阶段打出：剪断电话线、封死逃生点、装窃听。布局打早了才有用。</p></div>
           <div class="guide-card">${icon('escape')}<b>3 · 相邻只看轮廓，推门才是照面</b><p>隔壁房间<b>看得见名字、看不见人</b>——找人得自己走过去，或者靠侦查 / 感知牌。推门会引起注意，但<b>警觉达到 75 才会立即逃跑</b>；低警觉者会先观察、怀疑。<b>暗处能显著降低察觉速度</b>，切断照明、控制动静可以创造接近机会。先打<b>静止隐身</b>再进入，若目标独处且尚未察觉，第一刀会造成 2 点伤害，打开<b>致命窗口</b>。跑掉的人留下<b>鞋印</b>；更远的地方会传来<b>乌鸦叫、地板响</b>。</p></div>
-          <div class="guide-card">${icon('bloodPoint')}<b>4 · 行动点、脚印与杀戮</b><p>每回合 <b>${BASE_AP} 点行动点</b>：走路、挥刀、出牌、<b>搜索柜子</b>全从这一个池子里扣；砍完想立刻再砍，就花 1 点<b>擦刀</b>——但擦刀时幸存者也会跟着动。攻击只针对站立目标，倒地者使用独立的<b>处决</b>按钮（1 AP），但如果你暂时放过他，同伴仍可能救援；有人钻进柜子就点<b>搜索</b>翻出来。<b>鞋印</b>只看得见当前房间（留最近两次行动），严格踩着它连续追才攒<b>杀戮</b>，随便走不涨；满 50 后每回合多 2 点行动点，<b>路你自己走，不会瞬移</b>。砍中人或被击晕清零。</p></div>
-          <div class="guide-card">${icon('missionTarget')}<b>5 · 幸存者会做出反应</b><p>幸存者根据性格进行独立行动：报警、躲藏、寻找武器、救援同伴、前往补给点或修复断电区域。这些行动会制造线索与压力，但不存在幸存者团队进度，也没有需要争夺的团队目标房间。老练的家伙偶尔会踮着脚走，不留脚印也不惊动乌鸦。</p></div>
+          <div class="guide-card">${icon('bloodPoint')}<b>4 · 行动点、脚印与杀戮</b><p>每回合 <b>${BASE_AP} 点行动点</b>：走路、挥刀、出牌、<b>搜索柜子</b>全从这一个池子里扣；砍完想立刻再砍，就花 1 点<b>擦刀</b>——但擦刀时幸存者也会跟着动。普通攻击只针对站立目标。倒地者可以使用独立的<b>普通处决</b>按钮（1 AP），或抱起后搬运到指定地点执行<b>地点处决</b>；猎杀评分达到 200 分后，倒地者头顶还会出现独立的<b>分数处决 QTE</b>按钮。若暂时放过，同伴仍可能救援；有人钻进柜子就点<b>搜索</b>翻出来。<b>鞋印</b>只看得见当前房间，严格踩着它连续追才攒<b>杀戮</b>，满 50 后每回合多 2 点行动点。砍中人或被击晕清零。</p></div>
+          <div class="guide-card">${icon('missionTarget')}<b>5 · 幸存者会做出反应</b><p>幸存者根据性格报警、躲藏、寻找武器、救援同伴、前往补给点或修复断电区域；他们的行动会改变现场局势并制造线索。老练的家伙偶尔会踮着脚走，不留脚印也不惊动乌鸦。</p></div>
         </div>
         <div class="guide-note">
           ${icon('totem', 'ui-icon tiny')} 图腾：在此结束回合，下回合 +1 行动点。
-          ${icon('cabinet', 'ui-icon tiny')} 柜子：躲进去的人不会被引诱类卡牌锁定。
-          ${icon('obstacle', 'ui-icon tiny')} 障碍：需要「所向无敌」或杀手能力破开。
-          堵门的房间进入要多花 1 步。
+          ${icon('cabinet', 'ui-icon tiny')} 柜子：幸存者可以躲藏，女猎手可在柜子补充飞斧。
+          ${icon('obstacle', 'ui-icon tiny')} 木板：幸存者只能在原有障碍房间放下木板；地图会用橙色高亮标记，靠近后花费 1 AP 破坏。
         </div>
         <div class="actions"><button class="btn primary" data-action="guide-close">知道了</button></div>
       </div>
