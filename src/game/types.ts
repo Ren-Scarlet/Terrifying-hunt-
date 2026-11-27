@@ -113,7 +113,7 @@ export type NpcIntent =
   | 'stunned'
   | 'heal'
   | 'rescue'
-  /** 在没有被惊动时推进团队目标（修电闸 / 凑钥匙） */
+  /** 正在处理现场事务 */
   | 'work';
 
 /** 个人目的：决定他慌乱时往哪跑，是这一局 NPC 的行为主轴 */
@@ -125,17 +125,13 @@ export type NpcGoal =
   | 'weapon'
   | 'panic'
   | 'help'
-  /** 去团队目标房间做事：所有人合力完成，玩家就输 */
-  | 'objective'
-  /** 找钥匙开后门：同样计入团队进度 */
-  | 'key'
   /** 去道具箱翻一件能用的东西 */
   | 'supply'
   /** 按个人习惯在常去地点之间活动 */
   | 'routine';
 
 /** 幸存者从道具箱里翻出来的东西：用完即弃，是他们多出来的一条选择 */
-export type SurvivorItem = 'medkit' | 'toolbox' | 'flare' | 'key' | 'weapon' | 'smoke' | 'flashlight';
+export type SurvivorItem = 'medkit' | 'toolbox' | 'flare' | 'weapon' | 'smoke' | 'flashlight';
 
 /** 场地物品：杀手用不了，但可以砸掉 */
 export type SiteItemKind = 'itemBox';
@@ -279,7 +275,7 @@ export interface Disturbance {
 export type MissionKind = 'assassinate' | 'bodyCount' | 'escape';
 
 export type MissionTaskKind = 'kill_count' | 'kill_count_before_turn' | 'marked_kill' | 'execute' | 'special_execute' | 'no_alarm' | 'break_circuit' | 'alarm_below' | 'killer_stat';
-export type MissionTaskMetric = 'myers_stalk' | 'trap_triggers' | 'nurse_grabs' | 'hatchet_hits';
+export type MissionTaskMetric = 'myers_stalk' | 'trap_triggers' | 'nurse_blink_attacks' | 'hatchet_hits';
 
 export interface MissionTask {
   id: string;
@@ -337,7 +333,7 @@ export interface HuntStyleStats {
   trapTriggers: number;
   hatchetHits: number;
   nurseBlinks: number;
-  nurseGrabs: number;
+  nurseBlinkAttacks: number;
   myersBurstHits: number;
   quietKills: number;
 }
@@ -565,19 +561,10 @@ export interface GameState {
   /** 消防斧/电闸这类设施被破坏后的标记 */
   sabotage: string[];
 
-  /* ---------- 幸存者团队目标 ---------- */
-  /** 本局随机挑出的团队目标房间：电闸 / 钥匙柜 */
-  objectiveRooms: RoomId[];
-  /** 团队目标总进度 0–100，每 25% 完成一个阶段 */
-  teamProgress: number;
-  /** 已完成的团队阶段数：0–4，完成阶段不可倒退 */
-  teamStage: number;
-  /** 第四阶段完成后激活的两个动态逃生点 */
+  /** 警报升高后开放的实际逃生点；与已废弃的团队进度系统无关 */
   escapeRooms: RoomId[];
   /** 本局幸存者总人数（不包含警察），用于判定是否全部逃离 */
   survivorTotal: number;
-  /** 这局他们要做的事，用于日志与任务条 */
-  teamGoalLabel: string;
   /** 本局随机摆放的道具箱：幸存者可领取补给，杀手可以破坏 */
   siteItems: SiteItem[];
   /** 独立区域电闸及其供电范围 */
