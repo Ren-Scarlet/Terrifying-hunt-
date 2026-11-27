@@ -280,7 +280,7 @@ function addWanted(state: GameState, amount: number): void {
   addAlarm(state, amount * WANTED_TO_ALARM);
 }
 
-/** 暴露度：满 100 玩家被捕 / 被驱散。由玩家的动作推高，每回合自动回落。 */
+/** 警报：正向变化会刷新本回合活动标记；60 开放逃生点，100 触发最终危机。 */
 function activateEmergency(state: GameState): void {
   if (state.emergencyActive || state.result) return;
   state.emergencyActive = true;
@@ -320,6 +320,7 @@ function activateEmergency(state: GameState): void {
 
 export function addAlarm(state: GameState, amount: number): void {
   if (state.result || amount === 0) return;
+  if (amount > 0) state.heatTurn = state.turn;
   const before = state.alarm;
   state.alarm = clamp(state.alarm + amount, 0, ALARM_MAX);
   syncWanted(state);
