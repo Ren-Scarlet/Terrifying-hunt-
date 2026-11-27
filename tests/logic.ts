@@ -27,6 +27,7 @@ import {
   addAlarm,
   currentScore,
   scoreLines,
+  fearBand,
   calculateHuntStyleRating,
   triggerBearTrapForPerson,
   sabotageSiteItem,
@@ -2255,6 +2256,39 @@ check('苦涩低语：出牌后会等待下一次人类死亡，再触发全场�
   const sc2 = newGame();
   sc2.cardsPlayed.push('insidious', 'iron_grasp', 'deerstalker');
   check('分数构成：构筑多样性有加分', scoreLines(sc2).some((line) => line.label.includes('构筑多样性')), scoreLines(sc2).map((line) => line.label).join('|'));
+}
+
+// 恐惧驱动行为：档位、崩溃失能、独处累积
+{
+  const fg = newGame();
+  const subject = fg.people.find((p) => p.role !== 'police')!;
+  subject.fear = 0;
+  check('恐惧档位：低恐惧是冷静', fearBand(subject) === 'calm');
+  subject.fear = 65;
+  check('恐惧档位：中高恐惧是恐惧', fearBand(subject) === 'afraid');
+  subject.fear = 90;
+  check('恐惧档位：极高恐惧是崩溃', fearBand(subject) === 'broken');
+}
+{
+  const broken = newGame();
+  const victim = broken.people.find((p) => p.role !== 'police')!;
+  victim.fear = 100;
+  victim.alert = 90;
+  withRandomSource(() => 0.9, () => endTurn(broken));
+  check('恐惧崩溃：失去目的，只会僵住或乱跑', /瘫软|乱跑|缩在墙角/.test(victim.activity), `activity=${victim.activity}`);
+}
+{
+  const lonely = newGame();
+  const single = lonely.people.find((p) => p.role !== 'police')!;
+  lonely.people = lonely.people.filter((p) => p.id === single.id || p.role === 'police');
+  single.fear = 10;
+  withRandomSource(() => 0.5, () => endTurn(lonely));
+  check('恐惧：独处会累积恐惧', single.fear > 10, `fear=${single.fear}`);
+}
+{
+  const terror = newGame();
+  terror.huntStats.terrorKills = 2;
+  check('分数构成：恐惧崩溃击杀有加分', scoreLines(terror).some((line) => line.label.includes('恐惧崩溃击杀')));
 }
 
 caseNewPerkSystem();

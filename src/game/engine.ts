@@ -95,6 +95,25 @@ const DAWN_ALARM_GAIN = 4;
 const DAWN_ALERT_GAIN = 5;
 /** 最后 5 回合的收网：每回合额外警报 +2。 */
 const DAWN_LATE_ALARM = 2;
+
+/**
+ * 恐惧档位：恐惧不再只是数字，而是决定 NPC 这一回合会不会"失去理智"。
+ *   0–29  冷静：维持日常，会报警、找武器、救助同伴
+ *   30–59 不安：开始结伴、避开黑暗，遇袭先逃
+ *   60–84 恐惧：只想离你远一点，不再尝试报警/找武器
+ *   85+   崩溃：原地发抖或尖叫乱跑，彻底失去目的
+ */
+const FEAR_UNEASY = 30;
+const FEAR_AFRAID = 60;
+const FEAR_BROKEN = 85;
+
+export type FearBand = 'calm' | 'uneasy' | 'afraid' | 'broken';
+export function fearBand(person: Person): FearBand {
+  if (person.fear >= FEAR_BROKEN) return 'broken';
+  if (person.fear >= FEAR_AFRAID) return 'afraid';
+  if (person.fear >= FEAR_UNEASY) return 'uneasy';
+  return 'calm';
+}
 /** 动静（乌鸦叫）也只留最近这么多次行动：短线索，不是常驻雷达 */
 const DISTURBANCE_WINDOW = 3;
 /** 杀戮值上限 / 激活阈值：满值后每回合多 2 行动点，由玩家自己决定怎么走 */
@@ -866,6 +885,7 @@ function npcWitnessEvent(
 
 function killPerson(state: GameState, person: Person): void {
   if (state.carryPersonId === person.id) state.carryPersonId = null;
+  if (person.role !== 'police' && fearBand(person) === 'broken') state.huntStats.terrorKills += 1;
   if (!state.people.some((p) => p.id === person.id)) return;
   const directWitnesses = person.role === 'police'
     ? 0
@@ -1686,6 +1706,36 @@ function actByArchetype(state: GameState, person: Person): void {
   // 拉扯型、反抗型与英勇型会在近距离追逐中放倒家具，给自己争取逃跑时间。
   const counterArchetype = person.archetype === 'defiant' || person.archetype === 'brave' || person.archetype === 'kiter';
   const inPursuit = (person.alert >= 40 || state.chaseTargetId === person.id) && roomDistance(person.room, state.playerRoom) <= 2;
+  // 恐惧驱动：崩溃的人不再执行任何有目的的行为；被恐惧压过理智的人只想着逃。
+  const band = fearBand(person);
+  if (band === 'broken' && person.hp > 0) {
+    person.intent = 'flee';
+    if (random() < 0.45) {
+      person.activity = '瘫软在地，止不住地发抖';
+      log(state, `${person.name} 已经吓破了胆，瘫在原地一动不动。`);
+      return;
+    }
+    if (fleeAway(state, person, false, true)) {
+      person.activity = '尖叫着乱跑，完全失去了方向';
+      log(state, `${person.name} 尖叫着撞开房门，根本不知道该往哪里跑。`);
+      return;
+    }
+    person.activity = '缩在墙角发抖';
+    return;
+  }
+  if (band === 'afraid' && person.alert < 85 && person.hp > 0) {
+    if (inPursuit && canPlaceBarricade(state, person) && random() < 0.6) {
+      barricadeRoom(state, person);
+      fleeAway(state, person, false, true);
+      person.activity = '慌不择路地放下木板，只想离你远一点';
+      log(state, `${person.name} 慌不择路地放下木板挡住门，头也不回地逃了。`);
+      return;
+    }
+    if (fleeAway(state, person, false, true)) {
+      person.activity = '只想离你远一点';
+      return;
+    }
+  }
   const seeksTotemThisTurn = (person.id.charCodeAt(0) + state.turn + (person.routineIndex ?? 0)) % 6 === 0;
   if (!inPursuit && state.totems.length && (person.awareness >= 1 || person.alert >= 25) && seeksTotemThisTurn) {
     const targetTotem = nearestOf(person.room, state.totems);
@@ -1987,6 +2037,14 @@ function npcTurn(state: GameState): void {
         person.fear = clamp(person.fear + 8, 0, 100);
         person.alert = clamp(person.alert + 5, 0, 100);
       }
+    }
+    // 恐惧的环境来源：独处和黑暗会放大恐惧，结伴待在亮处才会回落。
+    if (person.hp > 0 && person.role !== 'police') {
+      const companions = peopleInRoom(state, person.room).filter((other) => other.id !== person.id && other.role !== 'police' && other.hp > 0).length;
+      const lit = isRoomLit(state, person.room);
+      if (companions === 0) person.fear = clamp(person.fear + 8, 0, 100);
+      if (!lit) person.fear = clamp(person.fear + 6, 0, 100);
+      if (companions > 0 && lit) person.fear = clamp(person.fear - 8, 0, 100);
     }
     if ((person.statusEffects.deepWound ?? 0) > 0) person.bleed = Math.max(person.bleed, 1);
     // 即时警觉值可以下降，但已经确认的危险不会被忘记。
@@ -4126,6 +4184,7 @@ export function scoreLines(state: GameState, result: ResultKind | null = null): 
   if (state.executionMethodsUsed.length > 1) {
     add('猎杀', `处决方式多样性 · ${state.executionMethodsUsed.length} 种`, (state.executionMethodsUsed.length - 1) * 10);
   }
+  add('猎杀', `恐惧崩溃击杀 · ${state.huntStats.terrorKills} 次`, state.huntStats.terrorKills * 8);
   add('猎杀', '地形处决奖励', state.specialExecutionBonus);
   add('猎杀', '卡牌猎杀奖励', state.cardBonusScore);
 
@@ -4265,11 +4324,6 @@ export function endTurn(state: GameState): void {
 
   npcTurn(state);
   if (state.result) return;
-  for (const person of npcs(state)) {
-    if (person.fear > 0 && person.hp > 0 && person.alert < 70 && person.room !== state.playerRoom) {
-      person.fear = Math.max(0, person.fear - 8);
-    }
-  }
   callPhase(state);
   if (state.result) return;
 

@@ -120,6 +120,7 @@ export function createGame(
       nurseBlinkAttacks: 0,
       myersBurstHits: 0,
       quietKills: 0,
+      terrorKills: 0,
     },
     huntStyleScore: 0,
     huntStyleRank: 'C',

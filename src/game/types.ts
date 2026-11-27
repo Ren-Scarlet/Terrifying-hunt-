@@ -338,6 +338,8 @@ export interface HuntStyleStats {
   nurseBlinkAttacks: number;
   myersBurstHits: number;
   quietKills: number;
+  /** 击杀时目标已处于「恐惧崩溃」状态的次数。 */
+  terrorKills: number;
 }
 
 export type HuntStyleRank = 'S' | 'A' | 'B' | 'C';

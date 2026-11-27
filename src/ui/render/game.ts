@@ -842,7 +842,8 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
                 <div class="score-line"><span>每击杀 1 人</span><b>+14</b></div>
                 <div class="score-line"><span>每处决 1 次</span><b>+10</b></div>
                 <div class="score-line"><span>胜利结算：每剩余 1 回合</span><b>+5</b></div>
-                <div class="score-line minus"><span>每逃走 1 人</span><b>-15</b></div>
+                <div class="score-line"><span>击杀已恐惧崩溃的目标</span><b>+8</b></div>
+                <div class="score-line"><span>每逃走 1 人</span><b>-15</b></div>
               </section>
             </details>
           </div>
