@@ -111,9 +111,9 @@ export function defaultDetailHtml(): string {
     `每回合 ${BASE_AP} 点行动点：走路、挥刀、出牌、搜索柜子全从这一个池子里扣。想多追几间屋就少出牌，想连砍就别乱跑。`,
     '伤害只有一个来源：左下角的「挥刀」（1 点行动点）。健康 → 受伤 → 倒地；倒地后要隔 2 回合才能补刀处决，这期间同伴可能把人救走。砍完要么做别的事、要么花 1 点「擦刀」，才能砍第二刀。卡牌只负责功能，不造成伤害。',
     '相邻房间只看得见轮廓，看不见人。推门就是照面，人当场跑；追不上就低头看鞋印（只看得见当前房间、只留最近两次行动），或者听哪间屋传来乌鸦叫——那是有人刚经过。',
-    '屋里的道具箱会给他们发道具（医疗包 / 工具箱 / 信号弹 / 钥匙 / 武器 / 烟雾弹），电闸控制各区域照明；你可以拉闸或砸毁控制箱，幸存者也可能用工具箱修复它。道具箱砸烂后就再也发不出东西。',
+    '屋里的道具箱会给他们发道具（医疗包 / 工具箱 / 信号弹 / 武器 / 烟雾弹），电闸控制各区域照明；你可以拉闸或砸毁控制箱，幸存者也可能用工具箱修复它。道具箱砸烂后就再也发不出东西。',
     '严格踩着脚印连续追才攒【杀戮】；随便走不涨。满 50 后每回合多 2 点行动点，路怎么走你自己点，不会替你瞬移。',
-    '他们也在忙自己的事：修电闸、凑钥匙、找后门。团队进度一旦做满，幸存者集体逃走，你就输了。有人藏进柜子时，点「搜索」翻出来（1 点行动点）。',
+    '幸存者会根据性格报警、躲藏、寻找武器、救援同伴、修复断电区域或寻找补给；这些是独立的个人行为，不存在团队任务进度或指定目标房间。有人藏进柜子时，点「搜索」翻出来（1 点行动点）。',
   ]);
 }
 
@@ -140,7 +140,7 @@ export function intentDot(person: Person): string {
   return `<i class="intent-dot i-${person.intent}" title="${escape(INTENT_LABEL[person.intent])}"></i>`;
 }
 
-export function personChip(person: Person, attackable = false, carryable = false, targetMode?: 'hatchet' | 'nurse-grab', darkRoom = false): string {
+export function personChip(person: Person, attackable = false, carryable = false, targetMode?: 'hatchet', darkRoom = false): string {
   const cls =
     person.role === 'police'
       ? 'police'
@@ -195,15 +195,11 @@ export function personChip(person: Person, attackable = false, carryable = false
   const dialogue = person.dialogue ? `<span class="person-dialogue" aria-hidden="true">${escape(person.dialogue)}</span>` : '';
   const action = targetMode === 'hatchet'
     ? 'hatchet-target'
-    : targetMode === 'nurse-grab'
-      ? 'nurse-grab-target'
-      : carryable ? 'carry' : 'person';
+    : carryable ? 'carry' : 'person';
   const note =
     targetMode === 'hatchet'
       ? ' · 点击投掷狩猎飞斧'
-      : targetMode === 'nurse-grab'
-        ? ' · 点击执行闪现抓取'
-        : person.role === 'police'
+      : person.role === 'police'
           ? ' · 警察：不能攻击，他会循着现场追你'
           : attackable
             ? ' · 点击对他挥刀'
