@@ -1671,7 +1671,7 @@ function finishCall(state: GameState, person: Person, device: string): void {
 function actByArchetype(state: GameState, person: Person): void {
   // 拉扯型、反抗型与英勇型会在近距离追逐中放倒家具，给自己争取逃跑时间。
   const counterArchetype = person.archetype === 'defiant' || person.archetype === 'brave' || person.archetype === 'kiter';
-  const inPursuit = person.alert >= 55 && roomDistance(person.room, state.playerRoom) <= 2;
+  const inPursuit = (person.alert >= 40 || state.chaseTargetId === person.id) && roomDistance(person.room, state.playerRoom) <= 2;
   if (counterArchetype && inPursuit && !state.barricades.includes(person.room) && random() < 0.72) {
     const blockedRoom = person.room;
     barricadeRoom(state, person);
