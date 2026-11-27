@@ -925,7 +925,8 @@ function killPerson(state: GameState, person: Person): void {
 }
 
 /** 受到伤害：只能推进一档，倒地的人再挨一下才会死 */
-function damagePerson(state: GameState, person: Person, amount: number, suppressFlee = false): void {
+function damagePerson(state: GameState, person: Person, amount: number, options: { suppressFlee?: boolean; affectFear?: boolean; forceFlee?: boolean } = {}): void {
+  const { suppressFlee = false, affectFear = true, forceFlee = false } = options;
   if (!state.people.some((p) => p.id === person.id)) return;
   let dmg = Math.max(0, amount + state.bonusDamage);
   state.bonusDamage = 0;
@@ -946,8 +947,10 @@ function damagePerson(state: GameState, person: Person, amount: number, suppress
   state.frenzy = 0;
 
   const before = person.hp;
-  person.fear = clamp(person.fear + Math.max(28, dmg * 24), 0, 100);
-  if (person.fear >= 100) dmg = Math.max(dmg, before);
+  if (affectFear) {
+    person.fear = clamp(person.fear + Math.max(28, dmg * 24), 0, 100);
+    if (person.fear >= 100) dmg = Math.max(dmg, before);
+  }
   person.hidden = false;
   person.blockedTurns = 0;
 
@@ -992,7 +995,7 @@ function damagePerson(state: GameState, person: Person, amount: number, suppress
   // 一刀下去他会连着跑两间屋，地板上留下一道血痕：
   // 「砍一刀、他挪一格、我跟上去」那种没有张力的追逐到此为止。
   for (let i = 0; i < PANIC_HOPS_ON_HIT; i++) {
-    if (!fleeAway(state, person)) break;
+    if (!fleeAway(state, person, false, forceFlee)) break;
     person.movesThisTurn += 1;
   }
 }
@@ -1276,8 +1279,8 @@ function wantsToLeave(state: GameState, person: Person): boolean {
  * quiet：玩家每动一下都会触发一次这样的逃跑，日志不能跟着刷屏；
  * 这时候只留地面上的痕迹，让玩家自己看地板。
  */
-function fleeAway(state: GameState, person: Person, quiet = false): boolean {
-  if (state.pinnedPeople.includes(person.id) || person.blockedTurns > 0 || person.hp <= 0 || person.fear >= 100) return false;
+function fleeAway(state: GameState, person: Person, quiet = false, ignoreFear = false): boolean {
+  if (state.pinnedPeople.includes(person.id) || person.blockedTurns > 0 || person.hp <= 0 || (person.fear >= 100 && !ignoreFear)) return false;
   if (person.room !== state.playerRoom && person.hp <= SURVIVOR_INJURED_HP && person.movesThisTurn % 2 === 1) {
     person.activity = '重伤拖慢了脚步，踉跄着停了一下';
     return false;
@@ -3114,7 +3117,7 @@ export function attack(state: GameState, targetId?: string, options: { costOverr
   }
   state.energy -= attackCost;
   if (state.killer === '护士' && state.nurseFollowUp && target.role !== 'police') {
-    state.huntStats.nurseGrabs += 1;
+    state.huntStats.nurseBlinkAttacks += 1;
     log(state, `护士利用闪现后的追击窗口攻击了 ${target.name}，额外挑战进度 +1。`);
   }
   state.attackReady = false;
@@ -3775,34 +3778,19 @@ export function blinkPlayer(state: GameState, room: RoomId): boolean {
   state.cooldowns.nurse_blink = 1;
   state.huntStats.nurseBlinks += 1;
   state.attackReady = true;
-  log(state, `护士穿过墙壁与房门，闪现到${roomName(room)}。你可以立即攻击或抓取同屋目标；下一次行动后将进入疲惫。`);
-  return true;
-}
-
-export function nurseGrabPerson(state: GameState, targetId: string): boolean {
-  if (state.killer !== '护士' || !state.nurseFollowUp || state.energy < 1 || state.attackBlockedTurn === state.turn) return false;
-  const target = state.people.find((person) => person.id === targetId);
-  if (!target || target.role === 'police' || target.hp <= 0 || target.room !== state.playerRoom) {
-    log(state, '闪现抓取只能选择当前房间内站立的幸存者。');
-    return false;
-  }
-  state.energy -= 1;
-  state.huntStats.nurseGrabs += 1;
-  damagePerson(state, target, 1, true);
-  state.nurseFollowUp = false;
-  state.nurseFatiguePending = false;
-  state.stunTurns = Math.max(state.stunTurns, 1);
-  state.attackReady = true;
-  afterPlayerAction(state);
-  checkImmediateWin(state);
+  log(state, `护士穿过墙壁与房门，闪现到${roomName(room)}。你可以立即对同屋站立幸存者发动一次普通攻击；下一次行动后将进入疲惫。`);
   return true;
 }
 
 export function throwHuntressHatchet(state: GameState, targetId: string): boolean {
-  if (state.killer !== '女猎手' || !state.huntressAiming || state.hatchets <= 0 || state.energy < 1 || state.attackBlockedTurn === state.turn) return false;
+  if (state.killer !== '女猎手') { log(state, '只有女猎手可以投掷狩猎飞斧。'); return false; }
+  if (!state.huntressAiming) { log(state, '请先点击「狩猎飞斧」进入瞄准状态。'); return false; }
+  if (state.hatchets <= 0) { log(state, '飞斧已经耗尽：前往柜子补充后再投掷。'); return false; }
+  if (state.energy < 1) { log(state, '行动点不足：投掷飞斧需要 1 点行动点。'); return false; }
+  if (state.attackBlockedTurn === state.turn) { log(state, '本回合攻击动作已被打断，暂时无法投掷飞斧。'); return false; }
   const target = state.people.find((person) => person.id === targetId);
   if (!target || !huntressTargetable(state, target)) {
-    log(state, '飞斧只能投向直线视野内可见的站立幸存者。');
+    log(state, '飞斧未投出：只能选择可见、未倒地、未藏匿，且位于当前房间或正前方直线房间的幸存者。');
     return false;
   }
   state.energy -= 1;
@@ -3812,10 +3800,8 @@ export function throwHuntressHatchet(state: GameState, targetId: string): boolea
   log(state, `女猎手掷出狩猎飞斧，命中${target.name}（剩余飞斧 ${state.hatchets}/3）。`);
   // 飞斧命中本身不应把「本次刚达到恐惧上限」当成第二次受击；
   // 临时留在 99 点完成受伤与逃跑，再恢复显示值 100，后续命中才会击倒。
-  const hatchetCausesPanic = target.fear < 100 && target.fear + 28 >= 100;
-  if (hatchetCausesPanic) target.fear = 71;
-  damagePerson(state, target, 1);
-  if (hatchetCausesPanic && target.hp > 0) target.fear = 100;
+  // 飞斧不影响恐惧值，也不因恐惧满值放大伤害；命中后仍会触发逃跑反应。
+  damagePerson(state, target, 1, { affectFear: false, forceFlee: true });
   state.attackReady = true;
   afterPlayerAction(state);
   checkImmediateWin(state);
@@ -3899,7 +3885,7 @@ export function powerBlockReason(state: GameState, powerId: string): string {
   if (powerId === 'trap_set') return trapPlacementBlockReason(state) ?? '';
   if (powerId === 'nurse_blink') {
     if (state.nurseBlinkTargeting) return '再次点击可取消闪现选点';
-    if (state.nurseFollowUp) return '闪现后的抓取窗口尚未结束';
+    if (state.nurseFollowUp) return '闪现后的攻击窗口尚未结束';
     if (state.energy < 1) return '至少需要 1 点行动点';
     return '';
   }
@@ -3952,7 +3938,7 @@ export function usePower(state: GameState, powerId: string): boolean {
     }
     if (!canUsePower(state, powerId)) { log(state, powerBlockReason(state, powerId) || '当前无法闪现。'); return false; }
     state.nurseBlinkTargeting = true;
-    log(state, '选择地图上 1–3 间房距离内的目标位置；闪现后可立即攻击或抓取同屋幸存者。');
+    log(state, '选择地图上 1–3 间房距离内的目标位置；闪现后可立即攻击同屋站立幸存者。');
     return true;
   }
   if (powerId === 'huntress_axe') {
@@ -4034,7 +4020,7 @@ export function missionTaskProgress(state: GameState, task: MissionTask): number
     case 'killer_stat':
       if (task.metric === 'myers_stalk') return state.myersStalkedIds.length;
       if (task.metric === 'trap_triggers') return state.huntStats.trapTriggers;
-      if (task.metric === 'nurse_grabs') return state.huntStats.nurseGrabs;
+      if (task.metric === 'nurse_blink_attacks') return state.huntStats.nurseBlinkAttacks;
       if (task.metric === 'hatchet_hits') return state.huntStats.hatchetHits;
       return 0;
   }
@@ -4057,7 +4043,7 @@ export function calculateHuntStyleRating(state: GameState, result: ResultKind): 
 } {
   const stats = state.huntStats;
   const planning = Math.min(30, stats.routineInsights * 8 + stats.environmentActions * 5 + stats.trapTriggers * 8 + stats.nurseBlinks * 2);
-  const precision = Math.min(25, stats.hatchetHits * 6 + stats.nurseGrabs * 8 + stats.myersBurstHits * 8 + (state.specialExecutionBonus > 0 ? 8 : 0));
+  const precision = Math.min(25, stats.hatchetHits * 6 + stats.nurseBlinkAttacks * 8 + stats.myersBurstHits * 8 + (state.specialExecutionBonus > 0 ? 8 : 0));
   const stealth = Math.min(20, (state.npcAlarmed ? 0 : 10) + Math.max(0, 10 - Math.floor(state.alarm / 10)));
   const efficiency = result === 'win' ? Math.min(15, Math.max(0, state.mission.turns - state.turn) * 2) : 0;
   const styleTypes = [
@@ -4066,7 +4052,7 @@ export function calculateHuntStyleRating(state: GameState, result: ResultKind): 
     stats.trapTriggers > 0,
     stats.hatchetHits > 0,
     stats.nurseBlinks > 0,
-    stats.nurseGrabs > 0,
+    stats.nurseBlinkAttacks > 0,
     stats.myersBurstHits > 0,
     stats.quietKills > 0,
   ].filter(Boolean).length;
@@ -4095,7 +4081,7 @@ function huntActionScore(state: GameState): number {
     stats.environmentActions * 3 +
     stats.trapTriggers * 10 +
     stats.hatchetHits * 6 +
-    stats.nurseGrabs * 8 +
+    stats.nurseBlinkAttacks * 8 +
     stats.myersBurstHits * 8 +
     stats.quietKills * 5,
   );
