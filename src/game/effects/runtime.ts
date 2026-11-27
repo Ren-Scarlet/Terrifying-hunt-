@@ -2,6 +2,7 @@ import { drawCards } from '../deck';
 import { INTENT_LABEL } from '../npc/catalog';
 import { POSSESS_TURNS } from '../constants';
 import { roomDistance } from '../navigation';
+import { EXECUTION_METHODS } from '../executions';
 import { roomName } from '../missions';
 import { ROOM_MAP, ROOMS, TOTEM_ROOMS } from '../rooms';
 import type { Cond, Dest, Op, Who } from '../effect';
@@ -29,6 +30,7 @@ export interface EffectRuntime {
   rescuePerson(state: GameState, person: Person): void;
   checkCond(state: GameState, cond: Cond): boolean;
   sabotageContext(state: GameState): boolean;
+  destroyCurrentObject(state: GameState): boolean;
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -36,7 +38,7 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 export function executeOps(state: GameState, ops: Op[], runtime: EffectRuntime): void {
-  const { selectPeople, log, damagePerson, canExecuteNow, executePerson, killPerson, addWanted, addAlarm, resolveDest, movePersonTo, markExplored, onPlayerEnter, scoutRoom, npcs, peopleInRoom, standing, nextStepToward, healPerson, rescuePerson, checkCond, sabotageContext } = runtime;
+  const { selectPeople, log, damagePerson, canExecuteNow, executePerson, killPerson, addWanted, addAlarm, resolveDest, movePersonTo, markExplored, onPlayerEnter, scoutRoom, npcs, peopleInRoom, standing, nextStepToward, healPerson, rescuePerson, checkCond, sabotageContext, destroyCurrentObject } = runtime;
   for (const op of ops) {
     switch (op.op) {
       case 'damage': {
@@ -207,6 +209,47 @@ export function executeOps(state: GameState, ops: Op[], runtime: EffectRuntime):
         addAlarm(state, op.amount);
         if (op.amount < 0) log(state, `暴露度降至 ${state.alarm}/100。`);
         break;
+      case 'fearFlee': {
+        const candidates = standing(state)
+          .filter((person) => person.role !== 'police' && !person.hidden && roomDistance(person.room, state.playerRoom) <= 1)
+          .sort((a, b) => roomDistance(a.room, state.playerRoom) - roomDistance(b.room, state.playerRoom) || b.alert - a.alert);
+        const target = candidates[0];
+        if (!target) {
+          log(state, '恐慌降临：当前房间及相邻房间没有可影响的幸存者。');
+          break;
+        }
+        const oldDistance = roomDistance(target.room, state.playerRoom);
+        target.fear = clamp(target.fear + op.amount, 0, 100);
+        const escapeRoom = ROOM_MAP[target.room].neighbors
+          .filter((room) => roomDistance(room, state.playerRoom) > oldDistance)
+          .filter((room) => !(state.roomLocks[room] && state.roomLocks[room]! > 0) && !state.barricades.includes(room))
+          .sort((a, b) => roomDistance(b, state.playerRoom) - roomDistance(a, state.playerRoom))[0];
+        if (escapeRoom) {
+          movePersonTo(state, target, escapeRoom);
+          target.intent = 'flee';
+          target.activity = '受到恐惧冲击，向远离杀手的方向逃跑';
+          log(state, `恐慌降临：${target.name}恐惧 +${op.amount}，并向远离你的方向逃进${roomName(escapeRoom)}。`);
+        } else {
+          log(state, `恐慌降临：${target.name}恐惧 +${op.amount}，但周围没有能继续远离你的通路。`);
+        }
+        break;
+      }
+      case 'destroyCurrentObject':
+        if (!destroyCurrentObject(state)) log(state, '所向无敌：当前房间没有可破坏的物品。');
+        break;
+      case 'revealExecutionSite': {
+        const nearestRoom = [...new Set(EXECUTION_METHODS.map((method) => method.room))]
+          .sort((a, b) => roomDistance(state.playerRoom, a) - roomDistance(state.playerRoom, b))[0];
+        if (!nearestRoom) {
+          log(state, '欣喜若狂：当前猎场没有可用的特殊处决地点。');
+          break;
+        }
+        state.executionSiteHint = nearestRoom;
+        scoutRoom(state, nearestRoom, op.turns);
+        const methods = EXECUTION_METHODS.filter((method) => method.room === nearestRoom).map((method) => method.name).join('、');
+        log(state, `欣喜若狂：最近的特殊处决地点是${roomName(nearestRoom)}（${methods}），已在地图上标出。`);
+        break;
+      }
       case 'contextSabotage':
         if (sabotageContext(state)) {
           addAlarm(state, -10);
