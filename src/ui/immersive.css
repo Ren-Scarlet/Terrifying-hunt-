@@ -2322,3 +2322,96 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
     max-height: 54vh !important;
   }
 }
+
+
+/* 2026-11-27: dossier and survivor marker readability pass. */
+#app.immersive-game .intel-grid { grid-template-columns: minmax(0,1fr) !important; }
+#app.immersive-game .person-dossier-panel { width: 100%; }
+#app.immersive-game .floorplan .room-people .person-chip .person-status-row {
+  top: -37px !important;
+  gap: 5px !important;
+}
+#app.immersive-game .floorplan .room-people .person-chip .person-status-icon {
+  flex: 0 0 30px !important;
+  width: 30px !important;
+  height: 30px !important;
+  padding: 3px !important;
+  border-radius: 6px !important;
+  border: 1px solid rgba(220,205,180,.72) !important;
+  background: rgba(8,10,12,.98) !important;
+  box-shadow: 0 3px 10px rgba(0,0,0,.9) !important;
+}
+#app.immersive-game .floorplan .room-people .person-chip .chip-sacrifice-frame { display: none !important; }
+#app.immersive-game .floorplan .room-people .person-chip .chip-sacrifice-mark {
+  position: absolute !important;
+  z-index: 36 !important;
+  right: -7px !important;
+  top: 5px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 22px !important;
+  height: 22px !important;
+  border: 1px solid rgba(255,120,105,.8) !important;
+  border-radius: 50% !important;
+  background: rgba(35,8,10,.96) !important;
+  color: #ffb6a7 !important;
+  font-size: 13px !important;
+  line-height: 1 !important;
+  pointer-events: none !important;
+}
+#app.immersive-game .person-item-detail {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(190,165,125,.42);
+  border-radius: 7px;
+  background: rgba(12,16,18,.88);
+}
+#app.immersive-game .person-item-detail > img {
+  display: block;
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+  flex: 0 0 42px;
+}
+#app.immersive-game .person-item-detail span { display: grid; gap: 4px; }
+#app.immersive-game .person-item-detail b { color: #f0dfc7; font-size: 14px; }
+#app.immersive-game .person-item-detail small { color: #c6aa88; font-size: 12px; }
+#app.immersive-game .killer-face.ability-portrait {
+  flex: 0 0 164px !important;
+  width: 138px !important;
+  height: 164px !important;
+  border: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+#app.immersive-game .killer-face.ability-portrait img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+}
+@media (max-width: 900px) {
+  #app.immersive-game .killer-face.ability-portrait {
+    flex-basis: 142px !important;
+    width: 120px !important;
+    height: 142px !important;
+  }
+  #app.immersive-game .floorplan .room-people .person-chip .person-status-row { top: -35px !important; }
+}
+@media (max-width: 700px) {
+  #app.immersive-game .killer-face.ability-portrait {
+    flex-basis: 112px !important;
+    width: 94px !important;
+    height: 112px !important;
+  }
+  #app.immersive-game .floorplan .room-people .person-chip .person-status-row { top: -33px !important; }
+  #app.immersive-game .floorplan .room-people .person-chip .person-status-icon {
+    flex-basis: 26px !important;
+    width: 26px !important;
+    height: 26px !important;
+  }
+}
