@@ -635,7 +635,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
     if (carriedPerson) guidanceDetail += ` 当前搬运目标：${carriedPerson.name}。`;
   } else if (downedHereNow) {
     guidanceTitle = '猎物已经倒地';
-    guidanceDetail = '普通处决可以立即完成；也可以抱起目标，搬运到指定地点执行地点处决。猎杀评分达到 ' + SCORE_EXECUTION_THRESHOLD + ' 分后，倒地目标头顶还会出现独立的「分数处决」QTE 按钮。若拖延，同伴可能赶来救援。';
+    guidanceDetail = '普通处决可以立即完成；也可以抱起目标，搬运到指定地点执行地点处决。当前猎杀评分 ' + currentScore(state) + ' / ' + SCORE_EXECUTION_THRESHOLD + '；达到门槛后，倒地目标头顶会出现独立的「分数处决」QTE 按钮。若拖延，同伴可能赶来救援。';
   } else if (markedAlive) {
     const targetVisible = isPersonVisible(state, markedAlive);
     guidanceRoom = targetVisible ? markedAlive.room : markedAlive.lastSeenRoom;
