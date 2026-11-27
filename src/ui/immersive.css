@@ -3780,3 +3780,8 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
 #app.immersive-game:not(.mobile-game-active) .floorplan .room-people .map-person-wrap .person-world-actions {
   bottom: calc(100% + var(--status) + 10px) !important;
 }
+
+/* 杀手面板与底部动作条留 10px 缓冲，避免测量误差贴边 */
+#app.immersive-game:not(.mobile-game-active) .killer-ability-panel {
+  bottom: calc(36px + var(--hud-h, 197px)) !important;
+}

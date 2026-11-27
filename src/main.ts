@@ -594,8 +594,13 @@ function render(): void {
 }
 
 /** 把底部动作条 / 顶部状态条的实际高度写进 CSS 变量，杀手面板据此在两者之间定位。 */
+let hudHeightObserver: ResizeObserver | null = null;
 function publishBottomHudHeight(): void {
-  if (!app.classList.contains('immersive-game') || app.classList.contains('mobile-game-active')) return;
+  if (!app.classList.contains('immersive-game') || app.classList.contains('mobile-game-active')) {
+    hudHeightObserver?.disconnect();
+    hudHeightObserver = null;
+    return;
+  }
   const hud = app.querySelector<HTMLElement>('#bottomHud');
   if (!hud) return;
   const write = (): void => {
@@ -607,6 +612,12 @@ function publishBottomHudHeight(): void {
   };
   write();
   window.requestAnimationFrame(write);
+  // 手牌张数、字体和图片落位都会改变动作条高度，用 ResizeObserver 持续跟随。
+  if (typeof ResizeObserver !== 'undefined') {
+    hudHeightObserver?.disconnect();
+    hudHeightObserver = new ResizeObserver(write);
+    hudHeightObserver.observe(hud);
+  }
 }
 
 /** 把场景画布挂到新的平面图节点上；离开对局时销毁 */
