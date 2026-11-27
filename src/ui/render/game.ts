@@ -768,10 +768,9 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
               </div>
               <div class="stat"><b>${state.kills}</b><small>击杀</small></div>
               <div class="stat survivor-count"><b>${state.people.filter((p) => p.role !== 'police' && p.hp > 0).length}/${state.survivorTotal}</b><small>存活</small></div>
-              <div class="stat frenzy ${state.frenzy >= FRENZY_THRESHOLD ? 'active' : ''}"><b>${state.frenzy}<i>/${FRENZY_MAX}</i></b><div class="alarm-track"><span style="width:${state.frenzy}%"></span></div><small>杀戮</small></div>
+              
               <div class="stat score"><b>${currentScore(state)}</b><small>预计得分</small></div>
             </div>
-            ${meter || myersMarks ? `<div class="bottom-special-meters">${meter}${myersMarks}</div>` : ''}
           </div>
           <div class="play-status"><b>${escape(guidanceTitle)}</b><span> · ${escape(guidanceDetail)}</span></div>
         </div>
