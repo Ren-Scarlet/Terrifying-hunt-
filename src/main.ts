@@ -1132,7 +1132,7 @@ app.addEventListener('click', (event) => {
       pendingMapAttackTarget = game.lastAttackedId ?? null;
       pendingMapAttackGhost = pendingMapAttackTarget ? ghosts.get(pendingMapAttackTarget) ?? null : null;
       if (pendingMapAttackTarget) updateAttackGhostEscapeDirection(pendingMapAttackGhost, pendingMapAttackTarget);
-      if (pendingMapAttackTarget && survivorIdsBefore.has(pendingMapAttackTarget)) playSurvivorHit(personId ? SURVIVOR_MAP[personId]?.gender ?? 'male' : 'male');
+      if (pendingMapAttackTarget && survivorIdsBefore.has(pendingMapAttackTarget)) playSurvivorHit(SURVIVOR_MAP[pendingMapAttackTarget]?.gender ?? 'male');
     }
     playKillerAttackSound(game);
     if (game.kills > kills) playSfx('kill');
@@ -1211,7 +1211,7 @@ app.addEventListener('click', (event) => {
       pendingMapAttackTarget = game.lastAttackedId;
       pendingMapAttackGhost = ghosts.get(game.lastAttackedId) ?? null;
       updateAttackGhostEscapeDirection(pendingMapAttackGhost, game.lastAttackedId);
-      if (survivorIdsBefore.has(game.lastAttackedId)) playSurvivorHit(personId ? SURVIVOR_MAP[personId]?.gender ?? 'male' : 'male');
+      if (survivorIdsBefore.has(game.lastAttackedId)) playSurvivorHit(SURVIVOR_MAP[game.lastAttackedId]?.gender ?? 'male');
       playKillerAttackSound(game);
     }
     playSfx('click');
