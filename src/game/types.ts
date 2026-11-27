@@ -324,6 +324,8 @@ export interface KillerRuntime {
 export interface ScoreLine {
   label: string;
   value: number;
+  /** 分数归类的维度：契约 / 猎杀 / 潜行 / 效率 / 风格 / 失分。缺省按「其他」显示。 */
+  category?: string;
 }
 
 /** 本局计划与专属能力使用记录，用于猎杀风格评价。 */
@@ -436,6 +438,8 @@ export interface GameState {
   specialExecutionBonus: number;
   /** 本局使用过的特殊处决方式；用于结算与永久图鉴记录。 */
   executionMethodsUsed: string[];
+  /** 本局打出过的卡牌 id（可重复）；用于结算的「构筑多样性」加分。 */
+  cardsPlayed: string[];
   npcAlarmed: boolean;
   carryPersonId: string | null;
   /** 欣喜若狂标出的最近特殊处决地点。 */

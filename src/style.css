@@ -1246,6 +1246,24 @@ button { font-family: inherit; cursor: pointer; }
 .score-line b { color: #c9a86c; font-family: var(--font-num); font-variant-numeric: tabular-nums; }
 .score-line.minus b { color: #b4543f; }
 
+/* 得分构成：实时面板（HUD 内可展开）与结算面板共用 */
+.score-details { flex-basis: 100%; margin-top: 4px; }
+.score-details summary {
+  cursor: pointer; color: #9c968c; font-size: 11px; letter-spacing: .6px;
+  list-style: none; user-select: none;
+}
+.score-details summary::-webkit-details-marker { display: none; }
+.score-details summary::before { content: '▸ '; color: #6f6a63; }
+.score-details[open] summary::before { content: '▾ '; }
+.score-details[open] summary { color: #c9a86c; }
+.score-details .score-group { margin-top: 6px; }
+.score-group h4 {
+  display: flex; justify-content: space-between; margin: 0 0 2px;
+  font-size: 10px; font-weight: 600; letter-spacing: 1px; color: #7d766c;
+  border-bottom: 1px solid rgba(140, 128, 108, .18); padding-bottom: 2px;
+}
+.score-group h4 b { color: #c9a86c; font-family: var(--font-num); }
+
 /* 指引 */
 .guide-modal { width: min(760px, 100%); }
 .guide-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 14px 0; }

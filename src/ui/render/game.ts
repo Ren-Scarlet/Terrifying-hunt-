@@ -25,6 +25,7 @@ import {
   canUsePower,
   conditionOf,
   currentScore,
+  scoreLines,
   effectiveCost,
   getStars,
   isLocked,
@@ -75,7 +76,22 @@ import {
 import { isCardTuned } from '../../game/tuning';
 import { isMuted, playHeartbeat, playSfx, playTrapScream, playSurvivorStartle } from '../audio';
 import { escape, icon, itemBadge, itemIconHtml, personChip, shadowFigures, perkIconHtml, TYPE_NAMES, killerFaceHtml, defaultDetailHtml, cardTextHtml } from './shared';
-import type { GameState, Person, RoomId, SaveData } from '../../game/types';
+import type { GameState, Person, RoomId, ScoreLine, SaveData } from '../../game/types';
+
+/**
+ * 分数明细按维度分组渲染：实时面板与结算面板共用。
+ * 分组顺序固定，玩家能直观看出「这一局的分数来自哪几类」。
+ */
+const SCORE_GROUPS = ['契约', '猎杀', '潜行', '效率', '风格', '失分', '其他'];
+function scoreGroupsHtml(lines: ScoreLine[]): string {
+  return SCORE_GROUPS.map((category) => {
+    const rows = lines.filter((line) => (line.category ?? '其他') === category);
+    if (!rows.length) return '';
+    const sum = rows.reduce((acc, line) => acc + line.value, 0);
+    const body = rows.map((line) => `<div class="score-line ${line.value < 0 ? 'minus' : ''}"><span>${escape(line.label)}</span><b>${line.value >= 0 ? '+' : ''}${line.value}</b></div>`).join('');
+    return `<section class="score-group"><h4>${category}<b>${sum >= 0 ? '+' : ''}${sum}</b></h4>${body}</section>`;
+  }).join('');
+}
 
 let lastRenderedTrapTriggerCount: number | null = null;
 let lastRedFigureSignature = '';
@@ -814,6 +830,21 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
               
               <div class="stat score"><b>${currentScore(state)}</b><small>预计得分</small></div>
             </div>
+            <details class="score-details">
+              <summary>得分构成 · 怎么加分</summary>
+              ${scoreGroupsHtml(scoreLines(state))}
+              <section class="score-group score-guide">
+                <h4>还能怎么加分</h4>
+                <div class="score-line"><span>全程无人成功报警</span><b>+25</b></div>
+                <div class="score-line"><span>结束时警报低于 30</span><b>+15</b></div>
+                <div class="score-line"><span>每多一种处决方式</span><b>+10</b></div>
+                <div class="score-line"><span>用满 3 种卡后，每多一种（上限 15）</span><b>+3</b></div>
+                <div class="score-line"><span>每击杀 1 人</span><b>+14</b></div>
+                <div class="score-line"><span>每处决 1 次</span><b>+10</b></div>
+                <div class="score-line"><span>胜利结算：每剩余 1 回合</span><b>+5</b></div>
+                <div class="score-line minus"><span>每逃走 1 人</span><b>-15</b></div>
+              </section>
+            </details>
           </div>
           <div class="play-status"><b>${escape(guidanceTitle)}</b><span> · ${escape(guidanceDetail)}</span></div>
         </div>
@@ -915,11 +946,7 @@ export function renderResult(state: GameState, newCard: string | null): string {
   const styleBreakdown = state.huntStyleBreakdown
     .map((line) => `<div class="style-score-line"><span>${escape(line.label)}</span><b>+${line.value}</b></div>`)
     .join('');
-  const breakdown = state.scoreBreakdown
-    .map((line) => `<div class="score-line ${line.value < 0 ? 'minus' : ''}">
-        <span>${escape(line.label)}</span><b>${line.value >= 0 ? '+' : ''}${line.value}</b>
-      </div>`)
-    .join('');
+  const breakdown = scoreGroupsHtml(state.scoreBreakdown);
   return `
     <div class="overlay">
       <div class="modal result-modal ${win ? 'is-win' : 'is-lose'}">

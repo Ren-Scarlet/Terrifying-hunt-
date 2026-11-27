@@ -26,6 +26,7 @@ import {
   SABOTAGE_COST,
   addAlarm,
   currentScore,
+  scoreLines,
   calculateHuntStyleRating,
   triggerBearTrapForPerson,
   sabotageSiteItem,
@@ -2236,6 +2237,24 @@ check('苦涩低语：出牌后会等待下一次人类死亡，再触发全场�
   late.alarm = 0;
   endTurn(late);
   check('天亮：最后五回合每回合持续加压', late.alarm >= 2, `alarm=${late.alarm}`);
+}
+
+// 分数构成：实时与结算同源，新增维度按条件给分
+{
+  const sc = newGame();
+  sc.alarm = 0;
+  sc.npcAlarmed = false;
+  sc.executionMethodsUsed.push('fridge', 'microwave');
+  const lines = scoreLines(sc);
+  const sum = lines.reduce((acc, line) => acc + line.value, 0);
+  check('分数构成：实时总分等于明细之和',
+    Math.abs(currentScore(sc) - Math.max(0, Math.round(sum))) <= 1,
+    `score=${currentScore(sc)} sum=${sum}`);
+  check('分数构成：无人报警有加分', lines.some((line) => line.label.includes('全程无人成功报警')), lines.map((line) => line.label).join('|'));
+  check('分数构成：处决方式多样性有加分', lines.some((line) => line.label.includes('处决方式多样性')));
+  const sc2 = newGame();
+  sc2.cardsPlayed.push('insidious', 'iron_grasp', 'deerstalker');
+  check('分数构成：构筑多样性有加分', scoreLines(sc2).some((line) => line.label.includes('构筑多样性')), scoreLines(sc2).map((line) => line.label).join('|'));
 }
 
 caseNewPerkSystem();

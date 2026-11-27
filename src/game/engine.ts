@@ -2934,6 +2934,7 @@ export function playCard(state: GameState, cardUid: string): boolean {
     const reason = attackBlockReason(state, victim.id, cost);
     if (reason) { log(state, reason); return false; }
     state.hand.splice(index, 1); state.discardPile.push(card);
+    state.cardsPlayed.push(card.defId);
     log(state, `你打出「${def.name}」，对 ${victim.name} 发动攻击。`);
     return attack(state, victim.id, { costOverride: cost, bleedTurns: attackOp.bleedTurns, hitStatus: attackOp.statusTurns > 0 ? attackOp.status : undefined, hitStatusTurns: attackOp.statusTurns });
   }
@@ -2941,6 +2942,7 @@ export function playCard(state: GameState, cardUid: string): boolean {
   state.energy -= cost;
   state.hand.splice(index, 1);
   state.discardPile.push(card);
+  state.cardsPlayed.push(card.defId);
   log(state, `你打出「${def.name}」（消耗 ${cost} 点行动点）。`);
 
   if (card.defId === 'myers_eclipse_light') {
@@ -4104,6 +4106,53 @@ function huntActionScore(state: GameState): number {
   );
 }
 
+/** 结算与实时分数共用同一份明细，避免「面板显示」和「实际得分」两套算法。 */
+export function scoreLines(state: GameState, result: ResultKind | null = null): ScoreLine[] {
+  const lines: ScoreLine[] = [];
+  const add = (category: string, label: string, value: number) => {
+    if (value !== 0) lines.push({ category, label, value });
+  };
+
+  // —— 契约 ——
+  add('契约', `契约基础分 · ${state.mission.title}`, state.mission.reward);
+  const bonusTasks = (state.mission.tasks ?? []).filter((task) => task.optional && missionTaskProgress(state, task) >= task.target);
+  if (bonusTasks.length) {
+    add('契约', `额外挑战 · ${bonusTasks.length} 项`, bonusTasks.reduce((sum, task) => sum + (task.reward ?? 25), 0));
+  }
+
+  // —— 猎杀 ——
+  add('猎杀', `击杀 ${state.kills} 人`, state.kills * 14);
+  add('猎杀', `处决 ${state.executions} 次`, state.executions * 10);
+  if (state.executionMethodsUsed.length > 1) {
+    add('猎杀', `处决方式多样性 · ${state.executionMethodsUsed.length} 种`, (state.executionMethodsUsed.length - 1) * 10);
+  }
+  add('猎杀', '地形处决奖励', state.specialExecutionBonus);
+  add('猎杀', '卡牌猎杀奖励', state.cardBonusScore);
+
+  // —— 潜行 ——
+  if (!state.npcAlarmed) add('潜行', '全程无人成功报警', 25);
+  if (state.alarm < 30) add('潜行', `低暴露度 · 警报 ${state.alarm}`, 15);
+  add('潜行', '无目击猎杀', Math.min(10, state.huntStats.quietKills * 3));
+
+  // —— 风格 ——
+  add('风格', '策略猎杀 · 观察习惯、环境操作、陷阱与专属能力', huntActionScore(state));
+  const uniqueCards = new Set(state.cardsPlayed).size;
+  if (uniqueCards >= 3) add('风格', `构筑多样性 · 用了 ${uniqueCards} 种卡`, Math.min(15, (uniqueCards - 2) * 3));
+
+  // —— 效率（只在胜利结算时计入）——
+  if (result === 'win' && state.mission.mode !== 'free') {
+    add('效率', `剩余 ${state.mission.turns - state.turn} 回合`, (state.mission.turns - state.turn) * 5);
+  }
+
+  // —— 失分 ——
+  if (state.escaped > 0) add('失分', `逃走 ${state.escaped} 人（每人 -15）`, -state.escaped * 15);
+  if (state.alarm >= 60) add('失分', `暴露度 ${state.alarm} 的代价`, -Math.round(state.alarm / 5));
+  if (result === 'caught') add('失分', '被警察当场抓捕', -80);
+  else if (result === 'timeout') add('失分', '任务超时', -50);
+  else if (result && result !== 'win') add('失分', state.resultReason || '任务失败', -40);
+  return lines;
+}
+
 function finish(state: GameState, result: ResultKind): void {
   if (state.result) return;
   state.result = result;
@@ -4114,45 +4163,18 @@ function finish(state: GameState, result: ResultKind): void {
   state.huntStyleBonus = style.bonus;
   state.huntStyleBreakdown = style.breakdown;
 
-  const lines: ScoreLine[] = [{ label: `契约基础分 · ${state.mission.title}`, value: state.mission.reward }];
-  const bonusTasks = (state.mission.tasks ?? []).filter((task) => task.optional && missionTaskProgress(state, task) >= task.target);
-  const bonusTaskScore = bonusTasks.reduce((sum, task) => sum + (task.reward ?? 25), 0);
-  if (bonusTasks.length) lines.push({ label: `额外挑战 · ${bonusTasks.length} 项`, value: bonusTaskScore });
-  if (state.specialExecutionBonus > 0) lines.push({ label: '地形处决奖励', value: state.specialExecutionBonus });
-  if (state.cardBonusScore > 0) lines.push({ label: '卡牌猎杀奖励', value: state.cardBonusScore });
-  const actionScore = huntActionScore(state);
-  if (actionScore > 0) lines.push({ label: '策略猎杀 · 观察习惯、环境操作、陷阱与专属能力', value: actionScore });
-  lines.push({ label: `凶残 · 击杀 ${state.kills} 人`, value: state.kills * 14 });
-  if (state.escaped > 0) lines.push({ label: `逃走 ${state.escaped} 人的失分（每人 -15）`, value: -state.escaped * 15 });
-  if (state.alarm >= 60) lines.push({ label: `暴露度 ${state.alarm} 的代价`, value: -Math.round(state.alarm / 5) });
-
   if (result === 'win') {
-    const bonus = state.mission.mode === 'free' ? 0 : (state.mission.turns - state.turn) * 5;
-    if (bonus > 0) lines.push({ label: `猎杀效率 · 剩余 ${state.mission.turns - state.turn} 回合`, value: bonus });
     state.rewardCards = state.mission.mode === 'free' ? [] : [UNLOCK_REWARDS[state.mission.kind]].filter(Boolean);
-  } else if (result === 'caught') {
-    lines.push({ label: '被警察当场抓捕', value: -80 });
-  } else if (result === 'timeout') {
-    lines.push({ label: '任务超时', value: -50 });
-  } else {
-    lines.push({ label: state.resultReason || '任务失败', value: -40 });
   }
 
+  const lines = scoreLines(state, result);
   state.scoreBreakdown = lines;
   state.score = Math.max(0, Math.round(lines.reduce((sum, line) => sum + line.value, 0)));
 }
 
 export function currentScore(state: GameState): number {
   if (state.result) return state.score;
-  return Math.max(
-    0,
-    Math.round(
-      state.mission.reward +
-        state.kills * 14 + state.specialExecutionBonus + state.cardBonusScore + huntActionScore(state) -
-        state.escaped * 15 -
-        Math.round(state.alarm / 5),
-    ),
-  );
+  return Math.max(0, Math.round(scoreLines(state).reduce((sum, line) => sum + line.value, 0)));
 }
 
 /** 从牌库抽牌；牌库耗尽时正常洗回弃牌堆。 */

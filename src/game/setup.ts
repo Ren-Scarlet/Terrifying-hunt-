@@ -95,6 +95,7 @@ export function createGame(
     survivorKills: 0,
     specialExecutionBonus: 0,
     executionMethodsUsed: [],
+    cardsPlayed: [],
     npcAlarmed: false,
     carryPersonId: null,
     executionSiteHint: null,
