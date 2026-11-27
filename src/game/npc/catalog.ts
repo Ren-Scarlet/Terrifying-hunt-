@@ -25,7 +25,7 @@ export const INTENT_LABEL: Record<NpcIntent, string> = {
   stunned: '动不了',
   heal: '正在治疗',
   rescue: '正在救援',
-  work: '在忙团队的事',
+  work: '正在处理现场事务',
 };
 
 export const GOAL_LABEL: Record<NpcGoal, string> = {
