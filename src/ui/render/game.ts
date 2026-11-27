@@ -76,6 +76,7 @@ import {
 
 import { isCardTuned } from '../../game/tuning';
 import { ACCESSORY_MAP, ACCESSORY_SLOTS } from '../../game/accessories';
+import { blinkRangeOf, hatchetMax, modifierSummary } from '../../game/modifiers';
 import { isMuted, playHeartbeat, playSfx, playTrapScream, playSurvivorStartle } from '../audio';
 import { addonIconHtml, escape, icon, itemBadge, itemIconHtml, personChip, shadowFigures, perkIconHtml, TYPE_NAMES, killerFaceHtml, defaultDetailHtml, cardTextHtml } from './shared';
 import type { GameState, Person, RoomId, ScoreLine, SaveData } from '../../game/types';
@@ -235,10 +236,10 @@ function powerButtonHtml(state: GameState, killer: KillerProfile): string {
       actionHint = reason || `携带 ${state.trapInventory}/4 · 当前房间布设（1 AP）`;
     } else if (power.id === 'nurse_blink') {
       label = state.nurseBlinkTargeting ? '取消闪现选点' : '斯宾塞的濒死之息';
-      actionHint = state.nurseBlinkTargeting ? '点击地图 1–3 间房距离内的位置' : state.nurseFollowUp ? '闪现后攻击窗口可用' : reason || '穿墙闪现 · 1 AP';
+      actionHint = state.nurseBlinkTargeting ? `点击地图 1–${blinkRangeOf(state)} 间房距离内的位置` : state.nurseFollowUp ? '闪现后攻击窗口可用' : reason || '穿墙闪现 · 1 AP';
     } else if (power.id === 'huntress_axe') {
       label = state.huntressAiming ? '取消飞斧瞄准' : '狩猎飞斧';
-      actionHint = state.huntressAiming ? '点击直线视野内的幸存者' : reason || `飞斧 ${state.hatchets}/3 · 选择目标投掷（1 AP）`;
+      actionHint = state.huntressAiming ? '点击直线视野内的幸存者' : reason || `飞斧 ${state.hatchets}/${hatchetMax(state)} · 选择目标投掷（1 AP）`;
     } else if (power.id === 'myers_gaze') {
       label = state.possessed ? '恶魔附身中' : state.stalkMeter >= 100 ? '恶魔附身' : '尾随';
       actionHint = state.possessed
@@ -279,7 +280,7 @@ function facilityOverviewHtml(state: GameState): string {
   const killerSupplies = state.killer === '设陷者'
     ? `<span class="facility-pill"><i>⚒</i><b>捕兽夹</b><strong>${state.trapInventory}/4 携带 · ${state.bearTraps.filter((trap) => trap.armed).length} 已布设 · ${state.trapCaches.length} 补给点</strong></span>`
     : state.killer === '女猎手'
-      ? `<span class="facility-pill"><i>➶</i><b>狩猎飞斧</b><strong>${state.hatchets}/3</strong></span>`
+      ? `<span class="facility-pill"><i>➶</i><b>狩猎飞斧</b><strong>${state.hatchets}/${hatchetMax(state)}</strong></span>`
       : '';
   return `<section class="facility-overview" aria-label="现场设施状态">
     <div class="facility-overview-heading"><b>现场设施</b><small>地图标记与当前状态</small></div>
@@ -452,7 +453,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
     const isPlayer = state.playerRoom === room.id;
     const reachable = canMoveTo(state, room.id);
     const blinkDistance = roomDistance(state.playerRoom, room.id);
-    const blinkSelectable = state.nurseBlinkTargeting && room.id !== state.playerRoom && blinkDistance >= 1 && blinkDistance <= 3;
+    const blinkSelectable = state.nurseBlinkTargeting && room.id !== state.playerRoom && blinkDistance >= 1 && blinkDistance <= blinkRangeOf(state);
     const locked = isLocked(state, room.id);
     const barricaded = state.barricades.includes(room.id);
     const cost = moveCost(state, room.id);
@@ -618,7 +619,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
     .forEach((p) => {
       statusBits.push(`<span class="status-badge downed">${escape(p.name)} 倒地 · 可立即处决 · 同伴仍可能救起</span>`);
     });
-  if (state.nurseBlinkTargeting) statusBits.push('<span class="status-badge blink-mode">护士闪现选点中 · 选择 1–3 间房距离内的位置</span>');
+  if (state.nurseBlinkTargeting) statusBits.push(`<span class="status-badge blink-mode">护士闪现选点中 · 选择 1–${blinkRangeOf(state)} 间房距离内的位置</span>`);
   if (state.nurseFollowUp) statusBits.push('<span class="status-badge blink-mode">濒死之息 · 现在可对同屋站立幸存者发动普通攻击；下一次行动后疲惫</span>');
   if (state.huntressAiming) statusBits.push('<span class="status-badge hatchet-mode">狩猎飞斧瞄准中 · 点击地图上的直线视野目标</span>');
   const statusHtml = statusBits.length ? `<div class="status-strip">${statusBits.join('')}</div>` : '';
@@ -740,7 +741,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
     ? `<button class="btn search" data-action="recover-trap" ${state.energy < 1 || state.trapInventory >= 4 ? 'disabled' : ''}>回收已触发捕兽夹</button>`
     : '';
   const hatchetRefillBtn = state.killer === '女猎手' && (CABINET_ROOMS.includes(state.playerRoom) || (state.mapId === 'badham' && ['nursery', 'storage', 'guestroom'].includes(state.playerRoom)))
-    ? `<button class="btn search" data-action="refill-hatchets" ${state.energy < 1 || state.hatchets >= 3 ? 'disabled' : ''}>柜子补充飞斧 · ${state.hatchets}/3</button>`
+    ? `<button class="btn search" data-action="refill-hatchets" ${state.energy < 1 || state.hatchets >= hatchetMax(state) ? 'disabled' : ''}>柜子补充飞斧 · ${state.hatchets}/${hatchetMax(state)}</button>`
     : '';
   const searchBtn = `<button class="btn search" data-action="search" ${searchOk ? '' : 'disabled'}
       title="${escape(searchOk ? (cabinetHere ? `搜索这间屋子的柜子：消耗 ${SEARCH_COST} 点行动点，把藏起来的人翻出来。` : `搜索这间屋子：消耗 ${SEARCH_COST} 点行动点。`) : '行动点不足')}">
@@ -897,6 +898,9 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
                   : '<span class="killer-addon-slot empty" title="空配件槽">＋</span>';
               }).join('')}
             </div>
+            ${modifierSummary(state).length
+              ? `<small class="killer-addon-mods" title="本局配件加成">${escape(modifierSummary(state).join(' · '))}</small>`
+              : ''}
           </div>
           <div class="killer-hud-abilities" aria-label="杀手能力图标 · 按 1–4 使用">
             <div class="killer-power-grid">${powerButtonHtml(state, killer)}</div>

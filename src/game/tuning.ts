@@ -1,7 +1,8 @@
 import { CARDS, CARD_MAP } from './data/cards';
 import { KILLERS, KILLER_MAP } from './data/killers';
+import { ACCESSORIES, ACCESSORY_MAP } from './data/accessories';
 import type { Op, Precheck } from './effect';
-import type { CardDef, CardType } from './types';
+import type { AccessoryModKey, CardDef, CardType } from './types';
 import { EFFECT_OPS, type EffectFieldType } from './effectCatalog';
 
 /**
@@ -33,8 +34,15 @@ export interface PowerTune {
   ops?: Op[];
 }
 
+/** 配件调参：只改说明与已存在修正键的数值，不允许后台凭空加键。 */
+export interface AddonTune {
+  desc?: string;
+  mods?: Partial<Record<AccessoryModKey, number>>;
+}
+
 export interface TuningData {
   cards: Record<string, CardTune>; powers: Record<string, PowerTune>;
+  addons: Record<string, AddonTune>;
   customCards: CardDef[]; deletedCards: string[];
 }
 
@@ -43,7 +51,9 @@ const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 /** 原始定义：用于「恢复默认」 */
 const BASELINE_CARD_DEFS = clone(CARDS);
 const BASELINE_CARDS = clone(CARDS.map((c) => ({ id: c.id, cost: c.cost, desc: c.desc, noAction: !!c.noAction, ops: c.ops })));
-const emptyTuning = (): TuningData => ({ cards: {}, powers: {}, customCards: [], deletedCards: [] });
+const emptyTuning = (): TuningData => ({ cards: {}, powers: {}, addons: {}, customCards: [], deletedCards: [] });
+/** 配件原始定义：恢复默认与导入校验都以这里为准。 */
+const BASELINE_ADDONS = clone(ACCESSORIES.map((item) => ({ id: item.id, desc: item.desc, mods: item.mods })));
 const BASELINE_POWERS = clone(
   KILLERS.flatMap((k) =>
     k.powers.map((p) => ({ owner: k.owner, id: p.id, cooldown: p.cooldown, ops: p.ops })),
@@ -55,9 +65,8 @@ function load(): TuningData {
     const raw = localStorage.getItem(KEY);
     if (!raw) return emptyTuning();
     const parsed: unknown = JSON.parse(raw);
-    if (isRecord(parsed)) { parsed.customCards ??= []; parsed.deletedCards ??= []; }
-    return validateTuning(parsed) ? clone(parsed) : emptyTuning();
-  } catch {
+    if (isRecord(parsed)) { parsed.customCards ??= []; parsed.deletedCards ??= []; parsed.addons ??= {}; }
+    return validateTuning(parsed) ? clone(parsed) : emptyTuning();  } catch {
     return emptyTuning();
   }
 }
@@ -103,6 +112,17 @@ export function applyTuning(): void {
     if (typeof tune.cooldown === 'number') power.cooldown = tune.cooldown;
     if (Array.isArray(tune.ops)) power.ops = clone(tune.ops);
   });
+  Object.entries(data.addons ?? {}).forEach(([id, tune]) => {
+    const def = ACCESSORY_MAP[id];
+    if (!def) return;
+    if (typeof tune.desc === 'string') def.desc = tune.desc;
+    if (tune.mods && isRecord(tune.mods)) {
+      for (const mod of def.mods) {
+        const value = tune.mods[mod.key];
+        if (typeof value === 'number' && Number.isFinite(value)) mod.value = value;
+      }
+    }
+  });
 }
 
 export function tuningData(): TuningData {
@@ -118,8 +138,14 @@ export function isPowerTuned(owner: string, powerId: string): boolean {
   return !!data.powers[powerKey(owner, powerId)];
 }
 
+export function isAddonTuned(id: string): boolean {
+  return !!data.addons?.[id];
+}
+
 export function hasTuning(): boolean {
-  return Object.keys(data.cards).length > 0 || Object.keys(data.powers).length > 0 || data.customCards.length > 0 || data.deletedCards.length > 0;
+  return Object.keys(data.cards).length > 0 || Object.keys(data.powers).length > 0
+    || Object.keys(data.addons ?? {}).length > 0
+    || data.customCards.length > 0 || data.deletedCards.length > 0;
 }
 
 /** 路径：`0.amount` 或 `0.then.1.turns`，指向一条指令上的字段 */
@@ -152,6 +178,34 @@ function recordPower(owner: string, powerId: string): void {
   if (!power) return;
   data.powers[powerKey(owner, powerId)] = { cooldown: power.cooldown, ops: clone(power.ops) };
   persist();
+}
+
+function recordAddon(id: string): void {
+  const def = ACCESSORY_MAP[id];
+  if (!def) return;
+  data.addons ??= {};
+  data.addons[id] = {
+    desc: def.desc,
+    mods: Object.fromEntries(def.mods.map((mod) => [mod.key, mod.value])),
+  };
+  persist();
+}
+
+/** 配件：说明文字；只允许本件已定义的修正键改数值。 */
+export function setAddonDesc(id: string, desc: string): void {
+  const def = ACCESSORY_MAP[id];
+  if (!def) return;
+  def.desc = desc.slice(0, 500);
+  recordAddon(id);
+}
+
+export function setAddonModValue(id: string, key: AccessoryModKey, value: number): void {
+  const def = ACCESSORY_MAP[id];
+  if (!def || !Number.isFinite(value)) return;
+  const mod = def.mods.find((item) => item.key === key);
+  if (!mod) return;
+  mod.value = Math.max(-1000, Math.min(1000, Math.round(value)));
+  recordAddon(id);
 }
 
 /** 卡牌：费用 */
@@ -287,6 +341,12 @@ export function resetTuning(): void {
     if (!power) return;
     power.cooldown = base.cooldown;
     power.ops = clone(base.ops);
+  });
+  BASELINE_ADDONS.forEach((base) => {
+    const def = ACCESSORY_MAP[base.id];
+    if (!def) return;
+    def.desc = base.desc;
+    def.mods = clone(base.mods);
   });
   persist();
 }
@@ -445,7 +505,22 @@ function validateOps(value: unknown, _baseline?: Op[]): value is Op[] {
 }
 function validateTuning(value: unknown): value is TuningData {
   if (!isRecord(value) || !isRecord(value.cards) || !isRecord(value.powers)) return false;
-  if (Object.keys(value).some((key) => !['cards', 'powers', 'customCards', 'deletedCards'].includes(key))) return false;
+  if (Object.keys(value).some((key) => !['cards', 'powers', 'addons', 'customCards', 'deletedCards'].includes(key))) return false;
+  const addons = value.addons ?? {};
+  if (!isRecord(addons)) return false;
+  for (const [id, tune] of Object.entries(addons)) {
+    const base = BASELINE_ADDONS.find((item) => item.id === id);
+    if (!base || !isRecord(tune) || Object.keys(tune).some((key) => key !== 'desc' && key !== 'mods')) return false;
+    if ('desc' in tune && (typeof tune.desc !== 'string' || tune.desc.length > 500)) return false;
+    if ('mods' in tune) {
+      if (!isRecord(tune.mods)) return false;
+      const keys = base.mods.map((mod) => mod.key);
+      for (const [key, num] of Object.entries(tune.mods)) {
+        if (!keys.includes(key as AccessoryModKey)) return false;
+        if (typeof num !== 'number' || !Number.isFinite(num) || Math.abs(num) > 1000) return false;
+      }
+    }
+  }
   const customCards = value.customCards ?? []; const deletedCards = value.deletedCards ?? [];
   if (!Array.isArray(customCards) || customCards.length > 200 || !Array.isArray(deletedCards) || deletedCards.some((id) => typeof id !== 'string' || !BASELINE_CARDS.some((card) => card.id === id))) return false;
   const customIds = new Set<string>();
@@ -489,7 +564,12 @@ export function importTuning(raw: string): boolean {
   if (!validateTuning(parsed)) return false;
 
   // 校验完整通过后才改运行时数据，错误文件不会污染当前平衡配置。
-  const normalized = { ...(parsed as TuningData), customCards: (parsed as TuningData).customCards ?? [], deletedCards: (parsed as TuningData).deletedCards ?? [] };
+  const normalized = {
+    ...(parsed as TuningData),
+    addons: (parsed as TuningData).addons ?? {},
+    customCards: (parsed as TuningData).customCards ?? [],
+    deletedCards: (parsed as TuningData).deletedCards ?? [],
+  };
   data = clone(normalized);
   rebuildCardRegistry();
   BASELINE_CARDS.forEach((base) => {
@@ -505,6 +585,12 @@ export function importTuning(raw: string): boolean {
     if (!power) return;
     power.cooldown = base.cooldown;
     power.ops = clone(base.ops);
+  });
+  BASELINE_ADDONS.forEach((base) => {
+    const def = ACCESSORY_MAP[base.id];
+    if (!def) return;
+    def.desc = base.desc;
+    def.mods = clone(base.mods);
   });
   applyTuning();
   persist();

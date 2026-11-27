@@ -72,13 +72,14 @@ import {
   setCardOpValue,
   setPowerCooldown,
   setPowerOpValue,
+  setAddonDesc,
+  setAddonModValue,
 } from './game/tuning';
 import { ROOM_MAP } from './game/rooms';
 import { SURVIVOR_MAP } from './game/survivors';
 import { getExecutionMethod } from './game/executions';
 import type { ExecutionMethodId } from './game/executions';
-import type { GameState, RoomId, SaveData } from './game/types';
-import {
+import type { AccessoryModKey, GameState, RoomId, SaveData } from './game/types';import {
   cardDetailHtml,
   defaultDetailHtml,
   getKiller,
@@ -92,7 +93,7 @@ import {
   renderShop,
   shopPrice,
 } from './ui/render';
-import { renderAdmin } from './ui/admin';
+import { renderAdmin, setAdminTab, type AdminTab } from './ui/admin';
 import { initCloudAuth, loadCloudConfig, saveCloudConfig, verifyGitHubToken, clearGitHubToken } from './game/cloud';
 import { mountFloorplanScene, type SceneHandle } from './ui/scene';
 import { playSfx, playStep, playSurvivorHit, playSurvivorDeath, setMusic, toggleMute, unlockAudio } from './ui/audio';
@@ -967,6 +968,13 @@ app.addEventListener('click', (event) => {
     return;
   }
 
+  if (action === 'admin-tab') {
+    const tab = target.dataset.tab;
+    if (tab === 'cards' || tab === 'powers' || tab === 'addons') setAdminTab(tab as AdminTab);
+    render();
+    return;
+  }
+
   if (action === 'admin-close') {
     adminOpen = false;
     render();
@@ -1592,9 +1600,10 @@ app.addEventListener('click', (event) => {
 
 /* 平衡调整：任何输入/下拉变化都直接写回运行中的数据 */
 app.addEventListener('change', (event) => {
-  const el = (event.target as HTMLElement).closest<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>('[data-tune]');
+  const el = (event.target as HTMLElement).closest<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>('[data-tune],[data-addon]');
   if (!el) return;
   const key = el.dataset.tune ?? '';
+  const addonKey = el.dataset.addon ?? '';
   const parts = key.split('|');
   const raw = el.value;
   const isNumber = el instanceof HTMLInputElement && el.type === 'number';
@@ -1604,7 +1613,16 @@ app.addEventListener('change', (event) => {
   const value: number | string | boolean = isCheckbox ? el.checked : isNumber ? Number(raw) : raw;
   let ok = false;
 
-  if (parts[0] === 'card' && parts.length >= 3) {
+  if (addonKey) {
+    const [id, path] = addonKey.split('|');
+    if (path === 'desc') {
+      setAddonDesc(id, String(value));
+      ok = true;
+    } else {
+      setAddonModValue(id, path as AccessoryModKey, Number(value));
+      ok = true;
+    }
+  } else if (parts[0] === 'card' && parts.length >= 3) {
     const id = parts[1];
     const path = parts[2];
     if (path === 'name') { setCardName(id, String(value)); ok = true;

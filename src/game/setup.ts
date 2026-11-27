@@ -2,6 +2,7 @@ import { random, randomOf, shuffle } from './random';
 import { CARD_MAP } from './cards';
 import { KILLER_MAP } from './killers';
 import { ACCESSORY_MAP, sanitizeAccessoryLoadout } from './accessories';
+import { modifiersForAccessories, modifierSummary } from './modifiers';
 import { generateMission } from './missions';
 import { createPeople } from './npc/factory';
 import {
@@ -39,6 +40,10 @@ export function createGame(
   const killerId = KILLER_MAP[killer] ? killer : '迈克尔·迈尔斯';
   // 配件是本局一次性消耗品：只认当前杀手的、最多 2 件，别的 id 直接忽略。
   const accessories = sanitizeAccessoryLoadout(accessoryIds, killerId);
+  // 所有配件数值先汇总成一张修正表，开局的基础值统一从这里取。
+  const modifiers = modifiersForAccessories(accessories);
+  const baseFearRadius = KILLER_MAP[killerId].fearRadius ?? 1;
+  const startingEnergy = Math.max(1, BASE_AP + modifiers.ap);
   const activeMission = mission ?? generateMission(killerId);
   const people = createPeople(activeMission).filter((person) => KILLER_MAP[killerId].school !== 'supernatural' || person.role !== 'police');
   const pile = shuffle(deckIds.filter((id) => CARD_MAP[id])).map<CardInstance>((defId) => ({
@@ -52,13 +57,14 @@ export function createGame(
     mapId: ground.id,
     killer: killerId,
     accessories,
+    modifiers,
     killerRuntime: { killUsed: false, moveUsed: false, attackUsed: false, witnessUsed: false },
     // 逮捕阈值已废弃（警戒与逮捕合并），保留字段只为兼容旧存档
     arrestThreshold: 5 + (activeMission.targetCount ?? 1),
     turn: 1,
     // 走路 / 砍人 / 打牌 / 搜索共用这一个池子，原来「能量 + 步数」两套资源合并
-    energy: BASE_AP,
-    maxEnergy: BASE_AP,
+    energy: startingEnergy,
+    maxEnergy: startingEnergy,
     // 与初始 alarm:12 对齐：wanted 只是暴露度 /10 的镜像
     wanted: 2,
     heatTurn: 0,
@@ -69,7 +75,7 @@ export function createGame(
     highlightedTrail: null,
     attackBlockedTurn: 0,
     auraTargeting: false,
-    stealthActions: 0,
+    stealthActions: Math.max(0, modifiers.startStealth),
     bleedNextHit: false,
     bitterMurmurReady: false,
     scourgeShrineRoom: null,
@@ -138,10 +144,10 @@ export function createGame(
     bearTraps: [],
     trapTriggerCount: 0,
     lastTrapTriggerId: null,
-    trapInventory: killerId === '设陷者' ? 2 : 0,
+    trapInventory: killerId === '设陷者' ? Math.max(0, 2 + modifiers.trapCount) : 0,
     trapCaches: [],
     huntressAiming: false,
-    hatchets: killerId === '女猎手' ? 3 : 0,
+    hatchets: killerId === '女猎手' ? Math.max(1, 3 + modifiers.hatchetCount) : 0,
     nurseBlinkTargeting: false,
     nurseFollowUp: false,
     nurseFatiguePending: false,
@@ -149,7 +155,7 @@ export function createGame(
     poltergeist: false,
     policeBlocked: false,
     pinnedPeople: [],
-    fearRadius: KILLER_MAP[killerId].fearRadius ?? 1,
+    fearRadius: Math.max(0, Math.min(2, baseFearRadius + modifiers.fearRadius)),
     myersStalking: false,
     myersMovedThisTurn: false,
     stalkPressure: 0,
@@ -185,7 +191,7 @@ export function createGame(
     roomLocks: {},
     revealedThisTurn: false,
     resultReason: '',
-    alarm: 12,
+    alarm: Math.max(0, Math.min(100, 12 + modifiers.startAlarm)),
     emergencyActive: false,
     explored: [ENTRY_ROOM, ...ROOM_MAP[ENTRY_ROOM].neighbors],
     scouted: {},
@@ -247,7 +253,9 @@ export function createGame(
   log(state, `契约已接取：${activeMission.title}`);
   if (lockedHomes.length) log(state, `有 ${lockedHomes.length} 间住屋从内部上锁。封锁房门会阻挡通行与视线；切断对应区域电力可使电子门锁失效，或在门外强行破门。`);
   if (sacrifice) log(state, `血祭品已标记：${sacrifice.name}。此标记本身没有额外效果。`);
-  log(state, `你以「${killerId}」的身份行动。每回合 ${BASE_AP} 点行动点：走路、挥刀、出牌、搜索柜子都从这里扣。`);
+  log(state, `你以「${killerId}」的身份行动。每回合 ${startingEnergy} 点行动点：走路、挥刀、出牌、搜索柜子都从这里扣。`);
+  const summary = modifierSummary(state);
+  if (summary.length) log(state, `配件生效：${summary.join(' · ')}。`);
   log(state, accessories.length
     ? `随身配件：${accessories.map((id) => ACCESSORY_MAP[id].name).join('、')}。配件带入即永久消耗，本局结束后不会归还。`
     : '本局没有携带配件。想带配件的话，下次出发前在装配界面选好两件。');

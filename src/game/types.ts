@@ -134,6 +134,9 @@ export interface AccessoryMod {
   value: number;
 }
 
+/** 统一修正层的汇总表：每个键的最终加值。 */
+export type AccessoryMods = Record<AccessoryModKey, number>;
+
 /**
  * 力量配件：每位杀手专属，开局最多带 2 件，带入即永久消耗。
  * 机制按本作简化，名称与图标取自图鉴（dbdwiki / 迷雾笔记）。
@@ -438,6 +441,8 @@ export interface GameState {
   killer: string;
   /** 本局带入的配件 id（最多 2 件）；进局时已从库存永久扣除 */
   accessories: string[];
+  /** 由带入配件汇总出的统一修正表；引擎只读这一份。 */
+  modifiers: AccessoryMods;
   killerRuntime: KillerRuntime;
   arrestThreshold: number;
   turn: number;

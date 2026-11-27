@@ -95,6 +95,8 @@ import {
   sanitizeAccessoryLoadout,
   starterAccessoryStock,
 } from '../src/game/accessories';
+import { blinkRangeOf, hatchetMax, modifierSummary, modifierValue, possessCost } from '../src/game/modifiers';
+import { exportTuning, importTuning, resetTuning, setAddonModValue } from '../src/game/tuning';
 import { HUNTING_GROUNDS } from '../src/game/maps';
 import type { GameState, RoomId } from '../src/game/types';
 import { createSeededRandom, random, withRandomSource } from '../src/game/random';
@@ -2429,6 +2431,101 @@ check('苦涩低语：出牌后会等待下一次人类死亡，再触发全场�
   check('配件：会写进开局日志', run.log.some((line) => line.includes('随身配件') && line.includes('设陷者腰包')));
   const wrongOwnerRun = createGame(STARTING_DECK, undefined, '护士', 'lampkin', ['trapper_bag', 'scratched_mirror']);
   check('配件：别的杀手的配件带不进本局', wrongOwnerRun.accessories.length === 0);
+}
+
+// 统一修正层：配件的数值必须真的落到引擎，而不是只写在数据表里
+{
+  const trapper = createGame(STARTING_DECK, undefined, '设陷者', 'lampkin', ['trapper_bag', 'rusted_jaws']);
+  check('配件效果：设陷者腰包让开局捕兽夹 2→3', trapper.trapInventory === 3, `traps=${trapper.trapInventory}`);
+  const trapVictim = trapper.people.find((person) => person.role !== 'police')!;
+  trapVictim.room = trapper.playerRoom;
+  trapVictim.hp = 4;
+  trapVictim.alert = 0;
+  trapper.bearTraps = [{ id: 'test-trap', room: trapper.playerRoom, armed: true, discovered: false }];
+  withRandomSource(() => 0.99, () => triggerBearTrapForPerson(trapper, trapVictim));
+  check('配件效果：生锈夹齿让捕兽夹伤害 1→2', trapVictim.hp === 2, `hp=${trapVictim.hp}`);
+  check('配件：修正摘要可读', modifierSummary(trapper).includes('捕兽夹 +1') && modifierSummary(trapper).includes('夹伤 +1'), modifierSummary(trapper).join(' · '));
+
+  const honing = createGame(STARTING_DECK, undefined, '设陷者', 'lampkin', ['honing_stone']);
+  const holdVictim = honing.people.find((person) => person.role !== 'police')!;
+  holdVictim.room = honing.playerRoom;
+  holdVictim.hp = 4;
+  holdVictim.alert = 0;
+  honing.bearTraps = [{ id: 'test-trap', room: honing.playerRoom, armed: true, discovered: false }];
+  withRandomSource(() => 0.99, () => triggerBearTrapForPerson(honing, holdVictim));
+  check('配件效果：打磨石让被困回合 1→2', holdVictim.blockedTurns === 2 && holdVictim.hp === 3, `hold=${holdVictim.blockedTurns}`);
+
+  const huntress = createGame(STARTING_DECK, undefined, '女猎手', 'lampkin', ['infantry_belt', 'iridescent_head']);
+  const axeTarget = huntress.people.find((person) => person.role !== 'police')!;
+  axeTarget.room = huntress.playerRoom;
+  axeTarget.hidden = false;
+  axeTarget.hp = 4;
+  huntress.energy = 4;
+  const axeReady = usePower(huntress, 'huntress_axe');
+  const axeHit = throwHuntressHatchet(huntress, axeTarget.id);
+  check('配件效果：多功能腰带开局 3→4 把飞斧', hatchetMax(huntress) === 4 && huntress.hatchets === 3, `left=${huntress.hatchets}`);
+  check('配件效果：荧虹斧刃让飞斧伤害 1→2', axeReady && axeHit && axeTarget.hp === 2, `hp=${axeTarget.hp}`);
+
+  const puttee = createGame(STARTING_DECK, undefined, '女猎手', 'lampkin', ['soldiers_puttee']);
+  check('配件效果：士兵绑腿行动点 +1、飞斧 -1',
+    puttee.maxEnergy === BASE_AP + 1 && puttee.energy === BASE_AP + 1 && puttee.hatchets === 2,
+    `ap=${puttee.maxEnergy} axes=${puttee.hatchets}`);
+
+  const nurse = createGame(STARTING_DECK, undefined, '护士', 'lampkin', ['campbells_last_breath']);
+  let farPair: [RoomId, RoomId] | null = null;
+  for (const from of ROOMS) {
+    for (const to of ROOMS) {
+      if (roomDistance(from.id, to.id) === 4) { farPair = [from.id, to.id]; break; }
+    }
+    if (farPair) break;
+  }
+  const blinkOk = !!farPair && (() => {
+    nurse.playerRoom = farPair![0];
+    nurse.energy = 4;
+    return usePower(nurse, 'nurse_blink') && blinkPlayer(nurse, farPair![1]);
+  })();
+  const baseNurse = createGame(STARTING_DECK, undefined, '护士', 'lampkin');
+  const baseBlinkOk = !!farPair && (() => {
+    baseNurse.playerRoom = farPair![0];
+    baseNurse.energy = 4;
+    return usePower(baseNurse, 'nurse_blink') && blinkPlayer(baseNurse, farPair![1]);
+  })();
+  check('配件效果：坎贝尔神父的濒死之息把闪现距离 3→4 间房', blinkRangeOf(nurse) === 4 && blinkOk && !baseBlinkOk);
+
+  const bookmark = createGame(STARTING_DECK, undefined, '护士', 'lampkin', ['torn_bookmark']);
+  const nearRoom = ROOM_MAP[bookmark.playerRoom].neighbors[0];
+  const bookmarkUsed = usePower(bookmark, 'nurse_blink') && blinkPlayer(bookmark, nearRoom);
+  check('配件效果：书签碎片把能力冷却 1→0', bookmarkUsed && !bookmark.cooldowns.nurse_blink, `cd=${bookmark.cooldowns.nurse_blink}`);
+
+  const bracelet = createGame(STARTING_DECK, undefined, '护士', 'lampkin', ['dull_bracelet']);
+  bracelet.loot = 100;
+  bracelet.result = 'win';
+  const braceletWin = lootPayout(bracelet);
+  bracelet.result = 'timeout';
+  const braceletFail = lootPayout(bracelet);
+  check('配件效果：灰暗手镯战利品 +30%，能力冷却 +1 回合',
+    braceletWin === 130 && braceletFail === 39 && modifierValue(bracelet, 'cooldown') === 1,
+    `win=${braceletWin} fail=${braceletFail}`);
+
+  const myers = createGame(STARTING_DECK, undefined, '迈克尔·迈尔斯', 'lampkin', ['scratched_mirror', 'judiths_tombstone']);
+  check('配件效果：划痕镜子尾随获取 +30%，墓碑把附身消耗 20→15',
+    modifierValue(myers, 'stalkGain') === 30 && possessCost(myers) === 15, `cost=${possessCost(myers)}`);
+  const journal = createGame(STARTING_DECK, undefined, '迈克尔·迈尔斯', 'lampkin', ['judiths_journal']);
+  check('配件效果：茱蒂丝的日志让开局警报 12→18', journal.alarm === 18, `alarm=${journal.alarm}`);
+}
+
+// 后台配件调参：改值、导出、拒绝非法键、恢复默认
+{
+  const before = ACCESSORY_MAP.trapper_bag.mods[0].value;
+  setAddonModValue('trapper_bag', 'trapCount', 3);
+  const changed = ACCESSORY_MAP.trapper_bag.mods[0].value === 3;
+  const exported = JSON.parse(exportTuning()) as { addons?: Record<string, { mods?: Record<string, number> }> };
+  const hasAddon = exported.addons?.trapper_bag?.mods?.trapCount === 3;
+  const invalidRejected = !importTuning(JSON.stringify({ ...exported, addons: { trapper_bag: { mods: { nonsense: 5 } } } }));
+  resetTuning();
+  check('后台配件：改值、导出与非法键拒绝，恢复默认后回到原值',
+    changed && hasAddon && invalidRejected && ACCESSORY_MAP.trapper_bag.mods[0].value === before,
+    `before=${before} now=${ACCESSORY_MAP.trapper_bag.mods[0].value}`);
 }
 
 caseNewPerkSystem();

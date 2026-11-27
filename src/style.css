@@ -3712,3 +3712,23 @@ button, .room-hit, .hand-row { touch-action: manipulation; }
   .acc-slots { grid-template-columns: 1fr; }
   .acc-grid { grid-template-columns: 1fr; max-height: 34vh; }
 }
+/* HUD 配件加成摘要：长度受杀手头像列宽度限制，完整内容在 title 里 */
+.killer-addon-mods {
+  display: block; max-width: 116px; margin-top: 1px;
+  color: #8f7a5c; font-size: 8px; line-height: 1.4;
+  letter-spacing: .2px; text-align: center;
+}
+/* 后台：分类标签页与配件数值格 */
+.admin-tabs {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  margin: 14px 0 4px; padding-bottom: 9px;
+  border-bottom: 1px solid #22262a;
+}
+.admin-tabs .btn small { margin-left: 3px; color: #8a7250; font-family: var(--font-num); }
+.admin-tabs .btn.primary small { color: #d3b482; }
+.tune-mods { display: flex; flex-wrap: wrap; gap: 8px; margin: 7px 0; }
+.tune-mod {
+  display: flex; flex-direction: column; gap: 3px;
+  font-size: 9px; letter-spacing: 1px; color: var(--faint);
+}
+.tune-mod input { width: 76px; }

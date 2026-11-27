@@ -2,6 +2,15 @@ import { random, randomOf, shuffle } from './random';
 import { getExecutionMethod, type ExecutionMethodId } from './executions';
 import { nearestOf, roomDistance } from './navigation';
 import { awarenessStage, myersStalkGain } from './npc/awareness';
+import {
+  blinkRangeOf,
+  hatchetDamageOf,
+  hatchetMax,
+  modifierValue,
+  possessCost,
+  trapDamageOf,
+  trapHoldTurns,
+} from './modifiers';
 import { ESCAPE_ROOMS, BASE_AP, SABOTAGE_COST, ITEM_BOX_CHARGES, POSSESS_TURNS, SURVIVOR_MAX_HP, SURVIVOR_INJURED_HP } from './constants';
 import { drawCards } from './deck';
 import { executeOps } from './effects/runtime';
@@ -711,14 +720,15 @@ function afterPlayerAction(state: GameState): void {
       }
     }
   });
-  // 恶魔附身以行动而非回合计时；每次行动消耗 20 点尾随值。
+  // 恶魔附身以行动而非回合计时；每次行动消耗的尾随值由统一修正层决定。
   if (state.killer === '迈克尔·迈尔斯' && state.possessed) {
-    state.stalkMeter = Math.max(0, state.stalkMeter - 20);
+    const cost = possessCost(state);
+    state.stalkMeter = Math.max(0, state.stalkMeter - cost);
     if (state.stalkMeter === 0) {
       state.possessed = false;
       log(state, '尾随值耗尽，恶魔附身结束。');
     } else {
-      log(state, `恶魔附身消耗 20 点尾随值（剩余 ${state.stalkMeter}/100）。`);
+      log(state, `恶魔附身消耗 ${cost} 点尾随值（剩余 ${state.stalkMeter}/100）。`);
     }
   }
   // 玩家的一次行动结束：痕迹的寿命按行动数走，不是按回合。
@@ -965,7 +975,8 @@ function damagePerson(state: GameState, person: Person, amount: number, options:
 
   const before = person.hp;
   if (affectFear) {
-    person.fear = clamp(person.fear + Math.max(28, dmg * 24), 0, 100);
+    // 配件「命中恐惧」在这里统一加；基础值仍然只有一套。
+    person.fear = clamp(person.fear + Math.max(28, dmg * 24) + modifierValue(state, 'fearOnHit'), 0, 100);
     if (person.fear >= 100) dmg = Math.max(dmg, before);
   }
   person.hidden = false;
@@ -1994,19 +2005,21 @@ export function triggerBearTrapForPerson(state: GameState, person: Person): void
   state.trapTriggerCount += 1;
   person.trapTriggered = true;
   person.revealedActions = Math.max(person.revealedActions ?? 0, 2);
-  person.hp = Math.max(0, person.hp - 1);
+  const trapDamage = trapDamageOf(state);
+  const holdTurns = trapHoldTurns(state);
+  person.hp = Math.max(0, person.hp - trapDamage);
   person.alert = 100;
   person.awareness = 3;
-  person.blockedTurns = 1;
+  person.blockedTurns = holdTurns;
   person.intent = 'stunned';
   if (person.hp <= 0) {
     person.hp = 0;
     person.downedTurns = 0;
     person.activity = '被捕兽夹击倒，倒在地上';
-    log(state, `${person.name} 踩中捕兽夹，受到 1 点伤害并被击倒，发出尖叫！`);
+    log(state, `${person.name} 踩中捕兽夹，受到 ${trapDamage} 点伤害并被击倒，发出尖叫！`);
   } else {
     person.activity = '脚踝被捕兽夹咬住，暂时无法移动';
-    log(state, `${person.name} 踩中捕兽夹，受到 1 点伤害并被困住 1 回合，发出尖叫！`);
+    log(state, `${person.name} 踩中捕兽夹，受到 ${trapDamage} 点伤害并被困住 ${holdTurns} 回合，发出尖叫！`);
   }
   addAlarm(state, 2);
   npcs(state).filter((other) => other.id !== person.id && other.room === person.room)
@@ -3249,10 +3262,10 @@ export function attack(state: GameState, targetId?: string, options: { costOverr
   const trackingCombo = target.role !== 'police' && target.trackedTurns > 0;
   const controlCombo = target.role !== 'police' && target.blockedTurns > 0;
   // 基础挥刀 2 点：一刀受伤、两刀倒地，再补一次处决。
-  // 猎杀本身要干脆，难点应该在于「怎么拿更高分」，而不是站桩砍四刀。
+  // 配件的「挥刀伤害」只在普通挥刀上生效，不放大厄咒/附身的一击倒地。
   const baseDamage = noedActive || (heavy && state.killer === '迈克尔·迈尔斯')
     ? SURVIVOR_MAX_HP
-    : 2;
+    : Math.min(SURVIVOR_MAX_HP, 2 + modifierValue(state, 'attackDamage'));
   const comboDamage = controlCombo && baseDamage < SURVIVOR_MAX_HP ? 1 : 0;
   if (noedActive && target.role !== 'police') {
     damagePerson(state, target, SURVIVOR_MAX_HP);
@@ -3851,8 +3864,9 @@ function huntressTargetable(state: GameState, person: Person): boolean {
 export function blinkPlayer(state: GameState, room: RoomId): boolean {
   if (state.killer !== '护士' || !state.nurseBlinkTargeting) return false;
   const distance = roomDistance(state.playerRoom, room);
-  if (room === state.playerRoom || distance < 1 || distance > 3 || state.energy < 1) {
-    log(state, '闪现目标必须在 1–3 间房距离内，且需要 1 点行动点。');
+  const maxRange = blinkRangeOf(state);
+  if (room === state.playerRoom || distance < 1 || distance > maxRange || state.energy < 1) {
+    log(state, `闪现目标必须在 1–${maxRange} 间房距离内，且需要 1 点行动点。`);
     return false;
   }
   const from = ROOM_MAP[state.playerRoom].rect;
@@ -3870,7 +3884,10 @@ export function blinkPlayer(state: GameState, room: RoomId): boolean {
   state.nurseBlinkTargeting = false;
   state.nurseFollowUp = true;
   state.nurseFatiguePending = true;
-  state.cooldowns.nurse_blink = 1;
+  // 冷却修正：负数 = 更快。基础闪现冷却 1 回合。
+  const blinkCooldown = Math.max(0, 1 + modifierValue(state, 'cooldown'));
+  if (blinkCooldown > 0) state.cooldowns.nurse_blink = blinkCooldown;
+  else delete state.cooldowns.nurse_blink;
   state.huntStats.nurseBlinks += 1;
   state.attackReady = true;
   log(state, `护士穿过墙壁与房门，闪现到${roomName(room)}。你可以立即对同屋站立幸存者发动一次普通攻击；下一次行动后将进入疲惫。`);
@@ -3892,9 +3909,9 @@ export function throwHuntressHatchet(state: GameState, targetId: string): boolea
   state.hatchets -= 1;
   state.huntStats.hatchetHits += 1;
   state.huntressAiming = false;
-  log(state, `女猎手掷出狩猎飞斧，命中${target.name}（剩余飞斧 ${state.hatchets}/3）。`);
+  log(state, `女猎手掷出狩猎飞斧，命中${target.name}（剩余飞斧 ${state.hatchets}/${hatchetMax(state)}）。`);
   // 飞斧不影响恐惧值，也不因恐惧满值放大伤害；命中后仍会触发逃跑反应。
-  damagePerson(state, target, 1, { affectFear: false, forceFlee: true });
+  damagePerson(state, target, hatchetDamageOf(state), { affectFear: false, forceFlee: true });
   state.attackReady = true;
   afterPlayerAction(state);
   checkImmediateWin(state);
@@ -3902,14 +3919,15 @@ export function throwHuntressHatchet(state: GameState, targetId: string): boolea
 }
 
 export function refillHuntressHatchets(state: GameState): boolean {
-  if (state.killer !== '女猎手' || !cabinetRoomsFor(state).includes(state.playerRoom) || state.hatchets >= 3 || state.energy < 1) {
+  const max = hatchetMax(state);
+  if (state.killer !== '女猎手' || !cabinetRoomsFor(state).includes(state.playerRoom) || state.hatchets >= max || state.energy < 1) {
     log(state, '只有在柜子房间内、行动点充足且飞斧未满时才能补充。');
     return false;
   }
   state.energy -= 1;
-  const restored = 3 - state.hatchets;
-  state.hatchets = 3;
-  log(state, `你从柜子里取出 ${restored} 把飞斧，补充至 3/3。`);
+  const restored = max - state.hatchets;
+  state.hatchets = max;
+  log(state, `你从柜子里取出 ${restored} 把飞斧，补充至 ${max}/${max}。`);
   afterPlayerAction(state);
   return true;
 }
@@ -3952,7 +3970,7 @@ export function canUsePower(state: GameState, powerId: string): boolean {
     if (state.killer !== '护士') return false;
     if (state.nurseBlinkTargeting) return true;
     if (state.nurseFollowUp || state.energy < 1) return false;
-    return ROOMS.some((room) => room.id !== state.playerRoom && roomDistance(state.playerRoom, room.id) <= 3);
+    return ROOMS.some((room) => room.id !== state.playerRoom && roomDistance(state.playerRoom, room.id) <= blinkRangeOf(state));
   }
   if (powerId === 'huntress_axe') {
     if (state.killer !== '女猎手' || state.energy < 1) return false;
@@ -4031,7 +4049,7 @@ export function usePower(state: GameState, powerId: string): boolean {
     }
     if (!canUsePower(state, powerId)) { log(state, powerBlockReason(state, powerId) || '当前无法闪现。'); return false; }
     state.nurseBlinkTargeting = true;
-    log(state, '选择地图上 1–3 间房距离内的目标位置；闪现后可立即攻击同屋站立幸存者。');
+    log(state, `选择地图上 1–${blinkRangeOf(state)} 间房距离内的目标位置；闪现后可立即攻击同屋站立幸存者。`);
     return true;
   }
   if (powerId === 'huntress_axe') {
@@ -4050,7 +4068,7 @@ export function usePower(state: GameState, powerId: string): boolean {
     if (state.stalkMeter >= 100) {
       state.energy -= 1;
       state.possessed = true;
-      log(state, '恶魔附身：尾随值已满，迈克尔释放积攒的恶意。接下来每次行动消耗 20 点尾随值，强化挥刀可直接击倒站立目标；结束后不会陷入虚弱。');
+      log(state, `恶魔附身：尾随值已满，迈克尔释放积攒的恶意。接下来每次行动消耗 ${possessCost(state)} 点尾随值，强化挥刀可直接击倒站立目标；结束后不会陷入虚弱。`);
       state.attackReady = true;
       afterPlayerAction(state);
       checkImmediateWin(state);
@@ -4066,7 +4084,9 @@ export function usePower(state: GameState, powerId: string): boolean {
       const isolated = !npcs(state).some((other) =>
         other.id !== person.id && other.hp > 0 && other.role !== 'police' && !other.hidden && other.room === person.room,
       );
-      const gain = myersStalkGain(person.alert) + (isolated ? 5 : 0);
+      const baseGain = myersStalkGain(person.alert) + (isolated ? 5 : 0);
+      // 配件的「尾随获取」按百分比放大，四舍五入保证 HUD 与结算看到同一个整数。
+      const gain = Math.max(0, Math.round(baseGain * (1 + modifierValue(state, 'stalkGain') / 100)));
       totalGain += gain;
       names.push(`${person.name} +${gain}${isolated ? '（落单）' : ''}`);
     }
@@ -4083,7 +4103,9 @@ export function usePower(state: GameState, powerId: string): boolean {
   }
   const killer = KILLER_MAP[state.killer];
   const power = killer.powers.find((p) => p.id === powerId)!;
-  state.cooldowns[powerId] = power.cooldown;
+  const cooldown = Math.max(0, power.cooldown + modifierValue(state, 'cooldown'));
+  if (cooldown > 0) state.cooldowns[powerId] = cooldown;
+  else delete state.cooldowns[powerId];
   log(state, `${killer.owner}·${power.name}：${power.desc}`);
   runOps(state, power.ops);
   if (state.killer === '鬼面' && powerId === 'ghost_stalk') {
@@ -4218,7 +4240,9 @@ export const LOOT_FAILURE_KEEP = 0.3;
 
 export function lootPayout(state: GameState): number {
   const keep = state.mission.mode === 'free' || state.result === 'win' ? 1 : LOOT_FAILURE_KEEP;
-  return Math.round(state.loot * keep);
+  // 配件「战利品」只在真正带出时生效：失败仍然只保留三成基础。
+  const gear = 1 + modifierValue(state, 'lootPct') / 100;
+  return Math.max(0, Math.round(state.loot * keep * gear));
 }
 
 export function scoreLines(state: GameState, result: ResultKind | null = null): ScoreLine[] {

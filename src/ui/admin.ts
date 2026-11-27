@@ -1,10 +1,12 @@
 import { CARDS } from '../game/data/cards';
 import { ACTIVE_KILLERS } from '../game/data/killers';
+import { ACCESSORIES, ACCESSORY_RARITY_LABEL } from '../game/data/accessories';
 import type { Op } from '../game/effect';
-import { exportTuning, hasTuning, createCustomCard, duplicateCard, deleteCard } from '../game/tuning';
+import { exportTuning, hasTuning, createCustomCard, duplicateCard, deleteCard, isAddonTuned } from '../game/tuning';
 import { isCloudSignedIn } from '../game/cloud';
 import { DEST_OPTIONS, EFFECT_OPS, FLAG_OPTIONS, SABOTAGE_OPTIONS, STATUS_OPTIONS, WHO_OPTIONS, type EffectFieldType } from '../game/effectCatalog';
-import { PERK_RARITY_BG, cardImage } from '../game/assetMap';
+import { ADDON_RARITY_BG, PERK_RARITY_BG, accessoryImage, cardImage } from '../game/assetMap';
+import { modifierLabel } from '../game/modifiers';
 
 /**
  * ============================================================================
@@ -122,7 +124,38 @@ function powerBlock(): string {
   }).join('');
 }
 
+/** 后台的「配件」标签页：只调说明和已定义修正键的数值，保持名称与图标不变。 */
+function addonBlock(): string {
+  return ACCESSORIES.map((item) => `
+    <div class="tune-card">
+      <div class="tune-head">
+        <span class="tune-perk">
+          <img src="${ADDON_RARITY_BG[item.rarity]}" alt="" onerror="this.style.display='none'">
+          <img class="tune-glyph" src="${accessoryImage(item.id)}" alt="" onerror="this.style.display='none'">
+        </span>
+        <b>${escape(item.name)}</b>
+        <em class="tune-ult">${ACCESSORY_RARITY_LABEL[item.rarity]}</em>
+        ${isAddonTuned(item.id) ? '<span class="admin-state dirty">已改</span>' : ''}
+      </div>
+      <label class="tune-description">效果说明<input type="text" maxlength="500" data-addon="${item.id}|desc" value="${escape(item.desc)}"></label>
+      <div class="tune-mods">
+        ${item.mods.map((mod) => `<label class="tune-mod">${modifierLabel(mod.key)}<input type="number" step="1" min="-1000" max="1000" data-addon="${item.id}|${mod.key}" value="${mod.value}"></label>`).join('')}
+      </div>
+      <div class="tune-pre">${escape(item.owner)} · 图鉴：${escape(item.sourceSkill)}${item.sourceText ? ` · ${escape(item.sourceText)}` : ''}</div>
+    </div>
+  `).join('');
+}
+
+export type AdminTab = 'cards' | 'powers' | 'addons';
+
+let adminTab: AdminTab = 'cards';
+
+export function setAdminTab(tab: AdminTab): void {
+  adminTab = tab;
+}
+
 export function renderAdmin(): string {
+  const tab = adminTab;
   return `
     <div class="overlay admin-overlay">
       <div class="modal admin-modal">
@@ -152,17 +185,27 @@ export function renderAdmin(): string {
             <button class="btn mini ghost" data-action="admin-hide-export">收起</button>
           </div>
         </div>
+        <div class="admin-tabs" role="tablist" aria-label="平衡调整分类">
+          <button type="button" role="tab" aria-selected="${tab === 'cards'}" class="btn mini ${tab === 'cards' ? 'primary' : 'ghost'}" data-action="admin-tab" data-tab="cards">卡牌 <small>${CARDS.length}</small></button>
+          <button type="button" role="tab" aria-selected="${tab === 'powers'}" class="btn mini ${tab === 'powers' ? 'primary' : 'ghost'}" data-action="admin-tab" data-tab="powers">杀手能力 <small>${ACTIVE_KILLERS.length}</small></button>
+          <button type="button" role="tab" aria-selected="${tab === 'addons'}" class="btn mini ${tab === 'addons' ? 'primary' : 'ghost'}" data-action="admin-tab" data-tab="addons">配件 <small>${ACCESSORIES.length}</small></button>
+        </div>
         <div class="admin-sections">
-          <section>
+          ${tab === 'cards' ? `<section>
             <h2>卡牌 <small>${CARDS.length} 张 · 可新建、复制、删除并编辑完整效果</small></h2>
             <p class="admin-lead">新卡默认加入通用卡池。攻击步骤可设置命中后流血次数和状态持续次数；0 表示不施加。</p>
             <button type="button" class="btn primary" data-action="admin-card-new">＋ 新建卡牌</button>
             <div class="admin-grid">${cardBlock()}</div>
-          </section>
-          <section>
+          </section>` : ''}
+          ${tab === 'powers' ? `<section>
             <h2>杀手能力 <small>${ACTIVE_KILLERS.length} 位 · 冷却与效果数值</small></h2>
             ${powerBlock()}
-          </section>
+          </section>` : ''}
+          ${tab === 'addons' ? `<section>
+            <h2>力量配件 <small>${ACCESSORIES.length} 件 · 说明与统一修正层数值</small></h2>
+            <p class="admin-lead">配件名称与图标取自图鉴，这里只改说明和数值。改动写进同一套修正层，下一局立刻生效；负数表示反向效果（例如冷却 +1 写成 1，冷却 -1 写成 -1）。</p>
+            <div class="admin-grid">${addonBlock()}</div>
+          </section>` : ''}
         </div>
       </div>
     </div>
