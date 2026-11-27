@@ -91,6 +91,7 @@ export function createGame(
     kills: 0,
     killsThisTurn: 0,
     executions: 0,
+    scoreExecutions: 0,
     survivorKills: 0,
     specialExecutionBonus: 0,
     executionMethodsUsed: [],
