@@ -70,12 +70,14 @@ import {
 
 
 import { isCardTuned } from '../../game/tuning';
-import { isMuted, playHeartbeat, playTrapScream } from '../audio';
+import { isMuted, playHeartbeat, playSfx, playTrapScream } from '../audio';
 import { escape, icon, itemBadge, itemIconHtml, personChip, shadowFigures, perkIconHtml, TYPE_NAMES, killerFaceHtml, defaultDetailHtml, cardTextHtml } from './shared';
 import type { GameState, Person, RoomId, SaveData } from '../../game/types';
 
 let lastRenderedTrapTriggerCount: number | null = null;
 let lastRedFigureSignature = '';
+let lastDiscoveryMissionId: string | null = null;
+const discoveredSurvivorIds = new Set<string>();
 
 function roomFeatures(state: GameState, roomId: RoomId): string {
   const parts: string[] = [];
@@ -123,7 +125,17 @@ function roomFeatures(state: GameState, roomId: RoomId): string {
     parts.push(`<span class="room-feature radio ${radioBroken ? 'broken' : 'on'}" title="备用无线电：${radioBroken ? '已被破坏' : '电话中断时可进行有限范围协调'}">▣<b>无线电</b></span>`);
   }
   const executionSites = executionMethodsAtRoom(roomId);
-  if (executionSites.length) parts.push(`<span class="room-feature execution-site" title="特殊处决地点：${executionSites.map((method) => escape(method.name)).join(' / ')}">☠<b>处决点 ${executionSites.length}</b></span>`);
+  if (executionSites.length) {
+    const carried = state.carryPersonId ? state.people.find((person) => person.id === state.carryPersonId) : undefined;
+    if (carried && carried.hp <= 0 && state.playerRoom === roomId) {
+      executionSites.forEach((method) => {
+        const glyph = method.id === 'fridge' ? '❄' : method.id === 'microwave' ? '▦' : method.id === 'garage_crush' ? '▤' : method.id === 'bathroom_tub' ? '♨' : method.id === 'laundry_dryer' ? '◉' : '⚒';
+        parts.push(`<button type="button" class="room-feature execution-site execution-action" data-action="execute-special" data-method="${method.id}" title="${escape(method.description)}"><span aria-hidden="true">${glyph}</span><b>${escape(method.name)}</b></button>`);
+      });
+    } else {
+      parts.push(`<span class="room-feature execution-site" title="特殊处决地点：${executionSites.map((method) => escape(method.name)).join(' / ')}">☠<b>处决点 ${executionSites.length}</b></span>`);
+    }
+  }
   if (roomId === EXIT_ROOM) parts.push(`<span class="room-feature escape" title="撤离点：任务完成的撤离位置">${icon('escape', 'ui-icon tiny')}</span>`);
   if (state.escapeRooms.includes(roomId)) parts.push(`<span class="room-feature escape-npc" title="团队第4阶段开启的逃生点">${icon('escape', 'ui-icon tiny')}</span>`);
   if (TOTEM_ROOMS.includes(roomId)) parts.push(`<span class="room-feature totem" title="图腾：在此结束回合，下回合 +1 行动点">${icon('totem', 'ui-icon tiny')}<b>图腾</b></span>`);
@@ -330,6 +342,15 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
   const redSignature = redFigures.map((person) => person.id).sort().join('|');
   if (redSignature && redSignature !== lastRedFigureSignature) playHeartbeat();
   lastRedFigureSignature = redSignature;
+  if (lastDiscoveryMissionId !== m.id) {
+    lastDiscoveryMissionId = m.id;
+    discoveredSurvivorIds.clear();
+  }
+  const newlyDiscovered = state.people.filter((person) => person.role !== 'police' && !person.hidden && isRoomVisible(state, person.room) && !discoveredSurvivorIds.has(person.id));
+  if (newlyDiscovered.length) {
+    newlyDiscovered.forEach((person) => discoveredSurvivorIds.add(person.id));
+    playSfx('survivorFound');
+  }
   const isMyers = killer.owner === '迈克尔·迈尔斯';
   if (state.turn === 1 && state.trailClock === 0) {
     lastRenderedTrapTriggerCount = state.trapTriggerCount;
@@ -339,6 +360,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
     lastRedFigureSignature = '';
   } else if (state.trapTriggerCount > lastRenderedTrapTriggerCount) {
     playTrapScream();
+    playSfx('trapTrigger');
     playHeartbeat();
     lastRenderedTrapTriggerCount = state.trapTriggerCount;
   }
@@ -664,7 +686,6 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
   const mapWorldActions = carried
     ? `<div class="map-world-actions" style="${markerStyle}" aria-label="携带目标操作">
         <button class="btn" data-action="drop-carried" ${state.energy < 1 ? 'disabled' : ''}>放下目标 · 1 AP</button>
-        ${executionMethodsAtRoom(state.playerRoom).map((method) => `<button class="btn" data-action="execute-special" data-method="${method.id}" title="${escape(method.description)}">特殊处决 · ${escape(method.name)}</button>`).join('')}
       </div>`
     : '';
   const carryStatus = carried ? `<div class="status-badge carrying">抱着 ${escape(carried.name)} · 搬运 ${state.carryDistance}/3 格</div>` : '';
