@@ -156,6 +156,9 @@ export type Cond =
   | { c: 'possession' }
   /** 视野中至少有一名存活幸存者 */
   | { c: 'visibleSurvivor' }
+  | { c: 'survivorNearby' }
+  | { c: 'carryingPerson' }
+  | { c: 'currentDestructible' }
   | { c: 'flag'; key: FlagKey }
   | { c: 'room'; is: RoomId }
   | { c: 'markedAlive' }
@@ -207,6 +210,12 @@ export type Op =
   /** 破坏设施 */
   | { op: 'sabotage'; key: SabotageKey }
   | { op: 'contextSabotage' }
+  /** 令当前房间或相邻房间的一名幸存者恐惧上升，并向远离杀手的方向移动一间房。 */
+  | { op: 'fearFlee'; amount: number }
+  /** 免费破坏杀手当前房间内的一处可破坏设施。 */
+  | { op: 'destroyCurrentObject' }
+  /** 标记最近的特殊处决地点，并短暂侦查该房间。 */
+  | { op: 'revealExecutionSite'; turns: number }
   | { op: 'draw'; amount: number }
   | { op: 'energy'; amount: number }
   | { op: 'steps'; amount: number }
