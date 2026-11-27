@@ -14,7 +14,7 @@ export const ASSET_PATHS: AssetPaths = {
   /** 一卡一图标：文件的 basename 与卡牌 id 相同 */
   cards: Object.keys(CARD_MAP).reduce(
     (acc, id) => {
-      acc[id] = id.startsWith('trapper_') ? `assets/dbd/perks/${id}.svg` : `assets/dbd/perks/${id}.png`;
+      acc[id] = `assets/dbd/perks/${id}.png`;
       return acc;
     },
     {} as Record<string, string>,
@@ -82,13 +82,15 @@ export const ASSET_PATHS: AssetPaths = {
  *   false_report 厄咒：惩戒 → Hex: Retribution
  *   unbreakable 不屈不挠 → Unrelenting          hex_huntress 厄咒：猎杀戾气 → Hex: Thrill of the Hunt
  *   hex_noed 厄咒：难逃一死 → Hex: No One Escapes Death
- *   scourge_shrine 天灾：鬼魔神龛 → Scourge Hook: Monstrous Shrine
+ *   scourge_shrine 天灾钩子：鬼魔神龛 → Scourge Hook: Monstrous Shrine
  *   distressing 恐惧释放 → Distressing          iron_grasp 牢牢紧握 → Iron Grasp
  *   deerstalker 猎鹿者 → Deerstalker            hex_ruin 粉碎希望 → Shattered Hope
  *   bitter_murmur 苦涩低语 → Bitter Murmur      sloppy_butcher 辣手屠夫 → Sloppy Butcher
- *   insidious 静止隐身 → Insidious              myers_eclipse_light 湮灭之光 → Dying Light
+ *   insidious 静止隐身 → Insidious              myers_eclipse_light 优胜劣汰 → Cull the Weak
  *   myers_last_best 把最好的留在最后 → Save the Best for Last
  *   myers_plaything 戏耍食物 → Play with Your Food
+ *   trapper_panic 恐慌降临 → Unnerving Presence  trapper_brutal_strength 所向无敌 → Brutal Strength
+ *   trapper_euphoria 欣喜若狂 → Agitation
  *   hell 恶灵地狱 → Whispers（恶灵低语：图鉴中没有同名技能，取名称与效果
  *     ——感知附近逃生者——最接近的官方技能图标替代）
  */

@@ -655,8 +655,7 @@ function caseMyersStalkingAndFearRadius(): void {
     (() => {
       const files = new Set(readdirSync('public/assets/dbd/perks'));
       return Object.keys(CARD_MAP).every((id) => {
-        const extension = id.startsWith('trapper_') ? '.svg' : '.png';
-        return files.has(`${id}${extension}`) && (cardImage(id)?.endsWith(`/${id}${extension}`) ?? false);
+        return files.has(`${id}.png`) && (cardImage(id)?.endsWith(`/${id}.png`) ?? false);
       });
     })());
   const normal = createGame(['silent_step'], undefined, '设陷者');

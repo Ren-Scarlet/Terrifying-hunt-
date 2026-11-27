@@ -3,7 +3,7 @@
 Run from the project root:
     python scripts/import_dbd_assets.py
 
-每一张卡牌对应一个杀手技能图标：图标 = 卡名所指的那枚技能（共 44 张，
+每一张卡牌对应一个杀手技能图标：图标 = 卡名所指的那枚技能（共 47 张，
 同名的两张卡共用同一枚图鉴图标，例如「牢牢紧握」的 choke 与 iron_grasp）。
 映射关系以 dbdwiki 的 perk-icons.manifest.json 为准，中文名以 perks.site.json
 为基准做核对，脚本结束时会打印一张 "卡牌 id → 技能中文名（所属杀手）" 的
@@ -73,10 +73,13 @@ CARD_PERKS = {
     "sloppy_butcher": "sloppy_butcher",              # 辣手屠夫
     "insidious": "insidious",                        # 静止隐身
     # ---- 迈尔斯专属 ----
-    "myers_eclipse_light": "cull_the_weak",          # 湮灭之光（Dying Light，
-                                                     # 图鉴中该图标归入 Cull the Weak）
+    "myers_eclipse_light": "cull_the_weak",          # 优胜劣汰
     "myers_last_best": "save_the_best_for_last",     # 把最好的留在最后
     "myers_plaything": "play_with_your_food",        # 戏耍食物
+    # ---- 设陷者专属 ----
+    "trapper_panic": "unnerving_presence",           # 恐慌降临
+    "trapper_brutal_strength": "brutal_strength",    # 所向无敌
+    "trapper_euphoria": "agitation",                 # 欣喜若狂
 }
 
 POWER_OWNERS = [

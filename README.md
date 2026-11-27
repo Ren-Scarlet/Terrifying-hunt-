@@ -354,20 +354,21 @@ scripts/
 | `unbreakable` | 不屈不挠 | 0 | 技能 | Unrelenting |
 | `hex_huntress` | 厄咒：猎杀戾气 | 1 | 布局 | Hex: Thrill of the Hunt |
 | `hex_noed` | 厄咒：难逃一死 | 1 | 布局 | Hex: No One Escapes Death |
-| `scourge_shrine` | 天灾：鬼魔神龛 | 1 | 布局 | Scourge Hook: Monstrous Shrine |
+| `scourge_shrine` | 天灾钩子：鬼魔神龛 | 1 | 布局 | Scourge Hook: Monstrous Shrine |
 | `distressing` | 恐惧释放 | 1 | 技能 | Distressing |
-| `hell` | 恶灵地狱 | 1 | 技能 | Whispers（恶灵低语）* |
+| `hell` | 恶灵低语 | 0 | 技能 | Whispers |
 | `iron_grasp` | 牢牢紧握 | 1 | 战术 | Iron Grasp |
 | `deerstalker` | 猎鹿者 | 1 | 技能 | Deerstalker |
 | `hex_ruin` | 粉碎希望 | 1 | 布局 | Shattered Hope |
 | `bitter_murmur` | 苦涩低语 | 1 | 技能 | Bitter Murmur |
 | `sloppy_butcher` | 辣手屠夫 | 1 | 技能 | Sloppy Butcher |
 | `insidious` | 静止隐身 | 1 | 技能 | Insidious |
-| `myers_eclipse_light` | 湮灭之光 | 1 | 技能 | Dying Light（图鉴图标现归入 Cull the Weak） |
+| `myers_eclipse_light` | 优胜劣汰 | 1 | 技能 | Cull the Weak |
 | `myers_last_best` | 把最好的留在最后 | 1 | 技能 | Save the Best for Last |
-| `myers_plaything` | 戏耍食物 | 1 | 战术 | Play with Your Food |
-
-\* 图鉴中没有名为「恶灵地狱」的技能，取名称与效果（感知附近逃生者）最接近的官方技能「恶灵低语 Whispers」的图标替代。
+| `myers_plaything` | 玩弄食物 | 0 | 战术 | Play with Your Food |
+| `trapper_panic` | 恐慌降临 | 0 | 战术 | Unnerving Presence |
+| `trapper_brutal_strength` | 所向无敌 | 0 | 技能 | Brutal Strength |
+| `trapper_euphoria` | 欣喜若狂 | 0 | 技能 | Agitation |
 
 图标文件名与卡牌 id 一一对应：`public/assets/dbd/perks/<id>.png`。重新生成（会打印上面这张表的实际命中结果）：
 

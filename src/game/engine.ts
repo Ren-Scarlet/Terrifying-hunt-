@@ -2919,7 +2919,7 @@ export function playCard(state: GameState, cardUid: string): boolean {
   if (card.defId === 'myers_eclipse_light') {
     const lastTarget = state.people.find((person) => person.id === state.lastAttackedId);
     if (state.killer !== '迈克尔·迈尔斯' || !lastTarget || lastTarget.hp > 0 || lastTarget.role === 'police') {
-      log(state, '湮灭之光：必须先击倒一名人类才能打出。');
+      log(state, '优胜劣汰：必须先击倒一名人类才能打出。');
       return false;
     }
   }
@@ -2961,7 +2961,7 @@ export function playCard(state: GameState, cardUid: string): boolean {
       if (sacrifice) {
         const survivors = state.people.filter((person) => person.role !== 'police' && person.hp > 0);
         survivors.forEach((person) => { person.fear = clamp(person.fear + 35, 0, 100); });
-        log(state, `血祭品被湮灭之光处决：所有 ${survivors.length} 名幸存人类恐惧值 +35。`);
+        log(state, `血祭品被优胜劣汰处决：所有 ${survivors.length} 名幸存人类恐惧值 +35。`);
       }
     }
   } else if (card.defId === 'myers_last_best') {
