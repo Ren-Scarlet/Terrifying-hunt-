@@ -2577,3 +2577,14 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
 #app.immersive-game .killer-face.ability-portrait img { object-fit:contain!important; object-position:bottom center!important; transform:none!important; }
 @media(max-width:1100px){#app.immersive-game .killer-ability-panel{width:300px!important;grid-template-columns:128px minmax(0,1fr)!important}#app.immersive-game .killer-face.ability-portrait{width:128px!important;height:158px!important;flex-basis:158px!important}}
 @media(max-width:700px){#app.immersive-game .killer-ability-panel{width:218px!important;grid-template-columns:86px minmax(0,1fr)!important}#app.immersive-game .killer-face.ability-portrait{width:86px!important;height:112px!important;flex-basis:112px!important}#app.immersive-game .bottom-hud .map-event-feed,#app.immersive-game .activity-log-panel{display:none!important}}
+
+#app.immersive-game .mission-task-list .mission-task { display:grid!important; grid-template-columns:18px minmax(0,1fr) auto!important; align-items:center!important; gap:4px 7px!important; padding:7px 8px!important; border:1px solid rgba(205,222,231,.13)!important; border-radius:5px!important; color:#d1dbe0!important; font-size:11px!important; line-height:1.4!important; }
+#app.immersive-game .mission-task-list .mission-task>b { color:#d17b72!important; font-size:13px!important; }
+#app.immersive-game .mission-task-list .mission-task em { color:#d8c4a9!important; font-size:10px!important; font-style:normal!important; }
+#app.immersive-game .mission-task-list .mission-task small { grid-column:2/-1!important; color:#91a0a8!important; font-size:9px!important; }
+#app.immersive-game .mission-task-list .mission-task.done { opacity:.62!important; }
+#app.immersive-game .mission-task-list .mission-task.failed { border-color:rgba(170,55,55,.45)!important; }
+#app.immersive-game .floorplan .room-feature.barricade-action { position:relative!important; z-index:80!important; pointer-events:auto!important; cursor:pointer!important; }
+#app.immersive-game .floorplan .room-feature.barricade-action:hover { border-color:rgba(235,95,82,.9)!important; background:rgba(70,18,18,.96)!important; }
+#app.immersive-game .killer-power-grid .btn.power .power-art { margin:0!important; }
+#app.immersive-game .killer-power-grid .btn.power .power-body b { text-align:left!important; }
