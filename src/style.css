@@ -3626,3 +3626,89 @@ button, .room-hit, .hand-row { touch-action: manipulation; }
   .guide-head{padding:16px 16px 12px;}
   .guide-body{padding:2px 16px 16px;}
 }
+
+/* ==========================================================================
+   力量配件：图标框、装配界面、HUD 槽位
+   ========================================================================== */
+
+/* 配件图标沿用图鉴的稀有度菱形底。与卡牌图标同一套结构，文件名 = 配件 id。 */
+.dbd-addon { position: relative; width: 64px; height: 64px; flex: 0 0 auto; }
+.dbd-addon-bg, .dbd-addon-glyph {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: contain; pointer-events: none;
+}
+.dbd-addon-bg { filter: saturate(.92) brightness(.82) contrast(1.06); }
+.dbd-addon-glyph { filter: drop-shadow(0 2px 5px #000b) contrast(1.04); }
+.dbd-addon.slot { width: 54px; height: 54px; }
+.dbd-addon.card { width: 46px; height: 46px; }
+.dbd-addon.hud { width: 26px; height: 26px; }
+
+.accessory-modal { width: min(960px, 100%); }
+.acc-resource {
+  display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center;
+  margin: 12px 0 4px; padding: 8px 12px;
+  border: 1px solid #2a2520; border-radius: 2px;
+  background: linear-gradient(90deg, #12100d, #0a0c0e);
+  font-size: 11px; color: var(--muted);
+}
+.acc-resource b { color: #c9a86c; font-family: var(--font-num); font-size: 13px; }
+.acc-resource span { display: inline-flex; align-items: center; gap: 4px; }
+
+.acc-slots { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 12px 0 6px; }
+.acc-slot {
+  display: flex; align-items: center; gap: 10px;
+  min-height: 86px; padding: 10px;
+  border: 1px dashed #3a322a; border-radius: 3px;
+  background: linear-gradient(180deg, #0f1113, #0a0c0e);
+}
+.acc-slot.filled {
+  border-style: solid; border-color: #5c4a34;
+  background: linear-gradient(180deg, #17130f, #0b0c0e);
+}
+.acc-slot.empty { flex-direction: column; justify-content: center; text-align: center; color: var(--faint); }
+.acc-slot.empty b { font-size: 11px; letter-spacing: 2px; color: #6f6a62; }
+.acc-slot.empty small { font-size: 9.5px; }
+.acc-slot-info { flex: 1; min-width: 0; }
+.acc-slot-info small { display: block; color: #8a7250; font-size: 8.5px; letter-spacing: 2px; }
+.acc-slot-info b { display: block; margin: 2px 0 3px; font-size: 12px; letter-spacing: .5px; color: #ded5c6; }
+.acc-slot-info span { display: block; color: #7f7a72; font-size: 9.5px; line-height: 1.5; }
+
+.acc-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(282px, 1fr)); gap: 8px;
+  margin-top: 10px; max-height: 40vh; overflow-y: auto; padding-right: 2px;
+}
+.acc-card {
+  display: flex; flex-direction: column;
+  padding: 9px;
+  border: 1px solid #22262a; border-radius: 2px;
+  background: linear-gradient(180deg, #0e1113, #0a0c0e);
+  transition: border-color .15s, background .15s;
+}
+.acc-card:hover { border-color: #3d362c; background: linear-gradient(180deg, #121518, #0b0d0f); }
+.acc-card.equipped { border-color: #6b5438; box-shadow: inset 0 0 0 1px #6b543822; }
+.acc-card.out { opacity: .55; }
+.acc-card-head { display: flex; align-items: center; gap: 9px; }
+.acc-card-title { min-width: 0; }
+.acc-card-title b { display: block; font-size: 11.5px; letter-spacing: .4px; }
+.acc-card-title small { display: block; color: var(--faint); font-size: 9px; letter-spacing: 1px; }
+.acc-card p { flex: 1; margin: 8px 0; color: #8b857c; font-size: 10px; line-height: 1.6; }
+.acc-card-actions { display: flex; gap: 6px; }
+.acc-card-actions .btn { flex: 1; justify-content: center; }
+
+/* HUD：杀手面板里的两个配件槽，空槽用虚线和加号 */
+.killer-addon-slots { display: flex; gap: 4px; justify-content: center; margin-top: 2px; }
+.killer-addon-slot {
+  display: grid; place-items: center;
+  width: 30px; height: 30px;
+  border-radius: 3px;
+}
+.killer-addon-slot.empty {
+  border: 1px dashed #3d362c; color: #575249;
+  font-size: 13px; line-height: 1;
+}
+.killer-addon-slot .dbd-addon.hud { width: 26px; height: 26px; }
+
+@media (max-width: 760px) {
+  .acc-slots { grid-template-columns: 1fr; }
+  .acc-grid { grid-template-columns: 1fr; max-height: 34vh; }
+}

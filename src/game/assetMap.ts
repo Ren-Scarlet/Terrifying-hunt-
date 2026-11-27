@@ -1,8 +1,18 @@
 import { CARD_MAP } from './cards';
 import { SURVIVOR_MAP, survivorPortrait } from './survivors';
+import type { AccessoryRarity } from './types';
 
 export const PERK_RARITY_BG = 'assets/dbd/rarity/perk-very-rare.webp';
 export const POWER_RARITY_BG = 'assets/dbd/rarity/addon-common.webp';
+
+/** 配件底框：按稀有度换色，与图鉴的 addon 菱形底一致。 */
+export const ADDON_RARITY_BG: Record<AccessoryRarity, string> = {
+  common: 'assets/dbd/rarity/addon-common.webp',
+  uncommon: 'assets/dbd/rarity/addon-uncommon.webp',
+  rare: 'assets/dbd/rarity/addon-rare.webp',
+  'very-rare': 'assets/dbd/rarity/addon-very-rare.webp',
+  visceral: 'assets/dbd/rarity/addon-visceral.webp',
+};
 
 export interface AssetPaths {
   cards: Record<string, string>;
@@ -84,6 +94,11 @@ export function cardImage(defId: string): string | undefined {
 export function characterImage(id: string): string | undefined {
   if (SURVIVOR_MAP[id]) return survivorPortrait(id);
   return ASSET_PATHS.characters[id];
+}
+
+/** 配件图标：与卡牌同一套约定——文件 basename = 配件 id。 */
+export function accessoryImage(id: string): string {
+  return `assets/dbd/addons/${id}.png`;
 }
 
 export function uiIcon(name: keyof AssetPaths['ui']): string {

@@ -48,6 +48,27 @@ CARD_PERKS = {
     "trapper_euphoria": "agitation",                 # 欣喜若狂
 }
 
+# 力量配件 id -> 图鉴图标文件名（loadout 图集里的 addon:IconAddon_xxx.png）。
+# 与 src/game/data/accessories.ts 的 id 一一对应；图标同样是「一配件一图」。
+ADDON_ICONS = {
+    # ---- 设陷者 ----
+    "trapper_bag": "IconAddon_trapperBag.png",
+    "rusted_jaws": "IconAddon_rustedJaws.png",
+    "honing_stone": "IconAddon_honingStone.png",
+    # ---- 护士 ----
+    "campbells_last_breath": "IconAddon_campbellsLastBreath.png",
+    "dull_bracelet": "IconAddon_dullBracelet.png",
+    "torn_bookmark": "IconAddon_tornBookmark.png",
+    # ---- 女猎手 ----
+    "infantry_belt": "IconAddon_infantryBelt.png",
+    "iridescent_head": "IconAddon_iridescentHead.png",
+    "soldiers_puttee": "IconAddon_soldiersPuttee.png",
+    # ---- 迈克尔·迈尔斯 ----
+    "scratched_mirror": "IconAddon_scratchedMirror.png",
+    "judiths_tombstone": "IconAddon_judithsTombstone.png",
+    "judiths_journal": "IconAddon_judithsJournal.png",
+}
+
 POWER_OWNERS = [
     "设陷者", "幽灵", "护士", "女猎手", "鬼面", "迈克尔·迈尔斯",
     "贞子", "梦魇", "食人魔", "处刑者", "魔王", "医生", "门徒",
@@ -74,7 +95,7 @@ def crop_sprite(sheet: Image.Image, pos: dict) -> Image.Image:
 
 def main():
     TEMP.mkdir(parents=True, exist_ok=True)
-    for d in ["perks", "powers", "rarity"]:
+    for d in ["perks", "powers", "addons", "rarity"]:
         (PUBLIC / d).mkdir(parents=True, exist_ok=True)
 
     perk_manifest = fetch_json(f"{BASE}/data/dbd/perk-icons.manifest.json")
@@ -114,6 +135,18 @@ def main():
         crop_sprite(perk_sheet, entry["position_2x"]).save(PUBLIC / "perks" / f"{card_id}.png")
         table.append((card_id, zh_by_slug.get(slug) or entry.get("name_en", slug), entry.get("character_en", "")))
 
+    # 力量配件：与卡牌同一张 loadout 图集，按 manifest 的 addon: 坐标裁切。
+    addon_table = []
+    missing_addons = []
+    for addon_id, filename in ADDON_ICONS.items():
+        entry = loadout_manifest["icons"].get(f"addon:{filename}")
+        if not entry:
+            missing_addons.append(filename)
+            print(f"[warn] missing addon icon: {filename}")
+            continue
+        crop_sprite(loadout_sheet, entry["position_2x"]).save(PUBLIC / "addons" / f"{addon_id}.png")
+        addon_table.append((addon_id, filename))
+
     # 只导入图标。src/game/killers.ts 为手写的原创机制数据，脚本不再覆盖它。
     for owner in POWER_OWNERS:
         module = next((m for m in addons["modules"] if m.get("owner") == owner and m.get("power")), None)
@@ -131,13 +164,20 @@ def main():
         fetch_file(f"{BASE}/assets/rarities/addon-{rarity}.webp", PUBLIC / "rarity" / f"addon-{rarity}.webp")
     fetch_file(f"{BASE}/assets/rarities/perk-very-rare.webp", PUBLIC / "rarity" / "perk-very-rare.webp")
 
-    print(f"\nImported {len(table)} perk icons, {len(POWER_OWNERS)} powers, {len(RARITIES) + 1} rarity backgrounds.")
+    print(f"\nImported {len(table)} perk icons, {len(addon_table)} addon icons, {len(POWER_OWNERS)} powers, {len(RARITIES) + 1} rarity backgrounds.")
     print("\n| 卡牌 id | 卡名（图鉴技能中文名） | 所属杀手 |")
     print("| --- | --- | --- |")
     for card_id, name, character in table:
         print(f"| `{card_id}` | {name} | {character or '通用'} |")
+    print("\n| 配件 id | 图鉴图标文件 |")
+    print("| --- | --- |")
+    for addon_id, filename in addon_table:
+        print(f"| `{addon_id}` | {filename} |")
     if missing:
         print(f"\n[error] {len(missing)} 个 slug 未命中: {', '.join(missing)}")
+        return 1
+    if missing_addons:
+        print(f"\n[error] {len(missing_addons)} 个配件图标未命中: {', '.join(missing_addons)}")
         return 1
     return 0
 

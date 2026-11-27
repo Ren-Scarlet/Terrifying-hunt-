@@ -88,6 +88,72 @@ export interface CardInstance {
   defId: string;
 }
 
+/** 配件稀有度：与图鉴一致，决定图标底图与血点价格。 */
+export type AccessoryRarity = 'common' | 'uncommon' | 'rare' | 'very-rare' | 'visceral';
+
+/**
+ * 统一修正层的键。每个键在 engine 里只有一个生效点，
+ * 配件只负责往这里加数，不允许各自另写一套数值。
+ */
+export type AccessoryModKey =
+  /** 每回合行动点上限 */
+  | 'ap'
+  /** 挥刀基础伤害 */
+  | 'attackDamage'
+  /** 恐惧范围（0–2） */
+  | 'fearRadius'
+  /** 命中时额外恐惧值 */
+  | 'fearOnHit'
+  /** 开局警报值（负数=更安静） */
+  | 'startAlarm'
+  /** 撤离时战利品百分比（正负都允许） */
+  | 'lootPct'
+  /** 专属能力冷却回合（负数=更快） */
+  | 'cooldown'
+  /** 开局捕兽夹数量 */
+  | 'trapCount'
+  /** 捕兽夹伤害 */
+  | 'trapDamage'
+  /** 被捕兽夹困住的额外回合 */
+  | 'trapHold'
+  /** 开局飞斧数量 */
+  | 'hatchetCount'
+  /** 飞斧伤害 */
+  | 'hatchetDamage'
+  /** 闪现距离（间房） */
+  | 'blinkRange'
+  /** 尾随值获取百分比 */
+  | 'stalkGain'
+  /** 恶魔附身每次行动消耗的尾随值 */
+  | 'possessCost'
+  /** 开局无法侦测行动次数 */
+  | 'startStealth';
+
+export interface AccessoryMod {
+  key: AccessoryModKey;
+  value: number;
+}
+
+/**
+ * 力量配件：每位杀手专属，开局最多带 2 件，带入即永久消耗。
+ * 机制按本作简化，名称与图标取自图鉴（dbdwiki / 迷雾笔记）。
+ */
+export interface AccessoryDef {
+  id: string;
+  name: string;
+  /** 所属杀手；与 KILLER_MAP 的 owner 一致 */
+  owner: string;
+  rarity: AccessoryRarity;
+  /** 本作效果说明，直接显示给玩家 */
+  desc: string;
+  /** 图鉴英文原名，供图标导入与卡名核对使用 */
+  sourceSkill: string;
+  /** 图鉴原始效果，只作考据，不参与结算 */
+  sourceText?: string;
+  /** 供统一修正层汇总的数值 */
+  mods: AccessoryMod[];
+}
+
 export type PersonRole = 'target' | 'civilian' | 'police';
 
 /**
@@ -370,6 +436,8 @@ export interface GameState {
   /** 本局实际使用的主题猎场，与主菜单展示插画保持一致。 */
   mapId: HuntingGroundId;
   killer: string;
+  /** 本局带入的配件 id（最多 2 件）；进局时已从库存永久扣除 */
+  accessories: string[];
   killerRuntime: KillerRuntime;
   arrestThreshold: number;
   turn: number;
@@ -597,6 +665,10 @@ export interface SaveData {
   unlockedKillers: string[];
   /** 已经亲自使用过的特殊处决方式，永久收录到处决图鉴。 */
   executionRecords?: string[];
+  /** 配件库存：配件 id → 拥有数量，无上限；带入猎场会永久消耗 1 件。 */
+  accessories: Record<string, number>;
+  /** 上一次选择带入的配件 id（最多 2 件），作为下局的默认装配。 */
+  accessoryLoadout: string[];
   /** 存档里记一下版本，方便以后迁移 */
   version?: number;
 }

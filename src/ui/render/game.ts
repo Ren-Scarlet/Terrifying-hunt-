@@ -75,8 +75,9 @@ import {
 
 
 import { isCardTuned } from '../../game/tuning';
+import { ACCESSORY_MAP, ACCESSORY_SLOTS } from '../../game/accessories';
 import { isMuted, playHeartbeat, playSfx, playTrapScream, playSurvivorStartle } from '../audio';
-import { escape, icon, itemBadge, itemIconHtml, personChip, shadowFigures, perkIconHtml, TYPE_NAMES, killerFaceHtml, defaultDetailHtml, cardTextHtml } from './shared';
+import { addonIconHtml, escape, icon, itemBadge, itemIconHtml, personChip, shadowFigures, perkIconHtml, TYPE_NAMES, killerFaceHtml, defaultDetailHtml, cardTextHtml } from './shared';
 import type { GameState, Person, RoomId, ScoreLine, SaveData } from '../../game/types';
 
 /**
@@ -888,6 +889,14 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
           <div class="killer-hud-portrait">
             ${killerFaceHtml(killer, 'ability-portrait')}
             <b>${escape(killer.owner)}</b>
+            <div class="killer-addon-slots" aria-label="本局带入的配件">
+              ${Array.from({ length: ACCESSORY_SLOTS }, (_, index) => {
+                const def = ACCESSORY_MAP[state.accessories[index] ?? ''];
+                return def
+                  ? `<span class="killer-addon-slot" title="${escape(`${def.name}：${def.desc}`)}">${addonIconHtml(def.id, def.rarity, 'hud')}</span>`
+                  : '<span class="killer-addon-slot empty" title="空配件槽">＋</span>';
+              }).join('')}
+            </div>
           </div>
           <div class="killer-hud-abilities" aria-label="杀手能力图标 · 按 1–4 使用">
             <div class="killer-power-grid">${powerButtonHtml(state, killer)}</div>

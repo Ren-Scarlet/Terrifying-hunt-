@@ -1,6 +1,7 @@
 import { random, randomOf, shuffle } from './random';
 import { CARD_MAP } from './cards';
 import { KILLER_MAP } from './killers';
+import { ACCESSORY_MAP, sanitizeAccessoryLoadout } from './accessories';
 import { generateMission } from './missions';
 import { createPeople } from './npc/factory';
 import {
@@ -28,6 +29,7 @@ export function createGame(
   mission: Mission | undefined = undefined,
   killer = '迈克尔·迈尔斯',
   mapId: HuntingGroundId = 'lampkin',
+  accessoryIds: string[] = [],
 ): GameState {
   // 先生成空间布局，再应用本局场地主题；菜单插画与实际地图使用同一个 mapId。
   const ground = getHuntingGround(mapId);
@@ -35,6 +37,8 @@ export function createGame(
   applyHuntingGround(ground.id);
 
   const killerId = KILLER_MAP[killer] ? killer : '迈克尔·迈尔斯';
+  // 配件是本局一次性消耗品：只认当前杀手的、最多 2 件，别的 id 直接忽略。
+  const accessories = sanitizeAccessoryLoadout(accessoryIds, killerId);
   const activeMission = mission ?? generateMission(killerId);
   const people = createPeople(activeMission).filter((person) => KILLER_MAP[killerId].school !== 'supernatural' || person.role !== 'police');
   const pile = shuffle(deckIds.filter((id) => CARD_MAP[id])).map<CardInstance>((defId) => ({
@@ -47,6 +51,7 @@ export function createGame(
     phase: 'playing',
     mapId: ground.id,
     killer: killerId,
+    accessories,
     killerRuntime: { killUsed: false, moveUsed: false, attackUsed: false, witnessUsed: false },
     // 逮捕阈值已废弃（警戒与逮捕合并），保留字段只为兼容旧存档
     arrestThreshold: 5 + (activeMission.targetCount ?? 1),
@@ -243,6 +248,9 @@ export function createGame(
   if (lockedHomes.length) log(state, `有 ${lockedHomes.length} 间住屋从内部上锁。封锁房门会阻挡通行与视线；切断对应区域电力可使电子门锁失效，或在门外强行破门。`);
   if (sacrifice) log(state, `血祭品已标记：${sacrifice.name}。此标记本身没有额外效果。`);
   log(state, `你以「${killerId}」的身份行动。每回合 ${BASE_AP} 点行动点：走路、挥刀、出牌、搜索柜子都从这里扣。`);
+  log(state, accessories.length
+    ? `随身配件：${accessories.map((id) => ACCESSORY_MAP[id].name).join('、')}。配件带入即永久消耗，本局结束后不会归还。`
+    : '本局没有携带配件。想带配件的话，下次出发前在装配界面选好两件。');
   log(state, '留意每个人的恐惧值与警戒值：恐惧会使人崩溃，警戒会促使人报警或逃跑。');
   log(state, `屋里有 ${items.length} 个道具箱；照明由各区域电闸独立控制。`);
   return state;

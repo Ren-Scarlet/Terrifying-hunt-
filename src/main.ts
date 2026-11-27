@@ -42,6 +42,13 @@ import {
   wipeBlade,
 } from './game/engine';
 import { loadSave, writeSave } from './game/save';
+import {
+  ACCESSORY_SLOTS,
+  buyAccessory,
+  consumeAccessories,
+  loadoutForRun,
+  sanitizeAccessoryLoadout,
+} from './game/accessories';
 import { generateFreeHunt, generateMission, withAnte } from './game/missions';
 import { STARTER_KILLERS } from './game/killers';
 import {
@@ -77,6 +84,7 @@ import {
   getKiller,
   personDetailHtml,
   renderDeckEditor,
+  renderAccessoryLoadout,
   renderGame,
   renderGuide,
   renderMenu,
@@ -112,6 +120,10 @@ let screen: Screen = 'menu';
 let editorOpen = false;
 let shopOpen = false;
 let guideOpen = false;
+/** 配件装配界面；pendingRun 非空时，确认后直接进入猎场。 */
+let accessoryOpen = false;
+let accessoryDraft: string[] = [];
+let pendingRun: 'contract' | 'free' | null = null;
 /** 下一局是否加注：达成追加目标则契约分 +60%，未达成结算 −50%。 */
 let anteArmed = false;
 let adminOpen = new URLSearchParams(window.location.search).get('admin') === '1';
@@ -535,6 +547,8 @@ function render(): void {
   let html = '';
   if (adminOpen) {
     html = renderAdmin();
+  } else if (accessoryOpen) {
+    html = renderAccessoryLoadout(save, accessoryDraft, pendingRun !== null);
   } else if (editorOpen) {
     html = renderDeckEditor(editorDeck, save.unlockedCards, save.killer ?? '迈克尔·迈尔斯');
   } else if (shopOpen) {
@@ -718,12 +732,16 @@ function afterAction(): void {
   render();
 }
 
-function startGame(freeHunt = false): void {
+function startGame(freeHunt = false, loadout: string[] = []): void {
   playedDeathLogMessages.clear();
   selectedPersonId = null;
+  // 三段串起来，避免同时响糊成一团：装配完成 → 进入地图 → 游戏开始
+  playSfx('ready');
+  window.setTimeout(() => playSfx('enterMap'), 190);
+  window.setTimeout(() => playSfx('start'), 430);
   const killer = save.killer ?? '迈克尔·迈尔斯';
   const mission = freeHunt ? generateFreeHunt() : (anteArmed ? withAnte(generateMission(killer)) : generateMission(killer));
-  game = createGame(save.deck, mission, killer, currentMenuMap().id);
+  game = createGame(save.deck, mission, killer, currentMenuMap().id, loadout);
   screen = 'game';
   lastKills = game.kills;
   lastWanted = game.wanted;
@@ -848,11 +866,83 @@ app.addEventListener('click', (event) => {
     return;
   }
   if (action === 'start' || action === 'again' || action === 'free-hunt') {
-    // 三段串起来，避免同时响糊成一团：点击准备完成 → 进入地图 → 游戏开始
-    playSfx('ready');
-    window.setTimeout(() => playSfx('enterMap'), 190);
-    window.setTimeout(() => playSfx('start'), 430);
-    startGame(action === 'free-hunt');
+    // 出发前先选配件：带入即消耗，所以每次开局都要经过这一步。
+    pendingRun = action === 'free-hunt' ? 'free' : 'contract';
+    accessoryDraft = loadoutForRun(save, save.killer ?? '迈克尔·迈尔斯');
+    accessoryOpen = true;
+    render();
+    return;
+  }
+
+  if (action === 'accessories') {
+    pendingRun = null;
+    accessoryDraft = sanitizeAccessoryLoadout(save.accessoryLoadout, save.killer ?? '迈克尔·迈尔斯');
+    accessoryOpen = true;
+    shopOpen = false;
+    editorOpen = false;
+    render();
+    return;
+  }
+
+  if (action === 'acc-equip') {
+    const id = target.dataset.id;
+    if (id && !accessoryDraft.includes(id) && accessoryDraft.length < ACCESSORY_SLOTS && (save.accessories?.[id] ?? 0) > 0) {
+      accessoryDraft = [...accessoryDraft, id];
+      playSfx('pickup');
+      render();
+    }
+    return;
+  }
+
+  if (action === 'acc-remove') {
+    const index = Number(target.dataset.index);
+    if (Number.isInteger(index) && index >= 0 && index < accessoryDraft.length) {
+      accessoryDraft = accessoryDraft.filter((_, i) => i !== index);
+      render();
+    }
+    return;
+  }
+
+  if (action === 'acc-buy') {
+    const id = target.dataset.id;
+    const next = id ? buyAccessory(save, id) : null;
+    if (next) {
+      save = next;
+      writeSave(save);
+      playSfx('pickup');
+    }
+    render();
+    return;
+  }
+
+  if (action === 'acc-close') {
+    accessoryOpen = false;
+    pendingRun = null;
+    accessoryDraft = [];
+    render();
+    return;
+  }
+
+  if (action === 'acc-confirm') {
+    const killer = save.killer ?? '迈克尔·迈尔斯';
+    // 装配栏里可能留着已用完的配件：进局前按库存再过滤一次。
+    const loadout = sanitizeAccessoryLoadout(accessoryDraft, killer)
+      .filter((id) => (save.accessories?.[id] ?? 0) > 0);
+    const mode = pendingRun;
+    if (mode) {
+      save = consumeAccessories(save, loadout);
+      writeSave(save);
+      accessoryOpen = false;
+      pendingRun = null;
+      accessoryDraft = [];
+      startGame(mode === 'free', loadout);
+    } else {
+      save = { ...save, accessoryLoadout: loadout };
+      writeSave(save);
+      accessoryOpen = false;
+      accessoryDraft = [];
+      render();
+    }
     return;
   }
 
@@ -863,6 +953,8 @@ app.addEventListener('click', (event) => {
     editorOpen = false;
     shopOpen = false;
     adminOpen = false;
+    accessoryOpen = false;
+    pendingRun = null;
     lastNewCard = null;
     rollMenuMap();
     render();
@@ -1040,7 +1132,12 @@ app.addEventListener('click', (event) => {
     if (owner && STARTER_KILLERS.includes(owner)) {
       const allowed = new Set(deckCardsForKiller(owner).map((card) => card.id));
       const compatibleDeck = save.deck.filter((id) => allowed.has(id));
-      save = { ...save, killer: owner, deck: compatibleDeck.length >= 10 ? compatibleDeck : [...STARTING_DECK] };
+      save = {
+        ...save,
+        killer: owner,
+        deck: compatibleDeck.length >= 10 ? compatibleDeck : [...STARTING_DECK],
+        accessoryLoadout: sanitizeAccessoryLoadout(save.accessoryLoadout, owner),
+      };
       writeSave(save);
       render();
     }

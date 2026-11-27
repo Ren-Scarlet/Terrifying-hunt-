@@ -1,5 +1,12 @@
 import { CARDS, deckCardsForKiller } from '../../game/cards';
 import {
+  ACCESSORY_MAP,
+  ACCESSORY_RARITY_LABEL,
+  ACCESSORY_SLOTS,
+  accessoriesForKiller,
+  accessoryPrice,
+} from '../../game/accessories';
+import {
   BASE_AP,
   ATTACK_COST,
   WIPE_COST,
@@ -15,7 +22,7 @@ import { CONTRACT_TURNS } from '../../game/missions';
 import { ACTIVE_KILLERS } from '../../game/killers';
 import type { SaveData } from '../../game/types';
 import { currentMenuMap, mapArtSrc } from '../mapArt';
-import { detailCardHtml, escape, getKiller, icon, killerFaceHtml, perkIconHtml, powerIconHtml, TYPE_NAMES } from './shared';
+import { detailCardHtml, addonIconHtml, escape, getKiller, icon, killerFaceHtml, perkIconHtml, powerIconHtml, TYPE_NAMES } from './shared';
 
 export function renderMenu(save: SaveData, ante = false): string {
   const killer = getKiller(save.killer);
@@ -93,12 +100,14 @@ export function renderMenu(save: SaveData, ante = false): string {
           <div><small>当前牌组</small><b>${save.deck.length} 张</b></div>
           <div><small>已解锁卡牌</small><b>${save.unlockedCards.filter((id) => deckCardsForKiller(killer.owner).some((card) => card.id === id)).length} / ${deckCardsForKiller(killer.owner).length}</b></div>
           <div><small>处决图鉴</small><b>${(save.executionRecords ?? []).length} / 6</b></div>
+          <div><small>配件库存</small><b>${Object.values(save.accessories ?? {}).reduce((sum, n) => sum + n, 0)} 件</b></div>
         </div>
         <div class="actions">
           <button class="btn primary" data-action="start">准备开始 · 随机契约</button>
           <button class="btn ${ante ? 'primary' : ''}" data-action="ante" title="多接一个高难目标：达成契约分 +60%，未达成 −50%">加注 · ${ante ? '已开启' : '关闭'}</button>
           <button class="btn" data-action="free-hunt">自由猎杀</button>
           <button class="btn" data-action="deck">编辑牌组</button>
+          <button class="btn" data-action="accessories">配件装配</button>
           <button class="btn" data-action="shop">卡牌商店</button>
           <button class="btn ghost" data-action="guide">玩法指引</button>
         </div>
@@ -211,9 +220,21 @@ export function renderGuide(): string {
           <section class="g-sec">
             <h2>8 · 经济</h2>
             <div class="g-rows">
-              <div class="g-row"><b>血点</b><span>完成任务获得，用于商店解锁卡牌</span></div>
+              <div class="g-row"><b>血点</b><span>完成任务获得，用于商店解锁卡牌、补货配件</span></div>
               <div class="g-row"><b>暗金细胞</b><span>胜利且评分 ≥150 时 +1，用于解锁杀手</span></div>
             </div>
+          </section>
+
+          <section class="g-sec">
+            <h2>9 · 力量配件</h2>
+            <p>每位杀手都有 3 件专属配件，出发前最多装 <b>${ACCESSORY_SLOTS} 件</b>。<b>带入即永久消耗</b>：用掉就没有了，想再带得用血点补货；库存本身没有上限。</p>
+            <p>配件数值统一走同一套修正层，和卡牌、能力共用一份规则，不会出现两套数字。</p>
+            <div class="g-rows">${ACTIVE_KILLERS.map((killer) => {
+              const items = accessoriesForKiller(killer.owner)
+                .map((item) => `${escape(item.name)}<i>${escape(item.desc)}</i>`)
+                .join('');
+              return `<div class="g-row"><b>${escape(killer.owner)}</b><span>${items}</span></div>`;
+            }).join('')}</div>
           </section>
         </div>
         <div class="actions"><button class="btn primary" data-action="guide-close">知道了</button></div>
@@ -251,6 +272,76 @@ export function renderShop(save: SaveData): string {
         <p>完成任务可获得血点。购买后卡牌永久解锁。当前血点：<b style="color:var(--gold)">${save.credits}</b></p>
         <div class="shop-list">${rows || '<p style="color:var(--muted)">所有卡牌都已解锁。</p>'}</div>
         <div class="actions"><button class="btn ghost" data-action="shop-back">返回主菜单</button></div>
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * 出发前的配件装配界面：最多 2 个槽位，进局时永久消耗。
+ * pendingRun=true 时由「准备开始 / 自由猎杀」进入，确认后直接开猎场。
+ */
+export function renderAccessoryLoadout(save: SaveData, draft: string[], pendingRun: boolean): string {
+  const killer = save.killer ?? '迈克尔·迈尔斯';
+  const defs = accessoriesForKiller(killer);
+  const owned = (id: string) => save.accessories?.[id] ?? 0;
+  const slots = Array.from({ length: ACCESSORY_SLOTS }, (_, index) => {
+    const def = ACCESSORY_MAP[draft[index] ?? ''];
+    if (!def) {
+      return `<div class="acc-slot empty"><b>槽位 ${index + 1}</b><small>空着 · 可从下方装配一件配件</small></div>`;
+    }
+    return `<div class="acc-slot filled">
+      ${addonIconHtml(def.id, def.rarity, 'slot')}
+      <div class="acc-slot-info">
+        <small>${ACCESSORY_RARITY_LABEL[def.rarity]}</small>
+        <b>${escape(def.name)}</b>
+        <span>${escape(def.desc)}</span>
+      </div>
+      <button class="btn mini ghost" data-action="acc-remove" data-index="${index}">卸下</button>
+    </div>`;
+  }).join('');
+
+  const cards = defs.map((def) => {
+    const count = owned(def.id);
+    const equipped = draft.includes(def.id);
+    const price = accessoryPrice(def.rarity);
+    const canEquip = !equipped && draft.length < ACCESSORY_SLOTS && count > 0;
+    return `<div class="acc-card ${equipped ? 'equipped' : ''} ${count <= 0 ? 'out' : ''}">
+      <div class="acc-card-head">
+        ${addonIconHtml(def.id, def.rarity, 'card')}
+        <div class="acc-card-title">
+          <b>${escape(def.name)}</b>
+          <small>${ACCESSORY_RARITY_LABEL[def.rarity]} · 库存 ${count}</small>
+        </div>
+      </div>
+      <p>${escape(def.desc)}</p>
+      <div class="acc-card-actions">
+        <button class="btn mini ${equipped ? 'ghost' : ''}" data-action="acc-equip" data-id="${def.id}" ${canEquip || equipped ? '' : 'disabled'}>${equipped ? '已装备' : '装备'}</button>
+        <button class="btn mini ghost" data-action="acc-buy" data-id="${def.id}" ${save.credits >= price ? '' : 'disabled'}>${icon('bloodPoint', 'ui-icon tiny')} ${price} 补货</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  return `
+    <div class="overlay">
+      <div class="modal accessory-modal">
+        <div class="subtitle">POWER ADD-ONS</div>
+        <h1>力量<span>配件</span></h1>
+        <p>当前杀手：<b>${escape(killer)}</b>。每位杀手专属配件，最多带 <b>${ACCESSORY_SLOTS} 件</b>；<b>进入猎场时永久消耗</b>，库存没有上限，可用血点补货。</p>
+        <div class="acc-resource">
+          <span>${icon('bloodPoint')} 血点 <b>${save.credits}</b></span>
+          <span>库存 <b>${defs.reduce((sum, def) => sum + owned(def.id), 0)}</b> 件</span>
+          <span>装配 <b>${draft.length}/${ACCESSORY_SLOTS}</b></span>
+        </div>
+        <div class="acc-slots">${slots}</div>
+        <div class="section-title">配件库 <small>名称与图标取自图鉴 · 效果按本作机制简化</small></div>
+        <div class="acc-grid">${cards || '<p style="color:var(--muted)">这位杀手还没有配件。</p>'}</div>
+        <div class="actions">
+          <button class="btn primary" data-action="acc-confirm">${pendingRun
+            ? (draft.length ? `进入猎场 · 消耗 ${draft.length} 件配件` : '不携带配件进入猎场')
+            : '保存装配 · 返回主菜单'}</button>
+          <button class="btn ghost" data-action="acc-close">${pendingRun ? '返回主菜单' : '取消'}</button>
+        </div>
       </div>
     </div>
   `;

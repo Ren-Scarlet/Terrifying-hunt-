@@ -84,6 +84,17 @@ import { readdirSync } from 'node:fs';
 import { personChip, personDetailHtml } from '../src/ui/render/shared';
 import { SURVIVOR_MAP } from '../src/game/survivors';
 import { generateMission, generateFreeHunt, withAnte } from '../src/game/missions';
+import {
+  ACCESSORIES,
+  ACCESSORY_MAP,
+  ACCESSORY_SLOTS,
+  accessoryPrice,
+  buyAccessory,
+  consumeAccessories,
+  loadoutForRun,
+  sanitizeAccessoryLoadout,
+  starterAccessoryStock,
+} from '../src/game/accessories';
 import { HUNTING_GROUNDS } from '../src/game/maps';
 import type { GameState, RoomId } from '../src/game/types';
 import { createSeededRandom, random, withRandomSource } from '../src/game/random';
@@ -2346,6 +2357,78 @@ check('苦涩低语：出牌后会等待下一次人类死亡，再触发全场�
   check('卡牌 id 与卡名唯一',
     ids.size === CARDS.length && names.size === CARDS.length,
     `ids=${ids.size}/${CARDS.length} names=${names.size}/${CARDS.length}`);
+}
+
+// 力量配件：数据完整性、库存、装配上限与进局扣除
+{
+  const owners = new Set(ACTIVE_KILLERS.map((killer) => killer.owner));
+  const ids = new Set(ACCESSORIES.map((item) => item.id));
+  const names = new Set(ACCESSORIES.map((item) => item.name));
+  check('配件：id 与名称唯一',
+    ids.size === ACCESSORIES.length && names.size === ACCESSORIES.length,
+    `ids=${ids.size}/${ACCESSORIES.length} names=${names.size}/${ACCESSORIES.length}`);
+  check('配件：每位开放杀手至少 3 件专属配件',
+    ACTIVE_KILLERS.every((killer) => ACCESSORIES.filter((item) => item.owner === killer.owner).length >= 3),
+    ACTIVE_KILLERS.map((killer) => `${killer.owner}:${ACCESSORIES.filter((item) => item.owner === killer.owner).length}`).join(' '));
+  check('配件：不存在无主或未开放杀手的配件',
+    ACCESSORIES.every((item) => owners.has(item.owner)));
+  const legalKeys = new Set([
+    'ap', 'attackDamage', 'fearRadius', 'fearOnHit', 'startAlarm', 'lootPct', 'cooldown',
+    'trapCount', 'trapDamage', 'trapHold', 'hatchetCount', 'hatchetDamage', 'blinkRange',
+    'stalkGain', 'possessCost', 'startStealth',
+  ]);
+  check('配件：每件都有合法的统一修正键',
+    ACCESSORIES.every((item) => item.mods.length > 0 && item.mods.every((mod) => legalKeys.has(mod.key) && Number.isFinite(mod.value))));
+  check('配件：图标文件齐全且按配件 id 命名',
+    (() => {
+      const files = new Set(readdirSync('public/assets/dbd/addons'));
+      return ACCESSORIES.every((item) => files.has(`${item.id}.png`));
+    })());
+  const starter = starterAccessoryStock();
+  check('配件：初始库存覆盖全部配件且各 1 件',
+    Object.keys(starter).length === ACCESSORIES.length && ACCESSORIES.every((item) => starter[item.id] === 1));
+
+  check('配件装配：最多 2 件、同名去重、按顺序保留',
+    sanitizeAccessoryLoadout(['trapper_bag', 'rusted_jaws', 'honing_stone', 'trapper_bag'], '设陷者').join('|') === 'trapper_bag|rusted_jaws');
+  check('配件装配：不属于当前杀手的配件会被丢弃',
+    sanitizeAccessoryLoadout(['trapper_bag', 'scratched_mirror'], '护士').length === 0);
+
+  const save = {
+    deck: [...STARTING_DECK],
+    unlockedCards: [] as string[],
+    bestScore: 0,
+    wins: 0,
+    killer: '设陷者',
+    credits: 100,
+    darkCells: 0,
+    unlockedKillers: [...STARTER_KILLERS],
+    accessories: { trapper_bag: 2, rusted_jaws: 1 } as Record<string, number>,
+    accessoryLoadout: [] as string[],
+  };
+  check('配件库存：带入猎场每件扣 1，归零后删除条目',
+    (() => {
+      const next = consumeAccessories(save, ['trapper_bag', 'rusted_jaws']);
+      return next.accessories.trapper_bag === 1 && !('rusted_jaws' in next.accessories) && next.accessoryLoadout.join('|') === 'trapper_bag|rusted_jaws';
+    })());
+  check('配件库存：库存不足的配件不会被带进猎场',
+    (() => {
+      const next = { ...save, accessories: { trapper_bag: 1 }, accessoryLoadout: ['trapper_bag', 'honing_stone'] };
+      return loadoutForRun(next, '设陷者').join('|') === 'trapper_bag';
+    })());
+  check('配件补货：花血点加 1 件，血点不够时失败',
+    (() => {
+      const bought = buyAccessory(save, 'trapper_bag');
+      const poor = buyAccessory({ ...save, credits: 0 }, 'torn_bookmark');
+      return !!bought && bought.credits === 100 - accessoryPrice('rare') && bought.accessories.trapper_bag === 3 && poor === null;
+    })());
+
+  const run = createGame(STARTING_DECK, undefined, '设陷者', 'lampkin', ['trapper_bag', 'rusted_jaws', 'honing_stone']);
+  check('配件：全局最多带 2 件进入猎场',
+    run.accessories.length === 2 && run.accessories.join('|') === 'trapper_bag|rusted_jaws',
+    run.accessories.join(','));
+  check('配件：会写进开局日志', run.log.some((line) => line.includes('随身配件') && line.includes('设陷者腰包')));
+  const wrongOwnerRun = createGame(STARTING_DECK, undefined, '护士', 'lampkin', ['trapper_bag', 'scratched_mirror']);
+  check('配件：别的杀手的配件带不进本局', wrongOwnerRun.accessories.length === 0);
 }
 
 caseNewPerkSystem();

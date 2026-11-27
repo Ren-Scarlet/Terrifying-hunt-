@@ -1,5 +1,5 @@
 import { CARDS, CARD_MAP } from '../../game/cards';
-import { PERK_RARITY_BG, POWER_RARITY_BG, cardImage, characterImage, uiIcon } from '../../game/assetMap';
+import { ADDON_RARITY_BG, PERK_RARITY_BG, POWER_RARITY_BG, accessoryImage, cardImage, characterImage, uiIcon } from '../../game/assetMap';
 import {
   ARCH_LABEL, BASE_AP, BLEEDOUT_TURNS, GOAL_LABEL, HEALTH_LABEL,
   INTENT_LABEL, SURVIVOR_ITEM_LABEL, conditionOf, effectiveCost, isPersonVisible,
@@ -11,7 +11,7 @@ import { getPersonProfile, type PersonProfile } from '../../game/people';
 import { ROUTINE_PROFILE } from '../../game/npc/catalog';
 import { SURVIVOR_MAP } from '../../game/survivors';
 import { awarenessLabel, awarenessStage } from '../../game/npc/awareness';
-import type { GameState, Person, SaveData } from '../../game/types';
+import type { AccessoryDef, GameState, Person, SaveData } from '../../game/types';
 
 export const escape = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
@@ -72,6 +72,16 @@ export function perkIconHtml(defId: string, size = ''): string {
     <div class="dbd-perk ${size}">
       <img class="dbd-perk-bg" src="${PERK_RARITY_BG}" alt="" onerror="this.style.display='none'">
       ${cardImage(defId) ? `<img class="dbd-perk-glyph" src="${cardImage(defId)}" alt="" onerror="this.style.display='none'">` : '<span class="dbd-perk-fallback" aria-hidden="true">✦</span>'}
+    </div>
+  `;
+}
+
+/** 配件图标：稀有度底框 + 图鉴裁切图标，尺寸由 CSS 类控制。 */
+export function addonIconHtml(id: string, rarity: AccessoryDef['rarity'], size = ''): string {
+  return `
+    <div class="dbd-addon ${size}">
+      <img class="dbd-addon-bg" src="${ADDON_RARITY_BG[rarity]}" alt="" onerror="this.style.display='none'">
+      <img class="dbd-addon-glyph" src="${accessoryImage(id)}" alt="" onerror="this.style.display='none'">
     </div>
   `;
 }
