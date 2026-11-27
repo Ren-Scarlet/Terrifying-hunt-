@@ -565,6 +565,7 @@ function afterAction(): void {
 }
 
 function startGame(freeHunt = false): void {
+  playedDeathLogMessages.clear();
   selectedPersonId = null;
   game = createGame(save.deck, freeHunt ? generateFreeHunt() : undefined, save.killer ?? '迈克尔·迈尔斯', currentMenuMap().id);
   screen = 'game';
