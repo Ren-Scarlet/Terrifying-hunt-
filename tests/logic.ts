@@ -97,6 +97,7 @@ import {
 } from '../src/game/accessories';
 import { blinkRangeOf, hatchetMax, modifierSummary, modifierValue, possessCost } from '../src/game/modifiers';
 import { exportTuning, importTuning, resetTuning, setAddonModValue } from '../src/game/tuning';
+import { renderAccessoryLoadout } from '../src/ui/render/menus';
 import { HUNTING_GROUNDS } from '../src/game/maps';
 import type { GameState, RoomId } from '../src/game/types';
 import { createSeededRandom, random, withRandomSource } from '../src/game/random';
@@ -2431,6 +2432,12 @@ check('苦涩低语：出牌后会等待下一次人类死亡，再触发全场�
   check('配件：会写进开局日志', run.log.some((line) => line.includes('随身配件') && line.includes('设陷者腰包')));
   const wrongOwnerRun = createGame(STARTING_DECK, undefined, '护士', 'lampkin', ['trapper_bag', 'scratched_mirror']);
   check('配件：别的杀手的配件带不进本局', wrongOwnerRun.accessories.length === 0);
+
+  const accHtml = renderAccessoryLoadout(save, ['trapper_bag', 'rusted_jaws'], true);
+  check('配件界面：渲染出两个槽位、补货入口与进入猎场按钮',
+    accHtml.includes('acc-slot filled') && accHtml.includes('设陷者腰包')
+    && accHtml.includes('data-action="acc-buy"') && accHtml.includes('进入猎场'),
+    `len=${accHtml.length}`);
 }
 
 // 统一修正层：配件的数值必须真的落到引擎，而不是只写在数据表里
