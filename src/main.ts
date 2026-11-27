@@ -529,6 +529,7 @@ function showCardPreview(uid: string | null, anchor: HTMLElement | null): void {
     preview.setAttribute('aria-live', 'polite');
     document.body.appendChild(preview);
   }
+  preview.classList.add('visible');
   if (cardPreviewUid !== uid) {
     if (cardPreviewTimer !== null) window.clearInterval(cardPreviewTimer);
     preview.innerHTML = cardDetailHtml(game, uid);
