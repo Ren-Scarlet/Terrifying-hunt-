@@ -31,6 +31,7 @@ import {
   isRoomExplored,
   isRoomVisible,
   isSensing,
+  getHuntOpportunities,
   knownPeople,
   moveCost,
   powerBlockReason,
