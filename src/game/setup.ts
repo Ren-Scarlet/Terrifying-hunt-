@@ -59,7 +59,6 @@ export function createGame(
     heatTurn: 0,
     policeLock: 0,
     ambushTurn: 0,
-    senseTurn: 0,
     revealAuraActions: 0,
     trailRevealActions: 0,
     highlightedTrail: null,

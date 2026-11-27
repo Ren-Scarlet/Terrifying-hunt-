@@ -381,8 +381,6 @@ export interface GameState {
   policeLock: number;
   /** 伏击生效的回合号：等于当前回合时，进门不会惊动任何人 */
   ambushTurn: number;
-  /** 感知生效的回合号：等于当前回合时，地图上会浮出红色人影（只有影子，没有身份） */
-  senseTurn: number;
   /** 周围范围红色轮廓剩余行动次数 */
   revealAuraActions: number;
   /** 最近脚印高亮剩余行动次数 */

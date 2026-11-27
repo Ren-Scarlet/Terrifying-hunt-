@@ -194,13 +194,6 @@ export type Op =
   | { op: 'lockRoom'; room: Dest; turns: number }
   /** 侦查：点亮房间并看见里面的人；adj 表示同时点亮相邻的所有房间 */
   | { op: 'scout'; to?: Dest; all?: boolean; adj?: boolean; turns?: number }
-  /**
-   * 感知：全场每个活着的人头上浮出一个红色人影，只亮这一回合。
-   * 它给的是「有人在那边」，不是「那是谁、正在干嘛」——找人还是得自己走过去。
-   */
-  | { op: 'pulse' }
-  /** 搜索当前房间，把藏起来的人揪出来 */
-  | { op: 'search' }
   /** 追踪一个人 N 回合 */
   | { op: 'track'; who: Who; turns: number }
   /** 制造噪声：把附近的人吸到目标房间 */
@@ -243,12 +236,6 @@ export type Op =
    * 灵异感知者（threat: spiritual）例外，她能直接看见你。
    */
   | { op: 'ambush' }
-  /**
-   * 追击：立刻贴到一个目标所在的位置（默认追正在逃跑的人），不计步数。
-   * 贴上去之后再挥刀（或先打「牢牢紧握」把人按住）就是「追上去补一刀」。
-   * distance 是允许的最大房间距离，默认 2。
-   */
-  | { op: 'pursue'; who: Who; distance?: number }
   | { op: 'flag'; key: FlagKey; value?: number | boolean }
   | { op: 'log'; text: string }
   | { op: 'if'; cond: Cond; then: Op[]; else?: Op[] };

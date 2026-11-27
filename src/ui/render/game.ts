@@ -30,7 +30,6 @@ import {
   isPersonVisible,
   isRoomExplored,
   isRoomVisible,
-  isSensing,
   getHuntOpportunities,
   knownPeople,
   moveCost,
@@ -360,7 +359,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
   const redFigures = state.people.filter((person) => {
     if (person.role === 'police' || person.hp <= 0 || person.hidden || isRoomVisible(state, person.room)) return false;
     const aura = state.revealAuraActions > 0 && (person.room === state.playerRoom || ROOM_MAP[state.playerRoom].neighbors.includes(person.room));
-    return isSensing(state) || aura || (person.revealedActions ?? 0) > 0;
+    return aura || (person.revealedActions ?? 0) > 0;
   });
   const redSignature = redFigures.map((person) => person.id).sort().join('|');
   if (redSignature && redSignature !== lastRedFigureSignature) playHeartbeat();
@@ -444,7 +443,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
     // 感知：看不见的房间也会浮出红色人影——只有影子，没有名字
     const auraReveal = state.revealAuraActions > 0 && (room.id === state.playerRoom || ROOM_MAP[state.playerRoom].neighbors.includes(room.id));
     const sensed = !visible
-      ? state.people.filter((p) => p.room === room.id && p.role !== 'police' && p.hp > 0 && !p.hidden && (isSensing(state) || auraReveal || (p.revealedActions ?? 0) > 0)).length
+      ? state.people.filter((p) => p.room === room.id && p.role !== 'police' && p.hp > 0 && !p.hidden && (auraReveal || (p.revealedActions ?? 0) > 0)).length
       : 0;
     const r = room.rect;
     const style = `left:${r.left}%;top:${r.top}%;width:${r.width}%;height:${r.height}%`;

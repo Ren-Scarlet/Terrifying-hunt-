@@ -231,7 +231,6 @@ function defaultEffectOp(name: string): Op | null {
     else result[field] = field === 'turns' ? 2 : field === 'count' || field === 'distance' ? 1 : 1;
   }
   if (name === 'scout') result.turns = 2;
-  if (name === 'pursue') result.distance = 2;
   return result as unknown as Op;
 }
 export function addCardOp(id: string, name: string): boolean {
@@ -435,7 +434,6 @@ function validateOps(value: unknown, _baseline?: Op[]): value is Op[] {
       if (candidate.op === 'scout' && field === 'to' && (typeof v !== 'string' || !DEST_VALUES.has(v))) return false;
       if (candidate.op === 'scout' && ['all', 'adj'].includes(field) && typeof v !== 'boolean') return false;
       if (candidate.op === 'scout' && field === 'turns' && (typeof v !== 'number' || v < 1 || v > 10)) return false;
-      if (candidate.op === 'pursue' && field === 'distance' && (typeof v !== 'number' || v < 1 || v > 20)) return false;
       if (candidate.op === 'flag' && field === 'value' && typeof v !== 'boolean' && (typeof v !== 'number' || !Number.isFinite(v))) return false;
       if (candidate.op === 'if' && field === 'else' && !Array.isArray(v)) return false;
     }

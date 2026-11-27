@@ -44,17 +44,14 @@ const COOL = CARDS.filter((c) =>
 const MODE = (process.env.SIM_MODE ?? 'tactics') as 'brute' | 'stealth' | 'tactics';
 const PER_KILLER = Number(process.env.GAMES ?? 3);
 
-/** 牌组：伏击 / 追击 / 处决 / 感知 / 搜索，剩下靠功能牌 */
+/** 牌组：伏击 / 处决 / 侦查，剩下靠功能牌 */
 function buildDeck(): string[] {
   const deck: string[] = [];
   const push = (pool: string[], n: number) => {
     for (let i = 0; i < n && pool.length; i++) deck.push(pool[i % pool.length]);
   };
   push(byOp('ambush'), 2);
-  push(byOp('pursue'), 3);
   push(byOp('execute'), 3);
-  push(byOp('pulse'), 2);
-  push(byOp('search'), 1);
   push(COOL, 2);
   push(byOp('sabotage'), 1);
   while (deck.length < 15) deck.push('sloppy_butcher');
@@ -153,10 +150,6 @@ function playOneGame(killer: string): void {
       // 4. 没人：追最近的目标 / 脚印 / 动静，但至少留 1 点给下一刀
       const target = chaseTarget(state);
       if (target && target !== state.playerRoom && state.energy > 2) {
-        if (tactics && withOp('pursue').length) {
-          const chase = withOp('pursue')[0];
-          if (playCard(state, chase.uid)) continue;
-        }
         const opts = ROOMS.map((r) => r.id).filter((r) => canMoveTo(state, r));
         if (opts.length) {
           const scored = opts
@@ -167,7 +160,7 @@ function playOneGame(killer: string): void {
       }
 
       // 5. 彻底没线索：用情报牌
-      const intel = withOp('pulse')[0] ?? withOp('scout')[0] ?? withOp('search')[0];
+      const intel = withOp('scout')[0];
       if (intel && playCard(state, intel.uid)) continue;
 
       // 6. 还有闲钱就降温

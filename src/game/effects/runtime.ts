@@ -152,32 +152,6 @@ export function executeOps(state: GameState, ops: Op[], runtime: EffectRuntime):
         );
         break;
       }
-      case 'pulse': {
-        // 只给影子，不给身份：地图上每个人所在的位置浮出一个红色人影，
-        // 而且只亮这一回合——之后的去向要靠地面上的痕迹。
-        state.senseTurn = state.turn;
-        const alive = npcs(state).filter((p) => p.hp > 0 && !p.hidden);
-        log(
-          state,
-          alive.length
-            ? `你感觉到 ${alive.length} 个活人的位置——地图上浮起红色人影，但你看不清是谁。`
-            : '你什么也感觉不到。',
-        );
-        break;
-      }
-      case 'search': {
-        const here = peopleInRoom(state, state.playerRoom).filter((p) => p.role !== 'police');
-        const found = here.filter((p) => p.hidden);
-        found.forEach((p) => {
-          p.hidden = false;
-          p.alert = clamp(p.alert + 35, 0, 100);
-          p.intent = 'flee';
-          log(state, `${p.name} 被你从藏身处拖了出来。`);
-        });
-        if (!found.length) log(state, '这里没有藏着人。');
-        scoutRoom(state, state.playerRoom, 2);
-        break;
-      }
       case 'track':
         selectPeople(state, op.who).forEach((p) => {
           p.trackedTurns = Math.max(p.trackedTurns, op.turns);
@@ -335,27 +309,6 @@ export function executeOps(state: GameState, ops: Op[], runtime: EffectRuntime):
       case 'ambush': {
         state.ambushTurn = state.turn;
         log(state, '你收住了呼吸——这一回合推门进去，不会有任何人察觉。');
-        break;
-      }
-      case 'pursue': {
-        const maxD = op.distance ?? 2;
-        const pool = selectPeople(state, op.who)
-          .filter((p) => p.hp > 0 && p.room !== state.playerRoom)
-          .filter((p) => roomDistance(p.room, state.playerRoom) <= maxD)
-          .sort((a, b) => roomDistance(a.room, state.playerRoom) - roomDistance(b.room, state.playerRoom));
-        const target = pool[0];
-        if (!target) {
-          log(state, '身边没有可以追的人。');
-          break;
-        }
-        const from = roomName(state.playerRoom);
-        state.playerRoom = target.room;
-        markExplored(state, target.room);
-        log(state, `你贴着他的脚步声从${from}追进了${roomName(target.room)}。`);
-        target.alert = clamp(target.alert + 12, 0, 100);
-        // 被追的人已经在你手边上了，不该再白拿一次「转身就跑」的反应，
-        // 否则追击牌等于把人推得更远。
-        onPlayerEnter(state, target.id);
         break;
       }
       case 'silenceAlarm':

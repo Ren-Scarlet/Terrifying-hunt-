@@ -556,11 +556,6 @@ export function visibleTrails(state: GameState): Trail[] {
   return state.trails.filter((t) => state.trailClock - t.clock <= trailActionWindow(state));
 }
 
-/** 感知：这一回合地图上浮着全场红色人影（只有影子，不告诉你那是谁） */
-export function isSensing(state: GameState): boolean {
-  return state.senseTurn === state.turn;
-}
-
 /**
  * 玩家做完一个动作之后：房子不会站着等你。
  * 跑掉的人继续跑、求救的人继续摸电话、救援的人继续包扎——只不过一回合有上限。

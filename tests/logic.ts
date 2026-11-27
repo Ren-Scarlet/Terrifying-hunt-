@@ -58,7 +58,6 @@ import {
   selectAuraRoom,
   isLocked,
   isRoomExplored,
-  isSensing,
   moveCost,
   movePlayer,
   breakBarricade,
