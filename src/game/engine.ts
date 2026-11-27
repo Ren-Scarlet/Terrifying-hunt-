@@ -2,13 +2,13 @@ import { random, randomOf, shuffle } from './random';
 import { getExecutionMethod, type ExecutionMethodId } from './executions';
 import { nearestOf, roomDistance } from './navigation';
 import { awarenessStage, myersStalkGain } from './npc/awareness';
-import { ESCAPE_ROOMS, BASE_AP, SABOTAGE_COST, ITEM_BOX_CHARGES, GENERATOR_JAM_TURNS, POSSESS_TURNS, SURVIVOR_MAX_HP, SURVIVOR_INJURED_HP } from './constants';
+import { ESCAPE_ROOMS, BASE_AP, SABOTAGE_COST, ITEM_BOX_CHARGES, POSSESS_TURNS, SURVIVOR_MAX_HP, SURVIVOR_INJURED_HP } from './constants';
 import { drawCards } from './deck';
 import { executeOps } from './effects/runtime';
 import { createGame } from './setup';
 export { drawCards } from './deck';
 export { createGame } from './setup';
-export { BASE_AP, SABOTAGE_COST, ITEM_BOX_CHARGES, GENERATOR_JAM_TURNS, POSSESS_TURNS, SURVIVOR_MAX_HP, SURVIVOR_INJURED_HP } from './constants';
+export { BASE_AP, SABOTAGE_COST, ITEM_BOX_CHARGES, POSSESS_TURNS, SURVIVOR_MAX_HP, SURVIVOR_INJURED_HP } from './constants';
 import { ACTIVITIES, createPeople, itemUsesFor } from './npc/factory';
 import { ARCH_DESC, ARCH_LABEL, GOAL_LABEL, HEALTH_LABEL, INTENT_LABEL, ROUTINE_PROFILE, SITE_ITEM_LABEL, SURVIVOR_ITEM_LABEL } from './npc/catalog';
 export { ARCH_DESC, ARCH_LABEL, GOAL_LABEL, HEALTH_LABEL, INTENT_LABEL, SITE_ITEM_LABEL, SURVIVOR_ITEM_LABEL } from './npc/catalog';
@@ -167,20 +167,8 @@ function teamWorkGain(state: GameState, person: Person): number {
   return scaleSurvivorProgress(state, person, base);
 }
 
-/* ---------- 场地物品：道具箱 / 发电机 ---------- */
-/** 每局两个道具箱，每个能发三件东西 */
+/* ---------- 场地物品：道具箱 ---------- */
 const ITEM_BOX_COUNT = 2;
-/** 发电机每局随机 1~2 台 */
-const GENERATOR_MIN = 1;
-const GENERATOR_MAX = 2;
-/** 在发电机房间待一回合推进多少；带工具箱翻倍 */
-const GENERATOR_GAIN = 9;
-/** 修满一台，一次性给团队进度的奖励 */
-const GENERATOR_CHARGED_BONUS = 26;
-/** 砸发电机扣掉的修复进度 / 已通电时倒退的团队进度 */
-const SABOTAGE_GEN_LOSS = 45;
-const SABOTAGE_TEAM_LOSS = 22;
-/** 砸坏后停机几回合，这段时间修不了 */
 
 /* ==================================================================== */
 /*  小工具                                                              */
@@ -1984,7 +1972,7 @@ function npcTurn(state: GameState): void {
     // 日常生活阶段不会因为房间亮着灯就逐渐怀疑异常。
     if (isRoomLit(state, person.room) && person.awareness > 0) {
       person.alert = clamp(person.alert + 4, 0, 100);
-      if (person.awareness >= 2 && (person.goal === 'objective' || person.goal === 'generator' || person.goal === 'key' || person.intent === 'work')) {
+      if (person.awareness >= 2 && (person.goal === 'objective' || person.goal === 'key' || person.intent === 'work')) {
         addTeamProgress(state, scaleSurvivorProgress(state, person, 2));
         log(state, `${roomName(person.room)}仍有照明，${person.name}借着灯光加快了行动（团队进度 +2）。`);
       }
@@ -2186,10 +2174,8 @@ function npcTurn(state: GameState): void {
           ? [EXIT_ROOM]
           : person.goal === 'supply'
             ? usableItemBoxes(state).map((i) => i.room)
-            : person.goal === 'generator'
-              ? state.siteItems.filter((i) => i.kind === 'generator' && !i.broken && !i.charged).map((i) => i.room)
-              : person.goal === 'phone'
-                ? PHONE_ROOMS
+            : person.goal === 'phone'
+              ? PHONE_ROOMS
                 : person.goal === 'weapon' || person.goal === 'gather'
                   ? WEAPON_ROOMS
                   : person.goal === 'hide'
@@ -2201,31 +2187,7 @@ function npcTurn(state: GameState): void {
                         : [person.room];
     const target = nearestOf(person.room, goalTargets.length ? goalTargets : [person.room]);
     if (target === person.room) {
-      // 发电机是「完成目的」的另一条路：站在这儿修，修满直接给团队进度一大块。
-      // 带工具箱的人修得翻倍——道具箱因此值得抢，也值得砸。
-      const gen = state.siteItems.find(
-        (i) => i.kind === 'generator' && i.room === person.room && !i.broken && i.jammedTurns === 0 && !i.charged,
-      );
-      if (person.goal === 'routine') {
-        person.activity = routine.activity;
-        person.intent = 'idle';
-        person.routineIndex = ((person.routineIndex ?? 0) + 1) % routine.rooms.length;
-      } else if (gen) {
-        const hasToolbox = person.item === 'toolbox' && person.itemUses > 0;
-        // 危急时刻发电机也修得更快：同伴的死亡和倒地都在催他们
-        const gain = scaleSurvivorProgress(state, person, Math.round(GENERATOR_GAIN * (1 + workPressure(state)))) * (hasToolbox ? 2 : 1);
-        gen.progress = Math.min(100, gen.progress + gain);
-        if (hasToolbox) consumeItem(state, person);
-        person.intent = 'work';
-        person.activity = `在修发电机（${gen.progress}%）`;
-        addDisturbance(state, person.room);
-        log(state, `${person.name} 在${roomName(person.room)}修发电机（${gen.progress}%）。`);
-        if (gen.progress >= 100) {
-          gen.charged = true;
-          addTeamProgress(state, scaleSurvivorProgress(state, person, GENERATOR_CHARGED_BONUS));
-          log(state, '发电机重新亮了起来，房间照明与设备供电恢复。');
-        }
-      } else if ((person.goal === 'objective' || person.goal === 'key') && state.teamProgress < TEAM_GOAL_MAX) {
+else if ((person.goal === 'objective' || person.goal === 'key') && state.teamProgress < TEAM_GOAL_MAX) {
         // 工具箱：按你的设计，推进团队目标也更快（不只是修发电机）
         const hasToolbox = person.item === 'toolbox' && person.itemUses > 0;
         const gain = teamWorkGain(state, person) * (hasToolbox ? 2 : 1);
@@ -2470,10 +2432,10 @@ function usableItemBoxes(state: GameState): SiteItem[] {
 function pickSupply(state: GameState, person: Person): SurvivorItem {
   const downed = npcs(state).some((p) => p.hp <= 0);
   const injured = npcs(state).some((p) => p.hp > 0 && p.hp <= SURVIVOR_INJURED_HP);
-  const genActive = state.siteItems.some((i) => i.kind === 'generator' && !i.broken && !i.charged);
+  const circuitsNeedRepair = state.powerCircuits.some((circuit) => circuit.broken || circuit.enabled === false);
   const score: Record<SurvivorItem, number> = {
     medkit: (downed ? 5 : 0) + (injured ? 2 : 0) + (person.archetype === 'rescuer' ? 4 : 0),
-    toolbox: genActive ? 4 + (person.goal === 'generator' || person.goal === 'objective' ? 3 : 0) : 0,
+    toolbox: circuitsNeedRepair ? 4 + (person.goal === 'objective' ? 3 : 0) : 0,
     flare: (state.alarm < 45 ? 3 : 1) + (person.archetype === 'caller' ? 4 : 0),
     key: state.teamProgress < 60 ? 3 + (person.goal === 'key' ? 2 : 0) : 1,
     weapon: (person.archetype === 'defiant' || person.archetype === 'brave' ? 5 : 0) + (state.alarm >= 45 ? 2 : 0),
@@ -2573,9 +2535,22 @@ function useSurvivorItem(state: GameState, person: Person): boolean {
       log(state, `${person.name} 丢了烟雾弹，脚印和视线一起断在这里。`);
       return true;
     }
-    case 'toolbox':
+    case 'toolbox': {
+      const circuit = state.powerCircuits.find((item) =>
+        item.breakerRoom === person.room && (item.broken || item.enabled === false),
+      );
+      if (!circuit) return false;
+      circuit.broken = false;
+      circuit.enabled = true;
+      consumeItem(state, person);
+      person.intent = 'work';
+      person.activity = `用工具箱修复了${circuit.name}电闸`;
+      addDisturbance(state, person.room);
+      log(state, `${person.name} 用工具箱修复了${circuit.name}电闸，相关区域恢复供电。`);
+      return true;
+    }
     case 'weapon':
-      // 工具箱在修发电机时生效，武器在反击时生效，都是「等到场合」的装备
+      // 武器会在反抗时消耗；工具箱用于修复被破坏的电闸。
       return false;
   }
   return false;
@@ -3282,12 +3257,10 @@ export function getHuntOpportunities(state: GameState): HuntOpportunity[] {
 }
 
 export function isRoomLit(state: GameState, room: RoomId): boolean {
-  return state.powerCircuits.some((c) => {
-    const source = c.generatorId ? state.siteItems.find((item) => item.id === c.generatorId) : undefined;
-    const generatorOnline = !source || (!source.broken && source.jammedTurns <= 0);
-    return !c.broken && c.enabled !== false && generatorOnline &&
-      (c.flickerTurns ?? 0) <= 0 && c.affectedRooms.includes(room);
-  });
+  return state.powerCircuits.some((circuit) =>
+    !circuit.broken && circuit.enabled !== false &&
+    (circuit.flickerTurns ?? 0) <= 0 && circuit.affectedRooms.includes(room),
+  );
 }
 
 /**
@@ -3469,10 +3442,6 @@ export function breakerBlockReason(state: GameState, circuitId?: string): string
   if (circuit.breakerRoom !== state.playerRoom) return '必须走到电闸所在房间才能操作。';
   if (circuit.broken) return '电闸控制箱已经损坏，无法操作。';
   if (state.energy < BREAKER_SWITCH_COST) return '行动点不足：操作电闸需要 1 点。';
-  if (circuit.enabled === false) {
-    const source = circuit.generatorId ? state.siteItems.find((item) => item.id === circuit.generatorId) : undefined;
-    if (source && (source.broken || source.jammedTurns > 0)) return '供电发电机尚未恢复，暂时无法合闸。';
-  }
   return null;
 }
 
@@ -3503,7 +3472,7 @@ export function togglePowerCircuit(state: GameState, circuitId?: string): boolea
 /** 统一破坏入口：相邻门锁、电话线、无线电、电闸、发电机与道具箱。 */
 function sabotageTarget(state: GameState): { kind: 'door'; room: RoomId } | { kind: 'phone' | 'radio' } | { kind: 'facility' } | null {
   const breaker = state.powerCircuits.some((c) => c.breakerRoom === state.playerRoom && !c.broken);
-  const item = state.siteItems.some((i) => i.room === state.playerRoom && !i.broken && (i.kind !== 'itemBox' || i.charges > 0));
+  const item = state.siteItems.some((i) => i.room === state.playerRoom && !i.broken && i.charges > 0);
   if (breaker || item) return { kind: 'facility' };
   if (PHONE_ROOMS.includes(state.playerRoom) && !state.phoneCut) return { kind: 'phone' };
   if (RADIO_ROOMS.includes(state.playerRoom) && !state.sabotage.includes('radio')) return { kind: 'radio' };
@@ -3560,23 +3529,10 @@ export function sabotageSiteItem(state: GameState, options: { free?: boolean; su
     circuit.broken = true;
     circuit.enabled = false;
     log(state, `你砸毁了${circuit.name}控制箱！${circuit.affectedRooms.map(roomName).join('、')}立即断电，灯光熄灭。`);
-  } else if (target.kind === 'facility' && item!.kind === 'itemBox') {
-    item!.broken = true;
-    item!.charges = 0;
-    log(state, `你砸烂了${roomName(item!.room)}的道具箱——从今往后，没人能从这里翻到道具了。`);
-  } else if (target.kind === 'facility') {
-    const before = item!.progress;
-    item!.progress = Math.max(0, item!.progress - SABOTAGE_GEN_LOSS);
-    if (item!.charged) {
-      item!.charged = false;
-      reduceTeamProgress(state, SABOTAGE_TEAM_LOSS);
-      log(state, `已经通电的线路被你扯断，他们的团队进度倒退了 ${SABOTAGE_TEAM_LOSS}。`);
-    }
-    item!.jammedTurns = GENERATOR_JAM_TURNS;
-    // 停机而不是永久报废：他们还能修回来，破坏是「拖时间」而非一劳永逸
-    item!.broken = false;
-    const affected = state.powerCircuits.filter((circuit) => circuit.generatorId === item!.id).map((circuit) => circuit.name);
-    log(state, `你砸了${roomName(item!.room)}的发电机，修复进度 ${before}% → ${item!.progress}%，停机 ${GENERATOR_JAM_TURNS} 回合。${affected.length ? '受其供电的 ' + affected.join('、') + ' 也随之熄灭。' : ''}`);
+  } else if (target.kind === 'facility' && item) {
+    item.broken = true;
+    item.charges = 0;
+    log(state, `你砸烂了${roomName(item.room)}的道具箱——从今往后，没人能从这里翻到道具了。`);
   }
   }
 
@@ -4162,10 +4118,6 @@ export function endTurn(state: GameState): void {
       .filter(([, v]) => (v as number) > 0),
   ) as Partial<Record<RoomId, number>>;
   state.exitBlockedTurns = Math.max(0, state.exitBlockedTurns - 1);
-  // 被砸停机的发电机慢慢缓过来，幸存者可以接着修
-  state.siteItems.forEach((i) => {
-    if (i.jammedTurns > 0) i.jammedTurns -= 1;
-  });
   // 临时闪断只持续一个完整回合，不会把电闸永久标记为已破坏。
   state.powerCircuits.forEach((circuit) => {
     if ((circuit.flickerTurns ?? 0) > 0) circuit.flickerTurns = Math.max(0, (circuit.flickerTurns ?? 0) - 1);
