@@ -60,6 +60,7 @@ import {
   setPowerOpValue,
 } from './game/tuning';
 import { ROOM_MAP } from './game/rooms';
+import { SURVIVOR_MAP } from './game/survivors';
 import { getExecutionMethod } from './game/executions';
 import type { ExecutionMethodId } from './game/executions';
 import type { GameState, RoomId, SaveData } from './game/types';
@@ -643,13 +644,6 @@ app.addEventListener('click', (event) => {
   clearHeldMovement();
   const action = target.dataset.action;
   if (handleImmersiveAction(action)) return;
-  // 纯提示物件：点击时仍可透过物件命中区移动到对应房间。
-  if (action === 'prop-info') {
-    const room = target.closest<HTMLElement>('.room');
-    const roomHit = room?.querySelector<HTMLButtonElement>('.room-hit:not([disabled])');
-    if (roomHit && roomHit.dataset.room !== game?.playerRoom) roomHit.click();
-    return;
-  }
 
   // 浏览器要求先有用户交互才允许出声
   unlockAudio();
@@ -974,7 +968,7 @@ app.addEventListener('click', (event) => {
         pendingMapAttackTarget = personId;
         pendingMapAttackGhost = ghosts.get(personId) ?? null;
         updateAttackGhostEscapeDirection(pendingMapAttackGhost, personId);
-        if (victimIsSurvivor) playSurvivorHit();
+        if (victimIsSurvivor) playSurvivorHit(SURVIVOR_MAP[personId]?.gender ?? 'male');
       }
       playKillerAttackSound(game);
       if (game.kills > killsBefore) playSfx('kill');
