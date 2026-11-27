@@ -2192,7 +2192,11 @@ function npcTurn(state: GameState): void {
                         : [person.room]);
     const target = nearestOf(person.room, goalTargets.length ? goalTargets : [person.room]);
     if (target === person.room) {
-else if ((person.goal === 'objective' || person.goal === 'key') && state.teamProgress < TEAM_GOAL_MAX) {
+      if (person.goal === 'routine') {
+        person.activity = routine.activity;
+        person.intent = 'idle';
+        person.routineIndex = ((person.routineIndex ?? 0) + 1) % routine.rooms.length;
+      } else if ((person.goal === 'objective' || person.goal === 'key') && state.teamProgress < TEAM_GOAL_MAX) {
         // 工具箱：按你的设计，推进团队目标也更快。
         const hasToolbox = person.item === 'toolbox' && person.itemUses > 0;
         const gain = teamWorkGain(state, person) * (hasToolbox ? 2 : 1);
