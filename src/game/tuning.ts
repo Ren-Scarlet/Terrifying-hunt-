@@ -160,7 +160,7 @@ export function setCardType(id: string, type: CardType): void { const card = CAR
 export function setCardFlavor(id: string, flavor: string): void { const card = CARD_MAP[id]; if (!card) return; card.flavor = flavor.slice(0, 160); recordCard(id); }
 export function setCardPrecheck(id: string, condition: string): void {
   const card = CARD_MAP[id]; if (!card) return;
-  const presets: Record<string, Precheck | null> = { none: null, victimHere: { cond: { c: 'victimHere' }, hint: '当前房间没有可以攻击的目标。' }, downedHere: { cond: { c: 'downedHere' }, hint: '当前房间没有倒地的人。' }, injuredHere: { cond: { c: 'injuredHere' }, hint: '当前房间没有受伤的人。' }, targetAway: { cond: { c: 'targetAway' }, hint: '场上没有远离你的目标。' }, visibleSurvivor: { cond: { c: 'visibleSurvivor' }, hint: '视野内没有存活的幸存者。' } };
+  const presets: Record<string, Precheck | null> = { none: null, victimHere: { cond: { c: 'victimHere' }, hint: '当前房间没有可以攻击的目标。' }, downedHere: { cond: { c: 'downedHere' }, hint: '当前房间没有倒地的人。' }, injuredHere: { cond: { c: 'injuredHere' }, hint: '当前房间没有受伤的人。' }, targetAway: { cond: { c: 'targetAway' }, hint: '场上没有远离你的目标。' }, visibleSurvivor: { cond: { c: 'visibleSurvivor' }, hint: '视野内没有存活的幸存者。' }, survivorNearby: { cond: { c: 'survivorNearby' }, hint: '当前或相邻房间没有可受影响的幸存者。' }, carryingPerson: { cond: { c: 'carryingPerson' }, hint: '必须先抱起一名倒地幸存者。' }, currentDestructible: { cond: { c: 'currentDestructible' }, hint: '当前房间没有可破坏的物品。' } };
   if (!(condition in presets)) return; card.precheck = presets[condition] ? clone(presets[condition]!) : undefined; recordCard(id);
 }
 function nextCustomId(): string {
@@ -363,6 +363,7 @@ const REQUIRED_OP_FIELDS: Record<string, string[]> = {
   alert: ['who', 'amount'], block: ['who', 'turns'], status: ['who', 'status', 'turns'], pin: ['who'],
   move: ['who', 'to'], teleportPlayer: ['to'], lockRoom: ['room', 'turns'], track: ['who', 'turns'],
   lure: ['to', 'count'], alarm: ['amount'], sabotage: ['key'], draw: ['amount'], energy: ['amount'],
+  fearFlee: ['amount'], revealExecutionSite: ['turns'],
   steps: ['amount'], stun: ['amount'], discount: ['amount'], bonusDamage: ['amount'], arrestThreshold: ['amount'],
   heal: ['who', 'amount'], rescue: ['who'], bleed: ['who', 'amount'], stalk: ['amount'],
   silenceAlarm: ['turns'], pursue: ['who'], flag: ['key'], log: ['text'], if: ['cond', 'then'],
@@ -387,7 +388,7 @@ function validateDynamicCondition(value: unknown): boolean {
     killsThisTurn: ['c', 'gte'], peopleHere: ['c', 'gte'], victimHere: ['c', 'maxHp'],
     downedHere: ['c'], injuredHere: ['c'], targetAway: ['c'], energy: ['c', 'gte'],
     wanted: ['c', 'gte', 'lte'], alarm: ['c', 'gte', 'lte'], stalk: ['c', 'gte'],
-    possession: ['c'], visibleSurvivor: ['c'], flag: ['c', 'key'], room: ['c', 'is'],
+    possession: ['c'], visibleSurvivor: ['c'], survivorNearby: ['c'], carryingPerson: ['c'], currentDestructible: ['c'], flag: ['c', 'key'], room: ['c', 'is'],
     markedAlive: ['c'], escaped: ['c', 'gte'], hasThreat: ['c', 'v'], hasArchetype: ['c', 'a'],
   };
   const keys = allowed[value.c];
