@@ -1,5 +1,5 @@
 import './mobile.css';
-import { CARD_MAP, STARTER_KILLERS } from '../game/cards';
+import { CARD_MAP } from '../game/cards';
 import {
   attack, attackBlockReason, blinkPlayer, canAttack, canMoveTo, canUsePower,
   discardCard, drawCardAction, endTurn, finishContract, finishFreeHunt,
@@ -11,7 +11,7 @@ import {
 import { createGame } from '../game/setup';
 import { generateFreeHunt, generateMission } from '../game/missions';
 import { loadSave, writeSave } from '../game/save';
-import { KILLER_MAP } from '../game/killers';
+import { KILLER_MAP, STARTER_KILLERS } from '../game/killers';
 import { ROOM_MAP, ROOMS, layoutAspectNum } from '../game/rooms';
 import { getHuntingGround } from '../game/maps';
 import type { GameState, RoomId } from '../game/types';
