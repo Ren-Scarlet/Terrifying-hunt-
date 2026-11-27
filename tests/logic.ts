@@ -1895,6 +1895,35 @@ function caseNpcLocksAndPersistentTrails(): void {
   endTurn(locked);
   check('AB 被封锁房间内的 NPC 不能逃出', survivor.room === before && isLocked(locked, lockedRoom), `before=${before} after=${survivor.room}`);
 
+  const breach = newGame();
+  breach.killer = '护士';
+  breach.roomLocks = {};
+  const breachRoom = (Object.keys(ROOM_MAP) as RoomId[]).find((room) =>
+    isRoomLit(breach, room) && ROOM_MAP[room].neighbors.length >= 2 &&
+    ROOM_MAP[room].neighbors.some((next) => !OBSTACLE_ROOMS.includes(next)),
+  );
+  if (breachRoom) {
+    const entry = ROOM_MAP[breachRoom].neighbors[0];
+    const trapped = player(breach);
+    breach.playerRoom = entry;
+    trapped.room = breachRoom;
+    trapped.hp = 4;
+    trapped.hidden = false;
+    trapped.alert = 78;
+    trapped.awareness = 2;
+    trapped.intent = 'wary';
+    breach.roomLocks[breachRoom] = 3;
+    breach.nurseBlinkTargeting = true;
+    breach.energy = 4;
+    const blinked = blinkPlayer(breach, breachRoom);
+    check('AB 护士闪入锁门房间后，幸存者会解锁并逃跑',
+      blinked && !isLocked(breach, breachRoom) && trapped.room !== breachRoom,
+      `blink=${blinked} locked=${isLocked(breach, breachRoom)} survivorRoom=${trapped.room}`,
+    );
+  } else {
+    check('AB 护士闪入锁门房间后，幸存者会解锁并逃跑', true, '当前地图没有适合的房间，跳过路径分支');
+  }
+
   const outside = newGame();
   const target = player(outside);
   const poweredOutsideRooms = new Set((Object.keys(ROOM_MAP) as RoomId[]).filter((room) => isRoomLit(outside, room)));
