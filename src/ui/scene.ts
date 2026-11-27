@@ -942,76 +942,65 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
     cc.translate(px, py);
     cc.rotate(facing);
 
-    // 1. 低强度环境反射：先形成宽而柔和的红色反射，不出现可辨认的椭圆边界。
-    const redSpill = cc.createRadialGradient(
-      coneLen * 0.44, 0, coneLen * 0.04,
-      coneLen * 0.44, 0, coneLen * 0.70,
-    );
-    redSpill.addColorStop(0, 'rgba(184,8,24,.24)');
-    redSpill.addColorStop(0.34, 'rgba(132,4,18,.16)');
-    redSpill.addColorStop(0.68, 'rgba(86,0,12,.065)');
-    redSpill.addColorStop(1, 'rgba(70,0,8,0)');
-    cc.fillStyle = redSpill;
-    cc.beginPath();
-    cc.ellipse(coneLen * 0.42, 0, coneLen * 0.58, coneLen * 0.31, 0, 0, Math.PI * 2);
-    cc.fill();
+    // 参考黎明杀机屠夫红光：不是一团圆斑，而是一束从杀手身前铺出去的锥形光，
+    // 沿光轴由近到远衰减，两侧用 canvas 模糊自然融进黑暗，末端落一个高光点。
+    const flick = 0.94 + Math.sin(t * 9.1) * 0.04 + Math.sin(t * 23.7) * 0.02;
+    cc.globalAlpha = flick;
 
-    // 2. 主照明区：光线从窄到宽扩散，距离越远照度越低，边缘采用连续弧线过渡。
-    cc.save();
+    // 1. 外围溢光：顺着光轴拉长成锥形，边缘整体模糊
+    const spillGlow = cc.createLinearGradient(0, 0, coneLen, 0);
+    spillGlow.addColorStop(0, 'rgba(150,6,18,.13)');
+    spillGlow.addColorStop(0.5, 'rgba(120,3,14,.15)');
+    spillGlow.addColorStop(1, 'rgba(90,0,10,0)');
+    cc.fillStyle = spillGlow;
+    cc.filter = `blur(${Math.max(6, coneLen * 0.06)}px)`;
     cc.beginPath();
     cc.moveTo(0, 0);
-    cc.bezierCurveTo(coneLen * 0.22, -coneLen * 0.052, coneLen * 0.64, -coneLen * 0.19, coneLen, -coneLen * 0.082);
-    cc.bezierCurveTo(coneLen * 1.03, -coneLen * 0.017, coneLen * 1.03, coneLen * 0.017, coneLen, coneLen * 0.082);
-    cc.bezierCurveTo(coneLen * 0.64, coneLen * 0.19, coneLen * 0.22, coneLen * 0.052, 0, 0);
+    cc.lineTo(coneLen * 1.02, -coneLen * 0.42);
+    cc.lineTo(coneLen * 1.02, coneLen * 0.42);
     cc.closePath();
-    cc.clip();
-
-    const beamFalloff = cc.createLinearGradient(0, 0, coneLen, 0);
-    beamFalloff.addColorStop(0, 'rgba(218,14,32,.72)');
-    beamFalloff.addColorStop(0.16, 'rgba(190,10,27,.58)');
-    beamFalloff.addColorStop(0.38, 'rgba(150,7,22,.39)');
-    beamFalloff.addColorStop(0.64, 'rgba(112,4,17,.22)');
-    beamFalloff.addColorStop(0.84, 'rgba(92,2,13,.085)');
-    beamFalloff.addColorStop(1, 'rgba(70,0,8,0)');
-    cc.fillStyle = beamFalloff;
-    cc.fillRect(0, -coneLen * 0.24, coneLen * 1.06, coneLen * 0.48);
-
-    // 光束中心的窄幅亮度核心：只增强中心，不把整束光涂成同一亮度。
-    const core = cc.createRadialGradient(
-      coneLen * 0.46, 0, coneLen * 0.015,
-      coneLen * 0.46, 0, coneLen * 0.26,
-    );
-    core.addColorStop(0, 'rgba(255,42,54,.34)');
-    core.addColorStop(0.32, 'rgba(220,18,36,.22)');
-    core.addColorStop(0.72, 'rgba(166,7,24,.075)');
-    core.addColorStop(1, 'rgba(130,0,16,0)');
-    cc.fillStyle = core;
-    cc.fillRect(0, -coneLen * 0.24, coneLen, coneLen * 0.48);
-    cc.restore();
-
-    // 3. 前方落点：形成更集中的红色照明区，中心亮、外围迅速衰减。
-    const pool = cc.createRadialGradient(
-      coneLen * 0.66, 0, coneLen * 0.012,
-      coneLen * 0.66, 0, coneLen * 0.21,
-    );
-    pool.addColorStop(0, 'rgba(255,34,48,.48)');
-    pool.addColorStop(0.24, 'rgba(218,12,30,.34)');
-    pool.addColorStop(0.58, 'rgba(154,5,22,.15)');
-    pool.addColorStop(1, 'rgba(110,0,12,0)');
-    cc.fillStyle = pool;
-    cc.beginPath();
-    cc.ellipse(coneLen * 0.66, 0, coneLen * 0.26, coneLen * 0.15, 0, 0, Math.PI * 2);
     cc.fill();
 
-    // 4. 光源附近的微弱溢光，避免出现过曝的红色圆点。
-    const emitter = cc.createRadialGradient(0, 0, 1, 0, 0, coneLen * 0.13);
-    emitter.addColorStop(0, 'rgba(255,66,72,.48)');
-    emitter.addColorStop(0.32, 'rgba(210,14,30,.30)');
+    // 2. 主光束：沿光轴线性衰减，两侧靠模糊过渡，没有硬边
+    const beam = cc.createLinearGradient(0, 0, coneLen, 0);
+    beam.addColorStop(0, 'rgba(255,64,72,.34)');
+    beam.addColorStop(0.18, 'rgba(232,22,42,.44)');
+    beam.addColorStop(0.52, 'rgba(196,10,30,.36)');
+    beam.addColorStop(0.8, 'rgba(158,4,20,.18)');
+    beam.addColorStop(1, 'rgba(120,0,10,0)');
+    cc.fillStyle = beam;
+    cc.filter = `blur(${Math.max(4, coneLen * 0.025)}px)`;
+    cc.beginPath();
+    cc.moveTo(0, 0);
+    cc.lineTo(coneLen, -coneLen * 0.34);
+    cc.lineTo(coneLen, coneLen * 0.34);
+    cc.closePath();
+    cc.fill();
+
+    // 3. 光斑落点：光轴 70% 处的圆形高光，外围迅速淡出
+    const pool = cc.createRadialGradient(coneLen * 0.7, 0, coneLen * 0.01, coneLen * 0.7, 0, coneLen * 0.30);
+    pool.addColorStop(0, 'rgba(255,86,86,.40)');
+    pool.addColorStop(0.35, 'rgba(226,20,38,.26)');
+    pool.addColorStop(0.72, 'rgba(170,4,20,.10)');
+    pool.addColorStop(1, 'rgba(130,0,14,0)');
+    cc.fillStyle = pool;
+    cc.filter = `blur(${Math.max(5, coneLen * 0.04)}px)`;
+    cc.beginPath();
+    cc.ellipse(coneLen * 0.7, 0, coneLen * 0.26, coneLen * 0.20, 0, 0, Math.PI * 2);
+    cc.fill();
+
+    // 4. 灯口溢光：贴身处很淡的一点红，不形成明显圆点
+    const emitter = cc.createRadialGradient(0, 0, 1, 0, 0, coneLen * 0.12);
+    emitter.addColorStop(0, 'rgba(255,90,90,.20)');
+    emitter.addColorStop(0.4, 'rgba(210,14,30,.11)');
     emitter.addColorStop(1, 'rgba(150,0,16,0)');
     cc.fillStyle = emitter;
+    cc.filter = `blur(${Math.max(4, coneLen * 0.03)}px)`;
     cc.beginPath();
-    cc.arc(0, 0, coneLen * 0.11, 0, Math.PI * 2);
+    cc.arc(0, 0, coneLen * 0.12, 0, Math.PI * 2);
     cc.fill();
+    cc.filter = 'none';
+    cc.globalAlpha = 1;
     cc.restore();
 
     d.globalCompositeOperation = 'destination-out';
@@ -1109,17 +1098,20 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
     ctx.clip();
     ctx.translate(px, py);
     ctx.rotate(facing);
-    const volume = ctx.createRadialGradient(
-      coneLen * 0.26, 0, coneLen * 0.02,
-      coneLen * 0.26, 0, coneLen * 0.64,
-    );
-    volume.addColorStop(0, 'rgba(220,12,28,.075)');
-    volume.addColorStop(0.42, 'rgba(170,6,20,.038)');
+    // 空气中的体积光：同样是锥形、沿轴衰减，不是一团圆形光晕
+    const volume = ctx.createLinearGradient(0, 0, coneLen, 0);
+    volume.addColorStop(0, 'rgba(220,12,28,.09)');
+    volume.addColorStop(0.5, 'rgba(170,6,20,.055)');
     volume.addColorStop(1, 'rgba(110,0,12,0)');
     ctx.fillStyle = volume;
+    ctx.filter = `blur(${Math.max(6, coneLen * 0.05)}px)`;
     ctx.beginPath();
-    ctx.ellipse(coneLen * 0.32, 0, coneLen * 0.58, coneLen * 0.26, 0, 0, Math.PI * 2);
+    ctx.moveTo(0, 0);
+    ctx.lineTo(coneLen, -coneLen * 0.40);
+    ctx.lineTo(coneLen, coneLen * 0.40);
+    ctx.closePath();
     ctx.fill();
+    ctx.filter = 'none';
     ctx.restore();
 
     // 门缝冷光：门槛上的一条细光，不是一团亮斑
