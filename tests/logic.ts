@@ -1168,8 +1168,8 @@ function caseAdjacentHidden(): void {
   v.room = front.id;
   check('P 玩家移动后能观察正前方一格房间', isRoomVisible(s, front.id) && isPersonVisible(s, v), `正前方：${front.id}`);
   v.room = from;
-  check('P 玩家移动后仍能持续观察刚离开的房间', isRoomVisible(s, from) && isPersonVisible(s, v), `身后监视：${from}`);
-  check('P 相邻房间仍然算已探索（有轮廓）', isRoomExplored(s, from));
+  check('P 玩家移动后不能继续观察刚离开的房间', !isRoomVisible(s, from) && !isPersonVisible(s, v), `身后房间：${from}`);
+  check('P 刚离开的房间仍保留已探索轮廓', isRoomExplored(s, from));
 }
 
 /** Q：搜索把柜子里的人翻出来 */
@@ -1786,8 +1786,14 @@ function caseContractsPowerAndCarry(): void {
   const watchedRoom = openNeighbor(watch.playerRoom);
   watch.roomLocks[watchedRoom] = 0;
   watch.watchedRoom = watchedRoom;
+  const currentRect = ROOM_MAP[watch.playerRoom].rect;
+  const rearRect = ROOM_MAP[watchedRoom].rect;
+  const dx = currentRect.left + currentRect.width / 2 - (rearRect.left + rearRect.width / 2);
+  const dy = currentRect.top + currentRect.height / 2 - (rearRect.top + rearRect.height / 2);
+  const length = Math.hypot(dx, dy) || 1;
+  watch.playerFacing = { x: dx / length, y: dy / length };
   watched.room = watchedRoom;
-  check('AB 玩家离开房间后仍可持续观察身后的相邻房间', isRoomVisible(watch, watchedRoom));
+  check('AB 玩家离开房间后不能继续观察身后的相邻房间', !isRoomVisible(watch, watchedRoom));
   const grid = newGame();
   const circuit = grid.powerCircuits[0];
   const affected = circuit.affectedRooms[0];
