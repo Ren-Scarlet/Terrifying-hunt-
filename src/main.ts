@@ -30,6 +30,8 @@ import {
   interactTotem,
   breakBarricade,
   movePlayer,
+  moveBlockReason,
+  noteToPlayer,
   playCard,
   searchRoom,
   sabotageSiteItem,
@@ -1283,8 +1285,16 @@ app.addEventListener('click', (event) => {
 
   if (action === 'move') {
     const room = target.dataset.room as RoomId | undefined;
-    if (room) movePlayer(game, room);
-    playSfx('step');
+    if (!room) return;
+    // 走不过去时说清楚原因，而不是静默失败；只有真的走成了才播放脚步声，
+    // 否则「有脚步声但画面没动」会被当成渲染 bug。
+    const reason = moveBlockReason(game, room);
+    if (reason) {
+      noteToPlayer(game, reason);
+    } else {
+      movePlayer(game, room);
+      playSfx('step');
+    }
     afterAction();
     return;
   }

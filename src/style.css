@@ -400,6 +400,7 @@ button { font-family: inherit; cursor: pointer; }
   box-shadow: inset 0 0 40px rgba(24, 40, 52, .55);
 }
 .room.disabled { border-color: transparent; }
+.room-hit.blocked { cursor: not-allowed; }
 .room.current {
   border-color: rgba(150, 122, 78, .42);
   box-shadow: inset 0 0 44px rgba(179, 148, 95, .09);

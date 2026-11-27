@@ -2631,6 +2631,33 @@ export function moveCost(state: GameState, room: RoomId): number {
   return 1 + stalkingSlowdown;
 }
 
+/**
+ * 为什么走不进这个房间：返回 null 表示可以走。
+ *
+ * 纯查询：不扣行动点、不掷搬运检定、不撞木板。UI 的悬停提示和点击拦截都用它，
+ * 这样「点了没反应」可以变成一句具体的原因，而不是静默失败。
+ */
+export function moveBlockReason(state: GameState, room: RoomId): string | null {
+  if (state.phase !== 'playing') return '现在还不能行动。';
+  if (room === state.playerRoom) return '你已经在这个房间了。';
+  const adjacent = ROOM_MAP[state.playerRoom].neighbors.includes(room);
+  if (!adjacent && !state.freeMove) return `${roomName(room)}不相邻：只能一间一间走过去。`;
+  if (state.barricades.includes(room)) return `${roomName(room)}门口堆着木板，先点「破坏木板」。`;
+  if (isLocked(state, room)) return `${roomName(room)}的门被锁住了。`;
+  if (isLocked(state, state.playerRoom)) return '你所在的房间被锁住了，先想办法出去。';
+  if (isObstacle(room) && !state.clearedObstacles.includes(room) && !state.possessed) {
+    return `${roomName(room)}入口被木板封住，先破坏木板。`;
+  }
+  const cost = state.freeMove ? 0 : moveCost(state, room);
+  if (state.energy < cost) return `行动点不够：进入${roomName(room)}需要 ${cost} 点。`;
+  return null;
+}
+
+/** 把一句话写进对局日志：给界面做即时反馈用（例如点击了走不进去的房间）。 */
+export function noteToPlayer(state: GameState, text: string): void {
+  log(state, text);
+}
+
 export function canMoveTo(state: GameState, room: RoomId): boolean {
   if (state.phase !== 'playing') return false;
   if (room === state.playerRoom) return false;

@@ -21,6 +21,7 @@ import {
   canAttack,
   executeBlockReason,
   canMoveTo,
+  moveBlockReason,
   canUsePower,
   conditionOf,
   currentScore,
@@ -437,6 +438,11 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
     const cost = moveCost(state, room.id);
     const adjacent = ROOM_MAP[state.playerRoom].neighbors.includes(room.id);
     const obstacleOpen = OBSTACLE_ROOMS.includes(room.id) && !state.clearedObstacles.includes(room.id);
+    // 相邻但进不去时也要给一个可点目标：否则点击落在房间块上没有任何处理器，
+    // 玩家只会觉得「点了没反应」。点了由 main.ts 用 moveBlockReason 说明原因。
+    const moveHint = reachable
+      ? `移动到${room.name}（需 ${cost} 点行动点）`
+      : (moveBlockReason(state, room.id) ?? `走不过去`);
     const darkRoom = !isRoomLit(state, room.id);
     const noise = visibleDisturbances(state).find((d) => d.room === room.id);
     // 感知：看不见的房间也会浮出红色人影——只有影子，没有名字
@@ -457,8 +463,8 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
             : ''
           : state.lookingAround && adjacent
             ? `<button type="button" class="room-hit look-hit" data-action="look-select" data-room="${room.id}" aria-label="查看${escape(room.name)}，消耗 ${LOOK_COST} 点行动点">查看这里</button>`
-            : !state.lookingAround && !state.huntressAiming && reachable
-              ? `<button type="button" class="room-hit" data-action="move" data-room="${room.id}" aria-label="移动到${escape(room.name)}（需 ${cost} 点行动点）"></button>`
+            : !state.lookingAround && !state.huntressAiming && adjacent && !barricaded
+              ? `<button type="button" class="room-hit ${reachable ? '' : 'blocked'}" data-action="move" data-room="${room.id}" aria-label="${escape(moveHint)}" title="${escape(moveHint)}"></button>`
               : ''}
         <div class="room-head">
           <span class="room-name">${explored ? escape(room.name) : '？？？'}</span>

@@ -46,6 +46,7 @@ import {
   attackBlockReason,
   canAttack,
   canMoveTo,
+  moveBlockReason,
   createGame,
   effectiveCost,
   endTurn,
@@ -2146,6 +2147,21 @@ const revealGuard = newGame();
 runOps(revealGuard, [{ op: 'flag', key: 'bitterMurmur' }]);
 check('苦涩低语：出牌后会等待下一次人类死亡，再触发全场回声',
   revealGuard.bitterMurmurReady && revealGuard.people.filter((p) => p.role !== 'police' && p.hp > 0).every((p) => !(p.revealedActions ?? 0)));
+
+// 点击走不进去时必须给出原因，而不是静默失败
+{
+  const mv = newGame();
+  const target = ROOM_MAP[mv.playerRoom].neighbors[0];
+  mv.energy = BASE_AP;
+  check('移动提示：行动点够、房间相邻时可以走', moveBlockReason(mv, target) === null, String(moveBlockReason(mv, target)));
+  mv.energy = 0;
+  const blocked = moveBlockReason(mv, target);
+  check('移动提示：行动点不够时说明原因', !!blocked && blocked.includes('行动点'), String(blocked));
+  check('移动提示：不相邻的房间会被明确拒绝', (() => {
+    const far = ROOMS.map((r) => r.id).find((id) => id !== mv.playerRoom && !ROOM_MAP[mv.playerRoom].neighbors.includes(id));
+    return !!far && (moveBlockReason(mv, far) ?? '').includes('相邻');
+  })());
+}
 
 caseNewPerkSystem();
 });
