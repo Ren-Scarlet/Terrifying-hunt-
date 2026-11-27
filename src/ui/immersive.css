@@ -2277,6 +2277,31 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
 #app.immersive-game .killer-ability-panel .killer-frenzy-meter,
 #app.immersive-game .killer-ability-panel .killer-special-resources { max-width: 200px !important; }
 #app.immersive-game .room-feature.execution-site { display: inline-flex !important; align-items: center !important; gap: 5px !important; }
+#app.immersive-game .floorplan .room-feature.bear-trap.armed,
+#app.immersive-game .floorplan .room-feature.bear-trap.spent,
+#app.immersive-game .floorplan .room-feature.bear-trap.triggered {
+  opacity: 1 !important;
+  filter: none !important;
+}
+#app.immersive-game .floorplan .room-feature.bear-trap.triggered {
+  border: 3px solid #ff342e !important;
+  box-shadow: 0 0 0 2px rgba(255,25,20,.32), 0 0 18px rgba(255,20,16,.95), inset 0 0 12px rgba(180,0,0,.4) !important;
+  background: rgba(54,7,8,.96) !important;
+}
+#app.immersive-game .floorplan .room-feature.bear-trap.armed {
+  border-color: rgba(220,185,125,.95) !important;
+  box-shadow: 0 0 12px rgba(230,185,120,.35), inset 0 0 8px rgba(0,0,0,.65) !important;
+}
+#app.immersive-game .floorplan .room-feature.execution-site.nearest {
+  border: 3px solid #f0c46c !important;
+  box-shadow: 0 0 0 3px rgba(240,196,108,.25), 0 0 22px rgba(255,184,72,.95), inset 0 0 14px rgba(170,103,28,.4) !important;
+  background: rgba(56,35,13,.96) !important;
+  animation: executionSiteHintPulse 1.5s ease-in-out infinite;
+}
+@keyframes executionSiteHintPulse {
+  0%,100% { filter: brightness(1); }
+  50% { filter: brightness(1.35); }
+}
 #app.immersive-game .room-feature.execution-site .execution-site-icon {
   display: inline-block !important; width: 19px !important; height: 19px !important;
   flex: 0 0 19px !important; object-fit: contain !important;
@@ -2461,8 +2486,9 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
   transform: none !important;
 }
 #app.immersive-game .floorplan .footprint {
-  width: 28px !important;
-  height: 36px !important;
+  width: 42px !important;
+  height: 54px !important;
+  z-index: 22 !important;
   object-fit: contain !important;
   filter: brightness(0) saturate(100%) invert(17%) sepia(93%) saturate(5880%) hue-rotate(350deg) brightness(96%) contrast(112%)
     drop-shadow(0 0 4px rgba(255,28,22,.92)) drop-shadow(0 0 10px rgba(220,12,12,.66)) !important;
