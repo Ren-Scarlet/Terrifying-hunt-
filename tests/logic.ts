@@ -1012,11 +1012,12 @@ function caseTrailDecay(): void {
     p.movesThisTurn = 0;
   });
   const now = visibleTrails(s).length;
-  for (let i = 0; i < 5; i++) s.trailClock += 1;
+  const trailWindow = s.mapId === 'ormond' ? 8 : 5;
+  for (let i = 0; i < trailWindow; i++) s.trailClock += 1;
   const later = visibleTrails(s).length;
   s.trailClock += 1;
   const expired = visibleTrails(s).length;
-  check('L 痕迹在 5 次行动内保留，之后自然过期', now > 0 && later > 0 && expired === 0, `${now} → ${later} → ${expired}`);
+  check('L 脚印在地图规定的追踪时限内保留，超过时限后自然过期', now > 0 && later > 0 && expired === 0, `${now} → ${later} → ${expired}`);
 }
 
 /** M：同屋多人时，点谁打谁 */
