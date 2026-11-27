@@ -3901,7 +3901,6 @@ export function togglePowerCircuit(state: GameState, circuitId?: string): boolea
   state.energy -= BREAKER_SWITCH_COST;
   state.huntStats.environmentActions += 1;
   circuit.enabled = circuit.enabled === false;
-  addDisturbance(state, state.playerRoom);
   addAlarm(state, 1);
   log(state, circuit.enabled
     ? `你合上了${circuit.name}电闸，供电恢复。`
@@ -3975,7 +3974,6 @@ export function sabotageSiteItem(state: GameState, options: { free?: boolean; su
   }
   }
 
-  addDisturbance(state, state.playerRoom);
   if (target.kind === 'facility') addAlarm(state, 3);
   // 砸东西也算「做了一件事」，刀可以收回来
   state.attackReady = true;

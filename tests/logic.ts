@@ -517,6 +517,9 @@ function caseMyersStalkingAndFearRadius(): void {
   myersBurst.energy = 4;
   check('迈尔斯：尾随值满后同一按钮发动恶魔附身，发动后保留 80 点爆发能量',
     usePower(myersBurst, 'myers_gaze') && myersBurst.possessed && myersBurst.stalkMeter === 80);
+  // 发动附身会惊动同屋目标（他们可能跑开），这里把目标放回屋里再验证挥刀伤害。
+  burstTarget.room = myersBurst.playerRoom;
+  burstTarget.hidden = false;
   check('迈尔斯：恶魔附身挥刀可直接击倒健康目标',
     attack(myersBurst, burstTarget.id) && burstTarget.hp === 0 && myersBurst.possessed && myersBurst.huntStats.myersBurstHits === 1,
     `hp=${burstTarget.hp} stalk=${myersBurst.stalkMeter}`);

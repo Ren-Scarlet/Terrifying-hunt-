@@ -177,7 +177,7 @@ function roomFeatures(state: GameState, roomId: RoomId): string {
     const canTake = alive && !taken && state.playerRoom === roomId;
     parts.push(`<span class="totem-anchor"><span class="room-feature totem ${alive ? 'cursed lit' : 'broken'}" title="${label}：幸存者可以拆除；杀手可从每座存续图腾领取一次奖励">${icon('totem', 'ui-icon tiny')}<b>${label}</b></span>${canTake ? `<span class="totem-actions"><button type="button" data-action="totem-draw" title="本局仅可从这座图腾领取一次奖励">抽 1 张牌</button><button type="button" data-action="totem-energy" title="本局仅可从这座图腾领取一次奖励">+1 行动点</button></span>` : ''}</span>`);
   }
-  if (state.trailRevealActions > 0 && visibleTrails(state).some((trail) => trail.room === roomId || trail.to === roomId)) parts.push('<span class="room-feature trail-highlight" title="猎鹿者显现的脚印路线">👣</span>');
+  if (state.trailRevealActions > 0 && visibleTrails(state).some((trail) => trail.room === roomId || trail.to === roomId)) parts.push(`<span class="room-feature trail-highlight" title="猎鹿者显现的脚印路线">${icon('trail', 'ui-icon tiny')}</span>`);
   if (state.scourgeShrineRoom === roomId) parts.push(`<span class="room-feature shrine" title="鬼魔神龛：等待有人踏入">${icon('totem', 'ui-icon tiny')}<b>神龛</b></span>`);
   if (CABINET_ROOMS.includes(roomId) || (state.mapId === 'badham' && ['nursery', 'storage', 'guestroom'].includes(roomId))) {
     const cabinetHere = state.playerRoom === roomId;
@@ -189,8 +189,9 @@ function roomFeatures(state: GameState, roomId: RoomId): string {
   const boardBlocksRoom = state.barricades.includes(roomId) || (OBSTACLE_ROOMS.includes(roomId) && !cleared && !state.possessed);
   if (boardBlocksRoom) {
     const canBreak = ROOM_MAP[state.playerRoom].neighbors.includes(roomId);
-    const label = state.barricades.includes(roomId) ? '幸存者木板封门' : '堵路木板';
-    const inner = `<span class="room-feature pallet" title="木板封门：靠近后可花费 1 AP 破坏">${icon('obstacle', 'ui-icon tiny')}<b>${label}</b></span>`;
+    const fixed = !state.barricades.includes(roomId);
+    const label = fixed ? '可破坏的墙壁' : '幸存者木板封门';
+    const inner = `<span class="room-feature pallet" title="${fixed ? '可被破坏的墙壁：靠近后可花费 1 AP 砸开' : '木板封门：靠近后可花费 1 AP 破坏'}">${icon(fixed ? 'wall' : 'obstacle', 'ui-icon tiny')}<b>${label}</b></span>`;
     parts.push(canBreak
       ? `<span class="feature-anchor">${inner}<button type="button" class="feature-action" data-action="break-barricade" data-room="${roomId}" ${state.energy < 1 ? 'disabled' : ''} title="砸碎这扇门上的木板：1 AP">破坏木板 · 1 AP</button></span>`
       : inner);
@@ -535,7 +536,7 @@ function personSlot(roomId: RoomId, personId: string, index: number): { x: numbe
               : ''}
         <div class="room-head">
           <span class="room-name">${explored ? escape(room.name) : '？？？'}</span>
-          ${noise ? `<span class="room-tag noise" title="${escape(noise.label)}">${icon('crow', 'crow-icon tiny')}动静</span>` : ''}
+          ${noise ? `<span class="room-tag noise loud" title="${escape(noise.label)}">${icon('crow', 'crow-icon tiny')}${escape(noise.label)}</span>` : ''}
           ${isPlayer
             ? '<span class="room-tag">你在</span>'
             : locked
@@ -558,8 +559,8 @@ function personSlot(roomId: RoomId, personId: string, index: number): { x: numbe
         <div class="room-people ${adjacent && people.length ? 'adjacent-survivors' : ''}">
           ${people.map((p) => p.hp <= 0 && p.room === state.playerRoom && !state.carryPersonId
             ? `<div class="map-person-wrap ${currentScore(state) >= SCORE_EXECUTION_THRESHOLD ? 'score-unlocked' : ''}" style="left:${personSlot(room.id, p.id, people.indexOf(p)).x.toFixed(1)}%;top:${personSlot(room.id, p.id, people.indexOf(p)).y.toFixed(1)}%">${personChip(p, false, false, undefined, !isRoomLit(state, p.room))}
-                ${currentScore(state) >= SCORE_EXECUTION_THRESHOLD ? `<button class="btn score-execution-btn" data-action="execute-score-special" data-person-id="${p.id}" ${scoreExecutionBlockReason(state, p.id) ? 'disabled' : ''} title="分数处决：猎杀评分达到 ${SCORE_EXECUTION_THRESHOLD} 分后解锁，消耗 1 AP 并触发 QTE">✦ 分数处决 · QTE</button>` : ''}
                 <div class="person-world-actions">
+                  ${currentScore(state) >= SCORE_EXECUTION_THRESHOLD ? `<button class="btn score-execution-btn" data-action="execute-score-special" data-person-id="${p.id}" ${scoreExecutionBlockReason(state, p.id) ? 'disabled' : ''} title="分数处决：猎杀评分达到 ${SCORE_EXECUTION_THRESHOLD} 分后解锁，消耗 1 AP 并触发 QTE">分数处决 · QTE</button>` : ''}
                   <button class="btn" data-action="carry" data-person-id="${p.id}" ${state.energy < 1 ? 'disabled' : ''} title="抱起倒地幸存者：消耗 1 AP；抱起后可搬运到指定地点执行地点处决">抱起</button>
                   <button class="btn execute" data-action="execute-target" data-person-id="${p.id}" ${executeBlockReason(state, p.id) ? 'disabled' : ''} title="普通处决：消耗 1 AP，立即击杀倒地目标">普通处决</button>
                 </div>
@@ -632,7 +633,7 @@ function personSlot(roomId: RoomId, personId: string, index: number): { x: numbe
         <span><b>${escape(p.name)} ${alertLabel}</b>
           <small class="goal-line">${escape(ARCH_LABEL[p.archetype])} · ${escape(GOAL_LABEL[p.goal])}</small>
           ${p.marked ? '<small class="contract-target-tag">★ 契约指定目标</small>' : ''}
-          ${p.bloodSacrifice ? '<small class="blood-sacrifice-tag">🩸 血祭品</small>' : ''}
+          ${p.bloodSacrifice ? '<small class="blood-sacrifice-tag"><i aria-hidden="true"></i>血祭品</small>' : ''}
           <small>${where} · ${HEALTH_LABEL[health]} · ${escape(intentLabel)}</small>
           ${health === 'downed' ? `<small class="roster-bleed">倒地 · 可立即处决 · ${Math.max(0, BLEEDOUT_TURNS - p.downedTurns)} 回合后流血死亡 · 同伴仍可能救起</small>` : ''}
           ${p.item ? `<small class="roster-item">携带 ${itemIconHtml(p.item)}${escape(SURVIVOR_ITEM_LABEL[p.item])} ×${p.itemUses}</small>` : ''}
@@ -758,7 +759,7 @@ function personSlot(roomId: RoomId, personId: string, index: number): { x: numbe
   const executeBtn = `<button class="btn execute-action ${executeReason ? 'spent' : 'ready'}" data-action="execute" ${executeReason ? 'disabled' : ''}
       aria-label="${escape(executeReason || `处决${executeTargetSummary}，消耗 1 点行动点`)}"
       title="${escape(executeReason || `处决${executeTargetSummary}，消耗 1 点行动点。也可以暂时放过，等待同伴前来救援。`)}">
-      <span class="execute-symbol" aria-hidden="true">☠</span>
+      <span class="execute-symbol" aria-hidden="true">${icon('statusKill', 'ui-icon tiny')}</span>
       <span class="execute-copy"><b>处决倒地者</b><small>${executeReason ? escape(executeReason) : `1 AP · ${executeTargetSummary}`}</small></span>
     </button>`;
   const wipeReason = wipeBlockReason(state);

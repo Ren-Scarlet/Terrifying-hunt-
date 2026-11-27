@@ -1689,7 +1689,7 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
 #app.immersive-game .killer-power-grid [data-power="doctor_shock"] .power-art::after { content: 'ϟ'; }
 #app.immersive-game .killer-power-grid [data-power="doctor_madness"] .power-art::after { content: '⌁'; }
 #app.immersive-game .killer-power-grid [data-power="pig_ambush"] .power-art::after { content: '⌄'; }
-#app.immersive-game .killer-power-grid [data-power="pig_baptism"] .power-art::after { content: '☠'; }
+#app.immersive-game .killer-power-grid [data-power="pig_baptism"] .power-art::after { content: ''; }
 
 
 /* 2026-11-27: enlarge killer portrait and restore every power glyph. */
@@ -1734,7 +1734,7 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
 #app.immersive-game .killer-power-grid .btn.power[data-power="doctor_shock"] .power-art::after { content: 'ϟ'; }
 #app.immersive-game .killer-power-grid .btn.power[data-power="doctor_madness"] .power-art::after { content: '⌁'; }
 #app.immersive-game .killer-power-grid .btn.power[data-power="pig_ambush"] .power-art::after { content: '⌄'; }
-#app.immersive-game .killer-power-grid .btn.power[data-power="pig_baptism"] .power-art::after { content: '☠'; }
+#app.immersive-game .killer-power-grid .btn.power[data-power="pig_baptism"] .power-art::after { content: ''; }
 @media (max-width: 900px) {
   #app.immersive-game .killer-ability-panel { grid-template-columns: 116px 1fr !important; width: 290px !important; }
   #app.immersive-game .killer-face.ability-portrait { flex-basis: 146px !important; width: 116px !important; height: 146px !important; }
@@ -3314,4 +3314,108 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
 }
 #app.immersive-game .floorplan .room-people {
   inset: 8px 6px 16px !important;
+}
+
+
+/* ================================================================== */
+/* 人物：只保留头像与头像下方状态；删除所有方框、红光、祭品环           */
+/* ================================================================== */
+#app.immersive-game .floorplan .room-people .person-chip .chip-sacrifice-mark,
+#app.immersive-game .floorplan .room-people .person-chip .chip-sacrifice-frame {
+  display: none !important;
+}
+#app.immersive-game .floorplan .room-people .person-chip.blood-sacrifice .person-avatar {
+  width: 100% !important;
+  height: 100% !important;
+  margin: 0 !important;
+  border: 0 !important;
+}
+#app.immersive-game .floorplan .room-people .person-chip .person-avatar-wrap {
+  border: 0 !important;
+  box-shadow: none !important;
+  outline: none !important;
+  filter: none !important;
+}
+
+/* 状态图标：明显放大，并允许悬停查看说明 */
+#app.immersive-game .floorplan .room-people .person-chip .chip-state {
+  pointer-events: auto !important;
+  bottom: -30px !important;
+}
+#app.immersive-game .floorplan .room.room-size-small .room-people .person-chip .chip-state .chip-state-icon {
+  width: 30px !important; height: 30px !important;
+}
+#app.immersive-game .floorplan .room.room-size-medium .room-people .person-chip .chip-state .chip-state-icon {
+  width: 38px !important; height: 38px !important;
+}
+#app.immersive-game .floorplan .room.room-size-large .room-people .person-chip .chip-state .chip-state-icon,
+#app.immersive-game .floorplan .room.room-size-open .room-people .person-chip .chip-state .chip-state-icon {
+  width: 46px !important; height: 46px !important;
+}
+#app.immersive-game .floorplan .room.room-size-small .room-people .person-chip .chip-state { bottom: -24px !important; }
+#app.immersive-game .floorplan .room.room-size-large .room-people .person-chip .chip-state,
+#app.immersive-game .floorplan .room.room-size-open .room-people .person-chip .chip-state { bottom: -34px !important; }
+
+/* 血祭品标签：小血点 + 文字，不用 emoji */
+#app.immersive-game .blood-sacrifice-tag {
+  display: inline-flex !important;
+  align-items: center; gap: 3px;
+  color: #ff8f84 !important;
+  font-size: 10px !important;
+}
+#app.immersive-game .blood-sacrifice-tag i {
+  display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+  background: #e0362c; box-shadow: 0 0 6px rgba(224, 54, 44, .8);
+}
+
+/* 分数处决：和普通处决并排，同样红色 */
+#app.immersive-game .person-world-actions .btn.score-execution-btn {
+  position: static !important;
+  transform: none !important;
+  border-color: rgba(204, 65, 58, .9) !important;
+  background: linear-gradient(180deg, rgba(99, 25, 25, .98), rgba(39, 10, 12, .98)) !important;
+  color: #ffe0d6 !important;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, .8) !important;
+}
+
+/* 动静标记：更醒目，带房间级提示 */
+#app.immersive-game .floorplan .room-tag.noise.loud {
+  gap: 4px;
+  padding: 2px 6px;
+  color: #ffd9a0 !important;
+  background: rgba(40, 18, 8, .95) !important;
+  border: 1px solid rgba(231, 161, 93, .8) !important;
+}
+#app.immersive-game .floorplan .room:has(.room-tag.noise.loud) {
+  box-shadow: inset 0 0 0 1px rgba(231, 161, 93, .55), inset 0 0 18px rgba(231, 120, 60, .25) !important;
+}
+
+/* 相邻木板：更强的橙色高亮 */
+#app.immersive-game .floorplan .room.board-near {
+  box-shadow: inset 0 0 0 3px rgba(255, 170, 80, .95), inset 0 0 34px rgba(255, 120, 40, .45) !important;
+  background-color: rgba(140, 70, 20, .18) !important;
+}
+#app.immersive-game .floorplan .room.board-near .room-feature.pallet .ui-icon {
+  filter: drop-shadow(0 0 8px rgba(255, 160, 70, 1)) !important;
+}
+
+/* 处决点图标与其他地图图标同尺寸 */
+#app.immersive-game .floorplan .room-feature .execution-site-icon {
+  width: 34px !important;
+  height: 34px !important;
+  object-fit: contain;
+}
+
+/* 处决动画：用血迹溅射代替 emoji */
+#app.immersive-game .execution-scene-overlay .execution-scene-flash::after {
+  content: '';
+  position: absolute;
+  inset: -10%;
+  background:
+    radial-gradient(circle at 42% 48%, rgba(180, 10, 10, .85) 0 6%, transparent 34%),
+    radial-gradient(circle at 58% 42%, rgba(140, 8, 8, .7) 0 4%, transparent 28%),
+    radial-gradient(circle at 64% 58%, rgba(110, 4, 4, .6) 0 5%, transparent 30%),
+    radial-gradient(circle at 36% 62%, rgba(90, 3, 3, .55) 0 3%, transparent 24%);
+  mix-blend-mode: multiply;
+  pointer-events: none;
 }

@@ -244,7 +244,7 @@ function finishQte(success: boolean): void {
 
 /** 把 QTE 面板挂到杀手头像上（跟着地图一起移动）。 */
 function syncQteUi(): void {
-  app.querySelector('.qte-panel')?.remove();
+  document.querySelector('.qte-panel')?.remove();
   const current = qte;
   if (!current) return;
   const marker = app.querySelector<HTMLElement>('.player-marker');
@@ -1126,7 +1126,7 @@ function createGameActions(): ActionTable {
     'break-door': ({ target }) => {
       const room = target.dataset.room as RoomId | undefined;
       if (!room) return;
-      if (breakDoor(currentGame(), room)) playSfx('barricadeSmash');
+      if (breakDoor(currentGame(), room)) playSfx('smash');
       afterAction();
     },
 
