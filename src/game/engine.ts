@@ -587,6 +587,15 @@ function npcReact(state: GameState): void {
 
     // 恐惧范围：相邻房间先起疑；范围 2 的杀手会在隔壁直接引发逃跑，两格外也会察觉。
     const distanceToPlayer = roomDistance(person.room, state.playerRoom);
+    // 正在治疗的人一旦进入恐慌（恐惧 70+）或发现杀手逼近，就会立刻中断包扎逃跑。
+    if (person.intent === 'heal' && (person.fear >= 70 || distanceToPlayer <= 1)) {
+      person.healTurns = 0;
+      person.healLastTurn = undefined;
+      person.intent = 'flee';
+      person.awareness = Math.max(person.awareness, 2);
+      person.alert = Math.max(person.alert, 75);
+      person.activity = '治疗被打断，察觉屠夫后立刻逃跑';
+    }
     if (fearRadius >= 2 && distanceToPlayer === 1 && person.alert < 45) {
       person.awareness = Math.max(person.awareness, 2);
       person.alert = Math.max(person.alert, 45);
@@ -1510,6 +1519,7 @@ function consumeItem(state: GameState, person: Person): void {
   if (person.itemUses <= 0) {
     person.item = null;
     person.healTurns = 0;
+    person.healLastTurn = undefined;
   }
 }
 
@@ -2580,16 +2590,22 @@ function useSurvivorItem(state: GameState, person: Person): boolean {
         npcs(state).find((p) => p.hp <= 0 && roomDistance(person.room, p.room) <= 2) ??
         npcs(state).find((p) => p.hp > 0 && p.hp <= SURVIVOR_INJURED_HP && roomDistance(person.room, p.room) <= 2);
       if (!hurt) return false;
-      // 慢速治疗：要连着两回合，玩家有一整个窗口去打断或先把人处决掉
-      person.healTurns += 1;
+      // 治疗必须跨过一个完整回合；同一回合内即使连续触发 NPC 行动，也不会提前完成。
       person.intent = 'heal';
-      if (person.healTurns < MEDKIT_TURNS) {
-        person.activity = `正在给${hurt.name}包扎（还要 ${MEDKIT_TURNS - person.healTurns} 回合）`;
-        log(state, `${person.name} 蹲下来给${hurt.name}包扎，还得要一会儿。`);
+      if (person.healLastTurn === undefined) {
+        person.healLastTurn = state.turn;
+        person.healTurns = 1;
+        person.activity = `正在给${hurt.name}包扎（本回合治疗中）`;
+        log(state, `${person.name} 蹲下来给${hurt.name}包扎；如果这一回合没有被你找到，伤口就会处理好。`);
         addDisturbance(state, person.room);
         return true;
       }
+      if (state.turn <= person.healLastTurn) {
+        person.activity = `正在给${hurt.name}包扎（还需要一个回合）`;
+        return true;
+      }
       person.healTurns = 0;
+      person.healLastTurn = undefined;
       if (hurt.hp <= 0) rescuePerson(state, hurt);
       else healPerson(state, hurt, 1);
       consumeItem(state, person);
