@@ -1014,7 +1014,7 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
     cc.fill();
     cc.restore();
 
-    d.globalCompositeOperation = 'destination-out';    d.globalCompositeOperation = 'destination-out';
+    d.globalCompositeOperation = 'destination-out';
     d.drawImage(refs.coneCv, 0, 0, w, h);
     d.globalCompositeOperation = 'source-over';
 
