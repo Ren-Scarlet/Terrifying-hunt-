@@ -1,6 +1,6 @@
 import { CARD_MAP } from '../../game/cards';
 import { awarenessLabel, awarenessStage } from '../../game/npc/awareness';
-import { characterImage, uiIcon } from '../../game/assetMap';
+import { characterImage, POWER_RARITY_BG, uiIcon } from '../../game/assetMap';
 import {
   ALARM_MAX,
   ARCH_LABEL,
@@ -136,12 +136,11 @@ function roomFeatures(state: GameState, roomId: RoomId): string {
     const canExecuteHere = !!carried && carried.hp <= 0 && state.playerRoom === roomId;
     if (canExecuteHere || downedHere) {
       executionSites.forEach((method) => {
-        const glyph = method.id === 'fridge' ? '❄' : method.id === 'microwave' ? '▦' : method.id === 'garage_crush' ? '▤' : method.id === 'bathroom_tub' ? '♨' : method.id === 'laundry_dryer' ? '◉' : '⚒';
         const hint = canExecuteHere ? method.description : '先抱起这里的倒地幸存者，再将其带到此处使用特殊处决。';
-        parts.push(`<button type="button" class="room-feature execution-site execution-action" data-action="execute-special" data-method="${method.id}" ${canExecuteHere ? '' : 'disabled'} title="${escape(hint)}"><span aria-hidden="true">${glyph}</span><b>${escape(method.name)}</b></button>`);
+        parts.push(`<button type="button" class="room-feature execution-site execution-action" data-action="execute-special" data-method="${method.id}" ${canExecuteHere ? '' : 'disabled'} title="${escape(hint)}"><img class="execution-site-icon" src="${uiIcon('executionSite')}" alt="" aria-hidden="true" onerror="this.style.display='none'"><b>${escape(method.name)}</b></button>`);
       });
     } else {
-      parts.push(`<span class="room-feature execution-site" title="特殊处决地点：${executionSites.map((method) => escape(method.name)).join(' / ')}">☠<b>处决点 ${executionSites.length}</b></span>`);
+      parts.push(`<span class="room-feature execution-site" title="特殊处决地点：${executionSites.map((method) => escape(method.name)).join(' / ')}"><img class="execution-site-icon" src="${uiIcon('executionSite')}" alt="" aria-hidden="true" onerror="this.style.display='none'"><b>处决点 ${executionSites.length}</b></span>`);
     }
   }
   if (roomId === EXIT_ROOM) parts.push(`<span class="room-feature escape" title="撤离点：任务完成的撤离位置">${icon('escape', 'ui-icon tiny')}</span>`);
@@ -219,7 +218,7 @@ function powerButtonHtml(state: GameState, killer: KillerProfile): string {
     return `<button class="btn power ${power.ultimate ? 'ultimate' : 'main'} ${ok ? '' : 'cooling'} ${power.id === 'myers_gaze' && state.stalkMeter >= 100 ? 'possessed-ready' : ''}"
       data-action="power" data-power="${power.id}" ${ok ? '' : 'disabled'}
       title="${escape(power.desc)}${reason ? ` · ${escape(reason)}` : ''}">
-      <span class="power-art" aria-hidden="true"><img class="power-icon" src="${power.id === 'doctor_madness' ? uiIcon('madness') : killer.icon}" alt="" onerror="this.style.display='none'"></span>
+      <span class="power-art" aria-hidden="true"><img class="power-icon-bg" src="${POWER_RARITY_BG}" alt="" onerror="this.style.display='none'"><img class="power-icon" src="${killer.icon}" alt="" onerror="this.style.display='none'"></span>
       <span class="power-body"><b>${escape(label)}</b><small>${escape(actionHint)}</small></span>
       <span class="power-pips">${pips}</span>
     </button>`;
