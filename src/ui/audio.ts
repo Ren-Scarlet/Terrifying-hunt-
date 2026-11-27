@@ -171,9 +171,14 @@ export function playSurvivorHit(gender: 'female' | 'male'): void {
   playSfx(gender === 'female' ? 'voiceFHurt' : 'voiceMHurt', 0.76);
 }
 
-/** 捕兽夹命中时播放幸存者尖叫；男女音轨随机选择，避免每次听起来完全相同。 */
-export function playTrapScream(): void {
-  playSfx(Math.random() < 0.5 ? 'voiceFScream' : 'voiceMScream', 0.9);
+/** 捕兽夹命中时播放被夹住者对应性别的尖叫。 */
+export function playTrapScream(gender: 'female' | 'male'): void {
+  playSfx(gender === 'female' ? 'voiceFScream' : 'voiceMScream', 0.9);
+}
+
+/** 幸存者首次被发现时播放对应性别的受惊声。 */
+export function playSurvivorStartle(gender: 'female' | 'male'): void {
+  playSfx(gender === 'female' ? 'voiceFStartle' : 'voiceMStartle', 0.86);
 }
 
 /** 幸存者死亡时播放死亡提示与对应性别的尖叫。 */
