@@ -1805,3 +1805,45 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
 }
 .card-hover-preview .detail-body p { font-size: 13px; line-height: 1.65; margin: 0 0 12px; }
 .card-hover-preview .detail-body .dbd-perk { width: 56px; height: 56px; }
+
+
+/* Map-anchored special execution actions appear at the execution site itself. */
+#app.immersive-game .room-features .room-feature.execution-action {
+  appearance: none; -webkit-appearance: none; cursor: pointer; pointer-events: auto;
+  flex: 0 0 auto !important; width: auto !important; min-width: 112px !important;
+  max-width: 160px; height: auto !important; min-height: 54px !important;
+  padding: 7px 9px !important; gap: 4px !important;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  border: 1px solid rgba(205,75,62,.9);
+  border-radius: 7px; color: #ffe8dd;
+  background: linear-gradient(155deg,rgba(87,25,24,.97),rgba(22,10,12,.97));
+  box-shadow: 0 4px 14px rgba(0,0,0,.8), 0 0 10px rgba(190,35,30,.2);
+  text-shadow: 0 1px 4px #000; font: inherit;
+}
+#app.immersive-game .room-features .room-feature.execution-action > span {
+  font-size: 18px; line-height: 1;
+}
+#app.immersive-game .room-features .room-feature.execution-action b {
+  font-size: 11px !important; line-height: 1.2; white-space: nowrap;
+}
+#app.immersive-game .room-features .room-feature.execution-action:hover:not(:disabled) {
+  border-color: #ffb19a; filter: brightness(1.2);
+  transform: translateY(-2px);
+}
+#app.immersive-game .room-features .room-feature.execution-action:disabled {
+  opacity: .45; cursor: not-allowed;
+}
+
+/* The direction is supplied by the newest trail created by this attack. */
+#app.immersive-game .room-people .person-chip.attack-ghost.blood-hit {
+  animation: survivorImpactDirectional .78s cubic-bezier(.12,.72,.18,1) forwards;
+  will-change: transform, opacity, filter;
+}
+@keyframes survivorImpactDirectional {
+  0% { opacity: 1; filter: brightness(1); transform: translate(0,0) scale(1); }
+  12% { opacity: 1; filter: brightness(2.35) sepia(.55) saturate(2.2); transform: translate(calc(var(--escape-back-x, -5px) * .35),calc(var(--escape-back-y, 0px) * .35)) rotate(-4deg) scale(1.08); }
+  28% { opacity: 1; filter: brightness(.78) sepia(.75) saturate(2); transform: translate(var(--escape-back-x,-5px),var(--escape-back-y,0px)) rotate(-2deg) scale(.98); }
+  52% { opacity: .95; filter: brightness(.65) sepia(.9) saturate(2); transform: translate(calc(var(--escape-x, 8px) * .5),calc(var(--escape-y, 0px) * .5)) rotate(2deg) scale(.96); }
+  76% { opacity: .62; filter: brightness(.58) sepia(1) saturate(2); transform: translate(calc(var(--escape-x, 8px) * .9),calc(var(--escape-y, 0px) * .9)) scale(.92); }
+  100% { opacity: 0; filter: brightness(.48) sepia(1) saturate(2); transform: translate(var(--escape-x, 8px),var(--escape-y, 0px)) scale(.86); }
+}
