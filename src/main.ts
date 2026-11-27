@@ -86,7 +86,7 @@ import {
 import { renderAdmin } from './ui/admin';
 import { initCloudAuth, loadCloudConfig, saveCloudConfig, verifyGitHubToken, clearGitHubToken } from './game/cloud';
 import { mountFloorplanScene, type SceneHandle } from './ui/scene';
-import { playSfx, playSurvivorHit, playSurvivorDeath, setMusic, toggleMute, unlockAudio } from './ui/audio';
+import { playSfx, playStep, playSurvivorHit, playSurvivorDeath, setMusic, toggleMute, unlockAudio } from './ui/audio';
 import type { SfxName } from './ui/audio';
 import { currentMenuMap, rollMenuMap } from './ui/mapArt';
 
@@ -400,7 +400,7 @@ function performHeldMovement(key: string): boolean {
   const nextRoom = nextRoomInDirection(key);
   if (!nextRoom || !movePlayer(game, nextRoom)) return false;
   pendingMapWalk = true;
-  playSfx('step');
+  playStep();
   afterAction();
   return true;
 }
@@ -652,6 +652,10 @@ function sfxFromLogs(): void {
     window.setTimeout(() => playSfx('wipe'), 260);
   }
   else if (/你杀死了/.test(head)) { playSfx('kill'); playVoice(head, 'Scream'); }
+  else if (/砸晕|木板突然向你砸来/.test(head)) playSfx('palletStun');
+  else if (/放下木板/.test(head)) playSfx('palletDrop');
+  else if (/木板砸碎|砸碎.*木板/.test(head)) playSfx('barricadeSmash');
+  else if (/电话突然响起|正在尝试报警|已经被报警|电话线/.test(head)) playSfx('phone');
   else if (/砸毁|断电|控制箱|电闸/.test(head)) {
     playSfx('breaker');
     window.setTimeout(() => playSfx('spark'), 150);
@@ -1214,6 +1218,7 @@ app.addEventListener('click', (event) => {
 
   if (action === 'execute-special') {
     if (!game || screen !== 'game') return;
+    playSfx('executionSite');
     const method = target.dataset.method as ExecutionMethodId | undefined;
     const methodInfo = method ? getExecutionMethod(method) : undefined;
     const carriedId = game.carryPersonId;
@@ -1319,7 +1324,7 @@ app.addEventListener('click', (event) => {
       noteToPlayer(game, reason);
     } else {
       movePlayer(game, room);
-      playSfx('step');
+      playStep();
     }
     afterAction();
     return;
@@ -1411,7 +1416,7 @@ app.addEventListener('click', (event) => {
 
   if (action === 'cabinet-interact') {
     interactCabinet(game);
-    playSfx('click');
+    playSfx('cabinet');
     afterAction();
     return;
   }
@@ -1425,7 +1430,7 @@ app.addEventListener('click', (event) => {
 
   if (action === 'break-barricade') {
     const room = target.dataset.room as RoomId | undefined;
-    if (room && breakBarricade(game, room)) playSfx('smash');
+    if (room && breakBarricade(game, room)) playSfx('barricadeSmash');
     afterAction();
     return;
   }

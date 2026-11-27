@@ -43,8 +43,10 @@
  * 浏览器要求「先有用户交互」才能出声，第一次点击会调 unlockAudio() 把当前音乐真正响起来。
  */
 const SFX_FILES = {
-  click: 'click.mp3',
-  step: 'step.mp3',
+  click: '悬停鼠标指向可以按的按钮音效.ogg',
+  step: '脚步声 (1).ogg',
+  step2: '脚步声 (2).ogg',
+  step3: '脚步声 (3).ogg',
   attack: 'attack.ogg',
   hit: 'hit.mp3',
   down: 'down.mp3',
@@ -93,6 +95,13 @@ const SFX_FILES = {
   execute: 'execute.ogg',
   spark: 'spark.ogg',
   smash: 'smash.ogg',
+  // 第四批：补齐此前一直缺失的槽位（这些文件早已在仓库里，只是没接线）
+  cabinet: '打开柜子和柜子互动.ogg',
+  phone: '电话声.ogg',
+  palletDrop: '幸存者放下板子（木板障碍物）.ogg',
+  palletStun: '幸存者放下板子（木板障碍物）砸晕屠夫.ogg',
+  executionSite: '点击地图中执行特殊数据的音效.ogg',
+  barricadeSmash: '玩家破坏模板障碍物.ogg',
 } as const;
 
 export type SfxName = keyof typeof SFX_FILES;
@@ -137,11 +146,17 @@ const VOLUME: Partial<Record<SfxName, number>> = {
   execute: 0.85,
   spark: 0.6,
   smash: 0.7,
+  cabinet: 0.6,
+  phone: 0.55,
+  palletDrop: 0.8,
+  palletStun: 0.85,
+  executionSite: 0.5,
+  barricadeSmash: 0.75,
 };
 
 /* ---------- 背景音乐：菜单一首、对局一首，按界面自动切换 ---------- */
 export type MusicTrack = 'menu' | 'bgm';
-const MUSIC_FILES: Record<MusicTrack, string> = { menu: 'menu.mp3', bgm: 'bgm.mp3' };
+const MUSIC_FILES: Record<MusicTrack, string> = { menu: 'menu.mp3', bgm: '环境底噪1.ogg' };
 const MUSIC_VOLUME: Record<MusicTrack, number> = { menu: 0.4, bgm: 0.22 };
 
 const BASE =
@@ -250,6 +265,15 @@ export function playSfx(name: SfxName, volume?: number): void {
   a.volume = volume ?? VOLUME[name] ?? 0.65;
   a.addEventListener('error', () => missing.add(name), { once: true });
   void a.play().catch(() => {});
+}
+
+/**
+ * 脚步：三条录音随机轮换，连续移动时听不出重复。
+ * 之前 step 指向不存在的 step.mp3，所以移动一直是静音的。
+ */
+const STEP_VARIANTS: SfxName[] = ['step', 'step2', 'step3'];
+export function playStep(): void {
+  playSfx(STEP_VARIANTS[Math.floor(Math.random() * STEP_VARIANTS.length)], 0.3);
 }
 
 /**
