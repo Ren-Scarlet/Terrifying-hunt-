@@ -274,7 +274,7 @@ export interface Disturbance {
 
 export type MissionKind = 'assassinate' | 'bodyCount' | 'execution' | 'sabotage' | 'silent' | 'scoreExecution';
 
-export type MissionTaskKind = 'kill_count' | 'kill_count_before_turn' | 'marked_kill' | 'execute' | 'special_execute' | 'score_execute' | 'no_alarm' | 'break_circuit' | 'alarm_below' | 'killer_stat';
+export type MissionTaskKind = 'kill_count' | 'kill_count_before_turn' | 'marked_kill' | 'execute' | 'special_execute' | 'score_execute' | 'score_threshold' | 'no_alarm' | 'break_circuit' | 'alarm_below' | 'killer_stat';
 export type MissionTaskMetric = 'myers_stalk' | 'trap_triggers' | 'nurse_blink_attacks' | 'hatchet_hits';
 
 export interface MissionTask {
