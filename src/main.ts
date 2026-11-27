@@ -60,6 +60,7 @@ import {
   setPowerOpValue,
 } from './game/tuning';
 import { ROOM_MAP } from './game/rooms';
+import { getExecutionMethod } from './game/executions';
 import type { ExecutionMethodId } from './game/executions';
 import type { GameState, RoomId, SaveData } from './game/types';
 import {
@@ -126,6 +127,35 @@ let heldMoveTimer = 0;
 let pendingMapWalk = false;
 
 const app = document.getElementById('app')!;
+
+let pendingExecutionScene: { roomId: RoomId; title: string; description: string } | null = null;
+
+function showPendingExecutionScene(): void {
+  if (!pendingExecutionScene) return;
+  const event = pendingExecutionScene;
+  pendingExecutionScene = null;
+  const room = app.querySelector<HTMLElement>('.room[data-room="' + event.roomId + '"]');
+  if (!room) return;
+  room.querySelector('.execution-scene-overlay')?.remove();
+  const overlay = document.createElement('div');
+  overlay.className = 'execution-scene-overlay';
+  overlay.setAttribute('aria-hidden', 'true');
+  const flash = document.createElement('div');
+  flash.className = 'execution-scene-flash';
+  const figure = document.createElement('div');
+  figure.className = 'execution-scene-figure';
+  const bubble = document.createElement('div');
+  bubble.className = 'execution-scene-bubble';
+  const heading = document.createElement('b');
+  heading.textContent = event.title;
+  const description = document.createElement('p');
+  description.textContent = event.description;
+  bubble.append(heading, description);
+  overlay.append(flash, figure, bubble);
+  room.appendChild(overlay);
+  window.setTimeout(() => overlay.remove(), 4200);
+}
+
 
 /**
  * 对局每次行动都会重绘 HUD，但地图世界本身不应被销毁。
@@ -361,6 +391,7 @@ function render(): void {
   }
   if (guideOpen) html += renderGuide();
   renderMarkupPreservingMap(html);
+  showPendingExecutionScene();
   if (pendingMapWalk) {
     pendingMapWalk = false;
     app.classList.remove('map-walk');
@@ -612,6 +643,14 @@ app.addEventListener('click', (event) => {
   clearHeldMovement();
   const action = target.dataset.action;
   if (handleImmersiveAction(action)) return;
+  // 纯提示物件：点击时仍可透过物件命中区移动到对应房间。
+  if (action === 'prop-info') {
+    const room = target.closest<HTMLElement>('.room');
+    const roomHit = room?.querySelector<HTMLButtonElement>('.room-hit:not([disabled])');
+    if (roomHit && roomHit.dataset.room !== game?.playerRoom) roomHit.click();
+    return;
+  }
+
   // 浏览器要求先有用户交互才允许出声
   unlockAudio();
 
@@ -979,7 +1018,16 @@ app.addEventListener('click', (event) => {
   if (action === 'execute-special') {
     if (!game || screen !== 'game') return;
     const method = target.dataset.method as ExecutionMethodId | undefined;
+    const methodInfo = method ? getExecutionMethod(method) : undefined;
+    const carried = game.carryPersonId ? game.people.find((person) => person.id === game.carryPersonId) : undefined;
     if (method && executeCarriedPerson(game, method)) {
+      if (methodInfo && carried) {
+        pendingExecutionScene = {
+          roomId: game.playerRoom,
+          title: '特殊处决 · ' + methodInfo.name,
+          description: methodInfo.flavor(carried.name),
+        };
+      }
       playSfx('execute');
       window.setTimeout(() => playSfx('wipe'), 260);
       lastLogHead = game.log[0] ?? '';
