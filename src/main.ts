@@ -503,6 +503,67 @@ function startGame(freeHunt = false): void {
   render();
 }
 
+let cardPreviewUid: string | null = null;
+let cardPreviewTimer: number | null = null;
+
+function hideCardPreview(): void {
+  const preview = document.getElementById('card-hover-preview');
+  preview?.classList.remove('visible');
+  cardPreviewUid = null;
+  if (cardPreviewTimer !== null) {
+    window.clearInterval(cardPreviewTimer);
+    cardPreviewTimer = null;
+  }
+}
+
+function showCardPreview(uid: string | null, anchor: HTMLElement | null): void {
+  if (!uid || !anchor || !game || screen !== 'game') {
+    hideCardPreview();
+    return;
+  }
+  let preview = document.getElementById('card-hover-preview');
+  if (!preview) {
+    preview = document.createElement('div');
+    preview.id = 'card-hover-preview';
+    preview.className = 'card-hover-preview';
+    preview.setAttribute('aria-live', 'polite');
+    document.body.appendChild(preview);
+  }
+  if (cardPreviewUid !== uid) {
+    if (cardPreviewTimer !== null) window.clearInterval(cardPreviewTimer);
+    preview.innerHTML = cardDetailHtml(game, uid);
+    cardPreviewUid = uid;
+    const body = preview.querySelector<HTMLElement>('.detail-body');
+    if (body && body.scrollHeight > body.clientHeight + 4) {
+      let pause = 0;
+      cardPreviewTimer = window.setInterval(() => {
+        if (!body.isConnected) return;
+        if (body.scrollTop + body.clientHeight >= body.scrollHeight - 2) {
+          pause += 1;
+          if (pause >= 30) { body.scrollTop = 0; pause = 0; }
+        } else {
+          body.scrollTop += 0.45;
+          pause = 0;
+        }
+      }, 40);
+    } else {
+      cardPreviewTimer = null;
+    }
+  }
+  const rect = anchor.getBoundingClientRect();
+  const width = Math.min(360, window.innerWidth * 0.38);
+  const height = Math.min(470, window.innerHeight * 0.72);
+  let left = rect.right + 14;
+  if (left + width > window.innerWidth - 10) left = rect.left - width - 14;
+  left = Math.max(10, Math.min(left, window.innerWidth - width - 10));
+  const top = Math.max(10, Math.min(rect.top + rect.height / 2 - height / 2, window.innerHeight - height - 10));
+  preview.style.left = `${left}px`;
+  preview.style.top = `${top}px`;
+  preview.style.width = `${width}px`;
+  preview.style.maxHeight = `${height}px`;
+  preview.classList.add('visible');
+}
+
 function showCardDetail(uid: string | null): void {
   const panel = document.getElementById('cardDetail');
   if (!panel) return;
@@ -1137,7 +1198,10 @@ app.addEventListener('change', (event) => {
 app.addEventListener('pointerover', (event) => {
   if (!game || screen !== 'game') return;
   const card = (event.target as HTMLElement).closest<HTMLElement>('[data-card-uid]');
-  if (card) showCardDetail(card.dataset.cardUid ?? null);
+  if (card) {
+    showCardDetail(card.dataset.cardUid ?? null);
+    showCardPreview(card.dataset.cardUid ?? null, card);
+  }
 });
 
 app.addEventListener('pointerout', (event) => {
@@ -1146,12 +1210,16 @@ app.addEventListener('pointerout', (event) => {
   const to = event.relatedTarget as HTMLElement | null;
   if (to && to.closest('[data-card-uid]')) return;
   showCardDetail(null);
+  hideCardPreview();
 });
 
 app.addEventListener('focusin', (event) => {
   if (!game || screen !== 'game') return;
   const card = (event.target as HTMLElement).closest<HTMLElement>('[data-card-uid]');
-  if (card) showCardDetail(card.dataset.cardUid ?? null);
+  if (card) {
+    showCardDetail(card.dataset.cardUid ?? null);
+    showCardPreview(card.dataset.cardUid ?? null, card);
+  }
 });
 
 app.addEventListener('focusout', (event) => {
@@ -1160,6 +1228,7 @@ app.addEventListener('focusout', (event) => {
   const to = event.relatedTarget as HTMLElement | null;
   if (to && to.closest('[data-card-uid]')) return;
   showCardDetail(null);
+  hideCardPreview();
 });
 
 
