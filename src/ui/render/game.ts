@@ -678,11 +678,6 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
   const cabinetHere = CABINET_ROOMS.includes(state.playerRoom) || (state.mapId === 'badham' && ['nursery', 'storage', 'guestroom'].includes(state.playerRoom));
   const hiddenHere = state.people.some((p) => p.room === state.playerRoom && p.hidden);
   const carried = state.carryPersonId ? state.people.find((p) => p.id === state.carryPersonId) : null;
-  const specialExecution = carried && carried.hp <= 0
-    ? executionMethodsAtRoom(state.playerRoom).map((method) =>
-        `<button class="btn execution" data-action="execute-special" data-method="${method.id}" title="${escape(method.description)}">${escape(method.name)} · +35</button>`,
-      ).join('')
-    : '';
   const mapWorldActions = carried
     ? `<div class="map-world-actions" style="${markerStyle}" aria-label="携带目标操作">
         <button class="btn" data-action="drop-carried" ${state.energy < 1 ? 'disabled' : ''}>放下目标 · 1 AP</button>
@@ -806,7 +801,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
               ${wipeBtn}
               ${searchBtn}
               ${lookBtn}
-              ${sabotageBtn}${specialExecution}
+              ${sabotageBtn}
               ${trapCacheBtn}${trapRecoverBtn}${hatchetRefillBtn}
 
               <button class="btn search wait-action" data-action="wait" ${selectingDiscards || state.energy < 1 ? 'disabled' : ''} title="消耗 1 点行动点；幸存者各自行动一次，你继续观察当前房间与刚离开的房间。">等待 · 1 AP</button>
