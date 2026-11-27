@@ -2663,6 +2663,19 @@ function caseHexPhonesAndAlarm(): void {
   const doorBroken = breakDoor(doorGame, doorRoom);
   check('破门：相邻上锁的门 1 AP 撞开', doorBroken && !isLocked(doorGame, doorRoom) && doorGame.energy === 3,
     `broken=${doorBroken} locked=${isLocked(doorGame, doorRoom)} energy=${doorGame.energy}`);
+
+  // 屠夫站在脸上：幸存者必须立刻警觉并开始逃，不许发呆
+  const face = createGame(STARTING_DECK, undefined, '设陷者');
+  const cornered = face.people.find((person) => person.role !== 'police')!;
+  cornered.room = face.playerRoom;
+  cornered.alert = 0;
+  cornered.awareness = 0;
+  cornered.intent = 'idle';
+  cornered.hp = 4;
+  endTurn(face);
+  check('同房间：幸存者会立刻警觉并逃跑',
+    cornered.alert >= 60 && cornered.intent === 'flee',
+    `alert=${cornered.alert} intent=${cornered.intent}`);
 }
 
 caseHexPhonesAndAlarm();

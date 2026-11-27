@@ -708,7 +708,9 @@
   }
 
   /* 房间点位上的互动标记放行，并盖在移动热区之上 */
-  #app.immersive-game.mobile-game-active .floorplan .room-actions {
+  #app.immersive-game.mobile-game-active .floorplan .room-actions,
+  #app.immersive-game.mobile-game-active .floorplan .totem-actions,
+  #app.immersive-game.mobile-game-active .floorplan .totem-actions button {
     pointer-events: auto !important;
     z-index: 9 !important;
   }

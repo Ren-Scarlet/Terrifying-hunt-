@@ -164,7 +164,8 @@ function roomFeatures(state: GameState, roomId: RoomId): string {
     const alive = state.totems.includes(roomId);
     const taken = state.totemInteractions.includes(roomId);
     const label = alive ? (taken ? '已汲取' : '图腾') : '已熄灭';
-    parts.push(`<span class="room-feature totem ${alive ? 'cursed lit' : 'broken'}" title="${label}：幸存者可以拆除；杀手可从每座存续图腾领取一次奖励">${icon('totem', 'ui-icon tiny')}<b>${label}</b></span>`);
+    const canTake = alive && !taken && state.playerRoom === roomId;
+    parts.push(`<span class="totem-anchor"><span class="room-feature totem ${alive ? 'cursed lit' : 'broken'}" title="${label}：幸存者可以拆除；杀手可从每座存续图腾领取一次奖励">${icon('totem', 'ui-icon tiny')}<b>${label}</b></span>${canTake ? `<span class="totem-actions"><button type="button" data-action="totem-draw" title="本局仅可从这座图腾领取一次奖励">抽 1 张牌</button><button type="button" data-action="totem-energy" title="本局仅可从这座图腾领取一次奖励">+1 行动点</button></span>` : ''}</span>`);
   }
   if (state.trailRevealActions > 0 && visibleTrails(state).some((trail) => trail.room === roomId || trail.to === roomId)) parts.push('<span class="room-feature trail-highlight" title="猎鹿者显现的脚印路线">👣</span>');
   if (state.scourgeShrineRoom === roomId) parts.push(`<span class="room-feature shrine" title="鬼魔神龛：等待有人踏入">${icon('totem', 'ui-icon tiny')}<b>神龛</b></span>`);
@@ -437,11 +438,6 @@ function roomActionsHtml(state: GameState, roomId: RoomId): string {
   const adjacent = ROOM_MAP[state.playerRoom].neighbors.includes(roomId);
   const actions: string[] = [];
 
-  if (here && state.totems.includes(roomId) && !state.totemInteractions.includes(roomId)) {
-    actions.push(`<button class="btn" data-action="totem-draw" title="本局仅可从这座图腾领取一次奖励">抽 1 张牌</button>`);
-    actions.push(`<button class="btn" data-action="totem-energy" title="本局仅可从这座图腾领取一次奖励">+1 行动点</button>`);
-  }
-
   const dynamicBoard = state.barricades.includes(roomId);
   const fixedBoard = OBSTACLE_ROOMS.includes(roomId) && !state.clearedObstacles.includes(roomId) && !state.possessed;
   if (adjacent && (dynamicBoard || fixedBoard)) {
@@ -459,6 +455,15 @@ function roomActionsHtml(state: GameState, roomId: RoomId): string {
   return actions.length ? `<div class="room-actions">${actions.join('')}</div>` : '';
 }
 
+
+/** 房间内的人物站位：按房间与人物 id 稳定散开，避开顶部特性区和底部动作区。 */
+function personSlot(roomId: RoomId, personId: string, index: number): { x: number; y: number } {
+  let hash = 0;
+  for (const ch of roomId + personId) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  const x = 24 + (hash % 52) + (index % 3) * 4;
+  const y = 46 + ((hash >> 9) % 22) + Math.floor(index / 3) * 6;
+  return { x: Math.min(84, x), y: Math.min(74, y) };
+}
   const rooms = ROOMS.map((room) => {
     const visible = isRoomVisible(state, room.id);
     const explored = isRoomExplored(state, room.id);
@@ -540,7 +545,7 @@ function roomActionsHtml(state: GameState, roomId: RoomId): string {
              <div class="room-features">${roomFeatures(state, room.id)}</div>`}
         <div class="room-people ${adjacent && people.length ? 'adjacent-survivors' : ''}">
           ${people.map((p) => p.hp <= 0 && p.room === state.playerRoom && !state.carryPersonId
-            ? `<div class="map-person-wrap ${currentScore(state) >= SCORE_EXECUTION_THRESHOLD ? 'score-unlocked' : ''}">${personChip(p, false, false, undefined, !isRoomLit(state, p.room))}
+            ? `<div class="map-person-wrap ${currentScore(state) >= SCORE_EXECUTION_THRESHOLD ? 'score-unlocked' : ''}" style="left:${personSlot(room.id, p.id, people.indexOf(p)).x.toFixed(1)}%;top:${personSlot(room.id, p.id, people.indexOf(p)).y.toFixed(1)}%">${personChip(p, false, false, undefined, !isRoomLit(state, p.room))}
                 ${currentScore(state) >= SCORE_EXECUTION_THRESHOLD ? `<button class="btn score-execution-btn" data-action="execute-score-special" data-person-id="${p.id}" ${scoreExecutionBlockReason(state, p.id) ? 'disabled' : ''} title="分数处决：猎杀评分达到 ${SCORE_EXECUTION_THRESHOLD} 分后解锁，消耗 1 AP 并触发 QTE">✦ 分数处决 · QTE</button>` : ''}
                 <div class="person-world-actions">
                   <button class="btn" data-action="carry" data-person-id="${p.id}" ${state.energy < 1 ? 'disabled' : ''} title="抱起倒地幸存者：消耗 1 AP；抱起后可搬运到指定地点执行地点处决">抱起</button>
@@ -553,6 +558,7 @@ function roomActionsHtml(state: GameState, roomId: RoomId): string {
                 false,
                 state.huntressAiming ? 'hatchet' : undefined,
                 !isRoomLit(state, p.room),
+                personSlot(room.id, p.id, people.indexOf(p)),
               )).join('')}
           ${police ? personChip(police) : ''}
           ${ghosts.map(() => '<span class="ghost-chip" title="最后确认位置：人可能已经走了">?</span>').join('')}

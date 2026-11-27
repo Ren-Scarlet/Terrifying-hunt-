@@ -136,7 +136,6 @@ const EXECUTION_STYLES: Record<string, ExecutionStyle> = {
   '门徒': { motion: 'pig', title: '游戏结束', line: '游戏结束了。', action: '门徒压低身形，面具后的刀锋突然逼近' },
 };
 let pendingExecutionScene: { roomId: RoomId; title: string; description: string; style: string; success: boolean } | null = null;
-let executionQteActive = false;
 
 function applyExecutionQteOutcome(outcome: ExecutionQteOutcome, style: ExecutionStyle): void {
   if (!game) return;
@@ -165,106 +164,88 @@ function applyExecutionQteOutcome(outcome: ExecutionQteOutcome, style: Execution
   }
 }
 
-function startExecutionQte(button: HTMLElement): void {
-  if (executionQteActive || !game) return;
-  unlockAudio();
-  executionQteActive = true;
-  const digits = Array.from({ length: 4 }, () => String(Math.floor(Math.random() * 10)));
-  const style = EXECUTION_STYLES[game.killer] ?? EXECUTION_STYLES['设陷者'];
-  let progress = 0;
-  let finished = false;
-  const duration = 4200;
-  const overlay = document.createElement('div');
-  overlay.className = 'execution-qte-overlay';
-  overlay.setAttribute('role', 'dialog');
-  overlay.setAttribute('aria-modal', 'true');
-  const scoreSpecial = button.dataset.action === 'execute-score-special';
-  overlay.setAttribute('aria-label', scoreSpecial ? '分数处决快速反应挑战' : '处决快速反应挑战');
-  const panel = document.createElement('div');
-  panel.className = 'execution-qte-panel';
-  const heading = document.createElement('b');
-  heading.className = 'execution-qte-heading';
-  heading.textContent = style.title + (scoreSpecial ? ' · 分数处决' : ' · 处决时机');
-  const sub = document.createElement('p');
-  sub.textContent = scoreSpecial ? '猎杀评分已达到解锁门槛。完成这次 QTE，执行独立的分数处决！按顺序输入屏幕上的四个数字。' : style.action + '。按顺序输入屏幕上的四个数字！';
-  const sequence = document.createElement('div');
-  sequence.className = 'execution-qte-sequence';
-  const cells = digits.map((digit, index) => {
-    const cell = document.createElement('span');
-    cell.textContent = digit;
-    cell.dataset.index = String(index);
-    sequence.appendChild(cell);
-    return cell;
-  });
-  const status = document.createElement('div');
-  status.className = 'execution-qte-status';
-  status.textContent = '按键盘数字键，或点击下方数字';
-  const timer = document.createElement('div');
-  timer.className = 'execution-qte-timer';
-  const timerFill = document.createElement('i');
-  timer.appendChild(timerFill);
-  const pad = document.createElement('div');
-  pad.className = 'execution-qte-pad';
-  for (let digit = 0; digit <= 9; digit++) {
-    const key = document.createElement('button');
-    key.type = 'button';
-    key.textContent = String(digit);
-    key.dataset.qteDigit = String(digit);
-    pad.appendChild(key);
-  }
-  panel.append(heading, sub, sequence, status, timer, pad);
-  overlay.appendChild(panel);
-  app.appendChild(overlay);
+/**
+ * 处决 QTE：不再弹全屏遮罩，而是把四位随机数字显示在杀手头像上。
+ * 状态放在 qte 里，渲染时挂到 .player-marker，键盘/触屏数字键按顺序输入。
+ * 以后要加别的 QTE（比如飞斧的时机条），沿用同一套「挂在头像上的即时交互」结构即可。
+ */
+type QteState = {
+  digits: string[];
+  index: number;
+  deadline: number;
+  timer: number;
+  button: HTMLElement;
+};
 
-  const update = (): void => {
-    cells.forEach((cell, index) => {
-      cell.classList.toggle('done', index < progress);
-      cell.classList.toggle('current', index === progress);
-    });
-    status.textContent = progress === 4 ? '完成！' : `输入进度：${progress}/4`;
-  };
-  const finish = (success: boolean): void => {
-    if (finished) return;
-    finished = true;
-    executionQteActive = false;
-    window.clearTimeout(timeout);
-    window.removeEventListener('keydown', onKeyDown, true);
-    overlay.remove();
-    button.dataset.qteOutcome = success ? 'perfect' : 'miss';
-    button.click();
-  };
-  const input = (digit: string): void => {
-    if (finished) return;
-    if (digit === digits[progress]) {
-      progress += 1;
-      update();
-      if (progress === 4) finish(true);
-    } else {
-      progress = digit === digits[0] ? 1 : 0;
-      update();
-      status.textContent = '按错了！重新输入顺序';
-      panel.classList.remove('wrong');
-      void panel.offsetWidth;
-      panel.classList.add('wrong');
-    }
-  };
-  const onKeyDown = (event: KeyboardEvent): void => {
-    if (!executionQteActive) return;
-    if (/^\d$/.test(event.key)) input(event.key);
-    event.preventDefault();
-    event.stopImmediatePropagation();
-  };
-  const onPadClick = (event: MouseEvent): void => {
-    const key = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-qte-digit]');
-    if (key?.dataset.qteDigit) input(key.dataset.qteDigit);
-  };
-  overlay.addEventListener('click', onPadClick);
-  window.addEventListener('keydown', onKeyDown, true);
-  const timeout = window.setTimeout(() => finish(false), duration);
-  timerFill.style.animationDuration = duration + 'ms';
-  update();
+let qte: QteState | null = null;
+
+function startExecutionQte(button: HTMLElement): void {
+  if (qte || !game) return;
+  unlockAudio();
+  const digits = Array.from({ length: 4 }, () => String(Math.floor(Math.random() * 10)));
+  const timer = window.setTimeout(() => finishQte(false), 4200);
+  qte = { digits, index: 0, deadline: performance.now() + 4200, timer, button };
+  render();
 }
 
+function qteInput(digit: string): void {
+  const current = qte;
+  if (!current) return;
+  if (digit !== current.digits[current.index]) {
+    finishQte(false);
+    return;
+  }
+  current.index += 1;
+  if (current.index >= current.digits.length) {
+    finishQte(true);
+    return;
+  }
+  syncQteUi();
+}
+
+function finishQte(success: boolean): void {
+  const current = qte;
+  if (!current) return;
+  qte = null;
+  window.clearTimeout(current.timer);
+  current.button.dataset.qteOutcome = success ? 'perfect' : 'miss';
+  syncQteUi();
+  current.button.click();
+}
+
+/** 把 QTE 面板挂到杀手头像上（跟着地图一起移动）。 */
+function syncQteUi(): void {
+  app.querySelector('.qte-panel')?.remove();
+  const current = qte;
+  if (!current) return;
+  const marker = app.querySelector<HTMLElement>('.player-marker');
+  if (!marker) return;
+  const remaining = Math.max(0, current.deadline - performance.now());
+  const panel = document.createElement('div');
+  panel.className = 'qte-panel';
+  panel.setAttribute('role', 'dialog');
+  panel.setAttribute('aria-label', '处决快速反应挑战');
+  panel.innerHTML = `
+    <b>处决时机</b>
+    <div class="qte-digits">${current.digits.map((digit, index) => `<span class="${index < current.index ? 'done' : index === current.index ? 'current' : ''}">${digit}</span>`).join('')}</div>
+    <i class="qte-timer" style="animation-duration:${remaining}ms"></i>
+    <div class="qte-pad">${'0123456789'.split('').map((digit) => `<button type="button" data-qte-digit="${digit}">${digit}</button>`).join('')}</div>
+  `;
+  panel.addEventListener('click', (event) => {
+    const key = (event.target as HTMLElement).closest<HTMLElement>('[data-qte-digit]');
+    if (key?.dataset.qteDigit) {
+      event.stopPropagation();
+      qteInput(key.dataset.qteDigit);
+    }
+  });
+  // 固定定位到杀手头像下方：头像在手机上会被缩放，用 rect 定位更稳。
+  const rect = marker.getBoundingClientRect();
+  const width = Math.min(260, window.innerWidth - 24);
+  panel.style.width = `${width}px`;
+  panel.style.left = `${Math.min(window.innerWidth - width - 8, Math.max(8, rect.left + rect.width / 2 - width / 2))}px`;
+  panel.style.top = `${Math.min(window.innerHeight - 180, rect.bottom + 8)}px`;
+  document.body.appendChild(panel);
+}
 
 function showPendingExecutionScene(): void {
   if (!pendingExecutionScene) return;
@@ -571,6 +552,7 @@ function render(): void {
   }
   syncScene();
   if (immersiveActive) syncImmersiveCamera(app);
+  syncQteUi();
 }
 
 /** 把场景画布挂到新的平面图节点上；离开对局时销毁 */
@@ -757,6 +739,10 @@ function startGame(freeHunt = false, loadout: string[] = []): void {
   freshSightings = 0;
   lastAuraSignature = '';
   lastAuraActions = 0;
+  if (qte) {
+    window.clearTimeout(qte.timer);
+    qte = null;
+  }
   selectedPersonId = null;
   // 三段串起来，避免同时响糊成一团：装配完成 → 进入地图 → 游戏开始
   playSfx('ready');
@@ -1393,6 +1379,12 @@ app.addEventListener('focusout', (event) => {
 
 
 window.addEventListener('keydown', (event) => {
+  if (qte && /^\d$/.test(event.key)) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    qteInput(event.key);
+    return;
+  }
   if (!game || !inGame() || event.altKey || event.ctrlKey || event.metaKey) return;
   const target = event.target as HTMLElement | null;
   if (target && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))) return;
