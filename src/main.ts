@@ -119,7 +119,7 @@ let lastKills = 0;
 let lastWanted = 0;
 /** 成功攻击后由下一次 render 消费，纯表现层，不进入存档或战斗状态。 */
 let pendingMapAttackTarget: string | null = null;
-let pendingMapAttackGhost: { roomId: string; element: HTMLElement; left: number; top: number; width: number; height: number } | null = null;
+let pendingMapAttackGhost: { roomId: string; element: HTMLElement; left: number; top: number; width: number; height: number; escapeAngle: number } | null = null;
 let heldMoveKey: string | null = null;
 let heldMoveTimer = 0;
 let pendingMapWalk = false;
@@ -131,8 +131,8 @@ const app = document.getElementById('app')!;
  * 保留原有 viewport / floorplan / Canvas，只替换房间交互层和人物标记，
  * 这样房间切换时旧场景持续显示，镜头可以从旧位置平滑过渡到新位置。
  */
-function captureAttackGhosts(): Map<string, { roomId: string; element: HTMLElement; left: number; top: number; width: number; height: number }> {
-  const captured = new Map<string, { roomId: string; element: HTMLElement; left: number; top: number; width: number; height: number }>();
+function captureAttackGhosts(): Map<string, { roomId: string; element: HTMLElement; left: number; top: number; width: number; height: number; escapeAngle: number }> {
+  const captured = new Map<string, { roomId: string; element: HTMLElement; left: number; top: number; width: number; height: number; escapeAngle: number }>();
   app.querySelectorAll<HTMLElement>('.room[data-room] .person-chip[data-person-id]').forEach((chip) => {
     const id = chip.dataset.personId;
     const room = chip.closest<HTMLElement>('.room[data-room]');
@@ -146,13 +146,19 @@ function captureAttackGhosts(): Map<string, { roomId: string; element: HTMLEleme
     clone.style.position = 'absolute';
     clone.style.pointerEvents = 'none';
     clone.style.margin = '0';
+    const person = game?.people.find((candidate) => candidate.id === id);
+    const trails = person && game ? [...game.trails].sort((a, b) => b.clock - a.clock) : [];
+    const lastTrail = person ? (trails.find((trail) => trail.to === person.room) ?? trails.find((trail) => trail.room === person.room)) : undefined;
+    let escapeAngle = 0;
+    if (lastTrail) {
+      const from = ROOM_MAP[lastTrail.room].rect;
+      const to = ROOM_MAP[lastTrail.to].rect;
+      escapeAngle = Math.atan2((to.top + to.height / 2) - (from.top + from.height / 2), (to.left + to.width / 2) - (from.left + from.width / 2));
+    }
     captured.set(id, {
-      roomId: room.dataset.room ?? '',
-      element: clone,
-      left: chip.offsetLeft,
-      top: chip.offsetTop,
-      width: chip.offsetWidth,
-      height: chip.offsetHeight,
+      roomId: room.dataset.room ?? '', element: clone,
+      left: chip.offsetLeft, top: chip.offsetTop,
+      width: chip.offsetWidth, height: chip.offsetHeight, escapeAngle,
     });
   });
   return captured;
@@ -239,6 +245,12 @@ function renderMarkupPreservingMap(html: string): void {
       ghost.style.top = `${pendingMapAttackGhost.top}px`;
       ghost.style.width = `${pendingMapAttackGhost.width}px`;
       ghost.style.height = `${pendingMapAttackGhost.height}px`;
+      const escapeX = Math.cos(pendingMapAttackGhost.escapeAngle) * 10;
+      const escapeY = Math.sin(pendingMapAttackGhost.escapeAngle) * 10;
+      ghost.style.setProperty('--escape-x', `${escapeX.toFixed(1)}px`);
+      ghost.style.setProperty('--escape-y', `${escapeY.toFixed(1)}px`);
+      ghost.style.setProperty('--escape-back-x', `${(-escapeX * 0.55).toFixed(1)}px`);
+      ghost.style.setProperty('--escape-back-y', `${(-escapeY * 0.55).toFixed(1)}px`);
       ghost.classList.add('blood-hit');
       people.appendChild(ghost);
       window.setTimeout(() => ghost.remove(), 760);
@@ -843,8 +855,11 @@ app.addEventListener('click', (event) => {
   if (action === 'execute' || action === 'execute-target') {
     if (!game || screen !== 'game') return;
     const personId = action === 'execute-target' ? target.dataset.personId : undefined;
+    const ghosts = captureAttackGhosts();
+    const downedId = personId ?? game.people.find((person) => person.role !== 'police' && person.hp <= 0 && person.room === game?.playerRoom)?.id;
     const executed = executeDownedPerson(game, personId);
     if (executed) {
+      if (downedId) { pendingMapAttackTarget = downedId; pendingMapAttackGhost = ghosts.get(downedId) ?? null; }
       playSfx('execute');
       window.setTimeout(() => playSfx('wipe'), 260);
       lastLogHead = game.log[0] ?? '';
@@ -1015,7 +1030,7 @@ app.addEventListener('click', (event) => {
 
   if (action === 'look-select') {
     const room = target.dataset.room as RoomId | undefined;
-    if (room) lookAtRoom(game, room);
+    if (room) { lookAtRoom(game, room); scene?.faceToward(room); }
     playSfx('click');
     afterAction();
     return;
