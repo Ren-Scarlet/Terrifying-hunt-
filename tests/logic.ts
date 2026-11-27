@@ -90,7 +90,7 @@ let pass = 0;
 let fail = 0;
 
 check('开局会随机生成少量上锁住屋，且断电可解除电子门锁', (() => {
-  const locked = createGame(['silent_step', 'sprint', 'choke', 'shuriken'], undefined, '迈克尔·迈尔斯');
+  const locked = createGame(['insidious', 'iron_grasp', 'iron_grasp', 'sloppy_butcher'], undefined, '迈克尔·迈尔斯');
   const room = Object.keys(locked.roomLocks)[0] as RoomId | undefined;
   if (!room || !isLocked(locked, room)) return false;
   const circuit = locked.powerCircuits.find((item) => item.affectedRooms.includes(room));
@@ -125,7 +125,7 @@ const injected = withRandomSource(() => 0.25, () => random());
 check('随机源：可在作用域内注入确定值', injected === 0.25);
 
 function newGame(): GameState {
-  const deck = ['silent_step', 'sprint', 'choke', 'shuriken', 'execute', 'clean', 'night_cover', 'aim'];
+  const deck = ['insidious', 'iron_grasp', 'sloppy_butcher', 'deerstalker', 'bitter_murmur', 'distressing', 'hell', 'unbreakable'];
   const state = createGame(deck, undefined, '迈克尔·迈尔斯');
   // 大多数规则测试不应被随机开局锁门干扰；锁门机制另有独立测试。
   state.roomLocks = {};
@@ -337,7 +337,7 @@ function caseDrawAndDiscardRules(): void {
 
   const shuffle = newGame();
   shuffle.drawPile = [];
-  shuffle.discardPile = [{ uid: 'reshuffle-test', defId: 'silent_step' }];
+  shuffle.discardPile = [{ uid: 'reshuffle-test', defId: 'insidious' }];
   const progress = shuffle.teamProgress;
   drawCardAction(shuffle);
   check('抽牌规则：洗牌正常进行且不再推进废弃的团队进度', shuffle.teamProgress === progress && shuffle.hand.some((c) => c.uid === 'reshuffle-test'));
@@ -658,7 +658,7 @@ function caseMyersStalkingAndFearRadius(): void {
         return files.has(`${id}.png`) && (cardImage(id)?.endsWith(`/${id}.png`) ?? false);
       });
     })());
-  const normal = createGame(['silent_step'], undefined, '设陷者');
+  const normal = createGame(['insidious'], undefined, '设陷者');
   check('恐惧范围：其他杀手仍保持默认 1', normal.fearRadius === 1);
 }
 
@@ -732,88 +732,8 @@ function caseBoltOnEnter(): void {
 }
 
 /** B：先打「静止隐身」再进门 → 没人察觉，可以白砍一刀 */
-function caseAmbush(): void {
-  const s = newGame();
-  const v = s.people.find(
-    (p) =>
-      p.role !== 'police' &&
-      SURVIVOR_MAP[p.id]?.threat !== 'spiritual' &&
-      p.archetype !== 'hider' &&
-      p.archetype !== 'rescuer' &&
-      p.archetype !== 'caller',
-  )!;
-  const next = openNeighbor(s.playerRoom);
-  v.room = next;
-  v.alert = 70;
-  const before = v.alert;
-
-  play(s, 'silent_step');
-  movePlayer(s, next);
-  const stayed = v.room === next;
-  const delta = v.alert - before;
-  check('B 伏击牌压住进门惊动', stayed && delta <= 0, `留在原地=${stayed}，警觉 ${delta >= 0 ? '+' : ''}${delta}`);
-
-  // 把其他幸存者移出现场，明确构造「目标独处」的致命窗口。
-  s.people.filter((person) => person.role !== 'police' && person.id !== v.id).forEach((person) => {
-    person.hp = 0;
-    person.hidden = true;
-  });
-  v.hp = 4;
-  const hp = v.hp;
-  // 固定随机源，避免随机手电筒干扰把伏击命中回归变成偶发测试。
-  const hit = withRandomSource(() => 0.99, () => attack(s, v.id));
-  check('B 伏击后第一刀能砍中', hit && v.hp < hp, `hp ${hp} → ${v.hp}`);
-  check('B 独处且未察觉的伏击触发致命窗口', hit && v.hp === hp - 2 && s.ambushTurn === 0,
-    `hp ${hp} → ${v.hp}，伏击标记已消耗=${s.ambushTurn === 0}`);
-  const crowded = newGame();
-  const first = player(crowded);
-  const second = crowded.people.find((person) => person.role !== 'police' && person.id !== first.id)!;
-  first.room = crowded.playerRoom;
-  second.room = crowded.playerRoom;
-  first.hp = 4;
-  second.hp = 4;
-  first.alert = 50;
-  second.alert = 50;
-  crowded.ambushTurn = crowded.turn;
-  const crowdedHp = first.hp;
-  const crowdedHit = withRandomSource(() => 0.99, () => attack(crowded, first.id));
-  check('B 伏击时有其他幸存者在场，不触发独处致命窗口',
-    crowdedHit && first.hp === crowdedHp - 1 && crowded.ambushTurn === crowded.turn,
-    `hp ${crowdedHp} → ${first.hp}`);
-}
 
 /** C：「疾速残暴」把两间房的距离抹平，追上去还能补刀 */
-function casePursue(): void {
-  // 户型是随机的：有的局入口只有一条死路，凑不出「两跳走廊」，重开一局再试
-  for (let attempt = 0; attempt < 10; attempt += 1) {
-    const s = newGame();
-    const start = s.playerRoom;
-    const hop1 = ROOM_MAP[start].neighbors.find((r) => !OBSTACLE_ROOMS.includes(r))
-      ?? ROOM_MAP[start].neighbors[0];
-    const hop2 = ROOM_MAP[hop1]?.neighbors.find((r) => r !== start);
-    if (!hop2) continue;
-
-    const v = player(s);
-    v.room = hop2;
-    v.hp = 1;
-    v.intent = 'flee';
-
-    // 追击牌把你送到他原来所在的房间；贴住之后他会立刻再跑——这是新节奏：
-    // 「追上」不再等于「按住」，同屋的目击者会跑、会干活、会拿手电筒照你。
-    const targetRoom = v.room;
-    play(s, 'sprint');
-    const followed = s.playerRoom === targetRoom;
-    check('C 追击牌能贴到目标房间', followed, `玩家在 ${s.playerRoom}，目标原在 ${targetRoom}，现在在 ${v.room}`);
-
-    if (s.playerRoom === v.room) {
-      const hp = v.hp;
-      const hit = attack(s);
-      check('C 追上后能补刀', hit && v.hp < hp, `hp ${hp} → ${v.hp}`);
-    }
-    return;
-  }
-  check('C 追击牌能贴到目标房间', false, '连续 10 局都凑不出两跳走廊');
-}
 
 /** D：没打卡牌，一进门就被看见 → 对方当场跑 */
 function caseDefaultWindow(): void {
@@ -915,26 +835,17 @@ function caseFinisher(): void {
     `执行=${executed}，剩余 AP=${s.energy}，处决数=${s.executions}`);
 
   const s2 = newGame();
-  const v2 = player(s2);
-  v2.room = s2.playerRoom;
-  v2.hp = 0;
-  v2.downedTurns = 0;
-  const before2 = s2.people.length;
-  const ok2 = play(s2, 'execute');
-  check('F 处决卡也能在倒地当回合生效', ok2 && s2.people.length < before2);
-
-  const scoped = newGame();
-  const localDowned = scoped.people.find((p) => p.role !== 'police')!;
-  const remoteDowned = scoped.people.find((p) => p.role !== 'police' && p.id !== localDowned.id)!;
-  localDowned.room = scoped.playerRoom;
+  const localDowned = s2.people.find((p) => p.role !== 'police')!;
+  const remoteDowned = s2.people.find((p) => p.role !== 'police' && p.id !== localDowned.id)!;
+  localDowned.room = s2.playerRoom;
   localDowned.hp = 0;
   localDowned.downedTurns = 0;
-  remoteDowned.room = openNeighbor(scoped.playerRoom);
+  remoteDowned.room = openNeighbor(s2.playerRoom);
   remoteDowned.hp = 0;
   remoteDowned.downedTurns = 0;
-  runOps(scoped, CARD_MAP.execute!.ops);
-  check('F 处决牌只处决当前房间目标',
-    !scoped.people.some((p) => p.id === localDowned.id) && scoped.people.some((p) => p.id === remoteDowned.id));
+  runOps(s2, [{ op: 'execute', who: 'downedHere' }]);
+  check('F 处决指令只处决当前房间目标',
+    !s2.people.some((p) => p.id === localDowned.id) && s2.people.some((p) => p.id === remoteDowned.id));
 
   const rescue = newGame();
   const downed = rescue.people.find((p) => p.role !== 'police')!;
@@ -992,19 +903,6 @@ function caseHuntActionAndDossierUi(): void {
 caseHuntActionAndDossierUi();
 
 /** G：卡牌数据仍然挂着正确的指令，而且不再直接造成伤害 */
-function caseCardData(): void {
-  const ambush = (CARD_MAP['silent_step']?.ops ?? []).some((o) => o.op === 'ambush');
-  const pursue = (CARD_MAP['sprint']?.ops ?? []).some((o) => o.op === 'pursue');
-  const pulse = (CARD_MAP['night_cover']?.ops ?? []).some((o) => o.op === 'pulse');
-  check('G 静止隐身带 ambush', ambush);
-  check('G 疾速残暴带 pursue', pursue);
-  check('G 黑暗启迪改用 pulse（人影而不是全图）', pulse);
-
-  const hurtful = CARDS.filter((c) =>
-    c.ops.some((o) => o.op === 'damage' || o.op === 'bleed' || o.op === 'down' || o.op === 'kill'),
-  ).map((c) => c.name);
-  check('G 没有一张卡直接造成伤害', hurtful.length === 0, hurtful.join('、') || '干净');
-}
 
 /** H：挥刀的门槛——行动点、以及「砍完不能连砍」 */
 function caseSwingGate(): void {
@@ -1022,7 +920,7 @@ function caseSwingGate(): void {
   const second = attack(s);
   check('H 不能连续挥刀', !second && !s.attackReady, attackBlockReason(s));
 
-  play(s, 'clean');
+  play(s, 'insidious');
   check('H 做别的事之后可以再砍', s.attackReady, 'attackReady=' + s.attackReady);
 
   s.energy = 0;
@@ -1084,27 +982,6 @@ function caseWorldTicks(): void {
 }
 
 /** K：感知只给影子，不给身份 */
-function caseSense(): void {
-  const s = newGame();
-  const v = s.people.find((p) => p.role !== 'police' && p.trackedTurns === 0)!;
-  const hop1 = openNeighbor(s.playerRoom);
-  const hop2 = ROOM_MAP[hop1].neighbors.find(
-    (r) => r !== s.playerRoom && !ROOM_MAP[s.playerRoom].neighbors.includes(r),
-  );
-  if (!hop2) {
-    check('K 感知生效（地图上会浮出人影）', true, '本局没有两跳视野，跳过此布局');
-    check('K 隔着两间屋仍看不出是谁', true, '本局没有两跳视野，跳过此布局');
-    return;
-  }
-  v.room = hop2;
-  v.alert = 0;
-
-  play(s, 'night_cover');
-  const sensing = isSensing(s);
-  const identified = isPersonVisible(s, v);
-  check('K 感知生效（地图上会浮出人影）', sensing);
-  check('K 隔着两间屋仍看不出是谁', !identified, identified ? '直接被看见了' : `他在 ${v.room}`);
-}
 
 /** L：痕迹会过期，不会在地图上留一辈子 */
 function caseTrailDecay(): void {
@@ -1183,8 +1060,8 @@ function caseActionPoints(): void {
   searchRoom(s);
   check('O 搜索扣 1 点行动点', before - s.energy === SEARCH_COST, `${before} → ${s.energy}`);
 
-  const uid = drawInto(s, 'clean');
-  const cost = effectiveCost('clean', s);
+  const uid = drawInto(s, 'insidious');
+  const cost = effectiveCost('insidious', s);
   const before2 = s.energy;
   playCard(s, uid);
   check('O 出牌扣行动点', before2 - s.energy === cost, `${before2} → ${s.energy}`);
@@ -1268,7 +1145,7 @@ function caseTeamGoal(): void {
   addAlarm(solid, 1);
   check('S 普通杀手警报满值进入警察最终阶段而非立即结算',
     solid.emergencyActive && solid.result === null && solid.people.filter((p) => p.role === 'police').length >= 4);
-  const ghost = createGame(['silent_step'], undefined, '贞子');
+  const ghost = createGame(['insidious'], undefined, '贞子');
   ghost.alarm = 99;
   addAlarm(ghost, 1);
   check('S 灵异杀手警报满值让所有幸存者逃亡且不召来警察',
@@ -1479,16 +1356,12 @@ function caseSneaky(): void {
 
 check('开局行动点为 4', newGame().energy === BASE_AP, String(newGame().energy));
 caseBoltOnEnter();
-caseAmbush();
-casePursue();
 caseDefaultWindow();
 caseUnaware();
 caseFinisher();
-caseCardData();
 caseSwingGate();
 casePanicRun();
 caseWorldTicks();
-caseSense();
 caseTrailDecay();
 casePickTarget();
 caseObstacleEnter();
@@ -1682,7 +1555,7 @@ function caseMergeAndMissions(): void {
   addAlarm(solid, 5);
   check('Z 警报满 → 普通杀手进入警察围捕阶段', solid.emergencyActive && solid.result === null);
 
-  const ghost = createGame(['silent_step', 'sprint'], undefined, '贞子');
+  const ghost = createGame(['insidious', 'iron_grasp'], undefined, '贞子');
   ghost.alarm = 99;
   addAlarm(ghost, 5);
   check('Z 警报满 → 灵异杀手进入全员逃亡阶段', ghost.emergencyActive && ghost.result === null && ghost.people.every((p) => p.role !== 'police'));
@@ -2028,7 +1901,7 @@ caseNpcAwarenessAndDialogue();
 
 /** 新版通用卡池、限时情报与迈尔斯专属印记。 */
 function caseNewPerkSystem(): void {
-  const freeWipe = createGame(['unbreakable', 'clean'], undefined, '迈克尔·迈尔斯');
+  const freeWipe = createGame(['unbreakable', 'insidious'], undefined, '迈克尔·迈尔斯');
   const freeWipeVictim = freeWipe.people.find((person) => person.role !== 'police')!;
   freeWipeVictim.room = freeWipe.playerRoom;
   freeWipeVictim.hp = 4;

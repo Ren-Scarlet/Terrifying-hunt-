@@ -57,7 +57,7 @@ function buildDeck(): string[] {
   push(byOp('search'), 1);
   push(COOL, 2);
   push(byOp('sabotage'), 1);
-  while (deck.length < 15) deck.push('choke');
+  while (deck.length < 15) deck.push('sloppy_butcher');
   return deck.slice(0, 15);
 }
 

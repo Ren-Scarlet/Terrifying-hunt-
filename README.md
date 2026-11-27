@@ -140,7 +140,7 @@ npm run check:full # 13 份杀手数据 × 8 局，只用于内部回归与平�
 | 逃生 | 跑到后院，撑一回合翻篱笆消失 | 锁门、钉死后院（`block_gate`）、在出口守一个回合 |
 | 报警 | 找电话/无线电，报警让通缉 +3 | 剪电话线、破坏无线电、先处理求救型 |
 | 救援 | 把倒地的人救起来 | 隔离、钉住（`pin`）、守尸 |
-| 反抗 | 找武器、堵门、正面挡你一步 | 提前清掉厨房/车库的武器，或用 `break_in` 撞门 |
+| 反抗 | 找武器、堵门、正面挡你一步 | 提前清掉厨房/车库的武器，或直接破门闯入 |
 | 躲藏 | 钻柜子、床底 | 搜寻类卡牌点亮房间，或直接把柜子所在房间翻一遍 |
 
 **任务失败条件**：团队警戒拉满 / 逃走人数超过上限 / 名单目标全部脱岗 / 通缉值超阈值被逮捕 / 天亮（回合用尽）。
@@ -178,7 +178,7 @@ npm run check:full # 13 份杀手数据 × 8 局，只用于内部回归与平�
 - **名单目标开局带线索**：前三回合你知道标记目标在哪（`trackedTurns`），之后就得靠侦查卡、脚印和动静续上——23 间房的迷雾里盲找，任务还没开始就输了。
 - **五种任务**：清除名单、无声收割、证据销毁、秘密仪式、替身游戏。每局任务条常驻显示**主目标 / 达成条件 / 失败条件 / 实时进度 / 剩余回合**，最后 5 回合闪红；达成目标才算成功，没达成（超时、目标逃走、被捕、警戒满、**他们的团队进度做满**）直接失败。清除名单与替身游戏都要求**最后撤回车库**，光把人砍完不算完。
 - **初期开放 3 位杀手：设陷者、护士、迈克尔·迈尔斯**。其余 10 位资料暂时保留在内部数据中，不会出现在玩家角色选择和公开平衡调整界面，待机制实装后再逐步开放。
-- **29 张卡**，按六种战术职责划分：**搜寻 / 诱导 / 破坏 / 封锁 / 潜行 / 追猎**。带商店与牌组构筑（10–15 张，同名最多 3 张）。
+- **18 张卡**：12 张通用卡（所有杀手共用）+ 迈尔斯专属 3 张 + 设陷者专属 3 张。带牌组构筑（10–15 张，同名最多 3 张）。
 
 ## 无障碍显示设置
 
@@ -219,7 +219,7 @@ src/
       catalog.ts         NPC 原型、意图、目标与状态文案
       factory.ts         NPC 原型选择、人物创建、阵容与出生点生成
     data/
-      cards.ts           ★ 29 张卡牌 + 每张的效果程序（改卡牌改这里）
+      cards.ts           ★ 18 张卡牌 + 每张的效果程序（改卡牌改这里）
       killers.ts         ★ 13 份杀手资料（当前开放 3 位）+ 能力效果程序
     cards.ts             转发 data/cards.ts
     killers.ts           转发 data/killers.ts
@@ -237,7 +237,7 @@ src/
       shared.ts          HTML 安全转义、人物/卡牌详情与渲染辅助
       menus.ts           主菜单、玩法指引、商店、牌组编辑
       game.ts            游戏 HUD 与结算页面
-    admin.ts             「平衡调整」工作台（29 张卡 + 当前开放的 3 位杀手能力逐条可编辑）
+    admin.ts             「平衡调整」工作台（18 张卡 + 当前开放的杀手能力逐条可编辑）
     scene.ts             Canvas 场景生命周期、墙体/门窗/光照与逐帧渲染
     scene/
       config.ts          房间材质、色调、灯光、窗户与家具静态配置
@@ -250,7 +250,7 @@ scripts/
 
 ## 平衡调整（不用改代码）
 
-主菜单 →「平衡调整」打开工作台，左边是 29 张卡、右边是当前开放的 3 位杀手能力：
+主菜单 →「平衡调整」打开工作台，左边是 18 张卡、右边是当前开放的杀手能力：
 
 - **卡牌**：直接改费用，改每一条指令的数值（伤害、流血、警戒、锁定回合……），改目标对象、改条件分支里的数值。
 - **能力**：改冷却，改每一条指令的数值。
@@ -273,14 +273,13 @@ scripts/
 
 ```ts
 {
-  id: 'shuriken',
+  id: 'sloppy_butcher',
   name: '辣手屠夫',
   cost: 1,
-  type: 'attack',
-  desc: '血迹会说话：所有已经受伤的人，接下来 3 回合位置始终可见。',
+  type: 'skill',
+  desc: '立即对当前房间一名站立幸存者发动一次攻击；命中后附带流血 2 回合，移动时留下血迹。',
   ops: [
-    { op: 'track', who: 'injuredAny', turns: 3 },
-    { op: 'log', text: '你低头看着地上的血迹——它比他跑得更快。' },
+    { op: 'attack', who: 'victim', bleedTurns: 2, status: 'deepWound', statusTurns: 0 },
   ],
 }
 ```
@@ -289,7 +288,7 @@ scripts/
 
 ```ts
   ops: [
-    { op: 'track', who: 'injuredAny', turns: 3 },
+    { op: 'attack', who: 'victim', bleedTurns: 2, status: 'deepWound', statusTurns: 0 },
     { op: 'alarm', amount: -4 },                 // 附带压低 4 点团队警戒
     { op: 'if', cond: { c: 'killsThisTurn', gte: 1 },
       then: [{ op: 'draw', amount: 1 }] },       // 本回合已杀过人则再抽一张
@@ -322,35 +321,6 @@ scripts/
 
 | 卡牌 id | 卡牌 | 费用 | 类型 | 原技能 |
 | --- | --- | --- | --- | --- |
-| `shuriken` | 辣手屠夫 | 1 | 攻击 | Sloppy Butcher |
-| `choke` | 牢牢紧握 | 2 | 攻击 | Iron Grasp |
-| `execute` | 恩赐解脱 | 3 | 攻击 | Coup de Grâce |
-| `harvest` | 鲜血回响 | 2 | 攻击 | Blood Echo |
-| `final_blow` | 优胜劣汰 | 1 | 攻击 | Cull the Weak |
-| `break_in` | 所向无敌 | 1 | 技能 | Brutal Strength |
-| `silent_step` | 静止隐身 | 1 | 技能 | Insidious |
-| `sprint` | 疾速残暴 | 1 | 技能 | Rapid Brutality |
-| `clean` | 折磨路径 | 1 | 技能 | Trail of Torment |
-| `night_cover` | 黑暗启迪 | 0 | 技能 | Darkness Revealed |
-| `silence` | 厄咒：猎手摇篮曲 | 1 | 技能 | Hex: Huntress Lullaby |
-| `disguise` | 黑暗奉献 | 2 | 技能 | Dark Devotion |
-| `intimidate` | 恐惧释放 | 2 | 技能 | Distressing |
-| `fear` | 小丑恐惧症 | 2 | 技能 | Coulrophobia |
-| `aim` | 猎鹿者 | 1 | 技能 | Deerstalker |
-| `evacuate` | 血腥狱长 | 3 | 技能 | Blood Warden |
-| `search` | 囤积者 | 1 | 技能 | Hoarder |
-| `false_lead` | 鬼祟追杀 | 2 | 战术 | Furtive Chase |
-| `lock_door` | 死锁 | 1 | 战术 | Deadlock |
-| `bait` | 鬼鸦谍影 | 1 | 战术 | Spies from the Shadows |
-| `mind_control` | 支配之力 | 2 | 战术 | Dominance |
-| `cut_line` | 失效开关 | 1 | 布局 | Dead Man's Switch |
-| `lure` | 人肉烧烤 | 1 | 布局 | Barbecue & Chilli |
-| `wiretap` | 护士的呼唤 | 1 | 布局 | A Nurse's Calling |
-| `poltergeist` | 厄咒：闹鬼之地 | 1 | 布局 | Hex: Haunted Ground |
-| `blackout` | 厄咒：直面黑暗 | 2 | 布局 | Hex: Face the Darkness |
-| `block_gate` | 花言巧语 | 2 | 布局 | Bamboozle |
-| `ghost_light` | 致命追踪者 | 1 | 布局 | Lethal Pursuer |
-| `false_report` | 厄咒：惩戒 | 2 | 布局 | Hex: Retribution |
 | `unbreakable` | 不屈不挠 | 0 | 技能 | Unrelenting |
 | `hex_huntress` | 厄咒：猎杀戾气 | 1 | 布局 | Hex: Thrill of the Hunt |
 | `hex_noed` | 厄咒：难逃一死 | 1 | 布局 | Hex: No One Escapes Death |

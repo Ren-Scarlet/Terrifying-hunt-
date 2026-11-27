@@ -63,36 +63,19 @@ export const ASSET_PATHS: AssetPaths = {
  * 卡牌图标与卡名一一对应：每张卡的图标就是「卡名所指的那枚杀手技能」，
  * 文件直接以卡牌 id 命名，不再借用其他卡牌的图案。
  *
- * 对照（卡名 → 图鉴技能，来源 dbdwiki.com 迷雾笔记）：
- *   shuriken 辣手屠夫 → Sloppy Butcher          choke 牢牢紧握 → Iron Grasp
- *   execute 恩赐解脱 → Coup de Grâce            harvest 鲜血回响 → Blood Echo
- *   final_blow 优胜劣汰 → Cull the Weak         break_in 所向无敌 → Brutal Strength
- *   silent_step 静止隐身 → Insidious            sprint 疾速残暴 → Rapid Brutality
- *   clean 折磨路径 → Trail of Torment           night_cover 黑暗启迪 → Darkness Revealed
- *   silence 厄咒：猎手摇篮曲 → Hex: Huntress Lullaby
- *   disguise 黑暗奉献 → Dark Devotion           intimidate 恐惧释放 → Distressing
- *   fear 小丑恐惧症 → Coulrophobia              aim 猎鹿者 → Deerstalker
- *   search 囤积者 → Hoarder                     evacuate 血腥狱长 → Blood Warden
- *   false_lead 鬼祟追杀 → Furtive Chase         bait 鬼鸦谍影 → Spies from the Shadows
- *   mind_control 支配之力 → Dominance           lock_door 死锁 → Deadlock
- *   cut_line 失效开关 → Dead Man's Switch       lure 人肉烧烤 → Barbecue & Chilli
- *   wiretap 护士的呼唤 → A Nurse's Calling      poltergeist 厄咒：闹鬼之地 → Hex: Haunted Ground
- *   blackout 厄咒：直面黑暗 → Hex: Face the Darkness
- *   block_gate 花言巧语 → Bamboozle             ghost_light 致命追踪者 → Lethal Pursuer
- *   false_report 厄咒：惩戒 → Hex: Retribution
+ * 对照（卡名 → 图鉴技能，来源 dbdwiki.com）：
  *   unbreakable 不屈不挠 → Unrelenting          hex_huntress 厄咒：猎杀戾气 → Hex: Thrill of the Hunt
  *   hex_noed 厄咒：难逃一死 → Hex: No One Escapes Death
  *   scourge_shrine 天灾钩子：鬼魔神龛 → Scourge Hook: Monstrous Shrine
- *   distressing 恐惧释放 → Distressing          iron_grasp 牢牢紧握 → Iron Grasp
- *   deerstalker 猎鹿者 → Deerstalker            hex_ruin 粉碎希望 → Shattered Hope
- *   bitter_murmur 苦涩低语 → Bitter Murmur      sloppy_butcher 辣手屠夫 → Sloppy Butcher
- *   insidious 静止隐身 → Insidious              myers_eclipse_light 优胜劣汰 → Cull the Weak
+ *   distressing 恐惧释放 → Distressing          hell 恶灵低语 → Whispers
+ *   iron_grasp 牢牢紧握 → Iron Grasp            deerstalker 猎鹿者 → Deerstalker
+ *   hex_ruin 粉碎希望 → Shattered Hope          bitter_murmur 苦涩低语 → Bitter Murmur
+ *   sloppy_butcher 辣手屠夫 → Sloppy Butcher    insidious 静止隐身 → Insidious
+ *   myers_eclipse_light 优胜劣汰 → Cull the Weak
  *   myers_last_best 把最好的留在最后 → Save the Best for Last
- *   myers_plaything 戏耍食物 → Play with Your Food
+ *   myers_plaything 玩弄食物 → Play with Your Food
  *   trapper_panic 恐慌降临 → Unnerving Presence  trapper_brutal_strength 所向无敌 → Brutal Strength
  *   trapper_euphoria 欣喜若狂 → Agitation
- *   hell 恶灵地狱 → Whispers（恶灵低语：图鉴中没有同名技能，取名称与效果
- *     ——感知附近逃生者——最接近的官方技能图标替代）
  */
 export function cardImage(defId: string): string | undefined {
   return ASSET_PATHS.cards[defId];

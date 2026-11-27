@@ -3,7 +3,7 @@
 Run from the project root:
     python scripts/import_dbd_assets.py
 
-每一张卡牌对应一个杀手技能图标：图标 = 卡名所指的那枚技能（共 47 张，
+每一张卡牌对应一个杀手技能图标：图标 = 卡名所指的那枚技能（共 18 张，
 同名的两张卡共用同一枚图鉴图标，例如「牢牢紧握」的 choke 与 iron_grasp）。
 映射关系以 dbdwiki 的 perk-icons.manifest.json 为准，中文名以 perks.site.json
 为基准做核对，脚本结束时会打印一张 "卡牌 id → 技能中文名（所属杀手）" 的
@@ -24,48 +24,14 @@ TEMP = ROOT / ".dbd-cache"
 # 卡牌 id -> 图鉴技能 slug。顺序与 src/game/data/cards.ts 保持一致，
 # 中文名与卡名逐字对应；个别卡没有同名技能，取效果最接近的官方技能并注明。
 CARD_PERKS = {
-    # ---- 攻击 ----
-    "shuriken": "sloppy_butcher",            # 辣手屠夫
-    "choke": "iron_grasp",                   # 牢牢紧握
-    "execute": "coup_de_grâce",              # 恩赐解脱
-    "harvest": "blood_echo",                 # 鲜血回响
-    "final_blow": "cull_the_weak",           # 优胜劣汰
-    "break_in": "brutal_strength",           # 所向无敌
-    # ---- 技能 ----
-    "silent_step": "insidious",              # 静止隐身
-    "sprint": "rapid_brutality",             # 疾速残暴
-    "clean": "trail_of_torment",             # 折磨路径
-    "night_cover": "darkness_revealed",      # 黑暗启迪
-    "silence": "hex_huntress_lullaby",       # 厄咒：猎手摇篮曲
-    "disguise": "dark_devotion",             # 黑暗奉献
-    "intimidate": "distressing",             # 恐惧释放
-    "fear": "coulrophobia",                  # 小丑恐惧症
-    "aim": "deerstalker",                    # 猎鹿者
-    "evacuate": "blood_warden",              # 血腥狱长
-    "search": "hoarder",                     # 囤积者
-    # ---- 战术 ----
-    "false_lead": "furtive_chase",           # 鬼祟追杀
-    "lock_door": "deadlock",                 # 死锁
-    "bait": "spies_from_the_shadows",        # 鬼鸦谍影
-    "mind_control": "dominance",             # 支配之力
-    # ---- 布局 ----
-    "cut_line": "dead_mans_switch",          # 失效开关
-    "lure": "barbecue_and_chilli",           # 人肉烧烤
-    "wiretap": "a_nurses_calling",           # 护士的呼唤
-    "poltergeist": "hex_haunted_ground",     # 厄咒：闹鬼之地
-    "blackout": "hex_face_the_darkness",     # 厄咒：直面黑暗
-    "block_gate": "bamboozle",               # 花言巧语
-    "ghost_light": "lethal_pursuer",         # 致命追踪者
-    "false_report": "hex_retribution",       # 厄咒：惩戒
     # ---- 新版初始卡池 ----
     "unbreakable": "unrelenting",                    # 不屈不挠
     "hex_huntress": "hex_thrill_of_the_hunt",        # 厄咒：猎杀戾气
     "hex_noed": "hex_no_one_escapes_death",          # 厄咒：难逃一死
     "scourge_shrine": "scourge_hook_monstrous_shrine",  # 天灾钩子：鬼魔神龛
     "distressing": "distressing",                    # 恐惧释放
-    "hell": "whispers",                              # 恶灵地狱（图鉴无同名技能，
-                                                     # 取「恶灵低语」Whispers 替代：
-                                                     # 同为感知附近逃生者）
+    "hell": "whispers",                              # 恶灵低语（图鉴技能名 Whispers，
+                                                     # 效果同为感知附近逃生者）
     "iron_grasp": "iron_grasp",                      # 牢牢紧握
     "deerstalker": "deerstalker",                    # 猎鹿者
     "hex_ruin": "shattered_hope",                    # 粉碎希望
@@ -75,7 +41,7 @@ CARD_PERKS = {
     # ---- 迈尔斯专属 ----
     "myers_eclipse_light": "cull_the_weak",          # 优胜劣汰
     "myers_last_best": "save_the_best_for_last",     # 把最好的留在最后
-    "myers_plaything": "play_with_your_food",        # 戏耍食物
+    "myers_plaything": "play_with_your_food",        # 玩弄食物
     # ---- 设陷者专属 ----
     "trapper_panic": "unnerving_presence",           # 恐慌降临
     "trapper_brutal_strength": "brutal_strength",    # 所向无敌
