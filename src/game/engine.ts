@@ -883,8 +883,8 @@ function killPerson(state: GameState, person: Person): void {
 }
 
 /** 受到伤害：只能推进一档，倒地的人再挨一下才会死 */
-function damagePerson(state: GameState, person: Person, amount: number, options: { suppressFlee?: boolean; affectFear?: boolean; forceFlee?: boolean } = {}): void {
-  const { suppressFlee = false, affectFear = true, forceFlee = false } = options;
+function damagePerson(state: GameState, person: Person, amount: number, options: { affectFear?: boolean; forceFlee?: boolean } = {}): void {
+  const { affectFear = true, forceFlee = false } = options;
   if (!state.people.some((p) => p.id === person.id)) return;
   let dmg = Math.max(0, amount + state.bonusDamage);
   state.bonusDamage = 0;
@@ -943,13 +943,6 @@ function damagePerson(state: GameState, person: Person, amount: number, options:
   // 同屋目击者必须形成真实行为反应；邻近房间只通过喊声获得转述信息。
   npcWitnessEvent(state, person.room, 'attack', person.id);
   addAlarm(state, 3);
-  if (suppressFlee) {
-    person.blockedTurns = 1;
-    person.intent = 'stunned';
-    person.activity = '被护士闪现后的抓取打断，短暂无法行动';
-    log(state, `${person.name} 被护士抓住，挣扎被强行打断。`);
-    return;
-  }
   // 一刀下去他会连着跑两间屋，地板上留下一道血痕：
   // 「砍一刀、他挪一格、我跟上去」那种没有张力的追逐到此为止。
   for (let i = 0; i < PANIC_HOPS_ON_HIT; i++) {
@@ -3785,8 +3778,6 @@ export function throwHuntressHatchet(state: GameState, targetId: string): boolea
   state.huntStats.hatchetHits += 1;
   state.huntressAiming = false;
   log(state, `女猎手掷出狩猎飞斧，命中${target.name}（剩余飞斧 ${state.hatchets}/3）。`);
-  // 飞斧命中本身不应把「本次刚达到恐惧上限」当成第二次受击；
-  // 临时留在 99 点完成受伤与逃跑，再恢复显示值 100，后续命中才会击倒。
   // 飞斧不影响恐惧值，也不因恐惧满值放大伤害；命中后仍会触发逃跑反应。
   damagePerson(state, target, 1, { affectFear: false, forceFlee: true });
   state.attackReady = true;
