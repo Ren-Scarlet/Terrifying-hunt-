@@ -649,12 +649,12 @@ function sfxFromLogs(): void {
   else if (/成功逃离|已经不在房子里了/.test(head)) playSfx('flee');
   else if (/发电机重新亮了起来|用钥匙捅开|联系上了外面|修发电机/.test(head)) playSfx('objective');
   else if (/地图出现两个逃生点|第四阶段完成/.test(head)) playSfx('gate');
-    else if (/【NPC目击】|发现了捕兽夹|发现并拆除了|忽然抬头|猛一回头|察觉到异常|发现了你/.test(head)) playVoice(head, 'Startle');
+    else if (freshSightings === 0 && /【NPC目击】|发现了捕兽夹|发现并拆除了|忽然抬头|猛一回头|察觉到异常|发现了你/.test(head)) playVoice(head, 'Startle');
   else if (/恶魔附身：/.test(head)) playSfx('possess');
   else if (/打倒在地上|受到 \d+ 点伤害/.test(head)) playVoice(head, 'Hit');
   else if (/受伤了（|在流血/.test(head)) playVoice(head, 'Hurt');
   else if (/喊了一声|警觉升到|尖叫/.test(head)) playVoice(head, 'Scream');
-  else if (/猛一回头|忽然抬头|察觉到异常|发抖/.test(head)) playVoice(head, 'Startle');
+  else if (freshSightings === 0 && /猛一回头|忽然抬头|察觉到异常|发抖/.test(head)) playVoice(head, 'Startle');
   else if (/致盲|击晕|手电筒|逼退/.test(head)) playSfx('stun');
   else if (/乌鸦|动静/.test(head)) playSfx('crow');
   else if (/翻出了|拾起|拿到了武器/.test(head)) playSfx('pickup');
@@ -662,9 +662,32 @@ function sfxFromLogs(): void {
   else if (/发电机/.test(head)) playSfx('generator');
 }
 
+/** 本轮新发现的幸存者数量：用来决定「发现幸存者」提示音，并压掉同一拍的受惊尖叫。 */
+let freshSightings = 0;
+/** 已经见过的幸存者：只在第一次看见时播放发现音效。 */
+let knownSurvivorIds = new Set<string>();
+
+/**
+ * 第一次看见某个幸存者时播放「发现幸存者」提示音。
+ *
+ * 之前这盘音效虽然配好了文件（audio.ts 的 survivorFound），却从来没有被触发；
+ * 玩家第一次遇到某人时听到的是受惊尖叫（日志规则命中 Startle）。
+ * 现在改为：新面孔给发现音，尖叫只留给真正受惊/受伤的事件。
+ */
+function announceNewSightings(): void {
+  if (!game) return;
+  const seen = game.people.filter((person) => person.role !== 'police' && person.hp > 0 && (person.lastSeenTurn ?? 0) > 0);
+  const fresh = seen.filter((person) => !knownSurvivorIds.has(person.id));
+  knownSurvivorIds = new Set(seen.map((person) => person.id));
+  freshSightings = fresh.length;
+  if (fresh.length) playSfx('survivorFound');
+}
+
 function afterAction(): void {
   pulseFeedback();
+  announceNewSightings();
   sfxFromLogs();
+  freshSightings = 0;
   if (game?.executionMethodsUsed.length) {
     const known = new Set(save.executionRecords ?? []);
     game.executionMethodsUsed.forEach((id) => known.add(id));
@@ -673,7 +696,7 @@ function afterAction(): void {
       writeSave(save);
     }
   }
-    if (game && game.phase === 'gameover' && ui().screen !== 'result') {
+  if (game && game.phase === 'gameover' && ui().screen !== 'result') {
     playSfx(game.result === 'win' ? 'win' : 'lose');
     showResult();
     if (!resultApplied) {
@@ -703,6 +726,8 @@ function afterAction(): void {
 
 function startGame(freeHunt = false, loadout: string[] = []): void {
   playedDeathLogMessages.clear();
+  knownSurvivorIds = new Set();
+  freshSightings = 0;
   selectedPersonId = null;
   // 三段串起来，避免同时响糊成一团：装配完成 → 进入地图 → 游戏开始
   playSfx('ready');

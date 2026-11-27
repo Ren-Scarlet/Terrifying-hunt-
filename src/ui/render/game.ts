@@ -203,6 +203,10 @@ function doorMarkersHtml(state: GameState): string {
     const canPass = !!targetRoom && !locked && canMoveTo(state, targetRoom);
     const shortOnAp = adjacent && !locked && !canPass;
     const status = locked ? 'blocked' : barricaded ? 'barricaded' : canPass ? 'active' : shortOnAp ? 'low-ap' : 'open';
+    // 普通门已经由 Canvas 画出墙体和门洞，DOM 只保留「与玩家这一格相关」的门：
+    // 现在能走的（绿）、行动点不够的（黄）、木板封门（橙）、电子门锁（红）。
+    // 远处的门不上图标——否则整张图会被门形符号糊满。
+    if (status === 'open' || !adjacent) return '';
     const title = locked ? '电子门锁：切断对应区域电力可解除，也可在门外强行破门' : barricaded ? '木板封门：花费 1 AP 破坏；追逐中强行冲门可能被砸晕' : canPass ? '当前可通行' : shortOnAp ? '门已打开，但行动点不足' : '可通行的门';
     return `<span class="map-door-marker ${position.orientation} ${status}" style="left:${position.left.toFixed(3)}%;top:${position.top.toFixed(3)}%" title="${title}" aria-hidden="true"><i></i></span>`;
   })).join('');
@@ -332,10 +336,12 @@ function threatRowsHtml(state: GameState): string {
  * 只显示 visibleTrails 里的几段——跟丢了、走得久了，旧的脚印就没了。
  */
 function trailOverlay(state: GameState): string {
-  // 只画当前房间里的鞋印：别处的痕迹不再隔墙可见（引擎里仍保留完整线索给杀戮/追击牌用）
+  // 默认只画「当前房间 + 相邻房间」的鞋印：既能看见脚下的痕迹，也能顺着门追到下一间；
+  // 隔了两间以上的痕迹不再透墙显示（引擎里仍保留完整线索给杀戮/追击牌用）。
+  const near = new Set<RoomId>([state.playerRoom, ...ROOM_MAP[state.playerRoom].neighbors]);
   const candidates = (state.trailRevealActions > 0
     ? visibleTrails(state)
-    : visibleTrails(state).filter((t) => t.room === state.playerRoom))
+    : visibleTrails(state).filter((t) => near.has(t.room) || near.has(t.to)))
     .filter((trail) => state.trailClock - trail.clock <= 3)
     .sort((a, b) => b.clock - a.clock);
   const seenPaths = new Set<string>();
@@ -366,8 +372,9 @@ function trailOverlay(state: GameState): string {
       const rot = (Math.atan2(dy, dx) * 180) / Math.PI + 90;
       const age = state.trailClock - t.clock;
       const cls = `footprint age-${Math.min(3, age)}${t.blood ? ' blood' : ''}${age <= 0 ? ' fresh' : ''}`;
-      const opacity = Math.max(0.14, 1 - age * 0.27);
-      return `<img class="${cls} footprint" src="${uiIcon('trail')}" alt="" aria-hidden="true" style="left:${x.toFixed(2)}%;top:${y.toFixed(2)}%;--rot:${rot.toFixed(1)}deg;--trail-opacity:${opacity.toFixed(2)}">`;
+      const opacity = Math.max(0.18, 1 - age * 0.24);
+      // 贴图 + 滤镜染红：遮罩方案在 WebP 上会整块消失，滤镜方案跨浏览器稳定。
+      return `<img class="${cls}" src="${uiIcon('trail')}" alt="" aria-hidden="true" style="left:${x.toFixed(2)}%;top:${y.toFixed(2)}%;--rot:${rot.toFixed(1)}deg;--trail-opacity:${opacity.toFixed(2)}">`;
     })
     .join('');
   return `<div class="trail-layer" aria-hidden="true">${prints}</div>`;

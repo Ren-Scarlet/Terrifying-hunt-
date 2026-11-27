@@ -10,6 +10,9 @@ function isMobileLayout(): boolean {
   return window.matchMedia(MOBILE_LAYOUT_QUERY).matches;
 }
 
+/** 手机端跟随视角的默认放大倍率：房间约 60px，能看清名字也点得准。 */
+const MOBILE_FOLLOW_ZOOM = 1.5;
+
 
 let root: HTMLElement | null = null;
 let mapElement: HTMLElement | null = null;
@@ -43,6 +46,8 @@ let activityLogOpen = false;
 let intelDrawerOpen = false;
 let hudHidden = false;
 let handOpen = true;
+/** 手机端只在首次进入对局时套用「跟随 + 放大」视角，之后交给玩家用顶部按钮切换。 */
+let mobileCameraReady = false;
 let intelPanelPosition: { left: number; top: number } | null = null;
 
 function bindIntelPanelDrag(): void {
@@ -238,10 +243,13 @@ export function syncImmersiveCamera(nextRoot: HTMLElement): void {
   mapElement = root.querySelector<HTMLElement>('.floorplan');
   const marker = root.querySelector<HTMLElement>('.player-marker');
   if (!viewportElement || !mapElement || !marker) return;
-  // 手机端没有鼠标滚轮，也不需要跟随镜头：固定为「整张地图缩放到窗口」。
-  if (isMobileLayout()) {
-    globalView = true;
-    following = false;
+  // 手机端默认「跟随 + 放大」：整图适配会让房间只有 30px，看不清也点不准。
+  // 玩家随时可以用顶部「全局」按钮切到整图俯瞰。
+  if (isMobileLayout() && !mobileCameraReady) {
+    mobileCameraReady = true;
+    globalView = false;
+    following = true;
+    zoom = MOBILE_FOLLOW_ZOOM;
   }
   if (!isMobileLayout() && wheelBoundViewport !== viewportElement) {
     wheelBoundViewport = viewportElement;
@@ -347,7 +355,7 @@ export function handleImmersiveAction(action: string | undefined): boolean {
   if (action === 'camera-follow') {
     globalView = false;
     following = true;
-    zoom = 1.18;
+    zoom = isMobileLayout() ? MOBILE_FOLLOW_ZOOM : 1.18;
     panX = 0;
     panY = 0;
     updateCamera(true);

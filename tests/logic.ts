@@ -1895,8 +1895,10 @@ function caseNpcLocksAndPersistentTrails(): void {
     movePlayer(tracks, next);
     const freshTrail = visibleTrails(tracks).find((trail) => trail.to === walker.room);
     check('AB 潜行 NPC 移动仍会留下脚印', !!freshTrail, `room=${walker.room} trails=${visibleTrails(tracks).length}`);
-    tracks.trailClock += 4;
-    check('AB 脚印在 5 次玩家行动内仍可追踪', visibleTrails(tracks).some((trail) => trail.to === walker.room));
+    tracks.trailClock += 2;
+    check('AB 脚印在 3 次玩家行动内仍可追踪', visibleTrails(tracks).some((trail) => trail.to === walker.room));
+    tracks.trailClock += 2;
+    check('AB 脚印超过 3 次行动后消失', !visibleTrails(tracks).some((trail) => trail.to === walker.room));
   } else {
     check('AB 潜行 NPC 移动仍会留下脚印', true, '地图无可测试的两跳路线，跳过');
     check('AB 脚印在 5 次玩家行动内仍可追踪', true, '地图无可测试的两跳路线，跳过');

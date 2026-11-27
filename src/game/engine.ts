@@ -96,7 +96,8 @@ export const TRAIL_TURNS = 3;
 /**
  * 痕迹保留最近五次「玩家行动」（不是按回合），给玩家足够时间追踪路线。
  */
-const TRAIL_ACTION_WINDOW = 5;
+/** 脚印保留的行动次数：所有地图统一 3 次行动。 */
+const TRAIL_ACTION_WINDOW = 3;
 /** 天亮阶段：每 5 回合推进一次，共 4 个阶段。 */
 export const DAWN_PHASE_TURNS = 5;
 /** 每次跨阶段：警报 +4，全场幸存者警觉 +5。 */
@@ -526,9 +527,9 @@ function snapshotRooms(state: GameState): Map<string, RoomId> {
   return new Map(npcs(state).map((p) => [p.id, p.room]));
 }
 
-/** 脚印在多少步行动后淡出：室内 5 步，奥蒙德雪地额外 +3。 */
-export function trailActionWindow(state: GameState): number {
-  return TRAIL_ACTION_WINDOW + (state.mapId === 'ormond' ? 3 : 0);
+/** 脚印在多少次行动后淡出：统一 3 次行动。 */
+export function trailActionWindow(_state: GameState): number {
+  return TRAIL_ACTION_WINDOW;
 }
 
 /**

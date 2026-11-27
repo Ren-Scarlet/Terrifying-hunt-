@@ -538,25 +538,8 @@ button { font-family: inherit; cursor: pointer; }
   pointer-events: none;
   overflow: hidden;
 }
-.footprint {
-  position: absolute;
-  width: 30px; height: 30px;
-  transform: translate(-50%, -50%) rotate(var(--rot, 0deg));
-  background: #ff7048;
-  -webkit-mask: url('/assets/ui/trail.webp') center / contain no-repeat;
-  mask: url('/assets/ui/trail.webp') center / contain no-repeat;
-  opacity: .92;
-  filter:
-    drop-shadow(0 0 3px #ffd9b0)
-    drop-shadow(0 0 8px #ff8a44)
-    drop-shadow(0 0 16px #ff4418)
-    drop-shadow(0 0 28px #cf1c08);
-  animation: trailGlow 1.5s ease-in-out infinite;
-  transition: opacity .2s ease;
-}
-.footprint.fresh { background: #ffa070; animation-duration: .95s; }
-.footprint.blood { background: #ff4a26; }
-.footprint.blood.fresh { background: #ff7a4a; }
+/* 脚印样式统一在 immersive.css（.floorplan .footprint）里定义：
+   用遮罩 + 背景色画，路径走相对资源，避免部署在子路径时绝对路径 404。 */
 @keyframes trailGlow {
   0%, 100% {
     opacity: .82;

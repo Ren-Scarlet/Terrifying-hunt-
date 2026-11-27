@@ -1902,19 +1902,57 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
   transform: scale(1.15); transform-origin: bottom center;
 }
 
-/* Newest footprints stay bright; older ones recede and disappear sooner. */
+/*
+ * 脚印：贴图 + 滤镜染成红色，越新越红越亮。
+ * age-0 最新：正红 + 呼吸光晕；age-1/2 逐渐变暗；age-3 只剩暗红余痕。
+ * 行动窗口见 engine.ts 的 TRAIL_ACTION_WINDOW（3 次行动）。
+ */
 #app.immersive-game .floorplan .footprint {
-  opacity: var(--trail-opacity,.92) !important;
-  transition: opacity .2s ease, filter .2s ease;
+  display: block !important; position: absolute !important;
+  width: 26px !important; height: 34px !important;
+  object-fit: contain !important;
+  background: transparent !important;
+  border: 0 !important;
+  transform: translate(-50%, -50%) rotate(var(--rot, 0deg)) !important;
+  opacity: var(--trail-opacity, .95) !important;
+  filter:
+    brightness(0) invert(30%) sepia(90%) saturate(6000%) hue-rotate(345deg) brightness(1.6)
+    drop-shadow(0 0 6px rgba(255, 42, 18, 1))
+    drop-shadow(0 0 14px rgba(255, 30, 10, .7)) !important;
+  animation: footprintPulse 1.8s ease-in-out infinite !important;
 }
-#app.immersive-game .floorplan .footprint:not(.fresh) { animation: none !important; }
 #app.immersive-game .floorplan .footprint.age-1 {
-  filter: drop-shadow(0 0 2px rgba(255,190,145,.5)) drop-shadow(0 0 4px rgba(255,90,48,.45));
+  filter:
+    brightness(0) invert(28%) sepia(85%) saturate(4500%) hue-rotate(342deg) brightness(1.35)
+    drop-shadow(0 0 4px rgba(255, 64, 36, .7)) !important;
+  animation: none !important;
 }
 #app.immersive-game .floorplan .footprint.age-2 {
-  filter: drop-shadow(0 0 1px rgba(255,145,105,.28)) drop-shadow(0 0 2px rgba(200,55,30,.3));
+  filter:
+    brightness(0) invert(24%) sepia(70%) saturate(3200%) hue-rotate(338deg) brightness(1.05)
+    drop-shadow(0 0 2px rgba(190, 40, 22, .45)) !important;
+  animation: none !important;
 }
-#app.immersive-game .floorplan .footprint.age-3 { filter: none; }
+#app.immersive-game .floorplan .footprint.age-3 {
+  filter: brightness(0) invert(18%) sepia(55%) saturate(2200%) hue-rotate(336deg) brightness(.85) !important;
+  animation: none !important;
+}
+#app.immersive-game .floorplan .footprint.blood {
+  filter:
+    brightness(0) invert(26%) sepia(95%) saturate(7000%) hue-rotate(348deg) brightness(1.5)
+    drop-shadow(0 0 8px rgba(255, 10, 0, 1)) !important;
+}
+@keyframes footprintPulse {
+  0%, 100% {
+    filter: brightness(0) invert(30%) sepia(90%) saturate(6000%) hue-rotate(345deg) brightness(1.5)
+      drop-shadow(0 0 6px rgba(255, 42, 18, .95)) drop-shadow(0 0 14px rgba(255, 30, 10, .65));
+  }
+  50% {
+    filter: brightness(0) invert(34%) sepia(95%) saturate(7000%) hue-rotate(348deg) brightness(1.9)
+      drop-shadow(0 0 9px rgba(255, 60, 35, 1)) drop-shadow(0 0 22px rgba(255, 30, 15, .85));
+  }
+}
+}
 
 /* Special executions receive a brief physical beat and an in-world narrative bubble. */
 #app.immersive-game .room .execution-scene-overlay {
@@ -2105,14 +2143,6 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
   border-color: #ff705e !important;
 }
 
-/* The footprint artwork now comes from the unused shoeprint icon asset. */
-#app.immersive-game .floorplan .footprint {
-  display: block !important; position: absolute !important;
-  width: 18px !important; height: 24px !important;
-  object-fit: contain !important; background: transparent !important;
-  border: 0 !important; transform: translate(-50%,-50%) rotate(var(--rot)) !important;
-  pointer-events: none !important;
-}
 #app.immersive-game .floorplan .footprint::before,
 #app.immersive-game .floorplan .footprint::after { content: none !important; display: none !important; }
 
@@ -2644,3 +2674,22 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
    不悬浮时保持原来的 19 层，不影响任何其他面板。 */
 #app.immersive-game .statusline:has(.alarm-stat:hover),
 #app.immersive-game .statusline:has(.alarm-stat:focus-within){z-index:46!important;}
+
+/*
+ * 门提示：Canvas 已经画了墙体和门洞，DOM 再贴一个门形图标只会把地图糊满。
+ * 这里改成没有形状的小圆点：绿色=现在能走、黄色=行动点不足、橙色=木板封门、红色=电子门锁。
+ * 位置仍然来自 doorMarkerPosition()，不改变交互。
+ */
+#app.immersive-game .floorplan .map-door-marker {
+  width: 9px !important; height: 9px !important;
+  min-width: 9px !important; min-height: 9px !important;
+  border-radius: 50% !important;
+  background: var(--door-ink, #86d9a6) !important;
+  box-shadow: 0 0 6px color-mix(in srgb, var(--door-ink, #86d9a6) 80%, transparent) !important;
+  opacity: .9 !important;
+}
+#app.immersive-game .floorplan .map-door-marker::before,
+#app.immersive-game .floorplan .map-door-marker::after,
+#app.immersive-game .floorplan .map-door-marker i {
+  content: none !important; display: none !important;
+}

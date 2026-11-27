@@ -73,9 +73,63 @@
     pointer-events: auto;
   }
 
-  /* 顶栏（品牌 + 镜头按钮）在手机端整体隐藏：镜头固定为整图适配 */
+  /* 顶栏只保留镜头按钮：浮在地图右上角，随时可切「全局 / 跟随」和缩放 */
   #app.immersive-game.mobile-game-active .topline {
+    display: flex !important;
+    position: fixed !important;
+    top: calc(var(--mob-top, 121px) + 8px) !important;
+    right: 6px;
+    left: auto;
+    bottom: auto;
+    width: auto !important;
+    height: auto !important;
+    margin: 0;
+    padding: 0;
+    z-index: 46;
+    pointer-events: auto;
+    background: none !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+  }
+
+  #app.immersive-game.mobile-game-active .topline .brand {
     display: none !important;
+  }
+
+  #app.immersive-game.mobile-game-active .topline .top-right,
+  #app.immersive-game.mobile-game-active .topline .camera-controls {
+    display: flex !important;
+    align-items: center;
+    gap: 4px;
+  }
+
+  #app.immersive-game.mobile-game-active .topline .camera-controls > * {
+    display: none !important;
+  }
+
+  #app.immersive-game.mobile-game-active .topline .camera-controls [data-action="camera-zoom-out"],
+  #app.immersive-game.mobile-game-active .topline .camera-controls [data-action="camera-global"],
+  #app.immersive-game.mobile-game-active .topline .camera-controls [data-action="camera-follow"],
+  #app.immersive-game.mobile-game-active .topline .camera-controls [data-action="camera-zoom-in"] {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    height: 32px;
+    min-width: 32px;
+    padding: 0 8px;
+    font-size: 10px;
+    border-radius: 8px;
+    background: rgba(12, 18, 22, .88);
+    border: 1px solid #2f3b44;
+    color: #cfd6db;
+  }
+
+  #app.immersive-game.mobile-game-active .topline .camera-controls [data-action="camera-follow"].active,
+  #app.immersive-game.mobile-game-active .topline .camera-controls [data-action="camera-global"].active {
+    background: #5a1d18;
+    border-color: #a8392c;
+    color: #ffd9cf;
   }
 
   /* 目标条：标题 + 一行副文案，超出省略 */
@@ -635,9 +689,22 @@
     display: none !important;
   }
 
+
+  /* 手机端点房间就只做一件事：移动。房间里的装饰按钮和人物头像不再抢点击，
+     柜子/搜索/破坏等操作统一走底部动作条，避免点房间弹出别的界面。 */
+  #app.immersive-game.mobile-game-active .floorplan .room-hit {
+    z-index: 6 !important;
+  }
+
+  #app.immersive-game.mobile-game-active .floorplan .room-feature,
+  #app.immersive-game.mobile-game-active .floorplan .person-chip,
+  #app.immersive-game.mobile-game-active .floorplan .score-execution-btn {
+    pointer-events: none !important;
+  }
+
   /* 玩家标记按比例缩小，避免盖住相邻三间房 */
   #app.immersive-game.mobile-game-active .floorplan .player-marker {
-    transform: scale(0.55) !important;
+    transform: scale(0.4) !important;
     transform-origin: 50% 60% !important;
   }
 
