@@ -296,9 +296,18 @@ function showPendingExecutionScene(): void {
   const description = document.createElement('p');
   description.textContent = event.description;
   bubble.append(heading, description);
-  overlay.append(flash, figure, bubble);
+  overlay.append(flash, figure);
   room.appendChild(overlay);
+  // 桌面端：处决文案做成画面底部字幕，留在房间里会被房名、描述和头像压住（图3）。
+  // 手机端仍是紧凑卡片，直接跟随房间，避免与手机 HUD 叠在一起。
+  if (app.classList.contains('mobile-game-active')) {
+    overlay.append(bubble);
+  } else {
+    bubble.classList.add('execution-scene-caption');
+    app.appendChild(bubble);
+  }
   window.setTimeout(() => overlay.remove(), 4200);
+  window.setTimeout(() => bubble.remove(), 4200);
 }
 
 
@@ -570,6 +579,7 @@ function render(): void {
   app.classList.toggle('immersive-game', immersiveActive);
   document.body.classList.toggle('immersive-hunt', immersiveActive);
   applyMobileGameLayout(app, immersiveActive);
+  publishBottomHudHeight();
   applyDisplaySettings();
   detailCardUid = null;
   if (game && view.screen === 'game' && selectedPersonId) {
@@ -581,6 +591,22 @@ function render(): void {
   syncScene();
   if (immersiveActive) syncImmersiveCamera(app);
   syncQteUi();
+}
+
+/** 把底部动作条 / 顶部状态条的实际高度写进 CSS 变量，杀手面板据此在两者之间定位。 */
+function publishBottomHudHeight(): void {
+  if (!app.classList.contains('immersive-game') || app.classList.contains('mobile-game-active')) return;
+  const hud = app.querySelector<HTMLElement>('#bottomHud');
+  if (!hud) return;
+  const write = (): void => {
+    const height = Math.ceil(hud.getBoundingClientRect().height);
+    if (height > 0) app.style.setProperty('--hud-h', `${height}px`);
+    const status = app.querySelector<HTMLElement>('.statusline');
+    const statusHeight = status ? Math.ceil(status.getBoundingClientRect().height) : 0;
+    if (statusHeight > 0) app.style.setProperty('--status-h', `${statusHeight}px`);
+  };
+  write();
+  window.requestAnimationFrame(write);
 }
 
 /** 把场景画布挂到新的平面图节点上；离开对局时销毁 */
@@ -1426,6 +1452,8 @@ window.addEventListener('keyup', (event) => {
   if (event.key.toLowerCase() === heldMoveKey) clearHeldMovement();
 });
 window.addEventListener('blur', clearHeldMovement);
+// 窗口尺寸变化时底部动作条高度会变，杀手面板的位置跟着重新量一次。
+window.addEventListener('resize', () => publishBottomHudHeight());
 
 installImmersiveKeys();
 render();

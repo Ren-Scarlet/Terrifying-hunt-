@@ -2944,6 +2944,16 @@ export function breakBarricade(state: GameState, room: RoomId): boolean {
   if (dynamicBoard) state.barricades = state.barricades.filter((r) => r !== room);
   if (fixedBoard) state.clearedObstacles.push(room);
   log(state, `你花费 1 点行动点，将${roomName(room)}入口的木板砸碎。`);
+  // 砸开木板的巨响会直接惊动门后的人：以前只有一句日志，屋内幸存者的警戒几乎不动，不合理。
+  const inside = state.people.filter((person) => person.role !== 'police' && person.hp > 0 && !person.hidden && person.room === room);
+  inside.forEach((person) => {
+    person.alert = Math.max(person.alert, 55);
+    person.fear = clamp(person.fear + 12, 0, 100);
+    person.awareness = Math.max(person.awareness, 2);
+  });
+  if (inside.length) {
+    log(state, `木板碎裂的巨响让${inside.map((person) => person.name).join('、')}立刻警觉起来，${inside.length > 1 ? '他们' : '他'}开始死死盯住门口。`);
+  }
   state.attackReady = true;
   afterPlayerAction(state);
   checkImmediateWin(state);

@@ -150,7 +150,7 @@ export function intentDot(person: Person): string {
   return `<i class="intent-dot i-${person.intent}" title="${escape(INTENT_LABEL[person.intent])}"></i>`;
 }
 
-export function personChip(person: Person, attackable = false, carryable = false, targetMode?: 'hatchet', darkRoom = false, slot?: { x: number; y: number }): string {
+export function personChip(person: Person, attackable = false, carryable = false, targetMode?: 'hatchet', darkRoom = false, slotStyle?: string): string {
   const cls =
     person.role === 'police'
       ? 'police'
@@ -214,8 +214,8 @@ export function personChip(person: Person, attackable = false, carryable = false
           : attackable
             ? ' · 点击对他挥刀'
             : '';
-  const slotStyle = slot ? ` style="left:${slot.x.toFixed(1)}%;top:${slot.y.toFixed(1)}%"` : '';
-  return `<button type="button" class="person-chip ${cls} ${person.bloodSacrifice ? 'blood-sacrifice' : ''} ${person.trapTriggered ? 'trap-triggered' : ''} ${health === 'downed' ? 'is-downed' : ''} ${attackable ? 'can-hit' : ''} ${targetMode ? 'targeting-' + targetMode : ''}"${slotStyle} data-action="${action}" data-person-id="${person.id}"${attackable ? ' data-attack="1"' : ''}
+  const slotStyleAttr = slotStyle ? ` style="${slotStyle}"` : '';
+  return `<button type="button" class="person-chip ${cls} ${person.bloodSacrifice ? 'blood-sacrifice' : ''} ${person.trapTriggered ? 'trap-triggered' : ''} ${health === 'downed' ? 'is-downed' : ''} ${attackable ? 'can-hit' : ''} ${targetMode ? 'targeting-' + targetMode : ''}"${slotStyleAttr} data-action="${action}" data-person-id="${person.id}"${attackable ? ' data-attack="1"' : ''}
     title="${escape(person.name)} · ${HEALTH_LABEL[health]} · ${awarenessLabel(person.alert)} ${person.alert}/100 · ${escape(ARCH_LABEL[person.archetype])} · ${escape(GOAL_LABEL[person.goal])} · 正在${escape(label)}${note}">
     ${avatarHtml}${trapHitMark}
     ${dialogue}<span>${escape(person.name)}</span>${contractTargetMark}${stateMark}<span class="person-status-row">${statusIcons}</span>${alertMark}${watchMark}

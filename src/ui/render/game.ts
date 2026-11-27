@@ -392,6 +392,48 @@ function trailOverlay(state: GameState): string {
   return `<div class="trail-layer" aria-hidden="true">${prints}</div>`;
 }
 
+/** 行动点下方的 buff / debuff 提示行：状态全部读自 GameState，后续卡牌加一条即可。 */
+function killerBuffsHtml(state: GameState): string {
+  const chips: Array<{ label: string; hint: string; tone: 'buff' | 'debuff' | 'neutral' }> = [];
+  if (state.hexNoedActive && state.alarm >= ALARM_MAX && state.totems.length > 0) {
+    chips.push({ label: '厄咒 · 难逃一死', hint: '警报已拉满，厄咒图腾仍在：攻击命中直接把幸存者击倒。', tone: 'buff' });
+  }
+  if (state.hexHuntressActive) {
+    chips.push({ label: '厄咒 · 猎杀戾气', hint: '咒术生效中：命中幸存者后额外累积恐惧。', tone: 'buff' });
+  }
+  if (state.nightfallActive) {
+    chips.push({ label: '夜幕监视', hint: '鬼面夜幕：相邻房间的目标持续显形。', tone: 'buff' });
+  }
+  if (state.possessed) {
+    chips.push({ label: `恶魔附身 · ${state.possessTurns} 回合`, hint: '迈尔斯恶魔附身：挥刀直接击倒站立目标。', tone: 'buff' });
+  }
+  if (state.frenzy >= FRENZY_MAX / 2) {
+    chips.push({ label: '杀戮沸腾 · 每回合 +2 AP', hint: '杀戮值已过半：每回合额外获得 2 点行动点。', tone: 'buff' });
+  }
+  if (state.bonusDamage > 0) {
+    chips.push({ label: `下一刀 +${state.bonusDamage}`, hint: '下一次攻击额外造成伤害，挥刀或擦刀后失效。', tone: 'buff' });
+  }
+  if (state.bonusEnergyNextTurn > 0) {
+    chips.push({ label: `下回合 +${state.bonusEnergyNextTurn} AP`, hint: '图腾余响：下一回合额外获得行动点。', tone: 'buff' });
+  }
+  if (state.ambushTurn === state.turn) {
+    chips.push({ label: '伏击就绪', hint: '本回合伏击生效：目标更难察觉你的接近。', tone: 'buff' });
+  }
+  if (state.nurseFollowUp) {
+    chips.push({ label: '濒死之息', hint: '护士：下一次行动后进入疲惫，下回合少 1 点行动点。', tone: 'neutral' });
+  }
+  if (state.stunTurns > 0) {
+    chips.push({ label: `眩晕 · 下回合 -${state.stunTurns} AP`, hint: '被幸存者反击或障碍打断，下回合行动点减少。', tone: 'debuff' });
+  }
+  if (state.blindTurns > 0) {
+    chips.push({ label: `致盲 · ${state.blindTurns} 回合`, hint: '被手电筒致盲：视野与判断受影响。', tone: 'debuff' });
+  }
+  if (!chips.length) return '';
+  return `<div class="killer-buffs" aria-label="当前增益与减益">${chips
+    .map((chip) => `<span class="killer-buff ${chip.tone}" title="${escape(chip.hint)}"><i aria-hidden="true"></i>${escape(chip.label)}</span>`)
+    .join('')}</div>`;
+}
+
 export function renderGame(state: GameState, killer: KillerProfile): string {
   const m = state.mission;
   const ground = getHuntingGround(state.mapId);
@@ -477,6 +519,25 @@ function personSlot(roomId: RoomId, personId: string, index: number): { x: numbe
   const y = 52 + ((hash >> 9) % 13) + Math.floor(index / 3) * 4;
   return { x: Math.min(61, x), y: Math.min(66, y) };
 }
+
+/**
+ * 头像半径（px）：与新版 CSS 里的 --chip 变量对齐，用于把人夹在房间墙内。
+ * 以前直接用百分比定位，房间一窄头像就压到墙上穿模，现在用 clamp() 兜住。
+ */
+function chipHalf(roomId: RoomId): number {
+  const size = ROOM_MAP[roomId].size;
+  if (size === 'large' || size === 'open') return 50;
+  if (size === 'medium') return 44;
+  return 37;
+}
+
+/** 生成 left/top 的 clamp 内联样式，保证头像中心不会贴到房间边缘。 */
+function personSlotStyle(roomId: RoomId, personId: string, index: number): string {
+  const half = chipHalf(roomId);
+  const slot = personSlot(roomId, personId, index);
+  const axis = (value: number) => `clamp(${half}px, ${value.toFixed(1)}%, calc(100% - ${half}px))`;
+  return `left:${axis(slot.x)};top:${axis(slot.y)}`;
+}
   const rooms = ROOMS.map((room) => {
     const visible = isRoomVisible(state, room.id);
     const explored = isRoomExplored(state, room.id);
@@ -558,7 +619,7 @@ function personSlot(roomId: RoomId, personId: string, index: number): { x: numbe
              <div class="room-features">${roomFeatures(state, room.id)}</div>`}
         <div class="room-people ${adjacent && people.length ? 'adjacent-survivors' : ''}">
           ${people.map((p) => p.hp <= 0 && p.room === state.playerRoom && !state.carryPersonId
-            ? `<div class="map-person-wrap ${currentScore(state) >= SCORE_EXECUTION_THRESHOLD ? 'score-unlocked' : ''}" style="left:${personSlot(room.id, p.id, people.indexOf(p)).x.toFixed(1)}%;top:${personSlot(room.id, p.id, people.indexOf(p)).y.toFixed(1)}%">${personChip(p, false, false, undefined, !isRoomLit(state, p.room))}
+            ? `<div class="map-person-wrap ${currentScore(state) >= SCORE_EXECUTION_THRESHOLD ? 'score-unlocked' : ''}" style="${personSlotStyle(room.id, p.id, people.indexOf(p))}">${personChip(p, false, false, undefined, !isRoomLit(state, p.room))}
                 <div class="person-world-actions">
                   ${currentScore(state) >= SCORE_EXECUTION_THRESHOLD ? `<button class="btn score-execution-btn" data-action="execute-score-special" data-person-id="${p.id}" ${scoreExecutionBlockReason(state, p.id) ? 'disabled' : ''} title="分数处决：猎杀评分达到 ${SCORE_EXECUTION_THRESHOLD} 分后解锁，消耗 1 AP 并触发 QTE">分数处决 · QTE</button>` : ''}
                   <button class="btn" data-action="carry" data-person-id="${p.id}" ${state.energy < 1 ? 'disabled' : ''} title="抱起倒地幸存者：消耗 1 AP；抱起后可搬运到指定地点执行地点处决">抱起</button>
@@ -571,7 +632,7 @@ function personSlot(roomId: RoomId, personId: string, index: number): { x: numbe
                 false,
                 state.huntressAiming ? 'hatchet' : undefined,
                 !isRoomLit(state, p.room),
-                personSlot(room.id, p.id, people.indexOf(p)),
+                personSlotStyle(room.id, p.id, people.indexOf(p)),
               )).join('')}
           ${police ? personChip(police) : ''}
           ${ghosts.map(() => '<span class="ghost-chip" title="最后确认位置：人可能已经走了">?</span>').join('')}
@@ -957,6 +1018,7 @@ function personSlot(roomId: RoomId, personId: string, index: number): { x: numbe
               <img class="killer-ap-icon" src="${uiIcon('trail')}" alt="" aria-hidden="true">
               <span>行动点：</span><b>${state.energy}<i>/${state.maxEnergy}</i></b>
             </div>
+            ${killerBuffsHtml(state)}
             ${meter || myersMarks ? `<div class="killer-special-resources">${meter}${myersMarks}</div>` : ''}
           </div>
         </section>
