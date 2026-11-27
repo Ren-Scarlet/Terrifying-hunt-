@@ -3228,3 +3228,8 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
   filter: drop-shadow(0 0 6px rgba(255, 150, 70, .95)) !important;
   opacity: 1 !important;
 }
+
+/* 人物站位容器留一点内边距，避免头像压到墙线 */
+#app.immersive-game .floorplan .room-people {
+  inset: 5px !important;
+}

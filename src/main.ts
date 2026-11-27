@@ -165,6 +165,36 @@ function applyExecutionQteOutcome(outcome: ExecutionQteOutcome, style: Execution
 }
 
 /**
+ * 分数处决的结算：QTE 结果只影响加分，动作本身照常完成；
+ * QTE 失败时按普通处决处理（不加分）。
+ */
+function runScoreExecution(personId: string | undefined, outcome: 'perfect' | 'miss'): void {
+  const game = currentGame();
+  if (!personId) return;
+  const ghosts = captureAttackGhosts();
+  const executed = executeScoreSpecial(game, personId);
+  if (executed) {
+    pendingMapAttackTarget = personId;
+    pendingMapAttackGhost = ghosts.get(personId) ?? null;
+    const style = executionStyleOf(game);
+    const perfect = outcome === 'perfect';
+    applyExecutionQteOutcome(perfect ? 'perfect' : 'miss', style);
+    pendingExecutionScene = {
+      roomId: game.playerRoom,
+      title: style.title + ' · 分数处决' + (perfect ? ' · 完美 QTE' : ''),
+      description: style.action + '。' + style.line + (perfect ? ' 分数处决完成，QTE 完美，额外获得 25 分。' : ' 分数处决仍然完成，但 QTE 失败，按普通处决处理，没有额外分数。'),
+      style: style.motion,
+      success: true,
+    };
+    playSfx('execute');
+    playSfx(SURVIVOR_MAP[personId]?.gender === 'female' ? 'voiceFScream' : 'voiceMScream', 0.96);
+    window.setTimeout(() => playSfx('wipe'), 260);
+    lastLogHead = game.log[0] ?? '';
+  }
+  afterAction();
+}
+
+/**
  * 处决 QTE：不再弹全屏遮罩，而是把四位随机数字显示在杀手头像上。
  * 状态放在 qte 里，渲染时挂到 .player-marker，键盘/触屏数字键按顺序输入。
  * 以后要加别的 QTE（比如飞斧的时机条），沿用同一套「挂在头像上的即时交互」结构即可。
@@ -174,17 +204,17 @@ type QteState = {
   index: number;
   deadline: number;
   timer: number;
-  button: HTMLElement;
+  personId: string;
 };
 
 let qte: QteState | null = null;
 
-function startExecutionQte(button: HTMLElement): void {
+function startExecutionQte(personId: string): void {
   if (qte || !game) return;
   unlockAudio();
   const digits = Array.from({ length: 4 }, () => String(Math.floor(Math.random() * 10)));
   const timer = window.setTimeout(() => finishQte(false), 4200);
-  qte = { digits, index: 0, deadline: performance.now() + 4200, timer, button };
+  qte = { digits, index: 0, deadline: performance.now() + 4200, timer, personId };
   render();
 }
 
@@ -208,9 +238,8 @@ function finishQte(success: boolean): void {
   if (!current) return;
   qte = null;
   window.clearTimeout(current.timer);
-  current.button.dataset.qteOutcome = success ? 'perfect' : 'miss';
   syncQteUi();
-  current.button.click();
+  runScoreExecution(current.personId, success ? 'perfect' : 'miss');
 }
 
 /** 把 QTE 面板挂到杀手头像上（跟着地图一起移动）。 */
@@ -229,7 +258,6 @@ function syncQteUi(): void {
     <b>处决时机</b>
     <div class="qte-digits">${current.digits.map((digit, index) => `<span class="${index < current.index ? 'done' : index === current.index ? 'current' : ''}">${digit}</span>`).join('')}</div>
     <i class="qte-timer" style="animation-duration:${remaining}ms"></i>
-    <div class="qte-pad">${'0123456789'.split('').map((digit) => `<button type="button" data-qte-digit="${digit}">${digit}</button>`).join('')}</div>
   `;
   panel.addEventListener('click', (event) => {
     const key = (event.target as HTMLElement).closest<HTMLElement>('[data-qte-digit]');
@@ -927,30 +955,10 @@ function createGameActions(): ActionTable {
     execute: (ctx) => runExecute(ctx),
     'execute-target': (ctx) => runExecute(ctx),
 
-    'execute-score-special': ({ target, qteOutcome }) => {
-      const game = currentGame();
+    'execute-score-special': ({ target }) => {
       const personId = target.dataset.personId;
-      const ghosts = captureAttackGhosts();
-      const executed = !!personId && executeScoreSpecial(game, personId);
-      if (executed && personId) {
-        pendingMapAttackTarget = personId;
-        pendingMapAttackGhost = ghosts.get(personId) ?? null;
-        const style = executionStyleOf(game);
-        const perfect = qteOutcome === 'perfect';
-        applyExecutionQteOutcome(perfect ? 'perfect' : 'miss', style);
-        pendingExecutionScene = {
-          roomId: game.playerRoom,
-          title: style.title + ' · 分数处决' + (perfect ? ' · 完美 QTE' : ''),
-          description: style.action + '。' + style.line + (perfect ? ' 分数处决完成，QTE 完美，额外获得 25 分。' : ' 分数处决仍然完成，但 QTE 失误，没有额外分数。'),
-          style: style.motion,
-          success: true,
-        };
-        playSfx('execute');
-        playSfx(SURVIVOR_MAP[personId]?.gender === 'female' ? 'voiceFScream' : 'voiceMScream', 0.96);
-        window.setTimeout(() => playSfx('wipe'), 260);
-        lastLogHead = game.log[0] ?? '';
-      }
-      afterAction();
+      if (!personId || qte) return;
+      startExecutionQte(personId);
     },
 
     'drop-carried': () => {
@@ -1305,12 +1313,6 @@ app.addEventListener('click', (event) => {
 
   // 分数处决：先在按钮上挂 QTE；QTE 结束后再次点击同一个按钮，这次才真正结算。
   const qteOutcome = target.dataset.qteOutcome as ExecutionQteOutcome | undefined;
-  if (action === 'execute-score-special' && game && inGame() && !qteOutcome) {
-    startExecutionQte(target);
-    return;
-  }
-  if (qteOutcome) delete target.dataset.qteOutcome;
-
   if (handleImmersiveAction(action)) return;
 
   // 浏览器要求先有用户交互才允许出声

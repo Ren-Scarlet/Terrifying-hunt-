@@ -621,6 +621,31 @@ export function visibleTrails(state: GameState): Trail[] {
  * 玩家做完一个动作之后：房子不会站着等你。
  * 跑掉的人继续跑、求救的人继续摸电话、救援的人继续包扎——只不过一回合有上限。
  */
+
+/**
+ * 屠夫就在同一间屋：除非杀手不可侦测、或幸存者看不见，
+ * 否则当场警觉并开始逃；看不见时只因为动静起疑。
+ */
+function sameRoomKillerReact(state: GameState, armed: boolean): void {
+  if (!armed) return;
+  for (const person of npcs(state)) {
+    if (state.result) break;
+    if (person.hp <= 0 || person.role === 'police' || person.room !== state.playerRoom) continue;
+    const effects = person.statusEffects ?? {};
+    // 站在脸上时潜行/尾随不再算「看不见」：只有障目、浑然不觉或黑暗能让他们没反应。
+    const killerHidden = false;
+    const survivorBlind = (effects.blind ?? 0) > 0 || (effects.oblivious ?? 0) > 0 || !isRoomLit(state, person.room);
+    if (!killerHidden && !survivorBlind) {
+      person.alert = clamp(Math.max(person.alert, 70), 0, 100);
+      person.awareness = Math.max(person.awareness, 2);
+      if (person.intent === 'idle' || person.intent === 'wary' || person.intent === 'call') person.intent = 'flee';
+      person.activity = '被你堵在屋里，正拼命往外跑';
+    } else {
+      person.alert = clamp(person.alert + 6, 0, 100);
+    }
+  }
+}
+
 function npcReact(state: GameState): void {
   if (state.result) return;
   const before = snapshotRooms(state);
@@ -736,6 +761,7 @@ function checkScourgeShrine(state: GameState): void {
 function afterPlayerAction(state: GameState): void {
   if (state.result) return;
   checkScourgeShrine(state);
+  sameRoomKillerReact(state, state.lastPlayerRoom === state.playerRoom);
   const beforeReaction = snapshotRooms(state);
   npcReact(state);
   checkScourgeShrine(state);
@@ -773,6 +799,7 @@ function afterPlayerAction(state: GameState): void {
   // 玩家的一次行动结束：痕迹的寿命按行动数走，不是按回合。
   // 这让「跟着脚印走」变成一段短线索，走错再回头就真的断了。
   state.trailClock += 1;
+  state.lastPlayerRoom = state.playerRoom;
   pruneTrails(state);
   pruneDisturbances(state);
 }
@@ -2113,6 +2140,7 @@ function crowAlertFor(state: GameState, person: Person): void {
 }
 
 function npcTurn(state: GameState): void {
+  sameRoomKillerReact(state, state.lastPlayerRoom === state.playerRoom);
   // 红色人影只保留到下一次 NPC 回合开始，给玩家足够时间确认陷阱命中。
   state.people.forEach((person) => { person.trapTriggered = false; });
   const before = snapshotRooms(state);
@@ -2135,20 +2163,6 @@ function npcTurn(state: GameState): void {
     person.statusEffects ??= {};
     const effectsNow = person.statusEffects;
     const cannotSenseKiller = (effectsNow.undetectable ?? 0) > 0 || (effectsNow.oblivious ?? 0) > 0 || (effectsNow.blind ?? 0) > 0 || !isRoomLit(state, person.room);
-    // 屠夫就在同一间屋：除非杀手不可侦测、或幸存者看不见，否则当场警觉并开始逃。
-    if (person.hp > 0 && person.role !== 'police' && person.room === state.playerRoom) {
-      const killerHidden = state.stealthActions > 0;
-      const survivorBlind = (effectsNow.blind ?? 0) > 0 || (effectsNow.oblivious ?? 0) > 0;
-      if (!killerHidden && !survivorBlind) {
-        person.alert = clamp(Math.max(person.alert, 70), 0, 100);
-        person.awareness = Math.max(person.awareness, 2);
-        if (person.intent === 'idle' || person.intent === 'wary' || person.intent === 'call') person.intent = 'flee';
-        person.activity = '被你堵在屋里，正拼命往外跑';
-      } else {
-        // 看不见你时只会因为动静稍微起疑
-        person.alert = clamp(person.alert + 6, 0, 100);
-      }
-    }
     if ((person.statusEffects.cursed ?? 0) > 0) {
       if (state.totems.length === 0) {
         person.statusEffects.cursed = 0;

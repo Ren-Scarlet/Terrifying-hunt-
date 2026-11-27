@@ -136,6 +136,7 @@ export function createGame(
     frenzy: 0,
     trails: [],
     playerRoom: ENTRY_ROOM,
+    lastPlayerRoom: ENTRY_ROOM,
     lookingAround: false,
     // 与场景初始朝向一致：开局面向画面下方
     playerFacing: { x: 0, y: 1 },

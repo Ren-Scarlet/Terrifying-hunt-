@@ -494,6 +494,8 @@ export interface GameState {
   /** 最近有人经过的房间：乌鸦叫 / 地板响，给玩家一个不靠技能的找人方向 */
   disturbances: Disturbance[];
   playerRoom: RoomId;
+  /** 上一次行动结束时杀手所在房间：用来区分「走进屋」和「站在屋里行动」 */
+  lastPlayerRoom: RoomId | '';
   /** 玩家已进入查看选择模式，等待点选一个相邻房间；此时尚未消耗 AP。 */
   lookingAround: boolean;
   /** 玩家当前朝向的单位向量；用于判断正前方一格房间 */

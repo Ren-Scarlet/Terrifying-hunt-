@@ -450,7 +450,7 @@ function caseMyersStalkingAndFearRadius(): void {
   const stalkStart = stalking.stalkMeter;
   check('迈尔斯：落单目标提供基础尾随值与额外收益',
     usePower(stalking, 'myers_gaze') && stalking.stalkMeter === stalkStart + 20 && stalking.energy === 4 &&
-    stalking.stalkPressure === 0 && prey.alert === 0 && prey.intent === 'idle',
+    stalking.stalkPressure === 0 && prey.alert >= 60 && prey.intent === 'flee',
     `stalk=${stalking.stalkMeter} AP=${stalking.energy}`);
 
   const groupStalk = createGame(STARTING_DECK, undefined, '迈克尔·迈尔斯');
