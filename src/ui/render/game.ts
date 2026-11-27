@@ -495,7 +495,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
             ? `<div class="map-person-wrap ${currentScore(state) >= SCORE_EXECUTION_THRESHOLD ? 'score-unlocked' : ''}">${personChip(p, false, false, undefined, !isRoomLit(state, p.room))}
                 ${currentScore(state) >= SCORE_EXECUTION_THRESHOLD ? `<button class="btn score-execution-btn" data-action="execute-score-special" data-person-id="${p.id}" ${scoreExecutionBlockReason(state, p.id) ? 'disabled' : ''} title="分数处决：猎杀评分达到 ${SCORE_EXECUTION_THRESHOLD} 分后解锁，消耗 1 AP 并触发 QTE">✦ 分数处决 · QTE</button>` : ''}
                 <div class="person-world-actions">
-                  <button class="btn" data-action="carry" data-person-id="${p.id}" ${state.energy < 1 ? 'disabled' : ''}>抱起</button>
+                  <button class="btn" data-action="carry" data-person-id="${p.id}" ${state.energy < 1 ? 'disabled' : ''} title="抱起倒地幸存者：消耗 1 AP；抱起后可搬运到指定地点执行地点处决">抱起</button>
                   <button class="btn execute" data-action="execute-target" data-person-id="${p.id}" ${executeBlockReason(state, p.id) ? 'disabled' : ''} title="普通处决：消耗 1 AP，立即击杀倒地目标">普通处决</button>
                 </div>
               </div>`
