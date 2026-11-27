@@ -128,6 +128,7 @@ export function createGame(
     phoneCut: false,
     bearTraps: [],
     trapTriggerCount: 0,
+    lastTrapTriggerId: null,
     trapInventory: killerId === '设陷者' ? 2 : 0,
     trapCaches: [],
     huntressAiming: false,
