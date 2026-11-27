@@ -1,6 +1,6 @@
 # 正式站、原有 /preview/ 与独立 /mobile-preview/ 共用 Pages 部署。
-# PR 构建时：根目录和 /preview/ 始终来自 main；/mobile-preview/ 来自 PR 分支。
-# PR 不会把测试分支内容覆盖到正式根目录。
+# 正式部署时：根目录和 /preview/ 来自 main；/mobile-preview/ 固定来自手机重构分支。
+# PR 只构建检查，不尝试部署 Pages，避免 Pages 拒绝 PR 环境。
 
 name: Build and deploy GitHub Pages
 
@@ -30,7 +30,7 @@ jobs:
       - name: Checkout mobile preview source
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: feature/mobile-ui-standalone
           path: mobile-source
 
       - uses: actions/setup-node@v4
@@ -68,8 +68,7 @@ jobs:
 
   deploy:
     if: >-
-      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-      (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
+      github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: build
     runs-on: ubuntu-latest
     permissions:
