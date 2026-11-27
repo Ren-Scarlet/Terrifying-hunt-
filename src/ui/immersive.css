@@ -2394,3 +2394,110 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
   content:'';position:fixed;inset:0;pointer-events:none;z-index:24;
   background:radial-gradient(120% 92% at 50% 46%,transparent 52%,rgba(0,0,0,.52) 100%);
 }
+
+/* ==========================================================================
+   杀手 HUD 终极版：无框、大图标、电影化
+   真实 DOM（合并后）：panel > [portrait] [abilities] [resources(frenzy + ap)]
+   设计原则：去掉一切方块描边与填充，只保留暗部渐变与图标光晕，读作"游戏 HUD"
+   ========================================================================== */
+#app.immersive-game .killer-ability-panel{
+  display:grid!important;
+  grid-template-columns:104px minmax(0,1fr)!important;
+  grid-template-rows:auto auto!important;
+  align-items:start!important;
+  column-gap:12px!important;row-gap:6px!important;
+  width:318px!important;max-width:calc(100vw - 26px)!important;
+  height:auto!important;max-height:none!important;
+  overflow:hidden!important;box-sizing:border-box!important;
+  padding:6px 10px 10px!important;
+  border:0!important;border-radius:0!important;
+  background:radial-gradient(130% 128% at 10% 84%,rgba(5,4,4,.88) 0%,rgba(5,4,4,.58) 44%,rgba(5,4,4,0) 76%)!important;
+  box-shadow:none!important;backdrop-filter:none!important;
+}
+#app.immersive-game .killer-hud-portrait{
+  grid-column:1!important;grid-row:1 / span 2!important;
+  display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:flex-end!important;
+  gap:3px!important;min-width:0!important;overflow:hidden!important;
+}
+#app.immersive-game .killer-hud-portrait>.killer-face.ability-portrait{
+  position:static!important;display:block!important;
+  width:104px!important;height:132px!important;flex:0 0 132px!important;
+  margin:0!important;padding:0!important;border:0!important;border-radius:0!important;
+  background:none!important;box-shadow:none!important;overflow:hidden!important;transform:none!important;
+}
+#app.immersive-game .killer-hud-portrait>.killer-face.ability-portrait img{
+  width:100%!important;height:100%!important;object-fit:contain!important;object-position:bottom center!important;
+  transform:none!important;filter:drop-shadow(0 6px 18px rgba(0,0,0,.85))!important;
+}
+#app.immersive-game .killer-hud-portrait>b{
+  font-size:11px!important;letter-spacing:3px!important;color:#b9927c!important;
+  max-width:104px!important;text-align:center!important;
+}
+#app.immersive-game .killer-hud-abilities{grid-column:2!important;grid-row:1!important;min-width:0!important;position:static!important;}
+#app.immersive-game .killer-hud-resources{
+  grid-column:2!important;grid-row:2!important;position:static!important;inset:auto!important;
+  display:flex!important;flex-direction:column!important;gap:7px!important;min-width:0!important;
+}
+#app.immersive-game .killer-hud-resources *,
+#app.immersive-game .killer-hud-resources img{position:static!important;inset:auto!important;float:none!important;transform:none!important;}
+
+/* 能力键：无框、大图标、暖色光晕 */
+#app.immersive-game .killer-power-grid{display:grid!important;grid-template-columns:1fr!important;gap:6px!important;}
+#app.immersive-game .killer-power-grid .btn.power{
+  display:grid!important;grid-template-columns:54px minmax(0,1fr)!important;align-items:center!important;
+  width:100%!important;min-width:0!important;height:60px!important;min-height:60px!important;
+  padding:0!important;gap:10px!important;
+  border:0!important;border-radius:0!important;background:none!important;box-shadow:none!important;
+}
+#app.immersive-game .killer-power-grid .btn.power:hover:not(:disabled){
+  background:radial-gradient(70% 120% at 20% 50%,rgba(180,60,36,.20),rgba(180,60,36,0) 70%)!important;
+}
+#app.immersive-game .killer-power-grid .power-art{
+  position:relative!important;width:52px!important;height:52px!important;flex:0 0 52px!important;
+  border:0!important;background:none!important;box-shadow:none!important;
+}
+#app.immersive-game .killer-power-grid .power-art .power-icon{
+  width:100%!important;height:100%!important;object-fit:contain!important;
+  filter:drop-shadow(0 0 9px rgba(232,126,72,.5)) contrast(1.1)!important;
+}
+#app.immersive-game .killer-power-grid .power-body{display:flex!important;flex-direction:column!important;align-items:flex-start!important;min-width:0!important;}
+#app.immersive-game .killer-power-grid .power-body>b{
+  font-size:13px!important;line-height:1.2!important;letter-spacing:1px!important;
+  color:#e8d7c8!important;text-shadow:0 2px 6px rgba(0,0,0,.9)!important;
+}
+
+/* 杀戮值 / 行动点：大图标 + 大数字，各自一行 */
+#app.immersive-game .killer-frenzy-meter{margin:0!important;width:100%!important;}
+#app.immersive-game .killer-resource-line{
+  display:flex!important;align-items:center!important;gap:8px!important;
+  font-size:12px!important;line-height:1!important;
+}
+#app.immersive-game .killer-resource-line .killer-frenzy-icon{
+  width:22px!important;height:22px!important;flex:0 0 22px!important;object-fit:contain!important;
+  filter:drop-shadow(0 0 6px rgba(232,126,72,.55))!important;
+}
+#app.immersive-game .killer-resource-line>span{color:#a08d80!important;letter-spacing:1px!important;}
+#app.immersive-game .killer-resource-line>b{
+  font-size:22px!important;color:#f7e4d6!important;font-weight:800!important;
+  text-shadow:0 2px 8px rgba(0,0,0,.9)!important;
+}
+#app.immersive-game .killer-frenzy-track{height:8px!important;margin-top:6px!important;border-radius:0!important;background:rgba(60,30,26,.55)!important;}
+#app.immersive-game .killer-frenzy-track i{border-radius:0!important;}
+#app.immersive-game .ap-display.killer-ap-display{
+  display:flex!important;align-items:center!important;gap:8px!important;
+  height:auto!important;min-height:0!important;margin:0!important;padding:0!important;
+  border:0!important;background:none!important;box-shadow:none!important;
+}
+#app.immersive-game .ap-display.killer-ap-display .killer-ap-icon{
+  width:22px!important;height:22px!important;flex:0 0 22px!important;object-fit:contain!important;
+  filter:drop-shadow(0 0 6px rgba(150,190,210,.4))!important;
+}
+#app.immersive-game .killer-ap-display>span{color:#a08d80!important;font-size:12px!important;letter-spacing:1px!important;}
+#app.immersive-game .killer-ap-display>b{font-size:22px!important;color:#f7e4d6!important;font-weight:800!important;text-shadow:0 2px 8px rgba(0,0,0,.9)!important;}
+#app.immersive-game .killer-ap-display>b>i{font-size:12px!important;color:#a6958a!important;font-style:normal!important;font-weight:600!important;}
+@media (max-width:900px){
+  #app.immersive-game .killer-ability-panel{left:8px!important;width:262px!important;grid-template-columns:82px minmax(0,1fr)!important;padding:4px 8px 8px!important;}
+  #app.immersive-game .killer-hud-portrait>.killer-face.ability-portrait{width:82px!important;height:104px!important;flex:0 0 104px!important;}
+  #app.immersive-game .killer-power-grid .btn.power{grid-template-columns:44px minmax(0,1fr)!important;height:50px!important;min-height:50px!important;}
+  #app.immersive-game .killer-power-grid .power-art{width:42px!important;height:42px!important;flex:0 0 42px!important;}
+}
