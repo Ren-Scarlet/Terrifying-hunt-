@@ -133,7 +133,145 @@ let pendingMapWalk = false;
 
 const app = document.getElementById('app')!;
 
-let pendingExecutionScene: { roomId: RoomId; title: string; description: string } | null = null;
+type ExecutionQteOutcome = 'perfect' | 'miss';
+type ExecutionStyle = { motion: string; title: string; line: string; action: string };
+const EXECUTION_STYLES: Record<string, ExecutionStyle> = {
+  '设陷者': { motion: 'trapper', title: '捕兽夹的猎物', line: '挣扎只会让金属咬得更紧。', action: '设陷者俯身压住猎物，冷酷地结束挣扎' },
+  '幽灵': { motion: 'wraith', title: '丧钟之后', line: '钟声停了。你也该安静了。', action: '幽灵在雾中现身，刀锋一闪又消失' },
+  '护士': { motion: 'nurse', title: '濒死之息', line: '嘘……我听见你最后一次呼吸了。', action: '护士骤然闪现，动作迅速而冰冷' },
+  '女猎手': { motion: 'huntress', title: '林中狩猎', line: '睡吧，小兔子。', action: '女猎手举起沉重的斧头，猛然落下' },
+  '鬼面': { motion: 'ghostface', title: '最后一张照片', line: '看着我。最后一次。', action: '鬼面贴近猎物，面具在暗处一闪' },
+  '迈克尔·迈尔斯': { motion: 'myers', title: '恶魔附身', line: '嘘……别动。', action: '迈尔斯将猎物提离地面，举起菜刀，寒光落下' },
+  '贞子': { motion: 'sadako', title: '怨灵现身', line: '你看见了不该看的东西。', action: '画面骤然失真，湿冷的黑影从地面逼近' },
+  '梦魇': { motion: 'freddy', title: '梦魇降临', line: '醒来？你已经没有机会了。', action: '梦魇从阴影中伸出利爪，画面被黑暗吞没' },
+  '食人魔': { motion: 'cannibal', title: '电锯轰鸣', line: '别怕，很快就结束了。', action: '电锯声骤然逼近，沉重身影猛扑而来' },
+  '处刑者': { motion: 'executioner', title: '最终裁决', line: '罪行已被裁决。', action: '处刑者拖动巨刃，沉重地挥下' },
+  '魔王': { motion: 'demon', title: '深渊献祭', line: '黑暗会记住你的名字。', action: '巨大的黑影压下，猩红光芒吞没画面' },
+  '医生': { motion: 'doctor', title: '电刑实验', line: '放松，实验还没结束。', action: '医生启动电流，刺眼白光骤然闪烁' },
+  '门徒': { motion: 'pig', title: '游戏结束', line: '游戏结束了。', action: '门徒压低身形，面具后的刀锋突然逼近' },
+};
+let pendingExecutionScene: { roomId: RoomId; title: string; description: string; style: string; success: boolean } | null = null;
+let executionQteActive = false;
+
+function applyExecutionQteOutcome(outcome: ExecutionQteOutcome, style: ExecutionStyle): void {
+  if (!game) return;
+  const nearby = (person: GameState['people'][number]): boolean =>
+    person.room === game!.playerRoom || ROOM_MAP[game!.playerRoom].neighbors.includes(person.room);
+  const affected = game.people.filter((person) => person.role !== 'police' && person.hp > 0 && !person.hidden && (outcome === 'perfect' || nearby(person)));
+  if (outcome === 'perfect') {
+    game.specialExecutionBonus += 25;
+    affected.forEach((person) => {
+      person.fear = Math.min(100, person.fear + 22);
+      person.alert = Math.min(100, person.alert + 8);
+    });
+    game.log.unshift(`【完美处决】${style.title}：额外获得 25 分；猎场中 ${affected.length} 名幸存者感受到更强烈的恐惧。`);
+  } else {
+    affected.forEach((person) => {
+      person.fear = Math.min(100, person.fear + 12);
+      person.alert = Math.min(100, person.alert + 5);
+    });
+    game.log.unshift(`【处决失误】动作仍然完成，但现场动静惊动了附近幸存者（${affected.length} 人），没有获得额外分数。`);
+  }
+}
+
+function startExecutionQte(button: HTMLElement): void {
+  if (executionQteActive || !game) return;
+  executionQteActive = true;
+  const digits = Array.from({ length: 4 }, () => String(Math.floor(Math.random() * 10)));
+  const style = EXECUTION_STYLES[game.killer] ?? EXECUTION_STYLES['设陷者'];
+  let progress = 0;
+  let finished = false;
+  const duration = 4200;
+  const overlay = document.createElement('div');
+  overlay.className = 'execution-qte-overlay';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-label', '处决快速反应挑战');
+  const panel = document.createElement('div');
+  panel.className = 'execution-qte-panel';
+  const heading = document.createElement('b');
+  heading.className = 'execution-qte-heading';
+  heading.textContent = style.title + ' · 处决时机';
+  const sub = document.createElement('p');
+  sub.textContent = style.action + '。按顺序输入屏幕上的四个数字！';
+  const sequence = document.createElement('div');
+  sequence.className = 'execution-qte-sequence';
+  const cells = digits.map((digit, index) => {
+    const cell = document.createElement('span');
+    cell.textContent = digit;
+    cell.dataset.index = String(index);
+    sequence.appendChild(cell);
+    return cell;
+  });
+  const status = document.createElement('div');
+  status.className = 'execution-qte-status';
+  status.textContent = '按键盘数字键，或点击下方数字';
+  const timer = document.createElement('div');
+  timer.className = 'execution-qte-timer';
+  const timerFill = document.createElement('i');
+  timer.appendChild(timerFill);
+  const pad = document.createElement('div');
+  pad.className = 'execution-qte-pad';
+  for (let digit = 0; digit <= 9; digit++) {
+    const key = document.createElement('button');
+    key.type = 'button';
+    key.textContent = String(digit);
+    key.dataset.qteDigit = String(digit);
+    pad.appendChild(key);
+  }
+  panel.append(heading, sub, sequence, status, timer, pad);
+  overlay.appendChild(panel);
+  app.appendChild(overlay);
+
+  const update = (): void => {
+    cells.forEach((cell, index) => {
+      cell.classList.toggle('done', index < progress);
+      cell.classList.toggle('current', index === progress);
+    });
+    status.textContent = progress === 4 ? '完成！' : `输入进度：${progress}/4`;
+  };
+  const finish = (success: boolean): void => {
+    if (finished) return;
+    finished = true;
+    executionQteActive = false;
+    window.clearTimeout(timeout);
+    window.removeEventListener('keydown', onKeyDown, true);
+    overlay.remove();
+    button.dataset.qteOutcome = success ? 'perfect' : 'miss';
+    button.click();
+  };
+  const input = (digit: string): void => {
+    if (finished) return;
+    if (digit === digits[progress]) {
+      progress += 1;
+      update();
+      if (progress === 4) finish(true);
+    } else {
+      progress = digit === digits[0] ? 1 : 0;
+      update();
+      status.textContent = '按错了！重新输入顺序';
+      panel.classList.remove('wrong');
+      void panel.offsetWidth;
+      panel.classList.add('wrong');
+    }
+  };
+  const onKeyDown = (event: KeyboardEvent): void => {
+    if (!executionQteActive) return;
+    if (/^\d$/.test(event.key)) input(event.key);
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  };
+  const onPadClick = (event: MouseEvent): void => {
+    const key = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-qte-digit]');
+    if (key?.dataset.qteDigit) input(key.dataset.qteDigit);
+  };
+  overlay.addEventListener('click', onPadClick);
+  window.addEventListener('keydown', onKeyDown, true);
+  const timeout = window.setTimeout(() => finish(false), duration);
+  timerFill.style.animationDuration = duration + 'ms';
+  update();
+}
+
 
 function showPendingExecutionScene(): void {
   if (!pendingExecutionScene) return;
@@ -143,7 +281,7 @@ function showPendingExecutionScene(): void {
   if (!room) return;
   room.querySelector('.execution-scene-overlay')?.remove();
   const overlay = document.createElement('div');
-  overlay.className = 'execution-scene-overlay';
+  overlay.className = 'execution-scene-overlay execution-style-' + event.style + (event.success ? ' execution-qte-success' : ' execution-qte-miss');
   overlay.setAttribute('aria-hidden', 'true');
   const flash = document.createElement('div');
   flash.className = 'execution-scene-flash';
@@ -656,6 +794,13 @@ app.addEventListener('click', (event) => {
   if (!target) return;
   clearHeldMovement();
   const action = target.dataset.action;
+  const qteAction = action === 'execute' || action === 'execute-target' || action === 'execute-special';
+  const qteOutcome = target.dataset.qteOutcome as ExecutionQteOutcome | undefined;
+  if (qteAction && game && screen === 'game' && !qteOutcome) {
+    startExecutionQte(target);
+    return;
+  }
+  if (qteOutcome) delete target.dataset.qteOutcome;
   if (handleImmersiveAction(action)) return;
 
   // 浏览器要求先有用户交互才允许出声
@@ -997,6 +1142,16 @@ app.addEventListener('click', (event) => {
     const executed = executeDownedPerson(game, personId);
     if (executed) {
       if (downedId) { pendingMapAttackTarget = downedId; pendingMapAttackGhost = ghosts.get(downedId) ?? null; }
+      const style = EXECUTION_STYLES[game.killer] ?? EXECUTION_STYLES['设陷者'];
+      const perfect = qteOutcome === 'perfect';
+      applyExecutionQteOutcome(perfect ? 'perfect' : 'miss', style);
+      pendingExecutionScene = {
+        roomId: game.playerRoom,
+        title: style.title + (perfect ? ' · 完美处决' : ' · 残酷处决'),
+        description: style.action + '。' + style.line + (perfect ? ' 你的动作干净利落，恐惧传遍猎场。' : ' 动作稍有迟滞，附近的人听见了动静。'),
+        style: style.motion,
+        success: perfect,
+      };
       playSfx('execute');
       if (downedId) playSfx(SURVIVOR_MAP[downedId]?.gender === 'female' ? 'voiceFScream' : 'voiceMScream', 0.96);
       window.setTimeout(() => playSfx('wipe'), 260);
@@ -1028,11 +1183,16 @@ app.addEventListener('click', (event) => {
     const carriedId = game.carryPersonId;
     const carried = carriedId ? game.people.find((person) => person.id === carriedId) : undefined;
     if (method && executeCarriedPerson(game, method)) {
+      const style = EXECUTION_STYLES[game.killer] ?? EXECUTION_STYLES['设陷者'];
+      const perfect = qteOutcome === 'perfect';
+      applyExecutionQteOutcome(perfect ? 'perfect' : 'miss', style);
       if (methodInfo && carried) {
         pendingExecutionScene = {
           roomId: game.playerRoom,
-          title: '特殊处决 · ' + methodInfo.name,
-          description: methodInfo.flavor(carried.name),
+          title: style.title + ' · ' + methodInfo.name + (perfect ? ' · 完美处决' : ''),
+          description: style.action + '。' + methodInfo.flavor(carried.name) + ' ' + style.line + (perfect ? ' 完美完成，额外获得 25 分。' : ' 动作失误，但处决仍然完成。'),
+          style: style.motion,
+          success: perfect,
         };
       }
       playSfx('execute');
