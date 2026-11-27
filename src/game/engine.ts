@@ -1359,6 +1359,12 @@ function shout(state: GameState, person: Person, base = 18): void {
 
 /** 玩家踏进房间的瞬间 */
 function npcOnPlayerEnter(state: GameState, barricadedEntry = false): void {
+  // 杀手既然已经进入电子门锁封闭的房间，门锁就不能继续把里面的幸存者钉死。
+  // 他们会趁杀手进门造成的混乱解锁并夺门逃跑；护士等穿墙能力因此不会让 NPC 原地等死。
+  if (isLocked(state, state.playerRoom)) {
+    state.roomLocks[state.playerRoom] = 0;
+    log(state, `你闯入了封锁区域，屋内幸存者立刻解除门锁，试图夺门逃跑！`);
+  }
   const hidden = playerIsHidden(state);
   const ambush = ambushActive(state);
   const before = snapshotRooms(state);
