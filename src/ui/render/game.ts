@@ -798,8 +798,8 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
           <div class="resource-bar">
             <div class="stats">
               <div class="stat"><b>${state.turn}<i>/${m.turns}</i></b><small>回合</small></div>
-              <div class="stat alarm-stat ${state.alarm >= 70 ? 'hot' : state.alarm >= 40 ? 'warm' : ''}" title="全局警报值">
-                <b>${state.alarm}<i>/${ALARM_MAX}</i></b><div class="alarm-track"><span style="width:${state.alarm}%"></span></div><small>警报</small>
+              <div class="stat alarm-stat ${state.alarm >= 70 ? 'hot' : state.alarm >= 40 ? 'warm' : ''}" title="警报值（0–100）：目击/发现你、攻击、处决、幸存者成功报警或呼救，以及部分破坏和卡牌效果都会使警报上升；电话或无线电求救会大幅增加。每回合结束通常下降 6 点；若本回合没有新的暴露度增加记录，再额外下降 4 点。部分卡牌和环境事件也能降低警报。达到 60 点会出现逃生点；达到 100 点会触发最终危机：普通杀手会引来警察，灵异杀手会迫使幸存者全面逃亡。" data-tooltip="警报值（0–100）：目击/发现你、攻击、处决、幸存者成功报警或呼救，以及部分破坏和卡牌效果都会使警报上升；电话或无线电求救会大幅增加。每回合结束通常下降 6 点；若本回合没有新的暴露度增加记录，再额外下降 4 点。部分卡牌和环境事件也能降低警报。达到 60 点会出现逃生点；达到 100 点会触发最终危机：普通杀手会引来警察，灵异杀手会迫使幸存者全面逃亡。" aria-label="警报值（0–100）：目击/发现你、攻击、处决、幸存者成功报警或呼救，以及部分破坏和卡牌效果都会使警报上升；电话或无线电求救会大幅增加。每回合结束通常下降 6 点；若本回合没有新的暴露度增加记录，再额外下降 4 点。部分卡牌和环境事件也能降低警报。达到 60 点会出现逃生点；达到 100 点会触发最终危机：普通杀手会引来警察，灵异杀手会迫使幸存者全面逃亡。">
+                <b>${state.alarm}<i>/${ALARM_MAX}</i></b><div class="alarm-track"><span style="width:${state.alarm}%"></span></div><small>警报 ⓘ</small>
               </div>
               <div class="stat"><b>${state.kills}</b><small>击杀</small></div>
               <div class="stat survivor-count"><b>${state.people.filter((p) => p.role !== 'police' && p.hp > 0).length}/${state.survivorTotal}</b><small>存活</small></div>
@@ -847,16 +847,16 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
           <div class="killer-hud-abilities" aria-label="杀手能力图标 · 按 1–4 使用">
             <div class="killer-power-grid">${powerButtonHtml(state, killer)}</div>
           </div>
-          <div class="killer-hud-resources">
+          <div class="killer-hud-resources" aria-label="杀戮值与行动点">
             <div class="killer-frenzy-meter">
               <div class="killer-resource-line"><img class="killer-frenzy-icon" src="${uiIcon('statusKill')}" alt="" aria-hidden="true"><span>杀戮值：</span><b>${state.frenzy}/${FRENZY_MAX}</b></div>
               <div class="killer-frenzy-track"><i style="width:${state.frenzy / FRENZY_MAX * 100}%"></i></div>
             </div>
+            <div class="ap-display killer-ap-display" aria-label="当前行动点">
+              <img class="killer-ap-icon" src="${uiIcon('trail')}" alt="" aria-hidden="true">
+              <span>行动点：</span><b>${state.energy}<i>/${state.maxEnergy}</i></b>
+            </div>
             ${meter || myersMarks ? `<div class="killer-special-resources">${meter}${myersMarks}</div>` : ''}
-          </div>
-          <div class="ap-display killer-ap-display" aria-label="当前行动点">
-            <img class="killer-ap-icon" src="${uiIcon('trail')}" alt="" aria-hidden="true">
-            <span>行动点：</span><b>${state.energy}<i>/${state.maxEnergy}</i></b>
           </div>
         </section>
       </div>
@@ -930,7 +930,7 @@ export function renderResult(state: GameState, newCard: string | null): string {
           <div><small>最终评分</small><b>${state.score}</b></div>
           <div><small>击杀人数</small><b>${state.kills}</b></div>
           <div><small>逃走人数</small><b>${state.escaped}</b></div>
-          <div><small>最终暴露度</small><b>${state.alarm}/${ALARM_MAX}</b></div>
+          <div><small>最终警报值</small><b>${state.alarm}/${ALARM_MAX}</b></div>
         </div>
         <section class="hunt-style-card">
           <div class="hunt-style-heading">
