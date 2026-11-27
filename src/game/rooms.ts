@@ -58,6 +58,7 @@ const ALL_ROOMS: Room[] = [...CORE_BLUEPRINTS, ...OPTIONAL_BLUEPRINTS].map((b) =
   rect: { left: 0, top: 0, width: 0, height: 0 },
   size: 'medium',
   neighbors: [],
+  cell: { left: 0, top: 0, width: 0, height: 0 },
 }));
 
 /** ROOMS 是本局实际出现的房间；ROOM_MAP 保留全部房间 ID，兼容仍引用旧局房间的状态。 */
@@ -442,6 +443,7 @@ export function buildLayout(style: LayoutStyle = 'wide'): string {
     room.x = region.left;
     room.y = region.top;
     room.rect = cellRect(region);
+    room.cell = { left: region.left, top: region.top, width: region.width, height: region.height };
     const area = regionArea(region);
     room.size = room.id === 'garden' ? 'open' : area >= 12 ? 'large' : area >= 7 ? 'medium' : 'small';
   });

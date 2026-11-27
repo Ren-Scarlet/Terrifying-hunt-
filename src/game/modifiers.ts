@@ -1,5 +1,6 @@
 import { ACCESSORY_MAP } from './data/accessories';
-import type { AccessoryModKey, AccessoryMods, GameState } from './types';
+import { cellDistance, roomDistance } from './navigation';
+import type { AccessoryModKey, AccessoryMods, GameState, RoomId } from './types';
 
 /**
  * ============================================================================
@@ -67,6 +68,19 @@ export function hatchetMax(state: GameState): number {
  */
 export function blinkRangeOf(state: GameState): number {
   return Math.max(1, BASE_BLINK_RANGE + modifierValue(state, 'blinkRange'));
+}
+
+/**
+ * 闪现能不能落到这间房。
+ * 规则：走门 3 步内 **或** 地图网格上 3 格内（穿墙瞬移看的是距离，不是门）。
+ * 以前只按门距判定，隔一堵墙、视觉上就在隔壁的房间会被排除，玩起来像“有的地方点不了”。
+ */
+export function blinkWithinRange(state: GameState, room: RoomId): boolean {
+  if (room === state.playerRoom) return false;
+  const range = blinkRangeOf(state);
+  // 「三格内任意瞬移」：走门 3 步内，或者图上与当前房间只隔 ≤3 格（穿墙看的是距离，不是门）。
+  if (roomDistance(state.playerRoom, room) <= range) return true;
+  return cellDistance(state.playerRoom, room) <= range;
 }
 
 /** 恶魔附身每次行动消耗的尾随值：基础 20，至少 5。 */

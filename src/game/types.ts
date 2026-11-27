@@ -56,6 +56,8 @@ export interface Room {
   size: 'small' | 'medium' | 'large' | 'open';
   neighbors: RoomId[];
   desc: string;
+  /** 房间在网格里的格子范围（不渲染，只用于「隔几格」这类几何判定，例如护士闪现）。 */
+  cell: { left: number; top: number; width: number; height: number };
 }
 
 export interface CardDef {

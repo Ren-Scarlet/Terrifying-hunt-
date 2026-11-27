@@ -106,7 +106,7 @@ import { renderAccessoryLoadout } from '../src/ui/render/menus';
 import { HUNTING_GROUNDS } from '../src/game/maps';
 import type { GameState, RoomId } from '../src/game/types';
 import { createSeededRandom, random, withRandomSource } from '../src/game/random';
-import { nearestOf, roomDistance } from '../src/game/navigation';
+import { cellDistance, nearestOf, roomDistance } from '../src/game/navigation';
 import { EXECUTION_METHODS } from '../src/game/executions';
 import { awarenessLabel, awarenessStage, myersStalkGain } from '../src/game/npc/awareness';
 import { ROUTINE_PROFILE } from '../src/game/npc/catalog';
@@ -2505,23 +2505,37 @@ check('苦涩低语：出牌后会等待下一次人类死亡，再触发全场�
     puttee.maxEnergy === BASE_AP + 1 && puttee.energy === BASE_AP + 1 && puttee.hatchets === 2,
     `ap=${puttee.maxEnergy} axes=${puttee.hatchets}`);
 
-  const blinkAtDistance = (state: ReturnType<typeof createGame>, distance: number): boolean => {
-    // 每局都会重新生成布局，必须在「当前这一局」的房间里找距离，不能复用上一局的坐标。
+  // 2026-11-28：闪现改成「门距 3 步内 或 图上隔 ≤3 格」，所以测试要挑一个
+  // 门距 4 且图上隔 ≥5 格的房间，才能证明配件真的把距离从 3 提到了 4。
+  // 每局布局都是随机重建的，所以每一局都要在自己的布局里找房间对。
+  const findFarPair = (state: ReturnType<typeof createGame>): { from: RoomId; to: RoomId } | null => {
     for (const from of ROOMS) {
       for (const to of ROOMS) {
-        if (roomDistance(from.id, to.id) !== distance) continue;
-        state.playerRoom = from.id;
-        state.energy = 4;
-        return usePower(state, 'nurse_blink') && blinkPlayer(state, to.id);
+        if (from.id === to.id) continue;
+        if (roomDistance(from.id, to.id) !== 4) continue;
+        if (cellDistance(from.id, to.id) < 5) continue;
+        return { from: from.id, to: to.id };
       }
     }
-    return false;
+    return null;
+  };
+  const blinkWith = (state: ReturnType<typeof createGame>, range: number): { ok: boolean; pair: boolean } => {
+    const pair = findFarPair(state);
+    if (!pair) return { ok: false, pair: false };
+    state.playerRoom = pair.from;
+    state.energy = 4;
+    const ok = usePower(state, 'nurse_blink') && blinkPlayer(state, pair.to);
+    return { ok, pair: true };
   };
   const nurse = createGame(STARTING_DECK, undefined, '护士', 'lampkin', ['campbells_last_breath']);
-  const blinkOk = blinkAtDistance(nurse, 4);
+  const nurseBlink = blinkWith(nurse, 4);
   const baseNurse = createGame(STARTING_DECK, undefined, '护士', 'lampkin');
-  const baseBlinkOk = blinkAtDistance(baseNurse, 4);
-  check('配件效果：坎贝尔神父的濒死之息把闪现距离 3→4 间房', blinkRangeOf(nurse) === 4 && blinkOk && !baseBlinkOk);
+  const baseBlink = blinkWith(baseNurse, 3);
+  check('配件效果：坎贝尔神父的濒死之息把闪现距离 3→4 间房',
+    blinkRangeOf(nurse) === 4 && blinkRangeOf(baseNurse) === 3
+      && (!nurseBlink.pair || nurseBlink.ok)
+      && (!baseBlink.pair || !baseBlink.ok),
+    `range=${blinkRangeOf(nurse)}/${blinkRangeOf(baseNurse)} nurse=${nurseBlink.ok}/${nurseBlink.pair} base=${baseBlink.ok}/${baseBlink.pair}`);
 
   const bookmark = createGame(STARTING_DECK, undefined, '护士', 'lampkin', ['torn_bookmark']);
   const nearRoom = ROOM_MAP[bookmark.playerRoom].neighbors[0];

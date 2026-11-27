@@ -54,7 +54,6 @@ import {
   SCORE_EXECUTION_THRESHOLD,
   isRoomLit,
 } from '../../game/engine';
-import { roomDistance } from '../../game/navigation';
 import { executionMethodsAtRoom } from '../../game/executions';
 import { SURVIVOR_MAP } from '../../game/survivors';
 import { getHuntingGround } from '../../game/maps';
@@ -76,7 +75,7 @@ import {
 
 import { isCardTuned } from '../../game/tuning';
 import { ACCESSORY_MAP, ACCESSORY_SLOTS } from '../../game/accessories';
-import { blinkRangeOf, hatchetMax, modifierSummary } from '../../game/modifiers';
+import { blinkRangeOf, blinkWithinRange, hatchetMax, modifierSummary } from '../../game/modifiers';
 import { isMuted, playHeartbeat, playSfx, playTrapScream } from '../audio';
 import { addonIconHtml, escape, icon, itemBadge, itemIconHtml, personChip, shadowFigures, perkIconHtml, TYPE_NAMES, killerFaceHtml, defaultDetailHtml, cardTextHtml } from './shared';
 import type { GameState, Person, RoomId, ScoreLine, SaveData } from '../../game/types';
@@ -252,7 +251,7 @@ function powerButtonHtml(state: GameState, killer: KillerProfile): string {
       actionHint = reason || `携带 ${state.trapInventory}/4 · 当前房间布设（1 AP）`;
     } else if (power.id === 'nurse_blink') {
       label = state.nurseBlinkTargeting ? '取消闪现选点' : '斯宾塞的濒死之息';
-      actionHint = state.nurseBlinkTargeting ? `点击地图 1–${blinkRangeOf(state)} 间房距离内的位置` : state.nurseFollowUp ? '闪现后攻击窗口可用' : reason || '穿墙闪现 · 1 AP';
+      actionHint = state.nurseBlinkTargeting ? `点击地图 ${blinkRangeOf(state)} 格内的任意位置` : state.nurseFollowUp ? '闪现后攻击窗口可用' : reason || '穿墙闪现 · 1 AP';
     } else if (power.id === 'huntress_axe') {
       label = state.huntressAiming ? '取消飞斧瞄准' : '狩猎飞斧';
       actionHint = state.huntressAiming ? '点击直线视野内的幸存者' : reason || `飞斧 ${state.hatchets}/${hatchetMax(state)} · 选择目标投掷（1 AP）`;
@@ -526,9 +525,9 @@ function personSlot(roomId: RoomId, personId: string, index: number): { x: numbe
  */
 function chipHalf(roomId: RoomId): number {
   const size = ROOM_MAP[roomId].size;
-  if (size === 'large' || size === 'open') return 50;
-  if (size === 'medium') return 44;
-  return 37;
+  if (size === 'large' || size === 'open') return 38;
+  if (size === 'medium') return 34;
+  return 30;
 }
 
 /** 生成 left/top 的 clamp 内联样式，保证头像中心不会贴到房间边缘。 */
@@ -560,8 +559,7 @@ function personSlotStyle(roomId: RoomId, personId: string, index: number): strin
       : [];
     const isPlayer = state.playerRoom === room.id;
     const reachable = canMoveTo(state, room.id);
-    const blinkDistance = roomDistance(state.playerRoom, room.id);
-    const blinkSelectable = state.nurseBlinkTargeting && room.id !== state.playerRoom && blinkDistance >= 1 && blinkDistance <= blinkRangeOf(state);
+    const blinkSelectable = state.nurseBlinkTargeting && blinkWithinRange(state, room.id);
     const locked = isLocked(state, room.id);
     const barricaded = state.barricades.includes(room.id);
     const cost = moveCost(state, room.id);
@@ -588,7 +586,7 @@ function personSlotStyle(roomId: RoomId, personId: string, index: number): strin
           ? `<button type="button" class="room-hit aura-hit" data-action="aura-select" data-room="${room.id}" aria-label="选择${escape(room.name)}，显示其中人类的气场">显形</button>`
           : state.nurseBlinkTargeting
           ? blinkSelectable
-            ? `<button type="button" class="room-hit blink-hit" data-action="blink-select" data-room="${room.id}" aria-label="闪现到${escape(room.name)}（距离 ${blinkDistance} 间房）">闪现</button>`
+            ? `<button type="button" class="room-hit blink-hit" data-action="blink-select" data-room="${room.id}" aria-label="闪现到${escape(room.name)}（${blinkRangeOf(state)} 格内任意位置）">闪现</button>`
             : ''
           : state.lookingAround && adjacent
             ? `<button type="button" class="room-hit look-hit" data-action="look-select" data-room="${room.id}" aria-label="查看${escape(room.name)}，消耗 ${LOOK_COST} 点行动点">查看这里</button>`
@@ -728,7 +726,7 @@ function personSlotStyle(roomId: RoomId, personId: string, index: number): strin
     .forEach((p) => {
       statusBits.push(`<span class="status-badge downed">${escape(p.name)} 倒地 · 可立即处决 · 同伴仍可能救起</span>`);
     });
-  if (state.nurseBlinkTargeting) statusBits.push(`<span class="status-badge blink-mode">护士闪现选点中 · 选择 1–${blinkRangeOf(state)} 间房距离内的位置</span>`);
+  if (state.nurseBlinkTargeting) statusBits.push(`<span class="status-badge blink-mode">护士闪现选点中 · 选择 ${blinkRangeOf(state)} 格内的任意位置</span>`);
   if (state.nurseFollowUp) statusBits.push('<span class="status-badge blink-mode">濒死之息 · 现在可对同屋站立幸存者发动普通攻击；下一次行动后疲惫</span>');
   if (state.huntressAiming) statusBits.push('<span class="status-badge hatchet-mode">狩猎飞斧瞄准中 · 点击地图上的直线视野目标</span>');
   const statusHtml = statusBits.length ? `<div class="status-strip">${statusBits.join('')}</div>` : '';
@@ -930,6 +928,7 @@ function personSlotStyle(roomId: RoomId, personId: string, index: number): strin
           <div class="resource-bar">
             <div class="stats">
               <div class="stat"><b>${state.turn}<i>/${m.turns}</i></b><small>回合</small></div>
+              ${left <= 3 ? `<div class="stat turn-warning ${left <= 1 ? 'final' : ''}" title="契约回合快用完了：回合耗尽会直接判猎场终止"><b>${left}</b><small>剩余回合</small></div>` : ''}
               <div class="stat alarm-stat ${state.alarm >= 70 ? 'hot' : state.alarm >= 40 ? 'warm' : ''}" tabindex="0" role="note" aria-label="警报值说明">
   <b>${state.alarm}<i>/${ALARM_MAX}</i></b><div class="alarm-track"><span style="width:${state.alarm}%"></span></div><small>警报 ⓘ</small>
   <span class="alarm-tooltip-content"><strong>警报值（0–100）</strong><br>上升：被幸存者目击或发现、攻击/处决、成功报警或呼救，以及部分破坏和卡牌效果；电话或无线电求救会大幅增加。<br>降低：每回合结束通常 −6；本回合没有新的暴露度增加时额外 −4；部分卡牌和环境事件也能降低。<br>阈值：达到 60 会出现逃生点；达到 100 触发最终危机（普通杀手引来警察，灵异杀手迫使幸存者全面逃亡）。</span>
@@ -991,6 +990,7 @@ function personSlotStyle(roomId: RoomId, personId: string, index: number): strin
           </div>
         </div>
         <section class="killer-ability-panel" aria-label="杀手能力 HUD">
+          <button type="button" class="killer-panel-toggle" data-action="toggle-killer-panel" aria-expanded="true" title="收起 / 展开杀手面板（收起后不挡地图）"></button>
           <div class="killer-hud-portrait">
             ${killerFaceHtml(killer, 'ability-portrait')}
             <b>${escape(killer.owner)}</b>

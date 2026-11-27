@@ -48,7 +48,7 @@ import {
 import { loadSave, writeSave } from './game/save';
 import { generateFreeHunt, generateMission, withAnte } from './game/missions';
 import { applyTuning } from './game/tuning';
-import { ROOM_MAP } from './game/rooms';
+import { CABINET_ROOMS, ROOM_MAP } from './game/rooms';
 import { SURVIVOR_MAP } from './game/survivors';
 import { getExecutionMethod } from './game/executions';
 import type { ExecutionMethodId } from './game/executions';
@@ -103,6 +103,8 @@ let lastNewCard: string | null = null;
 let detailCardUid: string | null = null;
 /** 当前锁定的人物档案；卡牌悬停结束后仍恢复显示。 */
 let selectedPersonId: string | null = null;
+/** 杀手面板是否收起（收起后只留立绘与行动点，不挡地图）。 */
+let killerPanelCollapsed = localStorage.getItem('nightfall-panel-collapsed') === '1';
 /** 平面图下方的场景画布 */
 let scene: SceneHandle | null = null;
 /** 上一次的击杀数与暴露度：用来判断这一手是得手还是暴露了 */
@@ -287,8 +289,6 @@ function showPendingExecutionScene(): void {
   overlay.setAttribute('aria-hidden', 'true');
   const flash = document.createElement('div');
   flash.className = 'execution-scene-flash';
-  const figure = document.createElement('div');
-  figure.className = 'execution-scene-figure';
   const bubble = document.createElement('div');
   bubble.className = 'execution-scene-bubble';
   const heading = document.createElement('b');
@@ -296,7 +296,9 @@ function showPendingExecutionScene(): void {
   const description = document.createElement('p');
   description.textContent = event.description;
   bubble.append(heading, description);
-  overlay.append(flash, figure);
+  // 2026-11-28：删掉原来的“倒下人影”占位（CSS 画的口袋形状，像一颗导弹），
+  // 只保留血光闪白 + 文案，避免角色脚下突然冒出一个图标。
+  overlay.append(flash);
   room.appendChild(overlay);
   // 桌面端：处决文案做成画面底部字幕，留在房间里会被房名、描述和头像压住（图3）。
   // 手机端仍是紧凑卡片，直接跟随房间，避免与手机 HUD 叠在一起。
@@ -575,8 +577,11 @@ function render(): void {
       app.querySelectorAll<HTMLElement>('.attack-hit').forEach((node) => node.classList.remove('attack-hit'));
     }, 620);
   }
-    const immersiveActive = Boolean(game && view.screen === 'game');
+  const immersiveActive = Boolean(game && view.screen === 'game');
   app.classList.toggle('immersive-game', immersiveActive);
+  app.classList.toggle('panel-collapsed', killerPanelCollapsed && immersiveActive);
+  const panelToggle = app.querySelector<HTMLElement>('.killer-panel-toggle');
+  if (panelToggle) panelToggle.setAttribute('aria-expanded', String(!killerPanelCollapsed));
   document.body.classList.toggle('immersive-hunt', immersiveActive);
   applyMobileGameLayout(app, immersiveActive);
   publishBottomHudHeight();
@@ -591,10 +596,92 @@ function render(): void {
   syncScene();
   if (immersiveActive) syncImmersiveCamera(app);
   syncQteUi();
+  syncHuntAlerts();
+}
+
+/* ------------------------------------------------------------------ */
+/* 对局中的强提示：有人逃走 / 逃生点开启 / 最终危机 / 回合快用完        */
+/* ------------------------------------------------------------------ */
+let hudHeightObserver: ResizeObserver | null = null;
+let lastEscaped = 0;
+let lastEscapeRoomCount = 0;
+let lastEmergency = false;
+let lastTurnsLeft = 99;
+let lastLogTop = '';
+let alertGameRef: GameState | null = null;
+
+function huntAlertHost(): HTMLElement {
+  let host = document.getElementById('huntAlerts');
+  if (!host) {
+    host = document.createElement('div');
+    host.id = 'huntAlerts';
+    host.className = 'hunt-alert-host';
+    host.setAttribute('aria-live', 'assertive');
+    document.body.appendChild(host);
+  }
+  return host;
+}
+
+/** 顶部居中的大字提示，4.6 秒后自动消失；最多同时显示 3 条。 */
+function pushHuntAlert(text: string, tone: 'info' | 'warn' | 'danger' = 'warn'): void {
+  const host = huntAlertHost();
+  const node = document.createElement('div');
+  node.className = `hunt-alert ${tone}`;
+  node.textContent = text;
+  host.appendChild(node);
+  while (host.children.length > 3) host.firstElementChild?.remove();
+  window.setTimeout(() => node.remove(), 4600);
+}
+
+function syncHuntAlerts(): void {
+  if (!game || ui().screen !== 'game') {
+    alertGameRef = game;
+    lastEscaped = game?.escaped ?? 0;
+    lastEscapeRoomCount = game?.escapeRooms.length ?? 0;
+    lastEmergency = game?.emergencyActive ?? false;
+    lastTurnsLeft = 99;
+    lastLogTop = '';
+    return;
+  }
+  if (alertGameRef !== game) {
+    alertGameRef = game;
+    lastEscaped = game.escaped;
+    lastEscapeRoomCount = game.escapeRooms.length;
+    lastEmergency = game.emergencyActive;
+    lastTurnsLeft = Math.max(0, game.mission.turns - game.turn + 1);
+    lastLogTop = game.log[0] ?? '';
+    return;
+  }
+  if (game.escaped > lastEscaped) {
+    pushHuntAlert(`有幸存者逃出去了！累计逃走 ${game.escaped} 人`, 'danger');
+    playSfx('flee');
+  }
+  lastEscaped = game.escaped;
+  if (game.escapeRooms.length > lastEscapeRoomCount) {
+    const names = game.escapeRooms.map((id) => ROOM_MAP[id]?.name ?? id).join('、');
+    pushHuntAlert(`逃生点开启：${names}（幸存者会往这里跑）`, 'warn');
+    playSfx('gate');
+  }
+  lastEscapeRoomCount = game.escapeRooms.length;
+  if (game.emergencyActive && !lastEmergency) {
+    pushHuntAlert('最终危机：警报拉满，所有逃生点全部开放！', 'danger');
+    playSfx('gate');
+  }
+  lastEmergency = game.emergencyActive;
+  const top = game.log[0] ?? '';
+  if (top !== lastLogTop && /已抵达逃生点/.test(top)) {
+    pushHuntAlert('有人已经跑到逃生点，下回合就会逃走！', 'warn');
+  }
+  lastLogTop = top;
+  const turnsLeft = Math.max(0, game.mission.turns - game.turn + 1);
+  if (turnsLeft <= 3 && turnsLeft < lastTurnsLeft) {
+    pushHuntAlert(turnsLeft <= 0 ? '契约回合已经耗尽！' : `只剩 ${turnsLeft} 个回合，主目标还没完成！`, turnsLeft <= 1 ? 'danger' : 'warn');
+    if (turnsLeft === 1) playSfx('heartbeat');
+  }
+  lastTurnsLeft = turnsLeft;
 }
 
 /** 把底部动作条 / 顶部状态条的实际高度写进 CSS 变量，杀手面板据此在两者之间定位。 */
-let hudHeightObserver: ResizeObserver | null = null;
 function publishBottomHudHeight(): void {
   if (!app.classList.contains('immersive-game') || app.classList.contains('mobile-game-active')) {
     hudHeightObserver?.disconnect();
@@ -930,6 +1017,14 @@ function currentGame(): GameState {
   return game;
 }
 
+/** 当前房间是否有柜子：搜索音效和「翻柜子」判定保持一致。 */
+function isCabinetRoom(state: GameState): boolean {
+  return (
+    CABINET_ROOMS.includes(state.playerRoom) ||
+    (state.mapId === 'badham' && ['nursery', 'storage', 'guestroom'].includes(state.playerRoom))
+  );
+}
+
 /** 返回大厅：丢弃对局，并重置只属于表现层的选择状态。 */
 function leaveToMenu(): void {
   game = null;
@@ -1174,8 +1269,13 @@ function createGameActions(): ActionTable {
     },
 
     search: () => {
-      searchRoom(currentGame());
-      playSfx('click');
+      const state = currentGame();
+      const energyBefore = state.energy;
+      searchRoom(state);
+      // 翻柜子统一用柜子音效：以前不管房里有柜子没柜子都是“点击声”，和开柜子两套声音。
+      if (state.energy < energyBefore) {
+        playSfx(isCabinetRoom(state) ? 'cabinet' : 'click');
+      }
       afterAction();
     },
 
@@ -1221,6 +1321,16 @@ function createGameActions(): ActionTable {
       interactCabinet(currentGame());
       playSfx('cabinet');
       afterAction();
+    },
+
+    'toggle-killer-panel': () => {
+      killerPanelCollapsed = !killerPanelCollapsed;
+      try {
+        localStorage.setItem('nightfall-panel-collapsed', killerPanelCollapsed ? '1' : '0');
+      } catch {
+        /* 私密模式下忽略 */
+      }
+      render();
     },
 
     'totem-draw': (ctx) => runTotem(ctx, 'draw'),
@@ -1467,4 +1577,15 @@ window.addEventListener('blur', clearHeldMovement);
 window.addEventListener('resize', () => publishBottomHudHeight());
 
 installImmersiveKeys();
+
+// 离线支持：首次联网打开后，Service Worker 会把整包资源缓存到本地，之后断网也能继续玩。
+// 只在生产构建里注册（vite dev 没有 sw.js），并且失败时静默忽略。
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker
+      .register(new URL('sw.js', document.baseURI).toString(), { scope: './' })
+      .catch(() => undefined);
+  });
+}
+
 render();

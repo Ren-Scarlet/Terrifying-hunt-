@@ -175,7 +175,7 @@ export function personChip(person: Person, attackable = false, carryable = false
   const alertMark =
     person.role === 'police'
       ? ''
-      : `<span class="chip-alert ${alertLevel}" title="警戒度：${awarenessLabel(person.alert)}（${person.alert}/100）；恐惧值：${person.fear}/100。恐惧满值后再次受击会倒地"><span class="chip-alert-label">警戒度：${awarenessLabel(person.alert)}</span><small class="chip-fear">恐惧值：${person.fear}/100</small></span>`;
+      : `<span class="chip-alert ${alertLevel}" title="警戒度：${awarenessLabel(person.alert)}（${person.alert}/100）；恐惧值：${person.fear}/100。恐惧满值后再次受击会倒地"><b>警戒 ${person.alert}</b><i>恐惧 ${person.fear}</i></span>`;
   const bleedLeft = Math.max(0, BLEEDOUT_TURNS - person.downedTurns);
   const stateMark =
     health === 'downed'

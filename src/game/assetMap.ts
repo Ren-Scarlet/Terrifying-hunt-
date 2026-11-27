@@ -60,7 +60,7 @@ export const ASSET_PATHS: AssetPaths = {
     trail: 'assets/ui/trail.webp',
     executionSite: 'assets/ui/特殊处决地点.webp',
     madness: 'assets/ui/神经紊乱2.webp',
-    statusInjured: 'assets/ui/受伤状态.webp', statusDowned: 'assets/ui/倒地状态.webp', statusBlind: 'assets/ui/障目.webp',
+    statusInjured: 'assets/ui/重伤.webp', statusDowned: 'assets/ui/倒地状态.webp', statusBlind: 'assets/ui/障目.webp',
     statusUndetectable: 'assets/ui/无法侦测.webp', statusBlocked: 'assets/ui/无法行动.webp',
     statusDanger: 'assets/ui/危险.webp', statusDeepWound: 'assets/ui/深度伤口.webp',
     statusBleed: 'assets/ui/流血.webp', statusOblivious: 'assets/ui/浑然不觉.webp',

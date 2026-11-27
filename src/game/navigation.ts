@@ -25,6 +25,20 @@ export function roomDistance(from: RoomId, to: RoomId): number {
   return 99;
 }
 
+/**
+ * 两间房在布局网格上的「空隔格数」：0 = 只隔一堵墙（相邻），1 = 中间空一格，依此类推。
+ * 用房间边缘算而不是中心点——大厅、走廊这种大房间中心离得很远，但它们在图上明明贴着。
+ * 没有格子信息时返回 99。
+ */
+export function cellDistance(from: RoomId, to: RoomId): number {
+  const a = ROOM_MAP[from]?.cell;
+  const b = ROOM_MAP[to]?.cell;
+  if (!a || !b || (a.width === 0 && a.height === 0) || (b.width === 0 && b.height === 0)) return 99;
+  const gapX = Math.max(0, a.left - (b.left + b.width), b.left - (a.left + a.width));
+  const gapY = Math.max(0, a.top - (b.top + b.height), b.top - (a.top + a.height));
+  return Math.max(gapX, gapY);
+}
+
 /** 从候选房间中选择离起点最近的一间。 */
 export function nearestOf(from: RoomId, candidates: RoomId[]): RoomId {
   let best = candidates[0];

@@ -4,6 +4,7 @@ import { nearestOf, roomDistance } from './navigation';
 import { awarenessStage, myersStalkGain } from './npc/awareness';
 import {
   blinkRangeOf,
+  blinkWithinRange,
   hatchetDamageOf,
   hatchetMax,
   modifierValue,
@@ -4018,10 +4019,9 @@ function huntressTargetable(state: GameState, person: Person): boolean {
 
 export function blinkPlayer(state: GameState, room: RoomId): boolean {
   if (state.killer !== '护士' || !state.nurseBlinkTargeting) return false;
-  const distance = roomDistance(state.playerRoom, room);
   const maxRange = blinkRangeOf(state);
-  if (room === state.playerRoom || distance < 1 || distance > maxRange || state.energy < 1) {
-    log(state, `闪现目标必须在 1–${maxRange} 间房距离内，且需要 1 点行动点。`);
+  if (!blinkWithinRange(state, room) || state.energy < 1) {
+    log(state, `闪现目标必须在 ${maxRange} 格内的任意房间，且需要 1 点行动点。`);
     return false;
   }
   const from = ROOM_MAP[state.playerRoom].rect;
@@ -4125,7 +4125,7 @@ export function canUsePower(state: GameState, powerId: string): boolean {
     if (state.killer !== '护士') return false;
     if (state.nurseBlinkTargeting) return true;
     if (state.nurseFollowUp || state.energy < 1) return false;
-    return ROOMS.some((room) => room.id !== state.playerRoom && roomDistance(state.playerRoom, room.id) <= blinkRangeOf(state));
+    return ROOMS.some((room) => blinkWithinRange(state, room.id));
   }
   if (powerId === 'huntress_axe') {
     if (state.killer !== '女猎手' || state.energy < 1) return false;
@@ -4204,7 +4204,7 @@ export function usePower(state: GameState, powerId: string): boolean {
     }
     if (!canUsePower(state, powerId)) { log(state, powerBlockReason(state, powerId) || '当前无法闪现。'); return false; }
     state.nurseBlinkTargeting = true;
-    log(state, `选择地图上 1–${blinkRangeOf(state)} 间房距离内的目标位置；闪现后可立即攻击同屋站立幸存者。`);
+    log(state, `选择地图上 ${blinkRangeOf(state)} 格内的任意位置；闪现后可立即攻击同屋站立幸存者。`);
     return true;
   }
   if (powerId === 'huntress_axe') {
