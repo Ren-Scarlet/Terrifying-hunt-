@@ -1248,24 +1248,26 @@ app.addEventListener('click', (event) => {
   }
 
   if (action === 'play') {
+    const currentGame = game;
+    if (!currentGame || screen !== 'game') return;
     const ghosts = captureAttackGhosts();
-    const killsBefore = game.kills;
-    const survivorIdsBefore = new Set(game.people.filter((person) => person.role !== 'police').map((person) => person.id));
-    const oldLogs = new Set(game.log);
+    const killsBefore = currentGame.kills;
+    const survivorIdsBefore = new Set(currentGame.people.filter((person) => person.role !== 'police').map((person) => person.id));
+    const oldLogs = new Set(currentGame.log);
     const cardUid = target.dataset.uid;
-    if (cardUid) playCard(game, cardUid);
-    if (game.kills > killsBefore) {
-      const deadId = [...survivorIdsBefore].find((id) => !game.people.some((person) => person.id === id));
+    if (cardUid) playCard(currentGame, cardUid);
+    if (currentGame.kills > killsBefore) {
+      const deadId = [...survivorIdsBefore].find((id) => !currentGame.people.some((person) => person.id === id));
       if (deadId) playSurvivorDeath(SURVIVOR_MAP[deadId]?.gender ?? 'male');
-      lastLogHead = game.log[0] ?? '';
+      lastLogHead = currentGame.log[0] ?? '';
     }
-    const newLogs = game.log.filter((line) => !oldLogs.has(line));
-    if (game.lastAttackedId && newLogs.some((line) => line.includes('你挥刀砍向') || line.includes('你俯身补上一刀'))) {
-      pendingMapAttackTarget = game.lastAttackedId;
-      pendingMapAttackGhost = ghosts.get(game.lastAttackedId) ?? null;
-      updateAttackGhostEscapeDirection(pendingMapAttackGhost, game.lastAttackedId);
-      if (survivorIdsBefore.has(game.lastAttackedId)) playSurvivorHit(SURVIVOR_MAP[game.lastAttackedId]?.gender ?? 'male');
-      playKillerAttackSound(game);
+    const newLogs = currentGame.log.filter((line) => !oldLogs.has(line));
+    if (currentGame.lastAttackedId && newLogs.some((line) => line.includes('你挥刀砍向') || line.includes('你俯身补上一刀'))) {
+      pendingMapAttackTarget = currentGame.lastAttackedId;
+      pendingMapAttackGhost = ghosts.get(currentGame.lastAttackedId) ?? null;
+      updateAttackGhostEscapeDirection(pendingMapAttackGhost, currentGame.lastAttackedId);
+      if (survivorIdsBefore.has(currentGame.lastAttackedId)) playSurvivorHit(SURVIVOR_MAP[currentGame.lastAttackedId]?.gender ?? 'male');
+      playKillerAttackSound(currentGame);
     }
     playSfx('click');
     afterAction();
