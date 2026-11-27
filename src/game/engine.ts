@@ -1679,6 +1679,7 @@ export function canPlaceBarricade(state: GameState, person: Person): boolean {
 function barricadeRoom(state: GameState, person: Person): boolean {
   if (!canPlaceBarricade(state, person)) return false;
   person.intent = 'barricade';
+  state.palletDropCount = (state.palletDropCount ?? 0) + 1;
   person.activity = '放下木板堵住入口';
   state.barricades.push(person.room);
   log(state, person.name + ' 在原有障碍房间放下木板，封住了' + roomName(person.room) + '的入口！地图已标记木板位置。');

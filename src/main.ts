@@ -650,6 +650,7 @@ function sfxFromLogs(): void {
 let freshSightings = 0;
 /** 上一次「气场显形」的幸存者签名与全局气场计数：心跳只在气场出现/刷新时响一次。 */
 let lastAuraSignature = '';
+let lastPalletDropCount = 0;
 let lastAuraActions = 0;
 
 /**
@@ -693,6 +694,10 @@ function announceNewSightings(): void {
 
 function afterAction(): void {
   pulseFeedback();
+  if (game && (game.palletDropCount ?? 0) > lastPalletDropCount) {
+    lastPalletDropCount = game.palletDropCount ?? 0;
+    playSfx('palletDrop');
+  }
   announceNewSightings();
   pulseAuraHeartbeat();
   sfxFromLogs();
@@ -739,6 +744,7 @@ function startGame(freeHunt = false, loadout: string[] = []): void {
   freshSightings = 0;
   lastAuraSignature = '';
   lastAuraActions = 0;
+  lastPalletDropCount = 0;
   if (qte) {
     window.clearTimeout(qte.timer);
     qte = null;

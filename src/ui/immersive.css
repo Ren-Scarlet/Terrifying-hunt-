@@ -3150,3 +3150,81 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
   border-color: rgba(255, 210, 74, .8);
   color: #ffd24a;
 }
+
+
+/* ------------------------------------------------------------------ */
+/* 地图物件：容器不挡路，但物件本身要能悬停/点击（逃生点、处决点、道具箱） */
+/* ------------------------------------------------------------------ */
+#app.immersive-game .floorplan .room-features { pointer-events: none !important; }
+#app.immersive-game .floorplan .room-features .room-feature {
+  pointer-events: auto !important;
+}
+
+/* 幸存者头像：不放圆框、不发光，只保留头像本身 */
+#app.immersive-game .floorplan .room-people .person-chip,
+#app.immersive-game .floorplan .room-people .person-chip:hover,
+#app.immersive-game .floorplan .room-people .person-chip.can-hit,
+#app.immersive-game .floorplan .room-people .person-chip.marked,
+#app.immersive-game .floorplan .room-people .person-chip.attack-hit,
+#app.immersive-game .floorplan .room-people .person-chip.target {
+  border: 0 !important;
+  box-shadow: none !important;
+  background: none !important;
+  filter: none !important;
+  animation: none !important;
+}
+#app.immersive-game .floorplan .room-people,
+#app.immersive-game .floorplan .room-people.adjacent-survivors {
+  box-shadow: none !important;
+  filter: none !important;
+}
+
+/* 头像按房间放大：小 34 / 中 46 / 大 58 */
+#app.immersive-game .floorplan .room.room-size-small .room-people .person-chip .person-avatar-wrap {
+  width: 34px !important; height: 34px !important; flex: 0 0 34px !important;
+}
+#app.immersive-game .floorplan .room.room-size-medium .room-people .person-chip .person-avatar-wrap {
+  width: 46px !important; height: 46px !important; flex: 0 0 46px !important;
+}
+#app.immersive-game .floorplan .room.room-size-large .room-people .person-chip .person-avatar-wrap,
+#app.immersive-game .floorplan .room.room-size-open .room-people .person-chip .person-avatar-wrap {
+  width: 58px !important; height: 58px !important; flex: 0 0 58px !important;
+}
+#app.immersive-game .floorplan .room-people .person-chip .person-avatar-wrap .person-avatar {
+  width: 100% !important; height: 100% !important; flex: 0 0 auto !important;
+}
+
+/* 倒地/受伤：头像正下方直接显示图标，没有圆框 */
+#app.immersive-game .floorplan .room-people .person-chip .chip-state {
+  left: 50% !important;
+  top: auto !important;
+  bottom: -22px !important;
+  transform: translateX(-50%) !important;
+  width: auto !important;
+  height: auto !important;
+  min-width: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  z-index: 40 !important;
+}
+#app.immersive-game .floorplan .room-people .person-chip .chip-state .chip-state-icon {
+  width: 26px !important;
+  height: 26px !important;
+  filter: drop-shadow(0 0 4px rgba(0, 0, 0, .9));
+}
+#app.immersive-game .floorplan .room-people .person-chip .chip-state b {
+  display: none !important;
+}
+
+/* 被放下的木板：堵路房间整间橙色高亮，一眼能看到 */
+#app.immersive-game .floorplan .room.barricaded {
+  box-shadow: inset 0 0 0 2px rgba(231, 161, 93, .85), inset 0 0 26px rgba(231, 120, 60, .35) !important;
+  background-color: rgba(120, 62, 20, .12) !important;
+}
+#app.immersive-game .floorplan .room.barricaded .room-feature.pallet {
+  filter: drop-shadow(0 0 6px rgba(255, 150, 70, .95)) !important;
+  opacity: 1 !important;
+}

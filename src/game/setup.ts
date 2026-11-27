@@ -225,6 +225,7 @@ export function createGame(
     totems: [...TOTEM_ROOMS],
     phones: [],
     crows: [],
+    palletDropCount: 0,
     crowAlerts: {},
     brokenPhones: [],
     totemInteractions: [],

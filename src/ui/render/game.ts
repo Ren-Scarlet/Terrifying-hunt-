@@ -460,9 +460,9 @@ function roomActionsHtml(state: GameState, roomId: RoomId): string {
 function personSlot(roomId: RoomId, personId: string, index: number): { x: number; y: number } {
   let hash = 0;
   for (const ch of roomId + personId) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
-  const x = 24 + (hash % 52) + (index % 3) * 4;
-  const y = 46 + ((hash >> 9) % 22) + Math.floor(index / 3) * 6;
-  return { x: Math.min(84, x), y: Math.min(74, y) };
+  const x = 34 + (hash % 32) + (index % 3) * 4;
+  const y = 44 + ((hash >> 9) % 18) + Math.floor(index / 3) * 5;
+  return { x: Math.min(72, x), y: Math.min(68, y) };
 }
   const rooms = ROOMS.map((room) => {
     const visible = isRoomVisible(state, room.id);
