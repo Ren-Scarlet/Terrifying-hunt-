@@ -34,7 +34,44 @@ let taskDrawerOpen = false;
 let intelDrawerOpen = false;
 let hudHidden = false;
 let handOpen = true;
+let intelPanelPosition: { left: number; top: number } | null = null;
 
+function bindIntelPanelDrag(): void {
+  const panel = root?.querySelector<HTMLElement>('.hunt-sidebar-left');
+  const handle = panel?.querySelector<HTMLElement>('.intel-drag-handle');
+  if (!panel || !handle || handle.dataset.dragBound === 'true') return;
+  handle.dataset.dragBound = 'true';
+  handle.addEventListener('pointerdown', (event: PointerEvent) => {
+    if ((event.target as HTMLElement).closest('button')) return;
+    const rect = panel.getBoundingClientRect();
+    handle.dataset.dragPointer = String(event.pointerId);
+    handle.dataset.dragStartX = String(event.clientX);
+    handle.dataset.dragStartY = String(event.clientY);
+    handle.dataset.dragLeft = String(rect.left);
+    handle.dataset.dragTop = String(rect.top);
+    try { handle.setPointerCapture(event.pointerId); } catch { /* Ignore unsupported pointer capture. */ }
+    event.preventDefault();
+  });
+  handle.addEventListener('pointermove', (event: PointerEvent) => {
+    if (handle.dataset.dragPointer !== String(event.pointerId)) return;
+    const left = Number(handle.dataset.dragLeft) + event.clientX - Number(handle.dataset.dragStartX);
+    const top = Number(handle.dataset.dragTop) + event.clientY - Number(handle.dataset.dragStartY);
+    const nextLeft = clamp(left, 8, Math.max(8, window.innerWidth - panel.offsetWidth - 8));
+    const nextTop = clamp(top, 8, Math.max(8, window.innerHeight - panel.offsetHeight - 8));
+    intelPanelPosition = { left: nextLeft, top: nextTop };
+    panel.style.left = String(nextLeft) + 'px';
+    panel.style.top = String(nextTop) + 'px';
+    panel.style.right = 'auto';
+    panel.style.transform = 'none';
+  });
+  const stop = (event: PointerEvent): void => {
+    if (handle.dataset.dragPointer !== String(event.pointerId)) return;
+    delete handle.dataset.dragPointer;
+    try { handle.releasePointerCapture(event.pointerId); } catch { /* Already released. */ }
+  };
+  handle.addEventListener('pointerup', stop);
+  handle.addEventListener('pointercancel', stop);
+}
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
@@ -155,6 +192,14 @@ export function syncImmersiveCamera(nextRoot: HTMLElement): void {
   root.querySelector<HTMLElement>('.task-detail-drawer')?.classList.toggle('open', taskDrawerOpen);
   const intel = root.querySelector<HTMLDetailsElement>('.intel-drawer');
   if (intel) intel.open = intelDrawerOpen;
+  bindIntelPanelDrag();
+  const intelPanel = root.querySelector<HTMLElement>('.hunt-sidebar-left');
+  if (intelPanel && intelPanelPosition) {
+    intelPanel.style.left = String(intelPanelPosition.left) + 'px';
+    intelPanel.style.top = String(intelPanelPosition.top) + 'px';
+    intelPanel.style.right = 'auto';
+    intelPanel.style.transform = 'none';
+  }
   root.classList.toggle('hud-hidden', hudHidden);
   root.classList.toggle('hand-collapsed', !handOpen);
   const handToggle = root.querySelector<HTMLButtonElement>('[data-action="toggle-hand"]');
