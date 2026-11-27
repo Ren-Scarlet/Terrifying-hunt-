@@ -1847,3 +1847,141 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
   76% { opacity: .62; filter: brightness(.58) sepia(1) saturate(2); transform: translate(var(--escape-near-x,8px),var(--escape-near-y,0px)) scale(.92); }
   100% { opacity: 0; filter: brightness(.48) sepia(1) saturate(2); transform: translate(var(--escape-x, 8px),var(--escape-y, 0px)) scale(.86); }
 }
+
+
+/* 2026-11-27: make in-world props hoverable/clickable instead of letting the room title steal pointer events. */
+#app.immersive-game .floorplan .room-features { pointer-events: auto !important; }
+#app.immersive-game .floorplan .room-features .room-feature { pointer-events: auto !important; }
+#app.immersive-game .floorplan .room-features button.room-feature { cursor: pointer; }
+#app.immersive-game .floorplan .room-features button.room-feature:disabled { cursor: help; opacity: .72; }
+#app.immersive-game .floorplan .room-prop-hotspots {
+  position: absolute; inset: 0; z-index: 2; pointer-events: none;
+}
+#app.immersive-game .floorplan .room-prop-hotspot {
+  position: absolute; display: block; min-width: 0; min-height: 0;
+  margin: 0; padding: 0; border: 1px solid transparent; border-radius: 4px;
+  background: transparent; box-shadow: none; opacity: 1; pointer-events: auto;
+  cursor: help; z-index: 2;
+}
+#app.immersive-game .floorplan .room-prop-hotspot:hover,
+#app.immersive-game .floorplan .room-prop-hotspot:focus-visible {
+  border-color: rgba(226,188,139,.72);
+  background: rgba(223,179,126,.08);
+  box-shadow: inset 0 0 10px rgba(223,179,126,.12), 0 0 8px rgba(223,179,126,.12);
+  outline: none;
+}
+#app.immersive-game .floorplan .room-prop-hotspot[data-prop="fridge"] { cursor: pointer; }
+
+/* Remove the obsolete AP strip; the live AP counter remains beside the hand. */
+#app.immersive-game .left-hud { display: none !important; }
+#app.immersive-game .right-tools { left: 20px !important; right: auto !important; }
+#app.immersive-game .hunt-sidebar.hunt-sidebar-left {
+  left: 70px !important; right: auto !important; top: 50% !important;
+  transform: translateY(-50%) !important;
+}
+#app.immersive-game .intel-drag-handle {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 12px; cursor: grab; user-select: none; touch-action: none;
+  border-bottom: 1px solid rgba(205,222,231,.13);
+  color: #e5d9d0; font-size: 12px;
+}
+#app.immersive-game .intel-drag-handle:active { cursor: grabbing; }
+#app.immersive-game .intel-drag-handle > div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+#app.immersive-game .intel-drag-handle b { font-size: 12px; letter-spacing: .08em; }
+#app.immersive-game .intel-drag-handle small { color: #98a6ad; font-size: 9px; }
+#app.immersive-game .intel-close {
+  flex: 0 0 26px; width: 26px; height: 26px; min-height: 26px; padding: 0;
+  border: 1px solid rgba(205,222,231,.2); border-radius: 5px;
+  background: rgba(10,15,19,.8); color: #d6c6ba; font-size: 18px; line-height: 1;
+}
+#app.immersive-game .intel-close:hover { background: rgba(110,38,39,.85); }
+#app.immersive-game .hunt-sidebar.hunt-sidebar-left .intel-grid {
+  max-height: 68vh; overflow: auto; overscroll-behavior: contain;
+}
+@media(max-width:700px) {
+  #app.immersive-game .hunt-sidebar.hunt-sidebar-left { left: 54px !important; width: min(300px,calc(100vw - 64px)); }
+}
+
+/* Real inline symbols: the icon no longer depends on CSS pseudo-element glyphs. */
+#app.immersive-game .killer-power-grid .power-art {
+  display: grid !important; place-items: center !important;
+  width: 30px !important; height: 30px !important; flex: 0 0 30px !important;
+  visibility: visible !important; opacity: 1 !important; overflow: visible !important;
+}
+#app.immersive-game .killer-power-grid .power-art::after { content: none !important; display: none !important; }
+#app.immersive-game .killer-power-grid .power-art .power-symbol {
+  display: grid !important; place-items: center !important;
+  width: 100%; height: 100%; color: #f0dfd2 !important;
+  font-family: "Segoe UI Symbol","Noto Sans Symbols 2","Arial Unicode MS",sans-serif;
+  font-size: 25px; font-weight: 700; line-height: 1;
+  text-shadow: 0 1px 7px rgba(0,0,0,.95), 0 0 8px rgba(207,151,117,.35);
+  visibility: visible !important; opacity: 1 !important;
+}
+#app.immersive-game .killer-power-grid .btn.power:disabled .power-symbol { color: #8d8179 !important; opacity: .55 !important; }
+
+/* Slightly enlarge only the killer artwork, without changing the HUD layout. */
+#app.immersive-game .killer-face.ability-portrait img {
+  transform: scale(1.15); transform-origin: bottom center;
+}
+
+/* Newest footprints stay bright; older ones recede and disappear sooner. */
+#app.immersive-game .floorplan .footprint {
+  opacity: var(--trail-opacity,.92) !important;
+  transition: opacity .2s ease, filter .2s ease;
+}
+#app.immersive-game .floorplan .footprint.age-1 {
+  filter: drop-shadow(0 0 2px rgba(255,190,145,.5)) drop-shadow(0 0 4px rgba(255,90,48,.45));
+}
+#app.immersive-game .floorplan .footprint.age-2 {
+  filter: drop-shadow(0 0 1px rgba(255,145,105,.28)) drop-shadow(0 0 2px rgba(200,55,30,.3));
+}
+#app.immersive-game .floorplan .footprint.age-3 { filter: none; }
+
+/* Special executions receive a brief physical beat and an in-world narrative bubble. */
+#app.immersive-game .room .execution-scene-overlay {
+  position: absolute; inset: 0; z-index: 12; pointer-events: none;
+}
+#app.immersive-game .execution-scene-flash {
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse at 50% 54%,rgba(165,18,22,.58),rgba(80,7,10,.2) 35%,transparent 72%);
+  animation: executionFlash 1.1s ease-out both;
+}
+#app.immersive-game .execution-scene-figure {
+  position: absolute; left: 50%; top: 61%; width: 25px; height: 48px;
+  border-radius: 48% 48% 28% 28%; background: linear-gradient(90deg,#09090b,#343034 52%,#09090b);
+  box-shadow: 0 0 18px rgba(0,0,0,.95); transform: translate(-50%,-50%);
+  animation: executionFall 1.45s cubic-bezier(.2,.7,.25,1) both;
+}
+#app.immersive-game .execution-scene-figure::before {
+  content: ""; position: absolute; left: 50%; top: -12px; width: 17px; height: 17px;
+  border-radius: 50%; background: #161316; transform: translateX(-50%);
+}
+#app.immersive-game .execution-scene-figure::after {
+  content: ""; position: absolute; left: -12px; right: -12px; bottom: 4px; height: 5px;
+  border-radius: 50%; background: rgba(105,5,10,.72); filter: blur(4px);
+}
+#app.immersive-game .execution-scene-bubble {
+  position: absolute; left: 50%; top: 5%; width: min(300px,82%);
+  transform: translateX(-50%); padding: 9px 12px;
+  border: 1px solid rgba(190,92,75,.72); border-radius: 8px;
+  color: #eadbd3; background: linear-gradient(145deg,rgba(25,12,14,.96),rgba(7,8,10,.94));
+  box-shadow: 0 8px 26px rgba(0,0,0,.78),0 0 18px rgba(128,15,19,.25);
+  text-align: left; animation: executionBubbleIn .35s ease-out both;
+}
+#app.immersive-game .execution-scene-bubble b {
+  display: block; margin-bottom: 4px; color: #e8a18c; font-size: 11px; letter-spacing: .08em;
+}
+#app.immersive-game .execution-scene-bubble p {
+  margin: 0; color: #d8cbc3; font-size: 10px; line-height: 1.55;
+}
+@keyframes executionFlash { 0%{opacity:0} 12%{opacity:1} 100%{opacity:0} }
+@keyframes executionFall {
+  0%{opacity:0;transform:translate(-50%,-42%) rotate(0) scale(1.05)}
+  18%{opacity:1;transform:translate(-50%,-50%) rotate(-7deg) scale(1)}
+  52%{opacity:1;transform:translate(-50%,-30%) rotate(38deg) scale(.92)}
+  100%{opacity:0;transform:translate(-50%,4%) rotate(86deg) scale(.72)}
+}
+@keyframes executionBubbleIn {
+  0%{opacity:0;filter:blur(4px);margin-top:8px}
+  100%{opacity:1;filter:blur(0);margin-top:0}
+}
