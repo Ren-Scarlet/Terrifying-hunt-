@@ -1913,6 +1913,7 @@ export function triggerBearTrapForPerson(state: GameState, person: Person): void
   }
   trap.armed = false;
   trap.triggeredBy = person.id;
+  trap.triggeredTurn = state.turn;
   state.huntStats.trapTriggers += 1;
   state.trapTriggerCount += 1;
   person.trapTriggered = true;
