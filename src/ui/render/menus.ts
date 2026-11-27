@@ -1,9 +1,21 @@
 import { CARDS, deckCardsForKiller } from '../../game/cards';
-import { BASE_AP } from '../../game/engine';
+import {
+  BASE_AP,
+  ATTACK_COST,
+  WIPE_COST,
+  SCORE_EXECUTION_THRESHOLD,
+  SCORE_RULES,
+  DAWN_PHASE_TURNS,
+  DAWN_ALARM_GAIN,
+  DAWN_ALERT_GAIN,
+  DAWN_LATE_ALARM,
+} from '../../game/engine';
+import { SURVIVOR_MAX_HP } from '../../game/constants';
+import { CONTRACT_TURNS } from '../../game/missions';
 import { ACTIVE_KILLERS } from '../../game/killers';
 import type { SaveData } from '../../game/types';
 import { currentMenuMap, mapArtSrc } from '../mapArt';
-import { detailCardHtml, escape, getKiller, icon, killerFaceHtml, perkIconHtml, powerIconHtml } from './shared';
+import { detailCardHtml, escape, getKiller, icon, killerFaceHtml, perkIconHtml, powerIconHtml, TYPE_NAMES } from './shared';
 
 export function renderMenu(save: SaveData, ante = false): string {
   const killer = getKiller(save.killer);
@@ -95,23 +107,114 @@ export function renderMenu(save: SaveData, ante = false): string {
   `;
 }
 
+/**
+ * 玩法指引：由数据生成，而不是手写文案。
+ * 卡牌来自 CARDS、杀手来自 ACTIVE_KILLERS、数值来自引擎常量与 SCORE_RULES，
+ * 所以改玩法后指南不会过期。
+ */
 export function renderGuide(): string {
+  const cardRows = ['attack', 'skill', 'tactic', 'setup']
+    .map((type) => {
+      const list = CARDS.filter((card) => card.type === type);
+      if (!list.length) return '';
+      const items = list.map((card) => `${escape(card.name)}<i>${card.cost}费</i>`).join('');
+      return `<div class="g-row"><b>${TYPE_NAMES[type] ?? type}</b><span>${items}</span></div>`;
+    })
+    .join('');
+
+  const killerRows = ACTIVE_KILLERS.map((killer) => {
+    const powers = killer.powers
+      .map((power) => `${escape(power.name)}${power.ultimate ? '（大招）' : ''}<i>CD ${power.cooldown}</i>`)
+      .join('');
+    return `<div class="g-row"><b>${escape(killer.owner)}</b><span>${powers}</span></div>`;
+  }).join('');
+
+  const R = SCORE_RULES;
+  const scoreRows: Array<[string, string]> = [
+    ['击杀 1 人', `+${R.kill}`],
+    ['处决 1 次', `+${R.execution}`],
+    ['处决方式每多 1 种', `+${R.executionVariety}`],
+    ['连杀（同回合第 2 人起）', `+${R.comboKill}`],
+    ['击杀已恐惧崩溃的目标', `+${R.terrorKill}`],
+    ['全程无人成功报警', `+${R.noAlarm}`],
+    [`结束时警报低于 ${R.lowAlarmBelow}`, `+${R.lowAlarm}`],
+    ['无目击猎杀', `+${R.quietKill}/次，上限 ${R.quietKillCap}`],
+    ['用过 3 种卡后，每多 1 种', `+${R.cardVarietyStep}，上限 ${R.cardVarietyCap}`],
+    ['胜利结算每剩余 1 回合', `+${R.efficiencyPerTurn}`],
+    ['加注达成', '契约分 +60%'],
+    ['逃走 1 人', `−${R.escapePenalty}`],
+    ['被警察抓捕 / 超时 / 失败', `−${R.caught} / −${R.timeout} / −${R.failed}`],
+  ];
+  const scoreTable = scoreRows.map(([label, value]) => `<div class="g-tr"><span>${label}</span><b>${value}</b></div>`).join('');
+
   return `
     <div class="overlay">
       <div class="modal guide-modal">
-        <div class="subtitle">FIELD MANUAL</div>
-        <h1>玩法<span>指引</span></h1>
-        <div class="guide-grid">
-          <div class="guide-card">${icon('mission')}<b>1 · 接取契约</b><p>点击准备开始后才会随机抽取契约。每种契约有不同的主目标；牌组在大厅提前构筑，不能预览契约后再针对性换牌。主目标可能要求指定击杀、累计猎杀、处决、破坏电闸或阻止报警；任务栏会持续显示目标和实时进度。</p></div>
-          <div class="guide-card">${icon('darkCell')}<b>2 · 现场布局</b><p>布局牌（绿色）在行动阶段打出：剪断电话线、封死逃生点、装窃听。布局打早了才有用。</p></div>
-          <div class="guide-card">${icon('escape')}<b>3 · 相邻只看轮廓，推门才是照面</b><p>隔壁房间<b>看得见名字、看不见人</b>——找人得自己走过去，或者靠侦查 / 感知牌。推门会引起注意，但<b>警觉达到 75 才会立即逃跑</b>；低警觉者会先观察、怀疑。<b>暗处能显著降低察觉速度</b>，切断照明、控制动静可以创造接近机会。先打<b>静止隐身</b>再进入，若目标独处且尚未察觉，第一刀会造成 2 点伤害，打开<b>致命窗口</b>。跑掉的人留下<b>鞋印</b>；更远的地方会传来<b>乌鸦叫、地板响</b>。</p></div>
-          <div class="guide-card">${icon('bloodPoint')}<b>4 · 行动点、脚印与杀戮</b><p>每回合 <b>${BASE_AP} 点行动点</b>：走路、挥刀、出牌、<b>搜索柜子</b>全从这一个池子里扣；砍完想立刻再砍，就花 1 点<b>擦刀</b>——但擦刀时幸存者也会跟着动。普通攻击只针对站立目标。倒地者可以使用独立的<b>普通处决</b>按钮（1 AP），或抱起后搬运到指定地点执行<b>地点处决</b>；猎杀评分达到 200 分后，倒地者头顶还会出现独立的<b>分数处决 QTE</b>按钮。若暂时放过，同伴仍可能救援；有人钻进柜子就点<b>搜索</b>翻出来。<b>鞋印</b>只看得见当前房间，严格踩着它连续追才攒<b>杀戮</b>，满 50 后每回合多 2 点行动点。砍中人或被击晕清零。</p></div>
-          <div class="guide-card">${icon('missionTarget')}<b>5 · 幸存者会做出反应</b><p>幸存者根据性格报警、躲藏、寻找武器、救援同伴、前往补给点或修复断电区域；他们的行动会改变现场局势并制造线索。老练的家伙偶尔会踮着脚走，不惊动乌鸦，但移动路线仍会留下脚印。</p></div>
+        <div class="guide-head">
+          <div class="subtitle">FIELD MANUAL</div>
+          <h1>玩法<span>指引</span></h1>
+          <p>你是这栋房子的东西，不是被追的人。目标不是"活下去"，而是<b>用最漂亮的方式完成契约，并且拿到更高的分</b>。</p>
         </div>
-        <div class="guide-note">
-          ${icon('totem', 'ui-icon tiny')} 图腾：在此结束回合，下回合 +1 行动点。
-          ${icon('cabinet', 'ui-icon tiny')} 柜子：幸存者可以躲藏，女猎手可在柜子补充飞斧。
-          ${icon('obstacle', 'ui-icon tiny')} 木板：幸存者只能在原有障碍房间放下木板；地图会用橙色高亮标记，靠近后花费 1 AP 破坏。
+        <div class="guide-body">
+          <section class="g-sec">
+            <h2>1 · 一局怎么走</h2>
+            <ol class="g-steps">
+              <li><b>接契约</b>：点「准备开始」后随机抽取，主目标可能是指定击杀、累计击杀、处决、破坏电闸或阻止报警。</li>
+              <li><b>潜伏接近</b>：隔壁只看得到名字、看不到人。黑暗会降低对方的察觉速度，但你也看不清。</li>
+              <li><b>制造恐惧</b>：杀戮、尖叫、断电、独处都会推高幸存者的恐惧；吓崩的人会僵住或乱跑。</li>
+              <li><b>收人</b>：两刀放倒，再补一次处决。处决方式越多样，分数越高。</li>
+              <li><b>结算</b>：主目标完成后可以立刻结算，也可以继续做额外挑战——但天亮会持续推进。</li>
+            </ol>
+          </section>
+
+          <section class="g-sec">
+            <h2>2 · 回合、行动点与天亮</h2>
+            <p>契约共 <b>${CONTRACT_TURNS} 回合</b>，每回合 <b>${BASE_AP} 点行动点</b>。走路、挥刀、擦刀、搜索、出牌、抽牌都从这一个池子里扣。</p>
+            <p><b>天亮</b>：每 ${DAWN_PHASE_TURNS} 回合推进一个阶段，跨阶段时警报 +${DAWN_ALARM_GAIN}、全场警觉 +${DAWN_ALERT_GAIN}；最后 ${DAWN_PHASE_TURNS} 回合每回合再额外 +${DAWN_LATE_ALARM}。拖得越久越危险。</p>
+            <p><b>杀戮值</b>：严格踩着脚印连续追才涨，满了每回合多行动点；砍中人或被击晕会清零。</p>
+          </section>
+
+          <section class="g-sec">
+            <h2>3 · 挥刀与处决</h2>
+            <p>幸存者 ${SURVIVOR_MAX_HP} 点生命：<b>一刀受伤、两刀倒地</b>。挥刀消耗 ${ATTACK_COST} AP，砍完要擦刀（${WIPE_COST} AP）或做别的事才能再砍。</p>
+            <p>倒地后有三种处理：<b>普通处决</b>（1 AP）、<b>搬运到地点处决</b>（6 种地点，加分更多）、以及评分达到 ${SCORE_EXECUTION_THRESHOLD} 后的<b>分数处决</b>（独立按钮 + QTE）。</p>
+          </section>
+
+          <section class="g-sec">
+            <h2>4 · 恐惧：最划算的武器</h2>
+            <div class="g-bands">
+              <div><b>0–29 冷静</b><span>该干嘛干嘛：报警、找武器、救人</span></div>
+              <div><b>30–59 不安</b><span>开始结伴、远离黑暗</span></div>
+              <div><b>60–84 恐惧</b><span>只想跑，不再报警；被追时放板</span></div>
+              <div><b>85+ 崩溃</b><span>僵住或尖叫乱跑，补刀极佳</span></div>
+            </div>
+            <p>恐惧来源：目击死亡、被攻击、<b>独处</b>、<b>黑暗</b>；结伴 + 照明会回落。恐惧崩溃时补刀每次额外 +${R.terrorKill}。</p>
+          </section>
+
+          <section class="g-sec">
+            <h2>5 · 卡牌（${CARDS.length} 张）</h2>
+            <p>牌组 10–15 张，同名最多 3 张。费用从行动点扣，所以"这套牌能不能在同一回合连起来"比单卡强度更重要。</p>
+            <div class="g-rows">${cardRows}</div>
+          </section>
+
+          <section class="g-sec">
+            <h2>6 · 杀手与能力</h2>
+            <div class="g-rows">${killerRows}</div>
+          </section>
+
+          <section class="g-sec">
+            <h2>7 · 分数构成</h2>
+            <p>HUD 里点「得分构成 · 怎么加分」可以随时看当前明细。完整规则：</p>
+            <div class="g-table">${scoreTable}</div>
+          </section>
+
+          <section class="g-sec">
+            <h2>8 · 经济</h2>
+            <div class="g-rows">
+              <div class="g-row"><b>血点</b><span>完成任务获得，用于商店解锁卡牌</span></div>
+              <div class="g-row"><b>暗金细胞</b><span>胜利且评分 ≥150 时 +1，用于解锁杀手</span></div>
+            </div>
+          </section>
         </div>
         <div class="actions"><button class="btn primary" data-action="guide-close">知道了</button></div>
       </div>

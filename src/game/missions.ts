@@ -115,6 +115,9 @@ function optionalTasks(killer: string, required: MissionTask[]): MissionTask[] {
   return selected;
 }
 
+/** 契约回合上限（难度基准，同时也供游戏指南展示）。 */
+export const CONTRACT_TURNS = 20;
+
 /** 契约只在玩家点击「准备开始」时随机生成；不会先展示任务供玩家针对性改牌。
  *  kind 可选：测试与「指定契约」入口用，传了就只在该类型里选。 */
 export function generateMission(killer = '迈克尔·迈尔斯', kind?: MissionKind): Mission {
@@ -127,7 +130,7 @@ export function generateMission(killer = '迈克尔·迈尔斯', kind?: MissionK
     kind: definition.kind,
     title: definition.title,
     desc: definition.desc,
-    turns: 20,
+    turns: CONTRACT_TURNS,
     reward: definition.reward,
     targetCount: definition.targetCount,
     tasks,

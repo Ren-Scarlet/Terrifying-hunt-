@@ -89,12 +89,12 @@ export const TRAIL_TURNS = 3;
  */
 const TRAIL_ACTION_WINDOW = 5;
 /** 天亮阶段：每 5 回合推进一次，共 4 个阶段。 */
-const DAWN_PHASE_TURNS = 5;
+export const DAWN_PHASE_TURNS = 5;
 /** 每次跨阶段：警报 +4，全场幸存者警觉 +5。 */
-const DAWN_ALARM_GAIN = 4;
-const DAWN_ALERT_GAIN = 5;
+export const DAWN_ALARM_GAIN = 4;
+export const DAWN_ALERT_GAIN = 5;
 /** 最后 5 回合的收网：每回合额外警报 +2。 */
-const DAWN_LATE_ALARM = 2;
+export const DAWN_LATE_ALARM = 2;
 
 /**
  * 恐惧档位：恐惧不再只是数字，而是决定 NPC 这一回合会不会"失去理智"。
@@ -4181,7 +4181,33 @@ function huntActionScore(state: GameState): number {
 }
 
 /** 结算与实时分数共用同一份明细，避免「面板显示」和「实际得分」两套算法。 */
+/**
+ * 分数规则表：结算、实时面板与游戏指南共用同一份数值，避免文档与实现漂移。
+ */
+export const SCORE_RULES = {
+  kill: 14,
+  execution: 10,
+  executionVariety: 10,
+  terrorKill: 8,
+  comboKill: 12,
+  quietKill: 3,
+  quietKillCap: 10,
+  noAlarm: 25,
+  lowAlarm: 15,
+  lowAlarmBelow: 30,
+  cardVarietyStep: 3,
+  cardVarietyCap: 15,
+  efficiencyPerTurn: 5,
+  escapePenalty: 15,
+  alarmPenaltyDivisor: 5,
+  alarmPenaltyFrom: 60,
+  caught: 80,
+  timeout: 50,
+  failed: 40,
+} as const;
+
 export function scoreLines(state: GameState, result: ResultKind | null = null): ScoreLine[] {
+  const R = SCORE_RULES;
   const lines: ScoreLine[] = [];
   const add = (category: string, label: string, value: number) => {
     if (value !== 0) lines.push({ category, label, value });
@@ -4201,37 +4227,37 @@ export function scoreLines(state: GameState, result: ResultKind | null = null): 
   }
 
   // —— 猎杀 ——
-  add('猎杀', `击杀 ${state.kills} 人`, state.kills * 14);
-  add('猎杀', `处决 ${state.executions} 次`, state.executions * 10);
+  add('猎杀', `击杀 ${state.kills} 人`, state.kills * R.kill);
+  add('猎杀', `处决 ${state.executions} 次`, state.executions * R.execution);
   if (state.executionMethodsUsed.length > 1) {
-    add('猎杀', `处决方式多样性 · ${state.executionMethodsUsed.length} 种`, (state.executionMethodsUsed.length - 1) * 10);
+    add('猎杀', `处决方式多样性 · ${state.executionMethodsUsed.length} 种`, (state.executionMethodsUsed.length - 1) * R.executionVariety);
   }
-  add('猎杀', `恐惧崩溃击杀 · ${state.huntStats.terrorKills} 次`, state.huntStats.terrorKills * 8);
-  add('猎杀', `连杀 · ${state.huntStats.comboKills} 次`, state.huntStats.comboKills * 12);
+  add('猎杀', `恐惧崩溃击杀 · ${state.huntStats.terrorKills} 次`, state.huntStats.terrorKills * R.terrorKill);
+  add('猎杀', `连杀 · ${state.huntStats.comboKills} 次`, state.huntStats.comboKills * R.comboKill);
   add('猎杀', '地形处决奖励', state.specialExecutionBonus);
   add('猎杀', '卡牌猎杀奖励', state.cardBonusScore);
 
   // —— 潜行 ——
-  if (!state.npcAlarmed) add('潜行', '全程无人成功报警', 25);
-  if (state.alarm < 30) add('潜行', `低暴露度 · 警报 ${state.alarm}`, 15);
-  add('潜行', '无目击猎杀', Math.min(10, state.huntStats.quietKills * 3));
+  if (!state.npcAlarmed) add('潜行', '全程无人成功报警', R.noAlarm);
+  if (state.alarm < R.lowAlarmBelow) add('潜行', `低暴露度 · 警报 ${state.alarm}`, R.lowAlarm);
+  add('潜行', '无目击猎杀', Math.min(R.quietKillCap, state.huntStats.quietKills * R.quietKill));
 
   // —— 风格 ——
   add('风格', '策略猎杀 · 观察习惯、环境操作、陷阱与专属能力', huntActionScore(state));
   const uniqueCards = new Set(state.cardsPlayed).size;
-  if (uniqueCards >= 3) add('风格', `构筑多样性 · 用了 ${uniqueCards} 种卡`, Math.min(15, (uniqueCards - 2) * 3));
+  if (uniqueCards >= 3) add('风格', `构筑多样性 · 用了 ${uniqueCards} 种卡`, Math.min(R.cardVarietyCap, (uniqueCards - 2) * R.cardVarietyStep));
 
   // —— 效率（只在胜利结算时计入）——
   if (result === 'win' && state.mission.mode !== 'free') {
-    add('效率', `剩余 ${state.mission.turns - state.turn} 回合`, (state.mission.turns - state.turn) * 5);
+    add('效率', `剩余 ${state.mission.turns - state.turn} 回合`, (state.mission.turns - state.turn) * R.efficiencyPerTurn);
   }
 
   // —— 失分 ——
-  if (state.escaped > 0) add('失分', `逃走 ${state.escaped} 人（每人 -15）`, -state.escaped * 15);
-  if (state.alarm >= 60) add('失分', `暴露度 ${state.alarm} 的代价`, -Math.round(state.alarm / 5));
-  if (result === 'caught') add('失分', '被警察当场抓捕', -80);
-  else if (result === 'timeout') add('失分', '任务超时', -50);
-  else if (result && result !== 'win') add('失分', state.resultReason || '任务失败', -40);
+  if (state.escaped > 0) add('失分', `逃走 ${state.escaped} 人（每人 -${R.escapePenalty}）`, -state.escaped * R.escapePenalty);
+  if (state.alarm >= R.alarmPenaltyFrom) add('失分', `暴露度 ${state.alarm} 的代价`, -Math.round(state.alarm / R.alarmPenaltyDivisor));
+  if (result === 'caught') add('失分', '被警察当场抓捕', -R.caught);
+  else if (result === 'timeout') add('失分', '任务超时', -R.timeout);
+  else if (result && result !== 'win') add('失分', state.resultReason || '任务失败', -R.failed);
   return lines;
 }
 
