@@ -2296,3 +2296,29 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
   #app.immersive-game .killer-power-grid .power-art .power-icon { inset: 5px !important; width: calc(100% - 10px) !important; height: calc(100% - 10px) !important; }
   #app.immersive-game .killer-face.ability-portrait { width: 70px !important; height: 88px !important; flex-basis: 88px !important; }
 }
+
+
+/* First production HUD cleanup: remove the repetitive turn-by-turn pursuit coaching. */
+#app.immersive-game .play-status { display: none !important; }
+
+/* Keep task details directly beneath the upper-left objective / turn information. */
+#app.immersive-game .task-pop {
+  left: 23px !important;
+  right: auto !important;
+  top: 126px !important;
+  width: min(360px, calc(100vw - 46px)) !important;
+  max-height: min(58vh, 560px) !important;
+  overflow: auto !important;
+  padding: 15px 17px !important;
+}
+#app.immersive-game .task-pop.open {
+  display: block !important;
+}
+@media (max-width: 700px) {
+  #app.immersive-game .task-pop {
+    left: 12px !important;
+    top: 112px !important;
+    width: min(340px, calc(100vw - 24px)) !important;
+    max-height: 54vh !important;
+  }
+}
