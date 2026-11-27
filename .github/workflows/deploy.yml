@@ -1,6 +1,8 @@
-# 单一构建：正式站与 /preview/ 使用同一份产物。
-# 之前 /preview/ 单独从 feature/in-game-map-hud 构建，导致每次改动要推两次、两条分支还会漂移。
-# 现在只维护 main：推一次 main，正式站和 /preview/ 同时更新。
+# 正式站、原有 /preview/ 与独立 /mobile-preview/ 共用 Pages 部署。
+# PR 构建时：根目录和 /preview/ 始终来自 main；/mobile-preview/ 来自 PR 分支。
+# PR 不会把测试分支内容覆盖到正式根目录。
+
+name: Build and deploy GitHub Pages
 
 on:
   push:
@@ -9,47 +11,70 @@ on:
     branches: [main]
   workflow_dispatch:
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
 concurrency:
-  group: pages-${{ github.event_name }}-${{ github.ref }}
+  group: github-pages
   cancel-in-progress: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout production source (main)
+        uses: actions/checkout@v4
         with:
           ref: main
-          path: source
+          path: production
+
+      - name: Checkout mobile preview source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          path: mobile-source
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: source/package-lock.json
-      - name: Typecheck, rules and smoke
+          cache-dependency-path: |
+            production/package-lock.json
+            mobile-source/package-lock.json
+
+      - name: Install and validate production source
         run: |
-          npm ci --prefix source
-          npm run check --prefix source
-          npm run build --prefix source
-      - name: Publish to root and /preview/
+          npm ci --prefix production
+          npm run check --prefix production
+          npm run build --prefix production
+
+      - name: Install and validate mobile preview source
         run: |
-          mkdir -p dist/preview
-          cp -a source/dist/. dist/
-          cp -a source/dist/. dist/preview/
+          npm ci --prefix mobile-source
+          npm run check --prefix mobile-source
+          npm run build --prefix mobile-source
+
+      - name: Assemble isolated site paths
+        run: |
+          mkdir -p dist/preview dist/mobile-preview
+          cp -a production/dist/. dist/
+          cp -a production/dist/. dist/preview/
+          cp -a mobile-source/dist/. dist/mobile-preview/
+
       - uses: actions/configure-pages@v5
+
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
 
   deploy:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: >-
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
