@@ -159,8 +159,8 @@ function roomFeatures(state: GameState, roomId: RoomId): string {
   if (boardBlocksRoom) {
     const canBreak = ROOM_MAP[state.playerRoom].neighbors.includes(roomId);
     parts.push(canBreak
-      ? `<button type="button" class="room-feature pallet barricade-action" data-action="break-barricade" data-room="${roomId}" title="破坏木板需要 1 点行动点">${icon('obstacle', 'ui-icon tiny')}<b>破坏木板</b></button>`
-      : `<span class="room-feature pallet" title="木板已封住入口">${icon('obstacle', 'ui-icon tiny')}<b>木板封门</b></span>`);
+      ? `<button type="button" class="room-feature pallet barricade-action" data-action="break-barricade" data-room="${roomId}" ${state.energy < 1 ? 'disabled' : ''} title="幸存者放下的木板：花费 1 AP 破坏，破坏后即可通过">${icon('obstacle', 'ui-icon tiny')}<b>破坏木板 · 1 AP</b></button>`
+      : `<span class="room-feature pallet" title="幸存者刚刚放下木板封住入口；靠近后可花费 1 AP 破坏">${icon('obstacle', 'ui-icon tiny')}<b>幸存者木板封门</b></span>`);
   }
 
   return parts.join('');
@@ -437,7 +437,6 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
     const cost = moveCost(state, room.id);
     const adjacent = ROOM_MAP[state.playerRoom].neighbors.includes(room.id);
     const obstacleOpen = OBSTACLE_ROOMS.includes(room.id) && !state.clearedObstacles.includes(room.id);
-    const isObjective = state.objectiveRooms.includes(room.id);
     const darkRoom = !isRoomLit(state, room.id);
     const noise = visibleDisturbances(state).find((d) => d.room === room.id);
     // 感知：看不见的房间也会浮出红色人影——只有影子，没有名字
@@ -448,8 +447,8 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
     const r = room.rect;
     const style = `left:${r.left}%;top:${r.top}%;width:${r.width}%;height:${r.height}%`;
     return `
-      <div class="room ${isPlayer ? 'current' : ''} ${reachable ? 'reachable' : 'disabled'} ${adjacent ? 'adjacent' : ''} ${state.lookingAround && adjacent ? 'look-target' : ''} ${state.auraTargeting ? 'aura-target' : ''} ${blinkSelectable ? 'blink-target' : ''} ${obstacleOpen ? 'obstacle' : ''} ${isObjective ? 'objective' : ''} ${darkRoom ? 'dark-room' : 'lit-room'} ${room.id === 'garden' ? 'outdoor' : ''} room-size-${room.size} ${locked ? 'locked' : ''} ${barricaded ? 'barricaded' : ''} ${explored ? 'explored' : 'unexplored'} ${visible ? 'in-sight' : 'fogged'}"
-        style="${style}" data-room="${room.id}" data-aura-count="${sensed}" title="${escape(room.name)}${explored ? `：${escape(room.desc)}` : '：还没进去过'}${isObjective ? ' · 设施热点' : ''}">
+      <div class="room ${isPlayer ? 'current' : ''} ${reachable ? 'reachable' : 'disabled'} ${adjacent ? 'adjacent' : ''} ${state.lookingAround && adjacent ? 'look-target' : ''} ${state.auraTargeting ? 'aura-target' : ''} ${blinkSelectable ? 'blink-target' : ''} ${obstacleOpen ? 'obstacle' : ''} ${darkRoom ? 'dark-room' : 'lit-room'} ${room.id === 'garden' ? 'outdoor' : ''} room-size-${room.size} ${locked ? 'locked' : ''} ${barricaded ? 'barricaded' : ''} ${explored ? 'explored' : 'unexplored'} ${visible ? 'in-sight' : 'fogged'}"
+        style="${style}" data-room="${room.id}" data-aura-count="${sensed}" title="${escape(room.name)}${explored ? `：${escape(room.desc)}` : '：还没进去过'}">
         ${state.auraTargeting
           ? `<button type="button" class="room-hit aura-hit" data-action="aura-select" data-room="${room.id}" aria-label="选择${escape(room.name)}，显示其中人类的气场">显形</button>`
           : state.nurseBlinkTargeting
@@ -464,13 +463,12 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
         <div class="room-head">
           <span class="room-name">${explored ? escape(room.name) : '？？？'}</span>
           ${noise ? `<span class="room-tag noise" title="${escape(noise.label)}">${icon('crow', 'crow-icon tiny')}动静</span>` : ''}
-          ${isObjective ? '<span class="room-tag objective" title="幸存者要在这儿做事：进度做满你就输">目标点</span>' : ''}
           ${isPlayer
             ? '<span class="room-tag">你在</span>'
             : locked
               ? '<span class="room-tag lock" title="电子门锁：断电解除或在门外强行破门">电子门锁 · 断电可解</span>'
               : barricaded
-                ? '<span class="room-tag bar">木板封门</span>'
+                ? '<span class="room-tag bar" title="幸存者刚刚放下木板封门；靠近后花费 1 AP 破坏">木板封门 · 幸存者放置</span>'
                 : obstacleOpen
                   ? `<span class="room-tag obstacle">木板障碍 · ${cost}点</span>`
                   : reachable
@@ -496,7 +494,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
                 p,
                 false,
                 false,
-                state.huntressAiming ? 'hatchet' : state.nurseFollowUp && p.hp > 0 && p.room === state.playerRoom ? 'nurse-grab' : undefined,
+                state.huntressAiming ? 'hatchet' : undefined,
                 !isRoomLit(state, p.room),
               )).join('')}
           ${police ? personChip(police) : ''}
@@ -595,7 +593,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
       statusBits.push(`<span class="status-badge downed">${escape(p.name)} 倒地 · 可立即处决 · 同伴仍可能救起</span>`);
     });
   if (state.nurseBlinkTargeting) statusBits.push('<span class="status-badge blink-mode">护士闪现选点中 · 选择 1–3 间房距离内的位置</span>');
-  if (state.nurseFollowUp) statusBits.push('<span class="status-badge blink-mode">濒死之息 · 现在可攻击同屋幸存者；下一次行动后疲惫</span>');
+  if (state.nurseFollowUp) statusBits.push('<span class="status-badge blink-mode">濒死之息 · 现在可对同屋站立幸存者发动普通攻击；下一次行动后疲惫</span>');
   if (state.huntressAiming) statusBits.push('<span class="status-badge hatchet-mode">狩猎飞斧瞄准中 · 点击地图上的直线视野目标</span>');
   const statusHtml = statusBits.length ? `<div class="status-strip">${statusBits.join('')}</div>` : '';
   const standingHere = here.filter((person) => person.hp > 0);
@@ -772,7 +770,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
     <div class="layout hunt-layout">
       <div class="main-column">
         <div class="panel map-panel">
-          <div class="panel-heading"><h2>房屋平面</h2><span>门形=通道 · 绿门=当前可走 · 红叉=封锁 · 黄门=堵门/行动点不足 · 蓝框=目标点</span>
+          <div class="panel-heading"><h2>房屋平面</h2><span>门形=通道 · 绿门=当前可走 · 红叉=封锁 · 橙色高亮=幸存者木板封门</span>
             <button class="btn ghost mini" data-action="guide">玩法指引</button>
             <button class="btn ghost mini display-control" data-action="display-setting" data-setting="interfaceScale">界面大小</button>
             <button class="btn ghost mini display-control" data-action="display-setting" data-setting="fontScale">文字大小</button>
@@ -782,6 +780,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
           ${statusHtml}${carryStatus}${huntPlanHtml}
           ${facilityOverviewHtml(state)}
           ${state.lookingAround ? '<div class="look-prompt" role="status"><b>选择要查看的房间</b><span>地图上亮起边框的房间都与当前位置相邻。点击其中一个，消耗 1 点行动点查看。</span><button class="btn ghost mini" data-action="look-cancel">取消</button></div>' : ''}
+          ${state.barricades.length ? `<div class="look-prompt barricade-prompt" role="status"><b>幸存者放下了木板</b><span>${state.barricades.map((room) => roomName(room)).join('、')}：地图上的橙色高亮标记就是被封住的入口。靠近该房间后点击「破坏木板 · 1 AP」即可通行。</span></div>` : ''}
           ${state.auraTargeting ? '<div class="look-prompt aura-prompt" role="status"><b>恶灵低语 · 选择房间</b><span>点击地图任意房间，包括你当前所在的房间；也可以取消，不发动显形效果。</span><button class="btn ghost mini" data-action="aura-cancel">取消选择</button></div>' : ''}
           <div class="map-viewport">
             <div class="floorplan" style="--ar:${layoutAspectNum().toFixed(4)};aspect-ratio:${layoutAspect()}">
