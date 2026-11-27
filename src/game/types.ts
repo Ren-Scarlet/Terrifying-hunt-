@@ -692,6 +692,10 @@ export interface SaveData {
   accessories: Record<string, number>;
   /** 肉鸽猎杀：进行中的 run；null / undefined 表示没有在跑。 */
   rogue?: import('./rogue').RogueRun | null;
+  /** 每位杀手的血网等级（等级 / 经验 / 转生 / 待领取次数）。 */
+  progress?: import('./progress').ProgressMap;
+  /** 公共卡池：别的杀手练到 30 的倍数后共享出来的专属卡。 */
+  sharedCards?: string[];
   /** 上一次选择带入的配件 id（最多 2 件），作为下局的默认装配。 */
   accessoryLoadout: string[];
   /** 存档里记一下版本，方便以后迁移 */

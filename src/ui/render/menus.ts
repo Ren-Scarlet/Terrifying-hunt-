@@ -22,6 +22,8 @@ import { CONTRACT_TURNS } from '../../game/missions';
 import { ACTIVE_KILLERS } from '../../game/killers';
 import type { SaveData } from '../../game/types';
 import type { RogueOffer, RogueRun } from '../../game/rogue';
+import type { BloodwebOffer, KillerProgress } from '../../game/progress';
+import { LEVELS_PER_PRESTIGE, XP_PER_LEVEL, totalLevel } from '../../game/progress';
 import { currentMenuMap, mapArtSrc } from '../mapArt';
 import { detailCardHtml, addonIconHtml, escape, getKiller, icon, killerFaceHtml, perkIconHtml, powerIconHtml, TYPE_NAMES } from './shared';
 
@@ -122,6 +124,7 @@ export function renderMenu(save: SaveData, ante = false): string {
           ${save.rogue ? '<button class="btn ghost" data-action="rogue-abandon">放弃肉鸽进度</button>' : ''}
           <button class="btn" data-action="deck">编辑牌组</button>
           <button class="btn" data-action="accessories">配件装配</button>
+          <button class="btn" data-action="bloodweb">血网升级${(save.progress?.[killer.owner]?.pending ?? 0) > 0 ? `（${save.progress?.[killer.owner]?.pending ?? 0}）` : ''}</button>
           <button class="btn" data-action="shop">卡牌商店</button>
           <button class="btn ghost" data-action="guide">玩法指引</button>
         </div>
@@ -295,6 +298,32 @@ export function renderShop(save: SaveData): string {
  * 出发前的配件装配界面：最多 2 个槽位，配件买过即永久拥有。
  * pendingRun=true 时由「准备开始 / 自由猎杀」进入，确认后直接开猎场。
  */
+export function renderBloodweb(killer: string, progress: KillerProgress, offers: BloodwebOffer[] | null): string {
+  const pending = progress.pending;
+  return `
+    <div class="overlay">
+      <div class="modal bloodweb-modal">
+        <div class="subtitle">BLOODWEB</div>
+        <h1>血网升级</h1>
+        <p class="bloodweb-killer">${escape(killer)} · 等级 <b>${progress.level}</b> / ${LEVELS_PER_PRESTIGE}${progress.prestige > 0 ? ` · <b>${progress.prestige} 转</b>` : ''} · 累计 ${totalLevel(progress)} 级</p>
+        <div class="bloodweb-xp"><span style="width:${(progress.xp / XP_PER_LEVEL) * 100}%"></span></div>
+        <div class="bloodweb-xp-text">${progress.xp} / ${XP_PER_LEVEL} 经验 · 待领取 <b>${pending}</b> 次</div>
+        ${pending <= 0 || !offers
+          ? '<p class="bloodweb-empty">现在没有可领取的血网。打一局（胜利或失败都算）就能攒经验，每 100 经验升 1 级。</p>'
+          : `<div class="bloodweb-offers">${offers.map((offer, index) => `
+              <button class="bloodweb-offer ${offer.kind}" data-action="bloodweb-pick" data-index="${index}">
+                <small>${offer.kind === 'accessory' ? '配件' : offer.kind === 'card' ? '卡牌' : '血点'}</small>
+                <b>${escape(offer.name)}</b>
+                <span>${escape(offer.desc)}</span>
+              </button>`).join('')}</div>`}
+        <div class="actions">
+          <button class="btn ghost" data-action="bloodweb-close">关闭</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 export function renderAccessoryLoadout(save: SaveData, draft: string[], pendingRun: boolean): string {
   const killer = save.killer ?? '迈克尔·迈尔斯';
   const defs = accessoriesForKiller(killer);
@@ -325,13 +354,13 @@ export function renderAccessoryLoadout(save: SaveData, draft: string[], pendingR
         ${addonIconHtml(def.id, def.rarity, 'card')}
         <div class="acc-card-title">
           <b>${escape(def.name)}</b>
-          <small>${ACCESSORY_RARITY_LABEL[def.rarity]} · ${count > 0 ? '已拥有' : '未拥有'}</small>
+          <small>${ACCESSORY_RARITY_LABEL[def.rarity]} · 库存 ${count}</small>
         </div>
       </div>
       <p>${escape(def.desc)}</p>
       <div class="acc-card-actions">
         <button class="btn mini ${equipped ? 'ghost' : ''}" data-action="acc-equip" data-id="${def.id}" ${canEquip || equipped ? '' : 'disabled'}>${equipped ? '已装备' : '装备'}</button>
-        <button class="btn mini ghost" data-action="acc-buy" data-id="${def.id}" ${count > 0 || save.credits < price ? 'disabled' : ''}>${icon('bloodPoint', 'ui-icon tiny')} ${count > 0 ? '已拥有' : `${price} 解锁`}</button>
+        <button class="btn mini ghost" data-action="acc-buy" data-id="${def.id}" ${save.credits >= price ? '' : 'disabled'}>${icon('bloodPoint', 'ui-icon tiny')} ${price} 补货</button>
       </div>
     </div>`;
   }).join('');
@@ -341,10 +370,10 @@ export function renderAccessoryLoadout(save: SaveData, draft: string[], pendingR
       <div class="modal accessory-modal">
         <div class="subtitle">POWER ADD-ONS</div>
         <h1>力量<span>配件</span></h1>
-        <p>当前杀手：<b>${escape(killer)}</b>。配件<b>买过即永久拥有</b>，出发前从已拥有的里挑最多 <b>${ACCESSORY_SLOTS} 件</b>带上；未拥有的可用血点解锁。</p>
+        <p>当前杀手：<b>${escape(killer)}</b>。配件从血网升级获得，出发前最多带 <b>${ACCESSORY_SLOTS} 件</b>，<b>带入会从库存扣掉</b>；不够可以用血点补货。</p>
         <div class="acc-resource">
           <span>${icon('bloodPoint')} 血点 <b>${save.credits}</b></span>
-          <span>已拥有 <b>${defs.filter((def) => owned(def.id) > 0).length}/${defs.length}</b> 件</span>
+          <span>库存 <b>${defs.reduce((sum, def) => sum + owned(def.id), 0)}</b> 件</span>
           <span>装配 <b>${draft.length}/${ACCESSORY_SLOTS}</b></span>
         </div>
         <div class="acc-slots">${slots}</div>
@@ -352,7 +381,7 @@ export function renderAccessoryLoadout(save: SaveData, draft: string[], pendingR
         <div class="acc-grid">${cards || '<p style="color:var(--muted)">这位杀手还没有配件。</p>'}</div>
         <div class="actions">
           <button class="btn primary" data-action="acc-confirm">${pendingRun
-            ? (draft.length ? `进入猎场 · 携带 ${draft.length} 件配件` : '不携带配件进入猎场')
+            ? (draft.length ? `进入猎场 · 消耗 ${draft.length} 件配件` : '不携带配件进入猎场')
             : '保存装配 · 返回主菜单'}</button>
           <button class="btn ghost" data-action="acc-close">${pendingRun ? '返回主菜单' : '取消'}</button>
         </div>
@@ -361,11 +390,11 @@ export function renderAccessoryLoadout(save: SaveData, draft: string[], pendingR
   `;
 }
 
-export function renderDeckEditor(deck: string[], unlocked: string[], killer = '迈克尔·迈尔斯'): string {
+export function renderDeckEditor(deck: string[], unlocked: string[], killer = '迈克尔·迈尔斯', sharedCards: string[] = []): string {
   const counts: Record<string, number> = {};
   deck.forEach((id) => (counts[id] = (counts[id] ?? 0) + 1));
 
-  const rows = deckCardsForKiller(killer).map((card) => {
+  const rows = deckCardsForKiller(killer, sharedCards).map((card) => {
     const count = counts[card.id] ?? 0;
     const isUnlocked = unlocked.includes(card.id);
     return `

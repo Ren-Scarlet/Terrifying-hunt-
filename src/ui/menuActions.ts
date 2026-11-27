@@ -9,6 +9,7 @@ import { shopPrice } from './render/menus';
 import {
   ACCESSORY_SLOTS,
   buyAccessory,
+  consumeAccessories,
   loadoutForRun,
   sanitizeAccessoryLoadout,
 } from '../game/accessories';
@@ -106,7 +107,7 @@ export function createMenuActions(deps: MenuActionDeps): ActionTable {
         .filter((id) => (current.accessories?.[id] ?? 0) > 0);
       const mode = session.pendingRun;
       if (mode) {
-        deps.setSave({ ...current, accessoryLoadout: loadout });
+        deps.setSave(consumeAccessories(current, loadout));
         writeSave(deps.getSave());
         session.pendingRun = null;
         session.accessoryDraft = [];

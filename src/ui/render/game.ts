@@ -162,7 +162,8 @@ function roomFeatures(state: GameState, roomId: RoomId): string {
     }
   }
   if ((state.crows ?? []).includes(roomId) && state.explored.includes(roomId)) {
-    parts.push(`<span class="room-feature crow-room" title="这间屋里有乌鸦：幸存者在这里行动会惊起它们">${icon('crow', 'ui-icon tiny')}<b>乌鸦</b></span>`);
+    const crowHot = (state.crowTriggered ?? []).includes(roomId);
+    parts.push(`<span class="room-feature crow-room${crowHot ? ' triggered' : ''}" title="这间屋里有乌鸦：幸存者在这里行动会惊起它们">${icon('crow', 'ui-icon tiny')}<b>乌鸦</b></span>`);
   }
   if (roomId === EXIT_ROOM) parts.push(`<span class="room-feature escape" title="撤离点：任务完成的撤离位置">${icon('escape', 'ui-icon tiny')}</span>`);
   if (state.playerRoom !== roomId && ROOM_MAP[state.playerRoom].neighbors.includes(roomId) && isLocked(state, roomId)) {
@@ -187,7 +188,8 @@ function roomFeatures(state: GameState, roomId: RoomId): string {
   }
   const boardBlocksRoom = state.barricades.includes(roomId) || (OBSTACLE_ROOMS.includes(roomId) && !cleared && !state.possessed);
   if (boardBlocksRoom) {
-    const canBreak = ROOM_MAP[state.playerRoom].neighbors.includes(roomId);
+    // 相邻可以砸；如果人就在这间屋里（比如被堵在里面），也允许砸开。
+    const canBreak = ROOM_MAP[state.playerRoom].neighbors.includes(roomId) || state.playerRoom === roomId;
     const fixed = !state.barricades.includes(roomId);
     const label = fixed ? '可破坏的墙壁' : '幸存者木板封门';
     const inner = `<span class="room-feature pallet" title="${fixed ? '可被破坏的墙壁：靠近后可花费 1 AP 砸开' : '木板封门：靠近后可花费 1 AP 破坏'}">${icon(fixed ? 'wall' : 'obstacle', 'ui-icon tiny')}<b>${label}</b></span>`;
@@ -433,28 +435,6 @@ function killerBuffsHtml(state: GameState): string {
     .join('')}</div>`;
 }
 
-/**
- * 房间信标：即使屠夫不在这个房间、家具被压暗，也要能一眼看到的红色提示。
- * 单独一层（不放进 .room-features），避免被「非当前房间 opacity .24」压掉。
- */
-function roomBeaconsHtml(state: GameState, roomId: RoomId): string {
-  const items: string[] = [];
-  if (state.escapeRooms.includes(roomId)) {
-    items.push(`<span class="room-beacon escape" title="逃生大门已开启：幸存者会往这里跑，守住它">${icon('escape', 'ui-icon tiny')}<b>逃生门</b></span>`);
-  }
-  if ((state.crowTriggered ?? []).includes(roomId) && (state.crows ?? []).includes(roomId)) {
-    items.push(`<span class="room-beacon crow" title="这里的乌鸦被惊动过：刚才有人在这间屋行动">${icon('crow', 'ui-icon tiny')}<b>乌鸦</b></span>`);
-  }
-  if (state.totems.includes(roomId)) {
-    items.push(`<span class="room-beacon totem" title="存续的图腾：幸存者可以拆，你也可以来领一次奖励">${icon('totem', 'ui-icon tiny')}<b>图腾</b></span>`);
-  }
-  const adjacentBarricade = state.barricades.includes(roomId) && ROOM_MAP[state.playerRoom].neighbors.includes(roomId);
-  if (adjacentBarricade) {
-    items.push(`<span class="room-beacon pallet" title="相邻房间的堵门木板：花 1 AP 可以砸开">${icon('obstacle', 'ui-icon tiny')}<b>木板</b></span>`);
-  }
-  return items.length ? `<div class="room-beacons">${items.join('')}</div>` : '';
-}
-
 export function renderGame(state: GameState, killer: KillerProfile): string {
   const m = state.mission;
   const ground = getHuntingGround(state.mapId);
@@ -658,7 +638,6 @@ function personSlotStyle(roomId: RoomId, personId: string, index: number): strin
           ${ghosts.map(() => '<span class="ghost-chip" title="最后确认位置：人可能已经走了">?</span>').join('')}
         </div>
         ${sensed ? `<div class="room-shadows" title="你感觉到这里有人，但看不清是谁">${shadowFigures(sensed)}</div>` : ''}
-        ${roomBeaconsHtml(state, room.id)}
       </div>
     `;
   }).join('');

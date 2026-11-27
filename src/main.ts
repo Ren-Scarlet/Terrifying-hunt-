@@ -49,6 +49,8 @@ import { loadSave, writeSave } from './game/save';
 import { generateFreeHunt, generateMission, withAnte } from './game/missions';
 import { applyTuning } from './game/tuning';
 import { advanceRogue, applyRogueFloor, rollRogueOffers, startRogueRun } from './game/rogue';
+import { gainXp, progressOf, rollBloodweb, syncSharedCards, xpForGame } from './game/progress';
+import type { BloodwebOffer } from './game/progress';
 import type { RogueOffer, RogueRun } from './game/rogue';
 import { CABINET_ROOMS, ROOM_MAP } from './game/rooms';
 import { SURVIVOR_MAP } from './game/survivors';
@@ -67,6 +69,7 @@ import {
   renderMenu,
   renderResult,
   renderRogueReward,
+  renderBloodweb,
   renderShop,
 } from './ui/render';
 import { renderAdmin } from './ui/admin';
@@ -110,6 +113,9 @@ let selectedPersonId: string | null = null;
 let killerPanelCollapsed = localStorage.getItem('nightfall-panel-collapsed') === '1';
 /** 肉鸽：层间三选一的待选项 */
 let rogueOffers: RogueOffer[] | null = null;
+/** 血网升级面板：是否打开 + 当前三选一 */
+let bloodwebOpen = false;
+let bloodwebOffers: BloodwebOffer[] | null = null;
 /** 平面图下方的场景画布 */
 let scene: SceneHandle | null = null;
 /** 上一次的击杀数与暴露度：用来判断这一手是得手还是暴露了 */
@@ -456,33 +462,8 @@ function renderMarkupPreservingMap(html: string): void {
   previousFloorplan.replaceChildren(previousCanvas, ...freshWorldNodes);
   nextFloorplan.replaceWith(previousFloorplan);
 
-  // 命中动画使用受击前的位置快照；即使幸存者在攻击结算中逃跑，也能在原地看到受击。
-  if (pendingMapAttackGhost?.roomId) {
-    const room = Array.from(previousFloorplan.querySelectorAll<HTMLElement>('.room[data-room]'))
-      .find((node) => node.dataset.room === pendingMapAttackGhost?.roomId);
-    const people = room?.querySelector<HTMLElement>('.room-people');
-    if (people) {
-      const ghost = pendingMapAttackGhost.element;
-      ghost.style.left = `${pendingMapAttackGhost.left}px`;
-      ghost.style.top = `${pendingMapAttackGhost.top}px`;
-      ghost.style.width = `${pendingMapAttackGhost.width}px`;
-      ghost.style.height = `${pendingMapAttackGhost.height}px`;
-      const escapeX = Math.cos(pendingMapAttackGhost.escapeAngle) * 18;
-      const escapeY = Math.sin(pendingMapAttackGhost.escapeAngle) * 18;
-      ghost.style.setProperty('--escape-x', `${escapeX.toFixed(1)}px`);
-      ghost.style.setProperty('--escape-y', `${escapeY.toFixed(1)}px`);
-      ghost.style.setProperty('--escape-back-x', `${(-escapeX * 0.55).toFixed(1)}px`);
-      ghost.style.setProperty('--escape-back-y', `${(-escapeY * 0.55).toFixed(1)}px`);
-      ghost.style.setProperty('--escape-mid-x', `${(escapeX * 0.5).toFixed(1)}px`);
-      ghost.style.setProperty('--escape-mid-y', `${(escapeY * 0.5).toFixed(1)}px`);
-      ghost.style.setProperty('--escape-near-x', `${(escapeX * 0.9).toFixed(1)}px`);
-      ghost.style.setProperty('--escape-near-y', `${(escapeY * 0.9).toFixed(1)}px`);
-      ghost.classList.add('blood-hit');
-      people.appendChild(ghost);
-      window.setTimeout(() => ghost.remove(), 760);
-    }
-    pendingMapAttackGhost = null;
-  }
+  // 2026-11-28：删掉「受击残影」——处决时它会瞬移到房间角落抖动消失，作者反馈很违和。
+  pendingMapAttackGhost = null;
 
   // 保留 viewport 本身和地图图例等兄弟层，避免地图卸载/重挂期间露出黑色底板。
   previousViewport.className = nextViewport.className;
@@ -552,11 +533,15 @@ function render(): void {
   } else if (view.panel === 'accessories') {
     html = renderAccessoryLoadout(save, session.accessoryDraft, session.pendingRun !== null);
   } else if (view.panel === 'deck') {
-    html = renderDeckEditor(session.editorDeck, save.unlockedCards, save.killer ?? '迈克尔·迈尔斯');
+    html = renderDeckEditor(session.editorDeck, save.unlockedCards, save.killer ?? '迈克尔·迈尔斯', save.sharedCards ?? []);
   } else if (view.panel === 'shop') {
     html = renderShop(save);
   } else if (view.screen === 'menu' || !game) {
     html = renderMenu(save, session.anteArmed);
+    if (bloodwebOpen) {
+      const killer = save.killer ?? '迈克尔·迈尔斯';
+      html += renderBloodweb(killer, progressOf(save.progress, killer), bloodwebOffers);
+    }
   } else {
     html = renderGame(game, getKiller(save.killer));
     if (view.screen === 'result') html += renderResult(game, lastNewCard);
@@ -666,8 +651,8 @@ function syncHuntAlerts(): void {
     return;
   }
   if (game.escaped > lastEscaped) {
+    // 2026-11-28：逃跑不再放 bgm/音效，只在顶部给一条文字提示。
     pushHuntAlert(`有幸存者逃出去了！累计逃走 ${game.escaped} 人`, 'danger');
-    playSfx('flee');
   }
   lastEscaped = game.escaped;
   if (game.escapeRooms.length > lastEscapeRoomCount) {
@@ -795,7 +780,7 @@ function sfxFromLogs(): void {
     playSfx('breaker');
     window.setTimeout(() => playSfx('spark'), 150);
   }
-  else if (/成功逃离|已经不在房子里了/.test(head)) playSfx('flee');
+  // 2026-11-28：逃跑不再放 bgm/音效，只保留顶部文字提示
   else if (/发电机重新亮了起来|用钥匙捅开|联系上了外面|修发电机/.test(head)) playSfx('objective');
   else if (/地图出现两个逃生点|第四阶段完成/.test(head)) playSfx('gate');
     else if (!suppressVoiceBeat && freshSightings === 0 && /【NPC目击】|发现了捕兽夹|发现并拆除了|忽然抬头|猛一回头|察觉到异常|发现了你/.test(head)) playVoice(head, 'Startle');
@@ -948,10 +933,25 @@ function afterAction(): void {
         });
       }
       save = { ...save, bestScore: newBest, wins, credits, darkCells, unlockedCards: unlocked };
+      grantGameXp(game);
       writeSave(save);
     }
   }
   render();
+}
+
+
+/** 一局结束给当前杀手经验；升级了就在结算/log 里提示。 */
+function grantGameXp(state: GameState): void {
+  const killer = state.killer;
+  const current = progressOf(save.progress, killer);
+  const gained = xpForGame(state);
+  const { progress, levels } = gainXp(current, gained);
+  const map = { ...(save.progress ?? {}), [killer]: progress };
+  save = { ...save, progress: map, sharedCards: syncSharedCards(map, save.sharedCards) };
+  if (levels > 0) {
+    state.log.unshift(`【血网】${killer} 升到 ${progress.level} 级（${progress.prestige} 转），获得 ${levels} 次血网三选一。`);
+  }
 }
 
 function startGame(freeHunt = false, loadout: string[] = []): void {
@@ -1579,6 +1579,46 @@ registry.register('菜单与面板', createMenuActions({
   leaveToMenu,
 }));
 registry.register('平衡面板', createAdminActions({ render }));
+registry.register('血网', {
+  bloodweb: () => {
+    const killer = save.killer ?? '迈克尔·迈尔斯';
+    const progress = progressOf(save.progress, killer);
+    bloodwebOpen = true;
+    bloodwebOffers = progress.pending > 0
+      ? rollBloodweb(killer, save.unlockedCards, save.accessories ?? {})
+      : null;
+    render();
+  },
+  'bloodweb-pick': ({ target }) => {
+    const killer = save.killer ?? '迈克尔·迈尔斯';
+    const progress = progressOf(save.progress, killer);
+    const index = Number(target.dataset.index);
+    const offer = bloodwebOffers?.[Number.isInteger(index) ? index : -1];
+    if (!offer || progress.pending <= 0) return;
+    const nextProgress = { ...progress, pending: progress.pending - 1 };
+    const nextSave = { ...save, progress: { ...(save.progress ?? {}), [killer]: nextProgress } };
+    if (offer.kind === 'accessory') {
+      nextSave.accessories = { ...(nextSave.accessories ?? {}), [offer.id]: (nextSave.accessories?.[offer.id] ?? 0) + 1 };
+    } else if (offer.kind === 'card') {
+      nextSave.unlockedCards = nextSave.unlockedCards.includes(offer.id) ? nextSave.unlockedCards : [...nextSave.unlockedCards, offer.id];
+    } else {
+      const amount = Number(offer.id.replace('credits_', '')) || 40;
+      nextSave.credits = nextSave.credits + amount;
+    }
+    save = nextSave;
+    writeSave(save);
+    playSfx('pickup');
+    bloodwebOffers = nextProgress.pending > 0
+      ? rollBloodweb(killer, save.unlockedCards, save.accessories ?? {})
+      : null;
+    render();
+  },
+  'bloodweb-close': () => {
+    bloodwebOpen = false;
+    bloodwebOffers = null;
+    render();
+  },
+});
 registry.register('肉鸽猎杀', {
   'rogue-start': () => enterRogue(),
   'rogue-pick': ({ target }) => {

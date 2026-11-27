@@ -392,10 +392,14 @@ export const CARD_MAP: Record<string, CardDef> = CARDS.reduce(
 
 export const INITIAL_CARD_IDS = CARDS.filter((card) => card.pool === 'initial').map((card) => card.id);
 
-export function deckCardsForKiller(killer: string): CardDef[] {
+export function deckCardsForKiller(killer: string, sharedCards: string[] = []): CardDef[] {
   // 商店卡也进入构筑池：未购买时在牌组编辑器里显示为「未解锁 · 可在商店购买」。
+  // 公共池：别的杀手练到每 30 级会把自己的专属卡放进来，这里一起算可用。
   return CARDS.filter(
-    (card) => card.pool === 'initial' || card.pool === 'shop' || (card.pool === 'killer' && card.killerOnly === killer),
+    (card) =>
+      card.pool === 'initial'
+      || card.pool === 'shop'
+      || (card.pool === 'killer' && (card.killerOnly === killer || sharedCards.includes(card.id))),
   );
 }
 

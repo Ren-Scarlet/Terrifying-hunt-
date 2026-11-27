@@ -3,6 +3,8 @@ import { KILLER_MAP, STARTER_KILLERS } from './killers';
 import { sanitizeAccessoryLoadout, sanitizeAccessoryStock, starterAccessoryStock } from './accessories';
 import type { SaveData } from './types';
 import { ROGUE_BUFFS } from './rogue';
+import { emptyProgress, progressOf, syncSharedCards } from './progress';
+import type { ProgressMap } from './progress';
 import type { RogueRun } from './rogue';
 
 const KEY = 'night-hunt-dossier-save-v1';
@@ -27,6 +29,8 @@ function defaultSave(): SaveData {
     accessories: starterAccessoryStock(),
     accessoryLoadout: [],
     rogue: null,
+    progress: {},
+    sharedCards: [],
     version: SAVE_VERSION,
   };
 }
@@ -35,11 +39,11 @@ function defaultSave(): SaveData {
  * 校验牌组：只保留存在的卡牌 id，单卡最多 3 张、总数最多 15 张。
  * 长度不足 10 张时直接回退到初始牌组，避免开局抽不到牌或出现不存在的卡导致白屏。
  */
-function sanitizeDeck(raw: unknown, killer: string): string[] {
+function sanitizeDeck(raw: unknown, killer: string, sharedCards: string[] = []): string[] {
   if (!Array.isArray(raw)) return [...STARTING_DECK];
   const counts = new Map<string, number>();
   const out: string[] = [];
-  const allowed = new Set(deckCardsForKiller(killer).map((card) => card.id));
+  const allowed = new Set(deckCardsForKiller(killer, sharedCards).map((card) => card.id));
   for (const id of raw) {
     if (typeof id !== 'string' || !CARD_MAP[id] || !allowed.has(id)) continue;
     const used = counts.get(id) ?? 0;
@@ -101,7 +105,7 @@ export function loadSave(): SaveData {
     // 旧版本的牌组里塞满了「攻击牌」。伤害改由挥刀按钮承担之后，
     // 这些牌已经换成了功能性效果，牌组也整体换了套路，所以 v4 以前的老档直接换新起始牌组。
     const version = toInt(parsed.version, 1);
-    const deck = version < DECK_RESET_VERSION ? [...STARTING_DECK] : sanitizeDeck(parsed.deck, killer);
+    const deck = version < DECK_RESET_VERSION ? [...STARTING_DECK] : sanitizeDeck(parsed.deck, killer, parsed.sharedCards ?? []);
 
     // 配件是 v5 才有的系统：第一次升级时送每位杀手每件各 1 个，之后只认库存表。
     const accessories = version < 5
@@ -110,6 +114,23 @@ export function loadSave(): SaveData {
     const accessoryLoadout = version < 5
       ? []
       : sanitizeAccessoryLoadout(parsed.accessoryLoadout, killer);
+
+    const progress: ProgressMap = {};
+    for (const killer of STARTER_KILLERS) {
+      const raw = parsed.progress?.[killer];
+      progress[killer] = raw && typeof raw === 'object'
+        ? {
+            level: Math.min(100, Math.max(1, toInt((raw as { level?: number }).level, 1) || 1)),
+            xp: Math.min(99, toInt((raw as { xp?: number }).xp, 0)),
+            prestige: toInt((raw as { prestige?: number }).prestige, 0),
+            pending: Math.min(30, toInt((raw as { pending?: number }).pending, 0)),
+          }
+        : emptyProgress();
+    }
+    const sharedCards = syncSharedCards(
+      progress,
+      Array.isArray(parsed.sharedCards) ? parsed.sharedCards.filter((id): id is string => typeof id === 'string' && !!CARD_MAP[id]) : [],
+    );
 
     return {
       deck,
@@ -126,6 +147,8 @@ export function loadSave(): SaveData {
       accessories,
       accessoryLoadout,
       rogue: sanitizeRogue(parsed.rogue),
+      progress,
+      sharedCards,
       version: SAVE_VERSION,
     };
   } catch {
