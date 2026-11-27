@@ -219,7 +219,7 @@ function powerButtonHtml(state: GameState, killer: KillerProfile): string {
     return `<button class="btn power ${power.ultimate ? 'ultimate' : 'main'} ${ok ? '' : 'cooling'} ${power.id === 'myers_gaze' && state.stalkMeter >= 100 ? 'possessed-ready' : ''}"
       data-action="power" data-power="${power.id}" ${ok ? '' : 'disabled'}
       title="${escape(power.desc)}${reason ? ` · ${escape(reason)}` : ''}">
-      <span class="power-art" aria-hidden="true"><img class="power-icon" src="${killer.icon}" alt="" onerror="this.style.display='none'"></span>
+      <span class="power-art" aria-hidden="true"><img class="power-icon" src="${power.id === 'doctor_madness' ? uiIcon('madness') : killer.icon}" alt="" onerror="this.style.display='none'"></span>
       <span class="power-body"><b>${escape(label)}</b><small>${escape(actionHint)}</small></span>
       <span class="power-pips">${pips}</span>
     </button>`;
@@ -341,7 +341,7 @@ function trailOverlay(state: GameState): string {
       const age = state.trailClock - t.clock;
       const cls = `footprint age-${Math.min(3, age)}${t.blood ? ' blood' : ''}${age <= 0 ? ' fresh' : ''}`;
       const opacity = Math.max(0.14, 1 - age * 0.27);
-      return `<i class="${cls}" style="left:${x.toFixed(2)}%;top:${y.toFixed(2)}%;--rot:${rot.toFixed(1)}deg;--trail-opacity:${opacity.toFixed(2)}"></i>`;
+      return `<img class="${cls} footprint" src="${uiIcon('trail')}" alt="" aria-hidden="true" style="left:${x.toFixed(2)}%;top:${y.toFixed(2)}%;--rot:${rot.toFixed(1)}deg;--trail-opacity:${opacity.toFixed(2)}">`;
     })
     .join('');
   return `<div class="trail-layer" aria-hidden="true">${prints}</div>`;
@@ -831,10 +831,6 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
             <div class="hand-row">${hand || '<div class="empty-hand">手牌已空，可花行动点主动抽牌。</div>'}</div>
           </div>
           <button class="hand-toggle" data-action="toggle-hand" title="收起 / 展开手牌" aria-label="收起或展开手牌" aria-expanded="true">⌄</button>
-          <div class="ap-display" aria-label="当前行动力">
-            <b>${state.energy}<i>/${state.maxEnergy}</i></b>
-            <small>行动力</small>
-          </div>
         </div>
         <section class="killer-ability-panel" aria-label="杀手能力 HUD">
           <div class="killer-hud-portrait">
@@ -847,6 +843,10 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
           <div class="killer-hud-resources">
             <div class="killer-frenzy-meter"><div><span>杀戮值</span><b>${state.frenzy}/${FRENZY_MAX}</b></div><div class="killer-frenzy-track"><i style="width:${state.frenzy / FRENZY_MAX * 100}%"></i></div></div>
             ${meter || myersMarks ? `<div class="killer-special-resources">${meter}${myersMarks}</div>` : ''}
+          </div>
+          <div class="ap-display killer-ap-display" aria-label="当前行动力">
+            <b>${state.energy}<i>/${state.maxEnergy}</i></b>
+            <small>行动点</small>
           </div>
         </section>
       </div>
