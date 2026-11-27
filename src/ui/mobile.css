@@ -147,7 +147,7 @@
     padding: 6px !important;
     overflow: auto !important;
     grid-template-columns: 62px minmax(0, 1fr) !important;
-    grid-template-areas: "portrait abilities" "portrait resources" "ap ap" !important;
+    grid-template-areas: "portrait abilities" "portrait resources" !important;
     gap: 5px 6px !important;
   }
 
