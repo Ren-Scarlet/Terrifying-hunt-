@@ -943,15 +943,15 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
     cc.rotate(facing);
 
     // 1. 低强度环境反射：先形成宽而柔和的红色反射，不出现可辨认的椭圆边界。
-    const spill = cc.createRadialGradient(
+    const redSpill = cc.createRadialGradient(
       coneLen * 0.52, 0, coneLen * 0.04,
       coneLen * 0.52, 0, coneLen * 0.82,
     );
-    spill.addColorStop(0, 'rgba(184,8,24,.24)');
-    spill.addColorStop(0.34, 'rgba(132,4,18,.16)');
-    spill.addColorStop(0.68, 'rgba(86,0,12,.065)');
-    spill.addColorStop(1, 'rgba(70,0,8,0)');
-    cc.fillStyle = spill;
+    redSpill.addColorStop(0, 'rgba(184,8,24,.24)');
+    redSpill.addColorStop(0.34, 'rgba(132,4,18,.16)');
+    redSpill.addColorStop(0.68, 'rgba(86,0,12,.065)');
+    redSpill.addColorStop(1, 'rgba(70,0,8,0)');
+    cc.fillStyle = redSpill;
     cc.beginPath();
     cc.ellipse(coneLen * 0.50, 0, coneLen * 0.72, coneLen * 0.39, 0, 0, Math.PI * 2);
     cc.fill();
