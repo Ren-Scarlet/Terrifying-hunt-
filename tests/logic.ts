@@ -9,6 +9,7 @@ import {
   BASE_AP,
   BLEEDOUT_TURNS,
   blinkPlayer,
+  canPlaceBarricade,
   collectTrapCache,
   refillHuntressHatchets,
   throwHuntressHatchet,
@@ -96,6 +97,18 @@ check('开局会随机生成少量上锁住屋，且断电可解除电子门锁'
   return !isLocked(locked, room);
 })());
 check('初始幸存者人数为 10，UI 可按 1/10 形式显示', newGame().survivorTotal === 10);
+
+const boardRules = newGame();
+const boardPerson = player(boardRules);
+const boardRoom = OBSTACLE_ROOMS[0];
+boardPerson.room = boardRoom;
+check('幸存者：原有障碍房间且木板未被清除时可以放板', canPlaceBarricade(boardRules, boardPerson));
+const plainRoom = ROOMS.find((room) => !OBSTACLE_ROOMS.includes(room.id))!.id;
+boardPerson.room = plainRoom;
+check('幸存者：普通房间不能凭空放下木板', !canPlaceBarricade(boardRules, boardPerson));
+boardPerson.room = boardRoom;
+boardRules.clearedObstacles.push(boardRoom);
+check('幸存者：原有木板已被清除后不能再次放板', !canPlaceBarricade(boardRules, boardPerson));
 
 check('初期可选杀手包含设陷者、护士、女猎手与迈尔斯',
   ACTIVE_KILLERS.map((killer) => killer.owner).join('|') === '设陷者|护士|女猎手|迈克尔·迈尔斯' &&
@@ -218,7 +231,7 @@ function casePhoneLineCoordination(): void {
 
 /** 房间导航模块：验证随机生成的房屋图最短路与候选点选择。 */
 
-/** 新抽牌规则：每回合补 1 张、主动抽牌、六张上限、洗牌推进团队进度。 */
+/** 新抽牌规则：每回合补 1 张、主动抽牌、六张上限与正常洗牌。 */
 /** 环境事件：每三回合改变一次现场局势，并正确区分临时闪断与永久断电。 */
 function caseExecutionVariety(): void {
   check('特殊处决：六种处决方式分布在六个不同的场地',
@@ -1550,7 +1563,7 @@ caseMergeAndMissions();
 caseEnvironmentalEvents();
 caseDrawAndDiscardRules();
 
-/** 本轮：人人可救援 / 主动赶去救 / 连杀之后团队进度被催快 */
+/** 本轮：人人可救援 / 主动赶去救 / 追击与逃跑反应。 */
 function caseAidAndPressure(): void {
   const originalRandom = Math.random;
 
