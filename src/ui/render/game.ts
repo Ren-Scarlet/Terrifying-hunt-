@@ -71,7 +71,7 @@ import {
 
 
 import { isCardTuned } from '../../game/tuning';
-import { isMuted, playHeartbeat, playSfx, playTrapScream } from '../audio';
+import { isMuted, playHeartbeat, playSfx, playTrapScream, playSurvivorStartle } from '../audio';
 import { escape, icon, itemBadge, itemIconHtml, personChip, shadowFigures, perkIconHtml, TYPE_NAMES, killerFaceHtml, defaultDetailHtml, cardTextHtml } from './shared';
 import type { GameState, Person, RoomId, SaveData } from '../../game/types';
 
