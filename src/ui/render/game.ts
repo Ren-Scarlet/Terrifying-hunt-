@@ -85,34 +85,23 @@ function roomFeatures(state: GameState, roomId: RoomId): string {
     .filter((i) => i.room === roomId)
     .forEach((i) => {
       const label = SITE_ITEM_LABEL[i.kind];
-      const status =
-        i.kind === 'itemBox'
-          ? i.broken
-            ? '已被砸烂'
-            : `还能翻 ${i.charges} 件`
-          : i.jammedTurns > 0
-            ? `停机 ${i.jammedTurns} 回合`
-            : i.charged
-              ? '已通电'
-              : `修复 ${i.progress}%`;
-      const down = i.broken || i.jammedTurns > 0;
-      const canBreakHere = state.playerRoom === roomId && !down && (i.kind !== 'itemBox' || i.charges > 0) && !state.powerCircuits.some((c) => c.breakerRoom === roomId) && !sabotageBlockReason(state);
-      const feature = `<span class="room-feature site ${i.kind} ${down ? 'broken' : ''}" title="${label}：${status}。你用不了它，但可以花 ${SABOTAGE_COST} 点行动点砸掉">${icon(i.kind === 'itemBox' ? 'itemBox' : 'generator', 'ui-icon tiny')}<b>${i.kind === 'itemBox' ? '道具箱' : '发电机'}</b></span>`;
+      const status = i.broken ? '已被砸烂' : `还能翻 ${i.charges} 件`;
+      const down = i.broken;
+      const canBreakHere = state.playerRoom === roomId && !down && i.charges > 0 && !state.powerCircuits.some((c) => c.breakerRoom === roomId) && !sabotageBlockReason(state);
+      const feature = `<span class="room-feature site itemBox ${down ? 'broken' : ''}" title="${label}：${status}。你用不了它，但可以花 ${SABOTAGE_COST} 点行动点砸掉">${icon('itemBox', 'ui-icon tiny')}<b>道具箱</b></span>`;
       parts.push(canBreakHere
-        ? `<button type="button" class="room-feature site ${i.kind}" data-action="sabotage" title="${label}：${status}。点击花费 ${SABOTAGE_COST} 点行动点破坏">${icon(i.kind === 'itemBox' ? 'itemBox' : 'generator', 'ui-icon tiny')}<b>${i.kind === 'itemBox' ? '破坏道具箱' : '破坏发电机'}</b></button>`
+        ? `<button type="button" class="room-feature site itemBox" data-action="sabotage" title="${label}：${status}。点击花费 ${SABOTAGE_COST} 点行动点破坏">${icon('itemBox', 'ui-icon tiny')}<b>破坏道具箱</b></button>`
         : feature);
     });
   // 房间照明由 Canvas 光照系统直接表现，不再用文字或 emoji 标记灯光状态。
   const circuitAt = state.powerCircuits.find((c) => c.breakerRoom === roomId);
   if (circuitAt) {
-    const source = circuitAt.generatorId ? state.siteItems.find((item) => item.id === circuitAt.generatorId) : undefined;
-    const sourceOffline = !!source && (source.broken || source.jammedTurns > 0);
-    const status = circuitAt.broken ? '控制箱损坏' : circuitAt.enabled === false ? '已拉闸' : sourceOffline ? '发电机停机' : '供电正常';
+    const status = circuitAt.broken ? '控制箱损坏' : circuitAt.enabled === false ? '已拉闸' : '供电正常';
     const breakerTitle = `${escape(circuitAt.name)}：${status}，影响 ${circuitAt.affectedRooms.map(roomName).join('、')}`;
     const breakerBlocked = breakerBlockReason(state, circuitAt.id) ? 'disabled' : '';
     parts.push(state.playerRoom === roomId
-      ? `<button type="button" class="room-feature breaker ${circuitAt.broken || circuitAt.enabled === false || sourceOffline ? 'broken' : ''}" data-action="toggle-breaker" data-circuit-id="${circuitAt.id}" ${breakerBlocked} title="${breakerTitle}。点击切换电闸（${BREAKER_SWITCH_COST} AP）">⚡<b>切换电闸</b></button>`
-      : `<span class="room-feature breaker ${circuitAt.broken || circuitAt.enabled === false || sourceOffline ? 'broken' : ''}" title="${breakerTitle}">⚡<b>电闸</b></span>`);
+      ? `<button type="button" class="room-feature breaker ${circuitAt.broken || circuitAt.enabled === false ? 'broken' : ''}" data-action="toggle-breaker" data-circuit-id="${circuitAt.id}" ${breakerBlocked} title="${breakerTitle}。点击切换电闸（${BREAKER_SWITCH_COST} AP）">${icon('generator', 'ui-icon tiny')}<b>切换电闸</b></button>`
+      : `<span class="room-feature breaker ${circuitAt.broken || circuitAt.enabled === false ? 'broken' : ''}" title="${breakerTitle}">${icon('generator', 'ui-icon tiny')}<b>电闸</b></span>`);
   }
   const placedTrap = state.bearTraps.find((trap) => trap.room === roomId);
   if (placedTrap) {
@@ -241,13 +230,7 @@ function huntOpportunityHtml(state: GameState): string {
 
 function facilityOverviewHtml(state: GameState): string {
   const boxes = state.siteItems.filter((item) => item.kind === 'itemBox');
-  const generators = state.siteItems.filter((item) => item.kind === 'generator');
-  const workingGenerators = generators.filter((item) => !item.broken && item.jammedTurns <= 0 && !item.charged).length;
-  const darkCircuits = state.powerCircuits.filter((circuit) =>
-    circuit.broken || circuit.enabled === false || (circuit.generatorId && state.siteItems.some((item) =>
-      item.id === circuit.generatorId && (item.broken || item.jammedTurns > 0),
-    )),
-  ).length;
+  const darkCircuits = state.powerCircuits.filter((circuit) => circuit.broken || circuit.enabled === false).length;
   const radioBroken = state.sabotage.includes('radio');
   const killerSupplies = state.killer === '设陷者'
     ? `<span class="facility-pill"><i>⚒</i><b>捕兽夹</b><strong>${state.trapInventory}/4 携带 · ${state.bearTraps.filter((trap) => trap.armed).length} 已布设 · ${state.trapCaches.length} 补给点</strong></span>`
@@ -258,8 +241,8 @@ function facilityOverviewHtml(state: GameState): string {
     <div class="facility-overview-heading"><b>现场设施</b><small>地图标记与当前状态</small></div>
     <div class="facility-overview-items">
       <span class="facility-pill"><i>▣</i><b>道具箱</b><strong>${boxes.filter((item) => !item.broken && item.charges > 0).length}/${boxes.length}</strong></span>
-      <span class="facility-pill"><i>⚙</i><b>发电机</b><strong>${workingGenerators}/${generators.length} 可修复</strong></span>
-      <span class="facility-pill"><i>⚡</i><b>电闸</b><strong>${darkCircuits} 组断电</strong></span>
+      <span class="facility-pill">${icon('generator', 'ui-icon tiny')}<b>电闸</b><strong>${darkCircuits} 组断电</strong></span>
+      
       <span class="facility-pill ${state.phoneCut ? 'offline' : ''}"><i>☎</i><b>电话线</b><strong>${state.phoneCut ? '中断' : '正常'}</strong></span>
       <span class="facility-pill ${radioBroken ? 'offline' : ''}"><i>▤</i><b>备用无线电</b><strong>${radioBroken ? '已破坏' : '可用'}</strong></span>
       ${killerSupplies}
@@ -283,7 +266,6 @@ function threatRowsHtml(state: GameState): string {
   if (armed.length) rows.push({ name: '武装反抗', count: armed.length, hint: armed.length + ' 名幸存者持有武器，近身接触可能让你失去行动点。考虑伏击或远程手段。', level: armed.length > 1 ? 'hot' : 'warn' });
   if (hiding.length) rows.push({ name: '藏匿目标', count: hiding.length, hint: hiding.length + ' 人藏在柜子或床底，需要搜索所在房间才能发现。', level: 'warn' });
   const brokenCircuits = state.powerCircuits.filter((c) => c.broken).length;
-  const activeGenerators = state.siteItems.filter((i) => i.kind === 'generator' && !i.broken && i.jammedTurns <= 0 && !i.charged).length;
   const injured = alive.filter((p) => p.hp > 0 && p.hp <= 2).length;
   const highAlert = alive.filter((p) => p.alert >= 75).length;
   const working = alive.filter((p) => p.intent === 'work').length;
@@ -295,7 +277,7 @@ function threatRowsHtml(state: GameState): string {
     ' · 高度警戒 ' + highAlert + ' · 落单 ' + isolated +
     ' · 警报值 ' + state.alarm + '% · 断电回路 ' + brokenCircuits + '/' + state.powerCircuits.length;
   const empty = rows.length ? '' : '<div class="threat-clear"><b>当前没有正在推进的高危行动</b><span>幸存者人数、伤势、恐惧、警戒、落单情况与设施状态仍会持续更新。局势变化时，这里会列出具体威胁和反制方向。</span></div>';
-  return '<div class="threat-live-summary"><b>幸存者威胁 · 实时状态</b><span>' + summary + '</span><small>' + (activeGenerators ? activeGenerators + ' 台发电机仍可被修复。' : '当前没有可继续修复的发电机。') + '</small></div>' +
+  return '<div class="threat-live-summary"><b>幸存者威胁 · 实时状态</b><span>' + summary + '</span><small>' + (brokenCircuits ? '部分电闸已损坏；幸存者可能携带工具箱前往修复。' : '各区域照明由独立电闸控制。') + '</small></div>' +
     '<div class="threat-list">' + rows.map((r) => '<div class="threat-row ' + r.level + '"><span class="t-name">' + r.name + '</span><b class="t-count">' + r.count + '</b><span class="t-hint">' + escape(r.hint) + '</span></div>').join('') + empty + '</div>';
 }
 /**
