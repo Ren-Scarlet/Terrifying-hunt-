@@ -69,6 +69,7 @@ import {
   searchRoom,
   visibleDisturbances,
   visibleTrails,
+  trailActionWindow,
   wipeBlade,
   usePower,
   nextStepToward,
@@ -286,10 +287,10 @@ function caseHuntingGroundsAndFreeHunt(): void {
     (free.mission.tasks?.length ?? 0) === 3);
   free.survivorKills = 3;
   free.executions = 2;
-  free.executionMethodsUsed.push('fridge');
-  const specialExecuteTask = free.mission.tasks!.find((task) => task.kind === 'special_execute');
-  check('自由猎杀：特殊处决挑战能正确累计',
-    !!specialExecuteTask && missionTaskProgress(free, specialExecuteTask) === 1,
+  free.scoreExecutions = 1;
+  const scoreTask = free.mission.tasks!.find((task) => task.kind === 'score_execute');
+  check('自由猎杀：分数处决挑战能正确累计',
+    !!scoreTask && missionTaskProgress(free, scoreTask) === 1,
     '当前挑战类型=' + (free.mission.tasks ?? []).map((task) => task.kind).join(','));
   endTurn(free);
   check('自由猎杀：完成挑战不会自动结束，玩家保留自主决定权',
@@ -615,11 +616,14 @@ function caseMyersStalkingAndFearRadius(): void {
   const scoreTarget = player(scoreExecution);
   scoreTarget.room = scoreExecution.playerRoom;
   scoreTarget.hp = 0;
-  scoreExecution.mission.reward = SCORE_EXECUTION_THRESHOLD;
+  // 门槛看的是 currentScore（含警报扣分），留出余量再测，避免刚好卡在 200 边界。
+  scoreExecution.mission.reward = SCORE_EXECUTION_THRESHOLD + 50;
   scoreExecution.energy = 4;
+  const scoreBlock = scoreExecutionBlockReason(scoreExecution, scoreTarget.id);
   check('分数处决：达到评分门槛后可对同屋倒地目标发动独立处决',
-    scoreExecutionBlockReason(scoreExecution, scoreTarget.id) === '' && executeScoreSpecial(scoreExecution, scoreTarget.id) &&
-    scoreExecution.scoreExecutions === 1 && scoreExecution.executions === 1 && scoreExecution.specialExecutionBonus === 25);
+    scoreBlock === '' && executeScoreSpecial(scoreExecution, scoreTarget.id) &&
+    scoreExecution.scoreExecutions === 1 && scoreExecution.executions === 1 && scoreExecution.specialExecutionBonus === 25,
+    `block=${scoreBlock} score=${currentScore(scoreExecution)}`);
 
   const hatchetTarget = player(huntress);
   hatchetTarget.room = huntress.playerRoom;
@@ -1024,12 +1028,14 @@ function caseTrailDecay(): void {
     p.movesThisTurn = 0;
   });
   const now = visibleTrails(s).length;
-  const trailWindow = s.mapId === 'ormond' ? 8 : 5;
-  for (let i = 0; i < trailWindow; i++) s.trailClock += 1;
+  const trailWindow = trailActionWindow(s);
+  // 脚印已经有一定年龄，直接推进满窗口会把它们推过界；先补到窗口边界再试。
+  const age = s.trails.length ? Math.max(...s.trails.map((t) => s.trailClock - t.clock)) : 0;
+  s.trailClock += Math.max(0, trailWindow - age);
   const later = visibleTrails(s).length;
   s.trailClock += 1;
   const expired = visibleTrails(s).length;
-  check('L 脚印在地图规定的追踪时限内保留，超过时限后自然过期', now > 0 && later > 0 && expired === 0, `${now} → ${later} → ${expired}`);
+  check('L 脚印在地图规定的追踪时限内保留，超过时限后自然过期', now > 0 && later > 0 && expired === 0, `${now} → ${later} → ${expired}（窗口 ${trailWindow}，起始年龄 ${age}）`);
 }
 
 /** M：同屋多人时，点谁打谁 */
@@ -1597,9 +1603,7 @@ caseDrawAndDiscardRules();
 
 /** 本轮：人人可救援 / 主动赶去救 / 追击与逃跑反应。 */
 function caseAidAndPressure(): void {
-  const originalRandom = Math.random;
-
-  // 同屋救援：把原型换成普通「警觉型」，验证不再只有救援型会拉人
+  // 引擎已改用种子随机源（random.ts），改 Math.random 不再生效，必须用 withRandomSource。
   const a = newGame();
   a.people.forEach((p) => { p.item = null; p.itemUses = 0; p.alert = 0; p.hidden = false; p.hp = 4; });
   const pair = a.people.filter((p) => p.role !== 'police').slice(0, 2);
@@ -1610,9 +1614,7 @@ function caseAidAndPressure(): void {
   pair[0].downedTurns = 0;
   pair[1].room = away;
   pair[1].archetype = 'alert';
-  Math.random = () => 0.01;
-  endTurn(a);
-  Math.random = originalRandom;
+  withRandomSource(() => 0.01, () => endTurn(a));
   check('AA 非救援型也会拉起同屋倒地同伴', pair[0].hp === 2, `hp=${pair[0].hp} down=${pair[0].downedTurns}`);
 
   // 主动赶路：倒地的人在另一间屋，附近的人会放下手里的活往那边走
@@ -1629,9 +1631,7 @@ function caseAidAndPressure(): void {
   folk[1].room = far;
   folk[1].archetype = 'alert';
   folk[1].intent = 'idle';
-  Math.random = () => 0.01;
-  endTurn(b);
-  Math.random = originalRandom;
+  withRandomSource(() => 0.01, () => endTurn(b));
   check(
     'AA 幸存者会主动朝倒地同伴赶过去',
     folk[1].room === near || folk[1].intent === 'rescue' || folk[1].activity.includes('赶去'),
@@ -1665,7 +1665,11 @@ function caseContractsPowerAndCarry(): void {
   check('AB 未发生报警时无报警目标保持完成', missionTaskProgress(contract, alarmTask) === 1);
   contract.npcAlarmed = true;
   check('AB 幸存者成功报警后无报警目标失败', missionTaskProgress(contract, alarmTask) === 0);
-  check('AB 契约只使用新任务类型且包含可选奖励目标', (contract.mission.tasks ?? []).every((task) => ['kill_count', 'marked_kill', 'execute', 'special_execute', 'alarm_below', 'killer_stat'].includes(task.kind)) && (contract.mission.tasks ?? []).some((task) => task.optional && (task.reward ?? 0) > 0));
+  const allowedKinds = ['kill_count', 'marked_kill', 'execute', 'special_execute', 'score_execute', 'alarm_below', 'no_alarm', 'break_circuit', 'killer_stat'];
+  const actualKinds = (contract.mission.tasks ?? []).map((task) => task.kind);
+  check('AB 契约只使用新任务类型且包含可选奖励目标',
+    actualKinds.every((kind) => allowedKinds.includes(kind)) && (contract.mission.tasks ?? []).some((task) => task.optional && (task.reward ?? 0) > 0),
+    '实际类型=' + actualKinds.join(','));
   check('AB 新契约回合上限延长到 40 且不生成限时击杀任务', contract.mission.turns === 40 && !(contract.mission.tasks ?? []).some((task) => task.kind === 'kill_count_before_turn'));
   const myersContract = generateMission('迈克尔·迈尔斯');
   check('AB 迈尔斯契约含尾随不同幸存者的专属奖励任务', myersContract.tasks?.some((task) => task.kind === 'killer_stat' && task.metric === 'myers_stalk') === true);
@@ -1688,7 +1692,9 @@ function caseContractsPowerAndCarry(): void {
   expired.mission.tasks = [{ ...timedTask, optional: false }]; expired.turn = 6;
   endTurn(expired);
   check('AB 旧限时任务不会再导致第 5 回合提前判负', expired.result === null && expired.phase === 'playing');
-  const mainObjective = newGame();
+  // 契约是随机生成的，这里显式指定「血色清单」才能保证有标记目标。
+  const mainObjective = createGame(STARTING_DECK, generateMission('迈克尔·迈尔斯', 'assassinate'), '迈克尔·迈尔斯');
+  mainObjective.roomLocks = {};
   mainObjective.markedKilled = 1;
   endTurn(mainObjective);
   check('AB 主目标完成后不自动结束，可继续追求额外奖励', mainObjective.missionPrimaryCompleted && mainObjective.result === null);
@@ -1762,7 +1768,8 @@ function caseContractsPowerAndCarry(): void {
 caseContractsPowerAndCarry();
 
 function caseMarkedTargetIdentification(): void {
-  const game = newGame();
+  const game = createGame(STARTING_DECK, generateMission('迈克尔·迈尔斯', 'assassinate'), '迈克尔·迈尔斯');
+  game.roomLocks = {};
   const marked = game.people.find((person) => person.marked && person.role !== 'police');
   const ordinary = game.people.find((person) => !person.marked && person.role !== 'police');
   check('特殊幸存者：每局至少有一名契约指定目标', Boolean(marked));

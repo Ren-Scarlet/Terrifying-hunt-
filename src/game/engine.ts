@@ -491,7 +491,8 @@ function snapshotRooms(state: GameState): Map<string, RoomId> {
   return new Map(npcs(state).map((p) => [p.id, p.room]));
 }
 
-function trailActionWindow(state: GameState): number {
+/** 脚印在多少步行动后淡出：室内 5 步，奥蒙德雪地额外 +3。 */
+export function trailActionWindow(state: GameState): number {
   return TRAIL_ACTION_WINDOW + (state.mapId === 'ormond' ? 3 : 0);
 }
 

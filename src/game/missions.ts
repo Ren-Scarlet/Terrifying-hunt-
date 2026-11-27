@@ -115,9 +115,11 @@ function optionalTasks(killer: string, required: MissionTask[]): MissionTask[] {
   return selected;
 }
 
-/** 契约只在玩家点击「准备开始」时随机生成；不会先展示任务供玩家针对性改牌。 */
-export function generateMission(killer = '迈克尔·迈尔斯'): Mission {
-  const definition = pick(contractDefinitions());
+/** 契约只在玩家点击「准备开始」时随机生成；不会先展示任务供玩家针对性改牌。
+ *  kind 可选：测试与「指定契约」入口用，传了就只在该类型里选。 */
+export function generateMission(killer = '迈克尔·迈尔斯', kind?: MissionKind): Mission {
+  const pool = contractDefinitions();
+  const definition = (kind ? pool.find((item) => item.kind === kind) : undefined) ?? pick(pool);
   const tasks = [...definition.tasks, ...optionalTasks(killer, definition.tasks)];
   return {
     id: `contract-${Date.now()}-${Math.floor(random() * 100000)}`,
