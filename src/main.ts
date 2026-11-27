@@ -476,11 +476,11 @@ function flash(cls: 'hit-kill' | 'hit-alert'): void {
   window.setTimeout(() => document.body.classList.remove(cls), 520);
 }
 
-/** 日志里的人名做稳定哈希：同一个幸存者始终是同一种嗓音（数据层没有性别字段） */
+/** 从行动日志中的真实人物姓名查回角色资料，按固定性别选择对应音轨。 */
 function playVoice(head: string, kind: 'Hurt' | 'Hit' | 'Scream' | 'Startle'): void {
-  let h = 0;
-  for (let i = 0; i < head.length; i += 1) h = (h * 31 + head.charCodeAt(i)) | 0;
-  playSfx(`voice${(h & 1) ? 'F' : 'M'}${kind}` as SfxName);
+  const survivor = Object.values(SURVIVOR_MAP).find((person) => head.includes(person.name));
+  if (!survivor) return;
+  playSfx(`voice${survivor.gender === 'female' ? 'F' : 'M'}${kind}` as SfxName);
 }
 
 /** 引擎日志里刚发生的事 → 补上对应音效（不侵入纯逻辑层） */
