@@ -1282,7 +1282,7 @@ function wantsToLeave(state: GameState, person: Person): boolean {
  * 这时候只留地面上的痕迹，让玩家自己看地板。
  */
 function fleeAway(state: GameState, person: Person, quiet = false): boolean {
-  if (state.pinnedPeople.includes(person.id) || person.blockedTurns > 0 || person.hp <= 0 || person.fear >= 100) return false;
+  if (state.pinnedPeople.includes(person.id) || person.blockedTurns > 0 || person.hp <= 0) return false;
   if (person.room !== state.playerRoom && person.hp <= SURVIVOR_INJURED_HP && person.movesThisTurn % 2 === 1) {
     person.activity = '重伤拖慢了脚步，踉跄着停了一下';
     return false;
@@ -3118,6 +3118,10 @@ export function attack(state: GameState, targetId?: string, options: { costOverr
     return false;
   }
   state.energy -= attackCost;
+  if (state.killer === '护士' && state.nurseFollowUp && target.role !== 'police') {
+    state.huntStats.nurseGrabs += 1;
+    log(state, `护士利用闪现后的追击窗口攻击了 ${target.name}，额外挑战进度 +1。`);
+  }
   state.attackReady = false;
   state.lastAttackedId = target.id;
   if (target.role === 'police') {
