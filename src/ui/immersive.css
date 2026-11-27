@@ -1997,3 +1997,12 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
   position: fixed !important; z-index: 120 !important;
   max-height: calc(100vh - 24px); overflow: visible;
 }
+
+
+/* Restore full visibility at the room layer too; child opacity cannot undo a dimmed parent. */
+#app.immersive-game .floorplan > .room:not(.current) .room-people.adjacent-survivors {
+  opacity: 1 !important; filter: none !important;
+}
+#app.immersive-game .floorplan > .room.fogged:not(.current) .room-people.adjacent-survivors {
+  opacity: 1 !important; filter: none !important;
+}
