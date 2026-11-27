@@ -182,7 +182,7 @@ function doorMarkersHtml(state: GameState): string {
     const canPass = !!targetRoom && !locked && canMoveTo(state, targetRoom);
     const shortOnAp = adjacent && !locked && !canPass;
     const status = locked ? 'blocked' : barricaded ? 'barricaded' : canPass ? 'active' : shortOnAp ? 'low-ap' : 'open';
-    const title = locked ? '封锁的门' : barricaded ? '木板封门：点击破坏，追逐中强行冲门可能被砸晕' : canPass ? '当前可通行' : shortOnAp ? '门已打开，但行动点不足' : '可通行的门';
+    const title = locked ? '电子门锁：切断对应区域电力可解除，也可在门外强行破门' : barricaded ? '木板封门：花费 1 AP 破坏；追逐中强行冲门可能被砸晕' : canPass ? '当前可通行' : shortOnAp ? '门已打开，但行动点不足' : '可通行的门';
     return `<span class="map-door-marker ${position.orientation} ${status}" style="left:${position.left.toFixed(3)}%;top:${position.top.toFixed(3)}%" title="${title}" aria-hidden="true"><i></i></span>`;
   })).join('');
 }
@@ -469,11 +469,11 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
           ${isPlayer
             ? '<span class="room-tag">你在</span>'
             : locked
-              ? '<span class="room-tag lock">封锁 · 进不去</span>'
+              ? '<span class="room-tag lock" title="电子门锁：断电解除或在门外强行破门">电子门锁 · 断电可解</span>'
               : barricaded
                 ? '<span class="room-tag bar">木板封门</span>'
                 : obstacleOpen
-                  ? `<span class="room-tag obstacle">障碍 · ${cost}点</span>`
+                  ? `<span class="room-tag obstacle">木板障碍 · ${cost}点</span>`
                   : reachable
                     ? `<span class="room-tag go">可进 · ${cost}点</span>`
                     : adjacent
@@ -766,7 +766,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
       <h3>当前任务 / OBJECTIVE</h3>
       <p><b>${escape(m.objective ?? m.title)}</b></p>
       <p>${escape(m.successText ?? '达成主目标')}<br>失败条件：${escape(m.failText ?? '超时或被捕')}</p>
-      <p>${progress.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()}</p>
+      <div class="mission-task-list"><b class="mission-task-heading">任务列表：</b>${progress}</div>
       <p>剩余回合：${left} · 当前猎杀阶段：${huntPhase}</p>
     </div>
 
@@ -791,14 +791,8 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
               ${trailOverlay(state)}
               ${playerMarker}
               ${mapWorldActions}
-              ${mapEventFeedHtml(state)}
           </div>
        </div>
-
-        <div class="panel intel-log-panel">
-          <div class="panel-heading"><h2>完整行动记录</h2><span>最新记录在最上方</span></div>
-          <div class="log">${state.log.slice(0, 30).map((line) => `<div>${escape(line)}</div>`).join('')}</div>
-        </div>
 
         <div class="statusline">
           <div class="resource-bar">
@@ -839,6 +833,8 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
             <div class="hand-row">${hand || '<div class="empty-hand">手牌已空，可花行动点主动抽牌。</div>'}</div>
           </div>
           <button class="hand-toggle" data-action="toggle-hand" title="收起 / 展开手牌" aria-label="收起或展开手牌" aria-expanded="true">⌄</button>
+          ${mapEventFeedHtml(state)}
+          <details class="activity-log-panel"><summary>活动日志 · ${state.log.length}</summary><div class="activity-log-list">${state.log.slice(0, 24).map((line) => `<div>${escape(line)}</div>`).join('')}</div></details>
         </div>
         <section class="killer-ability-panel" aria-label="杀手能力 HUD">
           <div class="killer-hud-portrait">
