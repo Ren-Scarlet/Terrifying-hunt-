@@ -41,36 +41,46 @@ function bindIntelPanelDrag(): void {
   const handle = panel?.querySelector<HTMLElement>('.intel-drag-handle');
   if (!panel || !handle || handle.dataset.dragBound === 'true') return;
   handle.dataset.dragBound = 'true';
-  handle.addEventListener('pointerdown', (event: PointerEvent) => {
-    if ((event.target as HTMLElement).closest('button')) return;
-    const rect = panel.getBoundingClientRect();
-    handle.dataset.dragPointer = String(event.pointerId);
-    handle.dataset.dragStartX = String(event.clientX);
-    handle.dataset.dragStartY = String(event.clientY);
-    handle.dataset.dragLeft = String(rect.left);
-    handle.dataset.dragTop = String(rect.top);
-    try { handle.setPointerCapture(event.pointerId); } catch { /* Ignore unsupported pointer capture. */ }
-    event.preventDefault();
-  });
-  handle.addEventListener('pointermove', (event: PointerEvent) => {
-    if (handle.dataset.dragPointer !== String(event.pointerId)) return;
-    const left = Number(handle.dataset.dragLeft) + event.clientX - Number(handle.dataset.dragStartX);
-    const top = Number(handle.dataset.dragTop) + event.clientY - Number(handle.dataset.dragStartY);
+  let activePointer: number | null = null;
+  let startX = 0;
+  let startY = 0;
+  let startLeft = 0;
+  let startTop = 0;
+  const move = (event: PointerEvent): void => {
+    if (activePointer !== event.pointerId) return;
+    const left = startLeft + event.clientX - startX;
+    const top = startTop + event.clientY - startY;
     const nextLeft = clamp(left, 8, Math.max(8, window.innerWidth - panel.offsetWidth - 8));
     const nextTop = clamp(top, 8, Math.max(8, window.innerHeight - panel.offsetHeight - 8));
     intelPanelPosition = { left: nextLeft, top: nextTop };
+    panel.style.position = 'fixed';
     panel.style.left = String(nextLeft) + 'px';
     panel.style.top = String(nextTop) + 'px';
     panel.style.right = 'auto';
     panel.style.transform = 'none';
-  });
-  const stop = (event: PointerEvent): void => {
-    if (handle.dataset.dragPointer !== String(event.pointerId)) return;
-    delete handle.dataset.dragPointer;
-    try { handle.releasePointerCapture(event.pointerId); } catch { /* Already released. */ }
   };
-  handle.addEventListener('pointerup', stop);
-  handle.addEventListener('pointercancel', stop);
+  const stop = (event: PointerEvent): void => {
+    if (activePointer !== event.pointerId) return;
+    activePointer = null;
+    window.removeEventListener('pointermove', move);
+    window.removeEventListener('pointerup', stop);
+    window.removeEventListener('pointercancel', stop);
+    try { handle.releasePointerCapture(event.pointerId); } catch { /* Pointer capture may already be released. */ }
+  };
+  handle.addEventListener('pointerdown', (event: PointerEvent) => {
+    if ((event.target as HTMLElement).closest('button')) return;
+    const rect = panel.getBoundingClientRect();
+    activePointer = event.pointerId;
+    startX = event.clientX;
+    startY = event.clientY;
+    startLeft = rect.left;
+    startTop = rect.top;
+    try { handle.setPointerCapture(event.pointerId); } catch { /* Window listeners still handle dragging. */ }
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', stop);
+    window.addEventListener('pointercancel', stop);
+    event.preventDefault();
+  });
 }
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
