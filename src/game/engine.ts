@@ -95,6 +95,8 @@ export const FRENZY_MAX = 100;
 export const FRENZY_THRESHOLD = 50;
 /** 满值给的额外行动点：不替玩家走第二步，只把「能多走」交到他手里 */
 export const FRENZY_AP_BONUS = 2;
+/** 分数处决的解锁门槛；达到后，倒地幸存者头顶出现独立 QTE 按钮。 */
+export const SCORE_EXECUTION_THRESHOLD = 200;
 /** 每跟对一段脚印涨多少，跟丢一次掉多少 */
 const FRENZY_GAIN = 25;
 const FRENZY_LOSS = 20;
@@ -3027,7 +3029,36 @@ export function executeDownedPerson(state: GameState, targetId?: string): boolea
   return true;
 }
 
+export function scoreExecutionBlockReason(state: GameState, targetId: string): string {
+  if (currentScore(state) < SCORE_EXECUTION_THRESHOLD) return '猎杀评分尚未达到 ' + SCORE_EXECUTION_THRESHOLD + ' 分，暂时无法发动分数处决。';
+  return executeBlockReason(state, targetId);
+}
 
+/** 分数处决：独立于普通处决与搬运地点处决，使用单独的头顶按钮和 QTE。 */
+export function executeScoreSpecial(state: GameState, targetId: string): boolean {
+  const reason = scoreExecutionBlockReason(state, targetId);
+  if (reason) {
+    log(state, reason);
+    return false;
+  }
+  const target = state.people.find((person) => person.id === targetId);
+  if (!target) {
+    log(state, '分数处决失败：没有找到目标。');
+    return false;
+  }
+  state.energy -= 1;
+  state.scoreExecutions += 1;
+  state.specialExecutionBonus += 25;
+  addAlarm(state, 8);
+  state.executions += 1;
+  log(state, '分数处决：你消耗 1 AP，发动独立处决动作，额外获得 25 分。');
+  killPerson(state, target);
+  if (state.result) return true;
+  state.attackReady = true;
+  afterPlayerAction(state);
+  checkImmediateWin(state);
+  return true;
+}
 
 /**
  * 普通攻击：只针对站立目标，健康 → 受伤，受伤 → 倒地；倒地后使用独立处决动作。
@@ -3970,6 +4001,7 @@ export function missionTaskProgress(state: GameState, task: MissionTask): number
     case 'marked_kill': return state.markedKilled;
     case 'execute': return state.executions;
     case 'special_execute': return state.executionMethodsUsed.length;
+    case 'score_execute': return state.scoreExecutions;
     case 'no_alarm': return state.npcAlarmed ? 0 : 1;
     case 'break_circuit': return state.powerCircuits.filter((c) => c.broken).length;
     case 'alarm_below': return state.alarm <= (task.limit ?? 35) ? 1 : 0;
