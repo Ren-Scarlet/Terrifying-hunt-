@@ -2588,3 +2588,25 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
 #app.immersive-game .floorplan .room-feature.barricade-action:hover { border-color:rgba(235,95,82,.9)!important; background:rgba(70,18,18,.96)!important; }
 #app.immersive-game .killer-power-grid .btn.power .power-art { margin:0!important; }
 #app.immersive-game .killer-power-grid .btn.power .power-body b { text-align:left!important; }
+
+
+/* Off-screen aura direction: subtle deep-red flashes at the nearest screen edge. */
+#app.immersive-game .map-viewport > .aura-edge-layer {
+  position:absolute; inset:0; z-index:60; overflow:hidden; pointer-events:none;
+}
+#app.immersive-game .aura-edge-indicator {
+  position:absolute; display:flex; align-items:center; justify-content:center; gap:4px;
+  min-width:34px; height:30px; padding:0 6px; border:1px solid rgba(190,8,24,.72);
+  border-radius:7px; color:#ffd8d9; background:rgba(72,0,10,.48);
+  box-shadow:0 0 10px rgba(150,0,18,.58),0 0 24px rgba(110,0,12,.38),inset 0 0 10px rgba(255,20,36,.12);
+  transform:translate(-50%,-50%); animation:auraEdgePulse 1.15s ease-in-out infinite;
+}
+#app.immersive-game .aura-edge-arrow {
+  display:block; color:#ff293c; font-size:16px; line-height:1;
+  transform:rotate(var(--aura-angle,0deg)); text-shadow:0 0 9px #b00019;
+}
+#app.immersive-game .aura-edge-indicator b { font-size:10px; color:#ffe2df; }
+@keyframes auraEdgePulse {
+  0%,100% { opacity:.42; filter:brightness(.8); box-shadow:0 0 7px rgba(150,0,18,.35),0 0 16px rgba(110,0,12,.2); }
+  50% { opacity:1; filter:brightness(1.5); box-shadow:0 0 13px rgba(210,0,24,.78),0 0 34px rgba(150,0,18,.58),0 0 58px rgba(110,0,12,.28); }
+}
