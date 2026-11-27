@@ -491,9 +491,18 @@ function caseMyersStalkingAndFearRadius(): void {
   )?.id ?? openNeighbor(trapper.playerRoom);
   trapper.playerRoom = trapRoom;
   trapper.energy = 4;
-  check('设陷者：开局携带 2 个捕兽夹并可在合适房间布设',
+  check('设陷者：开局携带 2 个捕兽夹并可在当前房间布设',
     trapper.trapInventory === 2 && usePower(trapper, 'trap_set') && trapper.trapInventory === 1 &&
     trapper.bearTraps.some((trap) => trap.room === trapRoom && trap.armed));
+  const unrestrictedTrapper = createGame(STARTING_DECK, undefined, '设陷者');
+  unrestrictedTrapper.playerRoom = 'garden';
+  unrestrictedTrapper.objectiveRooms.push('garden');
+  unrestrictedTrapper.energy = 4;
+  const firstFreePlacement = usePower(unrestrictedTrapper, 'trap_set');
+  const secondFreePlacement = usePower(unrestrictedTrapper, 'trap_set');
+  check('设陷者：陷阱可在室外、目标房间和已有陷阱的房间连续布设',
+    firstFreePlacement && secondFreePlacement && unrestrictedTrapper.bearTraps.filter((trap) => trap.room === 'garden' && trap.armed).length === 2 &&
+    unrestrictedTrapper.trapInventory === 0 && unrestrictedTrapper.energy === 2);
   check('设陷者：地图随机生成额外捕兽夹补给点',
     trapper.trapCaches.length === 2, `caches=${trapper.trapCaches.length}`);
   const trappedPerson = player(trapper);
@@ -528,6 +537,48 @@ function caseMyersStalkingAndFearRadius(): void {
     check('设陷者：可以在地图补给点收集额外捕兽夹',
       collectTrapCache(trapper) && trapper.trapInventory === beforeCache + 1);
   }
+
+  const trapperCardPool = deckCardsForKiller('设陷者').map((card) => card.id);
+  check('设陷者：三张专属卡只加入设陷者卡池',
+    ['trapper_panic', 'trapper_brutal_strength', 'trapper_euphoria'].every((id) => trapperCardPool.includes(id)) &&
+    !deckCardsForKiller('护士').some((card) => ['trapper_panic', 'trapper_brutal_strength', 'trapper_euphoria'].includes(card.id)));
+
+  const panicCard = createGame(STARTING_DECK, undefined, '设陷者');
+  const panicRoom = ROOM_MAP[panicCard.playerRoom].neighbors.find((room) =>
+    ROOM_MAP[room].neighbors.some((next) => roomDistance(panicCard.playerRoom, next) > 1),
+  )!;
+  const panicTarget = player(panicCard);
+  panicCard.people.forEach((person) => { if (person.role !== 'police' && person.id !== panicTarget.id) person.hidden = true; });
+  panicTarget.room = panicRoom;
+  panicTarget.hidden = false;
+  panicTarget.blockedTurns = 2;
+  panicTarget.fear = 0;
+  panicCard.hand = [{ uid: 'test-trapper-panic', defId: 'trapper_panic' }];
+  panicCard.energy = 0;
+  const panicDistance = roomDistance(panicCard.playerRoom, panicTarget.room);
+  const panicPlayed = playCard(panicCard, 'test-trapper-panic');
+  check('恐慌降临：0 费使相邻幸存者恐惧 +25 并向远离杀手的方向移动',
+    panicPlayed && panicTarget.fear === 25 && roomDistance(panicCard.playerRoom, panicTarget.room) > panicDistance,
+    `fear=${panicTarget.fear} room=${panicTarget.room}`);
+
+  const brutalCard = createGame(STARTING_DECK, undefined, '设陷者');
+  brutalCard.siteItems = [{ id: 'test-trapper-item', kind: 'itemBox', room: brutalCard.playerRoom, broken: false, charges: 1 }];
+  brutalCard.hand = [{ uid: 'test-trapper-brutal', defId: 'trapper_brutal_strength' }];
+  brutalCard.energy = 0;
+  const brutalPlayed = playCard(brutalCard, 'test-trapper-brutal');
+  check('所向无敌：0 费免费破坏当前房间的一处设施',
+    brutalPlayed && brutalCard.siteItems[0].broken && brutalCard.energy === 0);
+
+  const euphoriaCard = createGame(STARTING_DECK, undefined, '设陷者');
+  const carriedTarget = player(euphoriaCard);
+  carriedTarget.hp = 0;
+  euphoriaCard.carryPersonId = carriedTarget.id;
+  euphoriaCard.hand = [{ uid: 'test-trapper-euphoria', defId: 'trapper_euphoria' }];
+  euphoriaCard.energy = 0;
+  const euphoriaPlayed = playCard(euphoriaCard, 'test-trapper-euphoria');
+  check('欣喜若狂：抱起幸存者后免费获得 1 AP 并标记最近特殊处决地点',
+    euphoriaPlayed && euphoriaCard.energy === 1 && !!euphoriaCard.executionSiteHint &&
+    (euphoriaCard.scouted[euphoriaCard.executionSiteHint] ?? 0) >= 1);
 
   const nurse = createGame(STARTING_DECK, undefined, '护士');
   const nurseTarget = player(nurse);
