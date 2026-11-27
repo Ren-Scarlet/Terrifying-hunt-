@@ -13,6 +13,7 @@ import {
   throwHuntressHatchet,
   executeCarriedPerson,
   executeDownedPerson,
+  executeScoreSpecial,
   createGame,
   discardCard,
   drawCardAction,
@@ -40,7 +41,7 @@ import {
   wipeBlade,
 } from './game/engine';
 import { loadSave, writeSave } from './game/save';
-import { generateFreeHunt } from './game/missions';
+import { generateFreeHunt, generateMission } from './game/missions';
 import { STARTER_KILLERS } from './game/killers';
 import {
   applyTuning,
@@ -713,7 +714,9 @@ function afterAction(): void {
 function startGame(freeHunt = false): void {
   playedDeathLogMessages.clear();
   selectedPersonId = null;
-  game = createGame(save.deck, freeHunt ? generateFreeHunt() : undefined, save.killer ?? '迈克尔·迈尔斯', currentMenuMap().id);
+  const killer = save.killer ?? '迈克尔·迈尔斯';
+  const mission = freeHunt ? generateFreeHunt() : generateMission(killer);
+  game = createGame(save.deck, mission, killer, currentMenuMap().id);
   screen = 'game';
   lastKills = game.kills;
   lastWanted = game.wanted;
@@ -802,7 +805,7 @@ app.addEventListener('click', (event) => {
   if (!target) return;
   clearHeldMovement();
   const action = target.dataset.action;
-  const qteAction = action === 'execute' || action === 'execute-target' || action === 'execute-special';
+  const qteAction = action === 'execute' || action === 'execute-target' || action === 'execute-special' || action === 'execute-score-special';
   const qteOutcome = target.dataset.qteOutcome as ExecutionQteOutcome | undefined;
   if (qteAction && game && screen === 'game' && !qteOutcome) {
     startExecutionQte(target);
@@ -1162,6 +1165,34 @@ app.addEventListener('click', (event) => {
       };
       playSfx('execute');
       if (downedId) playSfx(SURVIVOR_MAP[downedId]?.gender === 'female' ? 'voiceFScream' : 'voiceMScream', 0.96);
+      window.setTimeout(() => playSfx('wipe'), 260);
+      lastLogHead = game.log[0] ?? '';
+    }
+    afterAction();
+    return;
+  }
+
+  if (action === 'execute-score-special') {
+    if (!game || screen !== 'game') return;
+    const personId = target.dataset.personId;
+    const ghosts = captureAttackGhosts();
+    const executed = !!personId && executeScoreSpecial(game, personId);
+    if (executed && personId) {
+      const person = game.people.find((candidate) => candidate.id === personId);
+      pendingMapAttackTarget = personId;
+      pendingMapAttackGhost = ghosts.get(personId) ?? null;
+      const style = EXECUTION_STYLES[game.killer] ?? EXECUTION_STYLES['设陷者'];
+      const perfect = qteOutcome === 'perfect';
+      applyExecutionQteOutcome(perfect ? 'perfect' : 'miss', style);
+      pendingExecutionScene = {
+        roomId: game.playerRoom,
+        title: style.title + ' · 分数处决' + (perfect ? ' · 完美 QTE' : ''),
+        description: style.action + '。' + style.line + (perfect ? ' 分数处决完成，QTE 完美，额外获得 25 分。' : ' 分数处决仍然完成，但 QTE 失误，没有额外分数。'),
+        style: style.motion,
+        success: perfect,
+      };
+      playSfx('execute');
+      if (person) playSfx(SURVIVOR_MAP[person.id]?.gender === 'female' ? 'voiceFScream' : 'voiceMScream', 0.96);
       window.setTimeout(() => playSfx('wipe'), 260);
       lastLogHead = game.log[0] ?? '';
     }
