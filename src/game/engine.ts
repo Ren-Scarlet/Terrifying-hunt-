@@ -902,6 +902,8 @@ function killPerson(state: GameState, person: Person): void {
   }
   state.kills += 1;
   if (person.role !== 'police') state.survivorKills += 1;
+  // 同一回合的第二个及之后的击杀算「连杀」，鼓励用控制/范围效果制造连锁。
+  if (person.role !== 'police' && state.killsThisTurn >= 1) state.huntStats.comboKills += 1;
   state.killsThisTurn += 1;
   if (person.marked) state.markedKilled += 1;
   state.lastCrimeRoom = state.playerRoom;
@@ -4191,6 +4193,12 @@ export function scoreLines(state: GameState, result: ResultKind | null = null): 
   if (bonusTasks.length) {
     add('契约', `额外挑战 · ${bonusTasks.length} 项`, bonusTasks.reduce((sum, task) => sum + (task.reward ?? 25), 0));
   }
+  if (state.mission.ante) {
+    const anteTask = (state.mission.tasks ?? []).find((task) => task.id === 'ante-target');
+    const anteDone = !!anteTask && missionTaskProgress(state, anteTask) >= anteTask.target;
+    if (anteDone) add('契约', '加注达成 · 契约分 +60%', Math.round(state.mission.reward * 0.6));
+    else if (result) add('失分', '加注未达成', -Math.round(state.mission.reward * 0.5));
+  }
 
   // —— 猎杀 ——
   add('猎杀', `击杀 ${state.kills} 人`, state.kills * 14);
@@ -4199,6 +4207,7 @@ export function scoreLines(state: GameState, result: ResultKind | null = null): 
     add('猎杀', `处决方式多样性 · ${state.executionMethodsUsed.length} 种`, (state.executionMethodsUsed.length - 1) * 10);
   }
   add('猎杀', `恐惧崩溃击杀 · ${state.huntStats.terrorKills} 次`, state.huntStats.terrorKills * 8);
+  add('猎杀', `连杀 · ${state.huntStats.comboKills} 次`, state.huntStats.comboKills * 12);
   add('猎杀', '地形处决奖励', state.specialExecutionBonus);
   add('猎杀', '卡牌猎杀奖励', state.cardBonusScore);
 

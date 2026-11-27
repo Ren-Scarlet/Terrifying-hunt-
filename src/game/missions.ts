@@ -137,6 +137,23 @@ export function generateMission(killer = '迈克尔·迈尔斯', kind?: MissionK
   };
 }
 
+/**
+ * 加注：在契约上追加一个高难目标。
+ * 达成时契约分 +60%，未达成时结算扣 50%——风险与收益都由玩家自己选。
+ */
+export function withAnte(mission: Mission): Mission {
+  if (mission.mode === 'free') return mission;
+  const anteTask: MissionTask = {
+    id: 'ante-target',
+    kind: 'kill_count',
+    label: '加注目标：累计击杀 6 名幸存者',
+    target: 6,
+    reward: 0,
+    optional: true,
+  };
+  return { ...mission, ante: true, tasks: [...(mission.tasks ?? []), anteTask] };
+}
+
 export function generateFreeHunt(): Mission {
   return {
     id: `free-hunt-${Date.now()}`,

@@ -843,6 +843,8 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
                 <div class="score-line"><span>每处决 1 次</span><b>+10</b></div>
                 <div class="score-line"><span>胜利结算：每剩余 1 回合</span><b>+5</b></div>
                 <div class="score-line"><span>击杀已恐惧崩溃的目标</span><b>+8</b></div>
+                <div class="score-line"><span>同一回合连杀（第 2 人起）</span><b>+12</b></div>
+                <div class="score-line"><span>加注达成</span><b>契约分 +60%</b></div>
                 <div class="score-line"><span>每逃走 1 人</span><b>-15</b></div>
               </section>
             </details>

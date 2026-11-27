@@ -121,6 +121,7 @@ export function createGame(
       myersBurstHits: 0,
       quietKills: 0,
       terrorKills: 0,
+      comboKills: 0,
     },
     huntStyleScore: 0,
     huntStyleRank: 'C',

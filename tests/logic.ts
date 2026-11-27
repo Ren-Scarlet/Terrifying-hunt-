@@ -82,7 +82,7 @@ import { cardImage } from '../src/game/assetMap';
 import { readdirSync } from 'node:fs';
 import { personChip, personDetailHtml } from '../src/ui/render/shared';
 import { SURVIVOR_MAP } from '../src/game/survivors';
-import { generateMission, generateFreeHunt } from '../src/game/missions';
+import { generateMission, generateFreeHunt, withAnte } from '../src/game/missions';
 import { HUNTING_GROUNDS } from '../src/game/maps';
 import type { GameState, RoomId } from '../src/game/types';
 import { createSeededRandom, random, withRandomSource } from '../src/game/random';
@@ -2289,6 +2289,22 @@ check('苦涩低语：出牌后会等待下一次人类死亡，再触发全场�
   const terror = newGame();
   terror.huntStats.terrorKills = 2;
   check('分数构成：恐惧崩溃击杀有加分', scoreLines(terror).some((line) => line.label.includes('恐惧崩溃击杀')));
+}
+
+// 连杀与加注
+{
+  const combo = newGame();
+  combo.huntStats.comboKills = 2;
+  check('分数构成：连杀有加分', scoreLines(combo).some((line) => line.label.includes('连杀')), scoreLines(combo).map((line) => line.label).join('|'));
+
+  const anteGame = newGame();
+  anteGame.mission = withAnte(anteGame.mission);
+  check('加注：未完成前不写入分数', !scoreLines(anteGame).some((line) => line.label.includes('加注')));
+  anteGame.survivorKills = 6;
+  check('加注：达成后额外获得 60% 契约分', scoreLines(anteGame).some((line) => line.label.includes('加注达成') && line.value > 0));
+  const anteFail = newGame();
+  anteFail.mission = withAnte(anteFail.mission);
+  check('加注：未达成时结算扣分', scoreLines(anteFail, 'timeout').some((line) => line.label.includes('加注未达成') && line.value < 0));
 }
 
 caseNewPerkSystem();

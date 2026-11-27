@@ -41,7 +41,7 @@ import {
   wipeBlade,
 } from './game/engine';
 import { loadSave, writeSave } from './game/save';
-import { generateFreeHunt, generateMission } from './game/missions';
+import { generateFreeHunt, generateMission, withAnte } from './game/missions';
 import { STARTER_KILLERS } from './game/killers';
 import {
   applyTuning,
@@ -111,6 +111,8 @@ let screen: Screen = 'menu';
 let editorOpen = false;
 let shopOpen = false;
 let guideOpen = false;
+/** 下一局是否加注：达成追加目标则契约分 +60%，未达成结算 −50%。 */
+let anteArmed = false;
 let adminOpen = new URLSearchParams(window.location.search).get('admin') === '1';
 let editorDeck: string[] = [...save.deck];
 let resultApplied = false;
@@ -537,7 +539,7 @@ function render(): void {
   } else if (shopOpen) {
     html = renderShop(save);
   } else if (screen === 'menu' || !game) {
-    html = renderMenu(save);
+    html = renderMenu(save, anteArmed);
   } else {
     html = renderGame(game, getKiller(save.killer));
     if (screen === 'result') html += renderResult(game, lastNewCard);
@@ -719,7 +721,7 @@ function startGame(freeHunt = false): void {
   playedDeathLogMessages.clear();
   selectedPersonId = null;
   const killer = save.killer ?? '迈克尔·迈尔斯';
-  const mission = freeHunt ? generateFreeHunt() : generateMission(killer);
+  const mission = freeHunt ? generateFreeHunt() : (anteArmed ? withAnte(generateMission(killer)) : generateMission(killer));
   game = createGame(save.deck, mission, killer, currentMenuMap().id);
   screen = 'game';
   lastKills = game.kills;
@@ -839,6 +841,11 @@ app.addEventListener('click', (event) => {
     return;
   }
 
+  if (action === 'ante') {
+    anteArmed = !anteArmed;
+    render();
+    return;
+  }
   if (action === 'start' || action === 'again' || action === 'free-hunt') {
     // 三段串起来，避免同时响糊成一团：点击准备完成 → 进入地图 → 游戏开始
     playSfx('ready');

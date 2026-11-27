@@ -5,7 +5,7 @@ import type { SaveData } from '../../game/types';
 import { currentMenuMap, mapArtSrc } from '../mapArt';
 import { detailCardHtml, escape, getKiller, icon, killerFaceHtml, perkIconHtml, powerIconHtml } from './shared';
 
-export function renderMenu(save: SaveData): string {
+export function renderMenu(save: SaveData, ante = false): string {
   const killer = getKiller(save.killer);
   const canAfford = save.darkCells >= 2;
   const map = currentMenuMap();
@@ -84,6 +84,7 @@ export function renderMenu(save: SaveData): string {
         </div>
         <div class="actions">
           <button class="btn primary" data-action="start">准备开始 · 随机契约</button>
+          <button class="btn ${ante ? 'primary' : ''}" data-action="ante" title="多接一个高难目标：达成契约分 +60%，未达成 −50%">加注 · ${ante ? '已开启' : '关闭'}</button>
           <button class="btn" data-action="free-hunt">自由猎杀</button>
           <button class="btn" data-action="deck">编辑牌组</button>
           <button class="btn" data-action="shop">卡牌商店</button>

@@ -310,6 +310,8 @@ export interface Mission {
   successText?: string;
   /** 失败条件：写清楚「没做到什么就失败」 */
   failText?: string;
+  /** 加注：开局面多接一个高难目标，达成契约分 +60%，未达成 −50%。 */
+  ante?: boolean;
 }
 
 /** 每回合重置，用于结算杀手被动的一次性效果 */
@@ -340,6 +342,8 @@ export interface HuntStyleStats {
   quietKills: number;
   /** 击杀时目标已处于「恐惧崩溃」状态的次数。 */
   terrorKills: number;
+  /** 同一回合内连续放倒的额外击杀次数（第 2 人起）。 */
+  comboKills: number;
 }
 
 export type HuntStyleRank = 'S' | 'A' | 'B' | 'C';
