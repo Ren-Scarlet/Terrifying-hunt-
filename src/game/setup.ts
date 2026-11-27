@@ -8,7 +8,7 @@ import {
   ITEM_BOX_COUNT, SABOTAGE_COST,
 } from './constants';
 import {
-  ENTRY_ROOM, EXIT_ROOM, OBSTACLE_ROOMS, ROOM_MAP, ROOMS, buildLayout,
+  ENTRY_ROOM, EXIT_ROOM, OBSTACLE_ROOMS, ROOM_MAP, ROOMS, TOTEM_ROOMS, buildLayout,
 } from './rooms';
 import type { CardInstance, GameState, Mission, SiteItem } from './types';
 import { drawCards } from './deck';
@@ -157,7 +157,8 @@ export function createGame(
     distressingActive: false,
     hexRuinActive: false,
     hexRuinUsed: false,
-    totems: [],
+    totems: [...TOTEM_ROOMS],
+    totemInteractions: [],
     bonusEnergyNextTurn: 0,
     clearedObstacles: [],
     escaped: 0,
