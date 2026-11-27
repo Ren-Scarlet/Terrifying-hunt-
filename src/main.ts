@@ -1064,7 +1064,7 @@ app.addEventListener('click', (event) => {
       pendingMapAttackGhost = ghosts.get(personId) ?? null;
       updateAttackGhostEscapeDirection(pendingMapAttackGhost, personId);
       playSfx('huntressAxe');
-      if (victimIsSurvivor) playSurvivorHit();
+      if (victimIsSurvivor) playSurvivorHit(personId ? SURVIVOR_MAP[personId]?.gender ?? 'male' : 'male');
     }
     afterAction();
     return;
@@ -1080,7 +1080,7 @@ app.addEventListener('click', (event) => {
       pendingMapAttackGhost = ghosts.get(personId) ?? null;
       updateAttackGhostEscapeDirection(pendingMapAttackGhost, personId);
       playSfx('nurseAttack');
-      if (victimIsSurvivor) playSurvivorHit();
+      if (victimIsSurvivor) playSurvivorHit(personId ? SURVIVOR_MAP[personId]?.gender ?? 'male' : 'male');
     }
     afterAction();
     return;
@@ -1132,7 +1132,7 @@ app.addEventListener('click', (event) => {
       pendingMapAttackTarget = game.lastAttackedId ?? null;
       pendingMapAttackGhost = pendingMapAttackTarget ? ghosts.get(pendingMapAttackTarget) ?? null : null;
       if (pendingMapAttackTarget) updateAttackGhostEscapeDirection(pendingMapAttackGhost, pendingMapAttackTarget);
-      if (pendingMapAttackTarget && survivorIdsBefore.has(pendingMapAttackTarget)) playSurvivorHit();
+      if (pendingMapAttackTarget && survivorIdsBefore.has(pendingMapAttackTarget)) playSurvivorHit(personId ? SURVIVOR_MAP[personId]?.gender ?? 'male' : 'male');
     }
     playKillerAttackSound(game);
     if (game.kills > kills) playSfx('kill');
@@ -1211,7 +1211,7 @@ app.addEventListener('click', (event) => {
       pendingMapAttackTarget = game.lastAttackedId;
       pendingMapAttackGhost = ghosts.get(game.lastAttackedId) ?? null;
       updateAttackGhostEscapeDirection(pendingMapAttackGhost, game.lastAttackedId);
-      if (survivorIdsBefore.has(game.lastAttackedId)) playSurvivorHit();
+      if (survivorIdsBefore.has(game.lastAttackedId)) playSurvivorHit(personId ? SURVIVOR_MAP[personId]?.gender ?? 'male' : 'male');
       playKillerAttackSound(game);
     }
     playSfx('click');
