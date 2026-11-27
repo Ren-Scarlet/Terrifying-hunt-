@@ -2345,10 +2345,35 @@ function escapePhase(state: GameState): void {
 /* ==================================================================== */
 
 function policeNextStep(state: GameState, police: Person): RoomId {
-  const fresh = state.heatTurn >= state.turn - 1;
-  const destination = state.emergencyActive ? state.playerRoom : state.decoyRoom ?? (fresh ? state.lastCrimeRoom ?? state.playerRoom : null);
+  const freshCrime = state.heatTurn >= state.turn - 1 || state.policeAssaulted;
+  const caller = state.people.find((person) =>
+    person.role !== 'police' && person.hp > 0 && !person.hidden && person.intent === 'call',
+  );
+  let destination: RoomId | null =
+    state.emergencyActive
+      ? state.playerRoom
+      : state.decoyRoom
+        ?? (freshCrime ? state.lastCrimeRoom ?? state.noiseRoom ?? state.playerRoom : null)
+        ?? caller?.room
+        ?? state.noiseRoom;
+
+  // 没有报警或犯罪线索时，警员不再随机游荡，而是巡查电话、无线电、电闸与逃生点。
+  const patrolPoints = [...new Set<RoomId>([
+    ...PHONE_ROOMS,
+    ...RADIO_ROOMS,
+    ...state.powerCircuits.map((circuit) => circuit.breakerRoom),
+    ...ESCAPE_ROOMS,
+  ])];
+  if (!destination && patrolPoints.length) {
+    let index = (police.routineIndex ?? 0) % patrolPoints.length;
+    if (police.room === patrolPoints[index]) {
+      index = (index + 1) % patrolPoints.length;
+      police.routineIndex = index;
+    }
+    destination = patrolPoints[index];
+  }
   if (!destination) {
-    const options = ROOM_MAP[police.room].neighbors.filter((r) => !isLocked(state, r));
+    const options = ROOM_MAP[police.room].neighbors.filter((room) => !isLocked(state, room));
     return options.length ? randomOf(options) : police.room;
   }
   if (police.room === destination) return police.room;
@@ -2357,9 +2382,9 @@ function policeNextStep(state: GameState, police: Person): RoomId {
 
 function policePhase(state: GameState): void {
   if (KILLER_MAP[state.killer]?.school === 'supernatural') return;
-  const officers = state.people.filter((p) => p.role === 'police');
+  const officers = state.people.filter((person) => person.role === 'police');
   if (!officers.length) return;
-  let reachedPlayer = false;
+
   for (const police of officers) {
     const next = policeNextStep(state, police);
     if (state.wiretap) log(state, `窃听：警察正在前往${roomName(next)}。`);
@@ -2368,28 +2393,53 @@ function policePhase(state: GameState): void {
       log(state, '后院大门被锁，警察本回合无法移动。');
     } else if (next !== police.room) {
       police.room = next;
-      log(state, `${police.name}移动到${roomName(next)}。`);
+      police.activity = `正在调查${roomName(next)}`;
+      log(state, `${police.name}沿着线索移动到${roomName(next)}。`);
     }
-    if (police.room === state.playerRoom) reachedPlayer = true;
   }
-  if (!reachedPlayer) { state.policeLock = 0; return; }
-  state.policeLock += 1;
-  if (state.emergencyActive) {
-    state.stunTurns = Math.max(state.stunTurns, 1);
-    log(state, state.policeLock >= 3
-      ? '警察从多个方向包围了你，枪托与电击器接连落下——你已无力继续抵抗！'
-      : '警察冲入你的房间并向你发动攻击！你必须甩开包围，不能再停留。');
-    if (state.policeLock >= 3) {
-      state.resultReason = '警察增援完成包围，你被制服。';
-      finish(state, 'caught');
-    }
+
+  const officerInRoom = officers.find((police) => police.room === state.playerRoom);
+  const officerNearby = officers.find((police) => roomDistance(police.room, state.playerRoom) <= 1);
+  if (!officerNearby) {
+    state.policeLock = 0;
     return;
   }
-  const pressure = state.policeLock >= 2 ? 18 : 10;
-  addAlarm(state, pressure);
-  log(state, state.policeLock >= 2
-    ? `警察咬住你不放，警报值升至 ${state.alarm}/${ALARM_MAX}。`
-    : `警察短暂拦住了你，警报值升至 ${state.alarm}/${ALARM_MAX}。`);
+
+  if (!officerInRoom) {
+    // 警员在相邻房间搜查：附近幸存者会因警笛和呼喊重新警觉。
+    const searched = npcs(state).filter((person) =>
+      person.hp > 0 && !person.hidden && roomDistance(person.room, officerNearby.room) <= 1,
+    );
+    searched.forEach((person) => {
+      person.alert = clamp(person.alert + 10, 0, 100);
+      person.awareness = Math.max(person.awareness, 1);
+      if (person.alert >= 40 && person.intent === 'idle') person.intent = 'wary';
+      person.activity = '听见警员在附近搜查';
+    });
+    addAlarm(state, 4);
+    log(state, `${officerNearby.name}正在相邻区域搜查，警笛声惊动了附近的幸存者（警报 +4）。`);
+    state.policeLock = 0;
+    return;
+  }
+
+  state.policeLock += 1;
+  state.stunTurns = Math.max(state.stunTurns, 1);
+  addAlarm(state, state.policeLock >= 2 ? 16 : 10);
+  npcs(state).filter((person) =>
+    person.hp > 0 && !person.hidden && roomDistance(person.room, state.playerRoom) <= 1,
+  ).forEach((person) => {
+    person.alert = clamp(person.alert + 14, 0, 100);
+    person.awareness = Math.max(person.awareness, 2);
+  });
+
+  log(state, state.emergencyActive && state.policeLock >= 3
+    ? '警察完成包围，枪托与电击器接连落下——你已无力继续抵抗！'
+    : '警察撞入你的房间并用电击器逼退你！你下回合少 1 点行动点，附近幸存者也被惊动。');
+
+  if (state.emergencyActive && state.policeLock >= 3) {
+    state.resultReason = '警察增援完成包围，你被制服。';
+    finish(state, 'caught');
+  }
 }
 
 function witnessPhase(state: GameState): void {
