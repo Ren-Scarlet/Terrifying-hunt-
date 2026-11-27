@@ -10,7 +10,6 @@ import {
   BLEEDOUT_TURNS,
   blinkPlayer,
   collectTrapCache,
-  nurseGrabPerson,
   refillHuntressHatchets,
   throwHuntressHatchet,
   HAND_LIMIT,
@@ -19,7 +18,6 @@ import {
   discardCard,
   FRENZY_AP_BONUS,
   SEARCH_COST,
-  TEAM_STAGE_COUNT,
   conditionOf,
   SABOTAGE_COST,
   addAlarm,
@@ -337,9 +335,8 @@ function caseDrawAndDiscardRules(): void {
   const shuffle = newGame();
   shuffle.drawPile = [];
   shuffle.discardPile = [{ uid: 'reshuffle-test', defId: 'insidious' }];
-  const progress = shuffle.teamProgress;
   drawCardAction(shuffle);
-  check('抽牌规则：洗牌正常进行且不再推进废弃的团队进度', shuffle.teamProgress === progress && shuffle.hand.some((c) => c.uid === 'reshuffle-test'));
+  check('抽牌规则：牌库耗尽后正常洗回弃牌堆', shuffle.hand.some((c) => c.uid === 'reshuffle-test'));
 
   const flee = newGame();
   const victim = player(flee);
@@ -485,7 +482,7 @@ function caseMyersStalkingAndFearRadius(): void {
   const trapper = createGame(STARTING_DECK, undefined, '设陷者');
   const trapRoom = ROOMS.find((room) =>
     room.id !== trapper.playerRoom && room.id !== 'garden' && room.id !== 'garage' &&
-    !trapper.objectiveRooms.includes(room.id) && room.neighbors.length >= 2 &&
+    room.neighbors.length >= 2 &&
     !trapper.people.some((person) => person.role !== 'police' && person.hp > 0 && person.room === room.id),
   )?.id ?? openNeighbor(trapper.playerRoom);
   trapper.playerRoom = trapRoom;
@@ -495,11 +492,10 @@ function caseMyersStalkingAndFearRadius(): void {
     trapper.bearTraps.some((trap) => trap.room === trapRoom && trap.armed));
   const unrestrictedTrapper = createGame(STARTING_DECK, undefined, '设陷者');
   unrestrictedTrapper.playerRoom = 'garden';
-  unrestrictedTrapper.objectiveRooms.push('garden');
   unrestrictedTrapper.energy = 4;
   const firstFreePlacement = usePower(unrestrictedTrapper, 'trap_set');
   const secondFreePlacement = usePower(unrestrictedTrapper, 'trap_set');
-  check('设陷者：陷阱可在室外、目标房间和已有陷阱的房间连续布设',
+  check('设陷者：陷阱可在室外和已有陷阱的房间连续布设',
     firstFreePlacement && secondFreePlacement && unrestrictedTrapper.bearTraps.filter((trap) => trap.room === 'garden' && trap.armed).length === 2 &&
     unrestrictedTrapper.trapInventory === 0 && unrestrictedTrapper.energy === 2);
   check('设陷者：地图随机生成额外捕兽夹补给点',
@@ -580,22 +576,6 @@ function caseMyersStalkingAndFearRadius(): void {
     (euphoriaCard.scouted[euphoriaCard.executionSiteHint] ?? 0) >= 1);
 
   // 抓取判定依赖随机原型（有的幸存者会改伤害/状态），整段固定随机源，避免偶发失败。
-  withRandomSource(createSeededRandom(20261127), () => {
-    const nurse = createGame(STARTING_DECK, undefined, '护士');
-    const nurseTarget = player(nurse);
-    const blinkRoom = ROOM_MAP[nurse.playerRoom].neighbors[0];
-    nurseTarget.room = blinkRoom;
-    nurseTarget.hidden = false;
-    nurse.energy = 4;
-    check('护士：闪现能力先进入选点状态，不立即消耗行动点',
-      usePower(nurse, 'nurse_blink') && nurse.nurseBlinkTargeting && nurse.energy === 4);
-    check('护士：可以穿过房门闪现到 1 格外房间并开启抓取窗口',
-      blinkPlayer(nurse, blinkRoom) && nurse.playerRoom === blinkRoom && nurse.nurseFollowUp && nurse.nurseFatiguePending && nurse.energy === 3);
-    check('护士：闪现后抓取会打断目标并施加疲惫',
-      nurseGrabPerson(nurse, nurseTarget.id) && nurseTarget.hp === 3 && nurseTarget.blockedTurns === 1 &&
-      nurse.huntStats.nurseBlinks === 1 && nurse.huntStats.nurseGrabs === 1 && nurse.stunTurns === 1 && !nurse.nurseFollowUp && !nurse.nurseFatiguePending);
-  });
-
   const nurseAttack = createGame(STARTING_DECK, undefined, '护士');
   const nurseAttackTarget = player(nurseAttack);
   nurseAttackTarget.room = ROOM_MAP[nurseAttack.playerRoom].neighbors[0];
@@ -609,7 +589,7 @@ function caseMyersStalkingAndFearRadius(): void {
   nurseAttack.energy = 4;
   nurseAttack.attackReady = true;
   check('护士：闪现后使用普通攻击也能完成专属额外任务',
-    attack(nurseAttack, nurseAttackTarget.id) && nurseAttack.huntStats.nurseGrabs === 1 && !nurseAttack.nurseFollowUp);
+    attack(nurseAttack, nurseAttackTarget.id) && nurseAttack.huntStats.nurseBlinkAttacks === 1 && !nurseAttack.nurseFollowUp);
 
   const huntress = createGame(STARTING_DECK, undefined, '女猎手');
   const hatchetTarget = player(huntress);
@@ -621,7 +601,7 @@ function caseMyersStalkingAndFearRadius(): void {
     huntress.hatchets === 3 && usePower(huntress, 'huntress_axe') && huntress.huntressAiming);
   check('女猎手：投掷飞斧消耗 1 把、造成伤害，并使幸存者恐慌逃离',
     throwHuntressHatchet(huntress, hatchetTarget.id) && huntress.hatchets === 2 && hatchetTarget.hp === 3 &&
-    huntress.huntStats.hatchetHits === 1 && hatchetTarget.fear === 100 && hatchetTarget.room !== huntress.playerRoom);
+    huntress.huntStats.hatchetHits === 1 && hatchetTarget.fear === 80 && hatchetTarget.room !== huntress.playerRoom);
   huntress.playerRoom = CABINET_ROOMS[0];
   huntress.hatchets = 1;
   huntress.energy = 4;
@@ -640,7 +620,7 @@ function caseMyersStalkingAndFearRadius(): void {
     trapTriggers: 2,
     hatchetHits: 2,
     nurseBlinks: 2,
-    nurseGrabs: 2,
+    nurseBlinkAttacks: 2,
     myersBurstHits: 2,
     quietKills: 3,
   };
@@ -1437,15 +1417,6 @@ function caseSurvivorItems(): void {
   endTurn(s2);
   check('Y 道具箱全被破坏后，幸存者拿不到道具', !s2.people.some((x) => x.item !== null));
 
-  const s3 = newGame();
-  const p3 = s3.people.find((x) => x.role !== 'police')!;
-  p3.item = 'key';
-  p3.itemUses = 1;
-  p3.alert = 100;
-  s3.playerRoom = 'hall';
-  const before = s3.teamProgress;
-  endTurn(s3);
-  check('Y 钥匙道具不再推进已废弃的团队进度', s3.teamProgress === before, `${before} → ${s3.teamProgress}`);
 }
 
 /** 本轮：擦刀 / 同屋目击者 / 袭警 / 道具次数 / 拉扯型 */
@@ -1502,9 +1473,8 @@ function caseNewMechanics() {
   pair[1].room = g.playerRoom;
   pair[0].hp = 4;
   g.attackReady = true;
-  const tp = g.teamProgress;
   attack(g, pair[0].id);
-  check('Z 同屋另一名幸存者不会站着不动', pair[1].alert > 0 || pair[1].movesThisTurn > 0 || g.teamProgress > tp, `alert=${pair[1].alert} tp=${g.teamProgress}`);
+  check('Z 同屋另一名幸存者不会站着不动', pair[1].alert > 0 || pair[1].movesThisTurn > 0, `alert=${pair[1].alert} moves=${pair[1].movesThisTurn}`);
 
   // 倒地者不再触发守尸惩罚，玩家可以选择继续追击或处决。
   const c = newGame();
@@ -1513,9 +1483,8 @@ function caseNewMechanics() {
   downed.room = c.playerRoom;
   downed.hp = 0;
   downed.downedTurns = 0;
-  const tp2 = c.teamProgress;
   endTurn(c);
-  check('Z 倒地者不再触发守尸惩罚', c.teamProgress === tp2, `${tp2} → ${c.teamProgress}`);
+  check('Z 倒地者在回合结束后正常推进流血倒计时', downed.downedTurns === 1, `downedTurns=${downed.downedTurns}`);
 
   // 袭警：现在可以砍警员，但通缉立刻暴涨
   const f = newGame();
@@ -1636,29 +1605,6 @@ function caseAidAndPressure(): void {
   withRandomSource(() => 0.99, () => { endTurn(medkitGame); endTurn(medkitGame); });
   check('AA 医疗包会在连续两回合后救起倒地同伴', medkitDowned.hp > 0 && medkitDowned.downedTurns === 0 && medic.itemUses < 2, `hp=${medkitDowned.hp} healTurns=${medic.healTurns}`);
 
-  // 击杀压力：死了 3 个人后，目标房干活一回合推进明显快于基础值 5
-  let delta = 0;
-  for (let attempt = 0; attempt < 5 && delta < 7; attempt += 1) {
-    const w = newGame();
-    w.siteItems = [];
-    w.people.forEach((p) => { p.item = null; p.itemUses = 0; p.alert = 0; p.hidden = false; p.hp = 4; });
-    const room = w.objectiveRooms.find((r) => r !== w.playerRoom);
-    if (!room) continue;
-    const worker = w.people.filter((p) => p.role !== 'police')[0];
-    worker.goal = 'objective';
-    worker.room = room;
-    worker.intent = 'idle';
-    worker.alert = 0;
-    worker.awareness = 2;
-    worker.movesThisTurn = 0;
-    w.kills = 3;
-    const before = w.teamProgress;
-    Math.random = () => 0.5;
-    endTurn(w);
-    Math.random = originalRandom;
-    delta = w.teamProgress - before;
-  }
-  check('AA 连杀三人不再推进已废弃的团队目标', delta === 0, `旧进度变化 ${delta}`);
 }
 
 caseAidAndPressure();
@@ -1877,9 +1823,8 @@ function caseNpcAwarenessAndDialogue(): void {
   const daily = newGame();
   const civilians = daily.people.filter((p) => p.role !== 'police');
   check('AC 幸存者开局处于日常认知阶段', civilians.every((p) => p.awareness === 0 && p.alert === 0));
-  const beforeProgress = daily.teamProgress;
   endTurn(daily);
-  check('AC 没有异常时幸存者不会启动团队逃生工作', daily.teamProgress === beforeProgress && civilians.every((p) => p.awareness === 0));
+  check('AC 没有异常时幸存者仍处于日常认知阶段', civilians.every((p) => p.awareness === 0));
   check('AC 日常 NPC 会生成生活对白', civilians.every((p) => p.dialogue.length > 0));
 
   const suspicious = newGame();
