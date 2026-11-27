@@ -62,7 +62,8 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     environment:
-      name: github-pages
+      # 功能分支使用独立环境，避免正式 Pages 环境只允许 main 的部署保护规则。
+      name: ${{ github.ref == 'refs/heads/main' && 'github-pages' || 'github-pages-preview' }}
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
