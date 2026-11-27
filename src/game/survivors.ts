@@ -3,7 +3,7 @@
  * 知名角色标记为 special，并赋予会真正影响玩法的威胁行为。
  */
 
-export type NpcThreat = 'alarm' | 'lead' | 'team' | 'spiritual';
+export type NpcThreat = 'alarm' | 'lead' | 'spiritual';
 
 export interface Survivor {
   id: string;
@@ -22,7 +22,7 @@ const portraitOf = (s: Omit<Survivor, 'portrait'>): string =>
   `assets/characters/portraits/${s.id}_${s.en.replace(/\s/g, '')}_Portrait.webp`;
 
 const SURVIVOR_SEEDS: Omit<Survivor, 'portrait'>[] = [
-  { id: 'S01', gender: 'male', name: '德怀特·费尔菲尔德', en: 'Dwight Fairfield', bio: '总在找人组队，却总是最后一个知道发生了什么。' },
+  { id: 'S01', gender: 'male', name: '德怀特·费尔菲尔德', en: 'Dwight Fairfield', bio: '总在寻找安全路线，却总是最后一个知道发生了什么。' },
   { id: 'S02', gender: 'female', name: '梅格·托马斯', en: 'Meg Thomas', bio: '短跑选手，习惯用速度解决一切问题。' },
   { id: 'S03', gender: 'female', name: '克洛黛特·莫雷尔', en: 'Claudette Morel', bio: '懂草药，也懂如何让别人闭嘴。' },
   { id: 'S04', gender: 'male', name: '朴杰克', en: 'Jake Park', bio: '沉默的徒步者，能在任何地方睡著。' },
@@ -38,8 +38,8 @@ const SURVIVOR_SEEDS: Omit<Survivor, 'portrait'>[] = [
   { id: 'S14', gender: 'male', name: '亚当·弗朗西斯', en: 'Adam Francis', bio: '教师，总是最后一个离开教室的人。' },
   { id: 'S15', gender: 'male', name: '杰夫·约翰森', en: 'Jeff Johansen', bio: '他在寻找失踪的姐姐，不会轻易离开线索。' },
   { id: 'S16', gender: 'female', name: '简·罗梅罗', en: 'Jane Romero', bio: '名人，知道自己被看见时的价值。' },
-  { id: 'S17', gender: 'male', name: '阿什·威廉姆斯', en: 'Ash Williams', franchise: '鬼玩人', threat: 'team', bio: '他见过书、见过恶魔，也见过比这更糟的夜晚。他会组织活人反击。' },
-  { id: 'S18', gender: 'female', name: '南希·惠勒', en: 'Nancy Wheeler', franchise: '怪奇物语', threat: 'team', bio: '她从不接受“反正没人会相信”这种说法。' },
+  { id: 'S17', gender: 'male', name: '阿什·威廉姆斯', en: 'Ash Williams', franchise: '鬼玩人', threat: 'lead', bio: '他见过书、见过恶魔，也见过比这更糟的夜晚；危险来临时，他从不轻易退缩。' },
+  { id: 'S18', gender: 'female', name: '南希·惠勒', en: 'Nancy Wheeler', franchise: '怪奇物语', threat: 'lead', bio: '她从不接受“反正没人会相信”这种说法。' },
   { id: 'S19', gender: 'male', name: '史蒂夫·哈灵顿', en: 'Steve Harrington', franchise: '怪奇物语', threat: 'lead', bio: '他总能把一群孩子带出险境，即使自己满身是伤。' },
   { id: 'S20', gender: 'female', name: '木村由衣', en: 'Yui Kimura', bio: '拳击手，习惯正面面对恐惧。' },
   { id: 'S21', gender: 'female', name: '扎里娜·卡西尔', en: 'Zarina Kassir', bio: '移民律师，相信每个人都能拿到第二次机会。' },
@@ -47,14 +47,14 @@ const SURVIVOR_SEEDS: Omit<Survivor, 'portrait'>[] = [
   { id: 'S23', gender: 'male', name: '费利克斯·里希特', en: 'Felix Richter', bio: '建筑师，对每一扇门的位置都记得很清楚。' },
   { id: 'S24', gender: 'female', name: '埃洛迪·拉科托', en: 'Elodie Rakoto', bio: '她带着一把旧斧头，也带着一整个家族的秘密。' },
   { id: 'S25', gender: 'female', name: '李允珍', en: 'Yun-Jin Lee', franchise: '娱乐公司', threat: 'alarm', bio: '她知道该打给谁，也知道该让谁闭嘴。' },
-  { id: 'S26', gender: 'female', name: '吉尔·瓦伦丁', en: 'Jill Valentine', franchise: '生化危机', threat: 'team', bio: 'S.T.A.R.S. 成员。她会迅速组织起一支临时小队。' },
-  { id: 'S27', gender: 'male', name: '里昂·S·肯尼迪', en: 'Leon Scott Kennedy', franchise: '生化危机', threat: 'team', bio: '新员工，但手里的枪从来不是装饰。' },
+  { id: 'S26', gender: 'female', name: '吉尔·瓦伦丁', en: 'Jill Valentine', franchise: '生化危机', threat: 'lead', bio: 'S.T.A.R.S. 成员。她习惯迅速判断威胁，并寻找反击机会。' },
+  { id: 'S27', gender: 'male', name: '里昂·S·肯尼迪', en: 'Leon Scott Kennedy', franchise: '生化危机', threat: 'lead', bio: '新员工，但手里的枪从来不是装饰。' },
   { id: 'S28', gender: 'female', name: '米凯拉·里德', en: 'Mikaela Reid', bio: '写恐怖故事的人，最怕自己写过的情节成真。' },
   { id: 'S29', gender: 'male', name: '乔纳·巴斯克斯', en: 'Jonah Vasquez', bio: '他的数学能算出最安全的路线。' },
   { id: 'S30', gender: 'male', name: '浅川阳一', en: 'Yoichi Asakawa', franchise: '午夜凶铃', threat: 'spiritual', bio: '他研究过那盘录像带，知道灵异的痕迹无法用常识解释。' },
   { id: 'S31', gender: 'female', name: '哈迪·考尔', en: 'Haddie Kaur', bio: '她记录过太多“不可能发生”的事。' },
-  { id: 'S32', gender: 'female', name: '艾达·王', en: 'Ada Wong', franchise: '生化危机', threat: 'team', bio: '她从不为别人冒险，除非那正好也是她的任务。' },
-  { id: 'S33', gender: 'female', name: '丽贝卡·查姆伯斯', en: 'Rebecca Chambers', franchise: '生化危机', threat: 'team', bio: '医疗兵，总能用人最少的资源救回最多的人。' },
+  { id: 'S32', gender: 'female', name: '艾达·王', en: 'Ada Wong', franchise: '生化危机', threat: 'lead', bio: '她从不为别人冒险，除非那正好也是她的任务。' },
+  { id: 'S33', gender: 'female', name: '丽贝卡·查姆伯斯', en: 'Rebecca Chambers', franchise: '生化危机', threat: 'lead', bio: '医疗兵，总能用人最少的资源救回最多的人。' },
   { id: 'S34', gender: 'male', name: '维托里奥·托斯卡诺', en: 'Vittorio Toscano', bio: '他带着祖传的护身符，从不解释它有什么用。' },
   { id: 'S35', gender: 'female', name: '塔莉塔·莱拉', en: 'Thalita Lyra', bio: '舞者，脚步比多数人安静。' },
   { id: 'S36', gender: 'male', name: '雷纳托·莱拉', en: 'Renato Lyra', bio: '她的兄弟，永远跟在她身后半步。' },
@@ -63,17 +63,17 @@ const SURVIVOR_SEEDS: Omit<Survivor, 'portrait'>[] = [
   { id: 'S39', gender: 'female', name: '艾伦·雷普利', en: 'Ellen Ripley', franchise: '异形', threat: 'lead', bio: '她从不抛下任何人，也从不相信“已经安全了”。' },
   { id: 'S40', gender: 'male', name: '艾伦·韦克', en: 'Alan Wake', franchise: '心灵杀手', threat: 'spiritual', bio: '他写下的句子会变成现实，包括那些最坏的句子。' },
   { id: 'S41', gender: 'female', name: '塞布尔·沃德', en: 'Sable Ward', franchise: '灵异', threat: 'spiritual', bio: '她在地下室摆过一场仪式，有些东西跟着她走了出来。' },
-  { id: 'S42', gender: 'male', name: '剧团', en: 'The Troupe', franchise: '马戏团', threat: 'team', bio: '他们一起行动，一起欢呼，一起消失。' },
+  { id: 'S42', gender: 'male', name: '剧团', en: 'The Troupe', franchise: '马戏团', threat: 'lead', bio: '他们的笑声总在你看不见的地方响起。' },
   { id: 'S43', gender: 'female', name: '劳拉·克劳馥', en: 'Lara Croft', franchise: '古墓丽影', threat: 'lead', bio: '她能凭一支火把走出任何迷宫。' },
-  { id: 'S44', gender: 'male', name: '特雷弗·贝尔蒙特', en: 'Trevor Belmont', franchise: '恶魔城', threat: 'team', bio: '他带着鞭子和圣水，对“鬼怪”这件事很有经验。' },
+  { id: 'S44', gender: 'male', name: '特雷弗·贝尔蒙特', en: 'Trevor Belmont', franchise: '恶魔城', threat: 'lead', bio: '他带着鞭子和圣水，对“鬼怪”这件事很有经验。' },
   { id: 'S45', gender: 'female', name: '托里·凯恩', en: 'Taurie Cain', franchise: '灵异', threat: 'spiritual', bio: '她能听见墙里的低语，并低声回答。' },
   { id: 'S46', gender: 'female', name: '奥雷拉·罗斯', en: 'Orela Rose', bio: '她相信善意能改变任何结局，包括这个。' },
-  { id: 'S47', gender: 'male', name: '瑞克·格莱姆斯', en: 'Rick Grimes', franchise: '行尸走肉', threat: 'team', bio: '他会先清点人数，再决定要不要开门。' },
-  { id: 'S48', gender: 'female', name: '米琼恩·格莱姆斯', en: 'Michonne Grimes', franchise: '行尸走肉', threat: 'team', bio: '她不需要说话就能让一屋子人安静下来。' },
+  { id: 'S47', gender: 'male', name: '瑞克·格莱姆斯', en: 'Rick Grimes', franchise: '行尸走肉', threat: 'lead', bio: '他习惯先确认周围环境，再决定是否开门。' },
+  { id: 'S48', gender: 'female', name: '米琼恩·格莱姆斯', en: 'Michonne Grimes', franchise: '行尸走肉', threat: 'lead', bio: '她不需要说话就能让一屋子人安静下来。' },
   { id: 'S49', gender: 'female', name: '薇·布尼亚萨克', en: 'Vee Boonyasak', bio: '她把每一道门都当作可以谈判的对象。' },
-  { id: 'S50', gender: 'male', name: '达斯汀·亨德森', en: 'Dustin Henderson', franchise: '怪奇物语', threat: 'team', bio: '他造的电台能接通任何不该被接通的频率。' },
+  { id: 'S50', gender: 'male', name: '达斯汀·亨德森', en: 'Dustin Henderson', franchise: '怪奇物语', threat: 'lead', bio: '他造的电台能接通任何不该被接通的频率。' },
   { id: 'S51', gender: 'female', name: '十一', en: 'Eleven', franchise: '怪奇物语', threat: 'spiritual', bio: '她能听见别人的声音，也能让门自己关上。' },
-  { id: 'S52', gender: 'male', name: '权泰英', en: 'Kwon Tae-young', franchise: '鱿鱼游戏', threat: 'team', bio: '他习惯在混乱里数清还有多少人站着。' },
+  { id: 'S52', gender: 'male', name: '权泰英', en: 'Kwon Tae-young', franchise: '鱿鱼游戏', threat: 'lead', bio: '他习惯在混乱里迅速判断局势。' },
 ];
 
 export const SURVIVORS: Survivor[] = SURVIVOR_SEEDS.map((s) => ({ ...s, portrait: portraitOf(s) }));
@@ -91,14 +91,12 @@ export const SPECIAL_SURVIVORS = SURVIVORS.filter((s) => s.threat);
 export const THREAT_LABEL: Record<NpcThreat, string> = {
   alarm: '报警者',
   lead: '领路人',
-  team: '组队者',
   spiritual: '灵异感知',
 };
 
 export const THREAT_DESC: Record<NpcThreat, string> = {
   alarm: '目击你时暴露度 +30，并直接把警察引到现场。',
-  lead: '每回合带一名同伴逃向更远的房间。',
-  team: '同房间的同伴受其保护，受到的攻击伤害 -1。',
+  lead: '更快识别危险，发现杀手时会迅速提高警觉并寻找脱身路线。',
   spiritual: '能看穿潜行与夜幕，你的无声机制对她无效。',
 };
 
