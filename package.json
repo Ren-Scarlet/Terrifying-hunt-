@@ -9,8 +9,7 @@
     "preview": "vite preview --host 127.0.0.1",
     "typecheck": "tsc --noEmit",
     "import:assets": "python scripts/import_dbd_assets.py",
-    "check": "node scripts/check.mjs",
-    "check:full": "node scripts/check.mjs --full"
+    "check": "node scripts/check.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.25.12",

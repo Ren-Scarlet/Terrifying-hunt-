@@ -1,14 +1,15 @@
 /**
- * 胜率抽样：一个「会打」的机器人。
+ * 整局冒烟：让一个「会打」的机器人把每局从开局跑到结算。
  *
- * 行动点统一后的打法：每回合 4 点 AP，走路 / 挥刀 / 出牌 / 搜索柜子都从这里扣。
- * 机器人优先砍眼前的人，再留一点 AP 追脚印或动静，避免「走光了点、砍不动」。
- * 用来抓「改动之后整体变简单/变难」的趋势，不是精确数值。
+ * 它不产出可用的平衡数据（牌组和打法是启发式的，数值没有统计意义），
+ * 唯一目的是抓「跑不到底」的问题：连续 160 步没有推进（卡死）、血量越界、
+ * 结算抛异常。出现这两类问题进程会以 1 退出，从而卡住 npm run check 与部署。
  *
- * 默认每杀手 3 局（39 局，约 0.2 秒）。要全量：GAMES=8 npm run check:full
+ * 只跑当前开放的 4 位杀手，每位 2 局（共 8 局，约 0.1 秒）。
+ * 想多跑几局：GAMES=6 node .cache/tests/sim.mjs
  */
 import { CARDS, CARD_MAP } from '../src/game/data/cards';
-import { KILLERS } from '../src/game/data/killers';
+import { KILLERS, STARTER_KILLERS } from '../src/game/killers';
 import {
   attack,
   canAttack,
@@ -42,7 +43,7 @@ const COOL = CARDS.filter((c) =>
 ).map((c) => c.id);
 
 const MODE = (process.env.SIM_MODE ?? 'tactics') as 'brute' | 'stealth' | 'tactics';
-const PER_KILLER = Number(process.env.GAMES ?? 3);
+const PER_KILLER = Number(process.env.GAMES ?? 2);
 
 /** 牌组：伏击 / 处决 / 侦查，剩下靠功能牌 */
 function buildDeck(): string[] {
@@ -198,20 +199,15 @@ function playOneGame(killer: string): void {
   if (guard >= 160) stat.stuck += 1;
 }
 
-for (const killer of KILLERS.map((k) => k.owner)) {
+for (const killer of STARTER_KILLERS) {
   for (let i = 0; i < PER_KILLER; i++) playOneGame(killer);
 }
 
 const g = stat.games;
-console.log(
-  `模拟 ${g} 局（${MODE}）：胜 ${stat.wins}（${((stat.wins / g) * 100).toFixed(0)}%）` +
-    ` / 天亮 ${stat.timeout} / 其他失败 ${stat.fail} / 卡死 ${stat.stuck}`,
-);
-console.log(
-  `均值：击杀 ${(agg.kills / g).toFixed(2)}　通缉 ${(agg.wanted / g).toFixed(2)}` +
-    `　警戒 ${(agg.alarm / g).toFixed(2)}　回合 ${(agg.turn / g).toFixed(2)}`,
-);
-console.log('结局分布', JSON.stringify(reasons, null, 2));
+console.log(`整局冒烟：跑完 ${g} 局（${STARTER_KILLERS.length} 位开放杀手 × ${PER_KILLER}）`);
+if (stat.invalidHp || stat.stuck) {
+  console.log('结局分布', JSON.stringify(reasons, null, 2));
+}
 
 if (stat.invalidHp > 0) {
   console.log(`!! hp 越界 ${stat.invalidHp} 次`);

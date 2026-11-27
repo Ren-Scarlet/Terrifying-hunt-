@@ -1,17 +1,15 @@
 /**
- * 一条命令跑完所有验证：类型检查 + 规则回归 + 胜率抽样。
+ * 一条命令跑完所有验证：类型检查 + 规则回归 + 整局冒烟。
  * 逻辑改动只需要跑这个，不要启动浏览器。
  *
- *   npm run check          3 秒左右（39 局抽样）
- *   npm run check:full     12 杀手 × 8 局，用于最终平衡
+ *   npm run check          几秒内跑完（8 局冒烟）
  */
 import { build } from 'esbuild';
 import { spawnSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 
 const OUT = '.cache/tests';
-const full = process.argv.includes('--full');
-const env = { ...process.env, GAMES: full ? '8' : '3' };
+const env = { ...process.env };
 
 mkdirSync(OUT, { recursive: true });
 
@@ -64,7 +62,7 @@ if (tscOk) {
   });
 
   step('规则回归', () => runNode(`${OUT}/logic.mjs`));
-  step('胜率抽样', () => runNode(`${OUT}/sim.mjs`));
+  step('整局冒烟', () => runNode(`${OUT}/sim.mjs`));
 }
 
 const failed = results.filter((r) => !r.ok);
