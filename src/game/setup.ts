@@ -97,6 +97,7 @@ export function createGame(
     executionMethodsUsed: [],
     npcAlarmed: false,
     carryPersonId: null,
+    executionSiteHint: null,
     carryDistance: 0,
     markedKilled: 0,
     decoyRoom: null,
