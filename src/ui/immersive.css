@@ -1538,3 +1538,127 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
 #app.immersive-game .killer-power-grid{display:grid;grid-template-columns:1fr;gap:6px}#app.immersive-game .killer-power-grid .btn.power{display:grid;grid-template-columns:38px minmax(0,1fr) auto;align-items:center;width:100%;min-width:0;min-height:54px;margin:0;padding:6px 8px;gap:7px}#app.immersive-game .killer-power-grid .power-art{width:36px;height:36px}#app.immersive-game .killer-power-grid .power-body{min-width:0;display:flex;flex-direction:column;gap:2px}#app.immersive-game .killer-power-grid .power-body b{font-size:11px}#app.immersive-game .killer-power-grid .power-body small{font-size:9px;white-space:normal;line-height:1.3}
 
 @media(max-width:1100px){#app.immersive-game .killer-ability-panel{right:10px;bottom:10px;width:240px;max-height:44vh;padding:9px}#app.immersive-game .killer-face.ability-portrait{flex-basis:52px;width:52px;height:52px}}@media(max-width:700px){#app.immersive-game .killer-ability-panel{right:6px;bottom:6px;width:min(48vw,210px);max-height:40vh;padding:7px}#app.immersive-game .killer-face.ability-portrait{flex-basis:42px;width:42px;height:42px}#app.immersive-game .killer-power-grid .btn.power{grid-template-columns:30px minmax(0,1fr)}#app.immersive-game .killer-power-grid .power-pips{display:none}}
+
+
+/* 2026-11-27: clarity and interaction corrections from playtest. */
+#app.immersive-game .floorplan > .room:not(.current) .room-head,
+#app.immersive-game .floorplan > .room:not(.current) .room-desc,
+#app.immersive-game .floorplan > .room:not(.current) .room-features,
+#app.immersive-game .floorplan > .room:not(.current) .room-people {
+  opacity: .24 !important; filter: brightness(.52) saturate(.48) !important;
+}
+#app.immersive-game .floorplan > .room.current .room-head,
+#app.immersive-game .floorplan > .room.current .room-desc,
+#app.immersive-game .floorplan > .room.current .room-features,
+#app.immersive-game .floorplan > .room.current .room-people { opacity: 1 !important; filter: none !important; }
+
+/* Downed-survivor actions stay visible and large enough to click reliably. */
+#app.immersive-game .map-person-wrap { padding-top: 34px; }
+#app.immersive-game .person-world-actions {
+  display: flex !important; left: 50%; top: -2px; transform: translateX(-50%);
+  align-items: center; justify-content: center; gap: 7px; z-index: 32; pointer-events: auto;
+}
+#app.immersive-game .person-world-actions .btn {
+  min-width: 66px; min-height: 34px; padding: 7px 11px;
+  border: 1px solid rgba(226,190,155,.7); border-radius: 6px;
+  background: rgba(10,13,16,.96); color: #f1e6d9; font-size: 13px;
+  font-weight: 800; line-height: 1; box-shadow: 0 3px 12px rgba(0,0,0,.8);
+  cursor: pointer; pointer-events: auto;
+}
+#app.immersive-game .person-world-actions .btn.execute {
+  border-color: rgba(204,65,58,.9);
+  background: linear-gradient(180deg,rgba(99,25,25,.98),rgba(39,10,12,.98)); color: #ffe0d6;
+}
+#app.immersive-game .person-world-actions .btn:disabled { opacity: .48; cursor: not-allowed; }
+
+/* Killer HUD: large portrait, ability icons and slim meters; no boxed dashboard. */
+#app.immersive-game .killer-ability-panel {
+  position: fixed !important; left: 20px !important; right: auto !important; bottom: 18px !important;
+  z-index: 28 !important; display: grid !important;
+  grid-template-columns: 116px 1fr; grid-template-rows: auto auto;
+  align-items: end; column-gap: 12px; row-gap: 7px;
+  width: min(310px, 28vw) !important; max-height: none !important; overflow: visible !important;
+  padding: 0 !important; border: 0 !important; border-radius: 0 !important;
+  background: transparent !important; box-shadow: none !important; backdrop-filter: none !important;
+}
+#app.immersive-game .killer-hud-portrait {
+  grid-column: 1; grid-row: 1 / span 2; display: flex; flex-direction: column;
+  align-items: center; justify-content: flex-end; gap: 4px; min-width: 0;
+}
+#app.immersive-game .killer-face.ability-portrait {
+  display: block; flex: 0 0 138px; width: 116px; height: 138px;
+  overflow: visible; border: 0; border-radius: 0; background: transparent;
+  filter: drop-shadow(0 5px 10px rgba(0,0,0,.9));
+}
+#app.immersive-game .killer-face.ability-portrait img {
+  width: 100%; height: 100%; object-fit: contain; object-position: bottom center;
+}
+#app.immersive-game .killer-hud-portrait b {
+  max-width: 116px; color: #eadbd0; font-size: 11px; font-weight: 800;
+  text-shadow: 0 2px 5px #000; text-align: center;
+}
+#app.immersive-game .killer-hud-abilities {
+  grid-column: 2; grid-row: 1; align-self: end; min-width: 0; padding-bottom: 3px;
+}
+#app.immersive-game .killer-power-grid {
+  display: grid; grid-template-columns: repeat(2, minmax(42px, 52px)); gap: 7px; justify-content: start;
+}
+#app.immersive-game .killer-power-grid .btn.power {
+  display: flex !important; position: relative; flex-direction: column;
+  justify-content: center; align-items: center; gap: 2px;
+  width: 52px !important; min-width: 52px !important; height: 52px !important;
+  min-height: 52px !important; padding: 4px !important;
+  border: 1px solid rgba(194,155,130,.55); border-radius: 7px;
+  background: linear-gradient(145deg,rgba(35,30,28,.92),rgba(7,9,11,.9));
+  box-shadow: 0 3px 10px rgba(0,0,0,.75);
+}
+#app.immersive-game .killer-power-grid .power-art { width: 30px !important; height: 30px !important; object-fit: contain; }
+#app.immersive-game .killer-power-grid .power-body { display: none !important; }
+#app.immersive-game .killer-power-grid .power-pips { position: absolute; right: 3px; bottom: 2px; font-size: 8px; }
+#app.immersive-game .killer-hud-resources {
+  grid-column: 2; grid-row: 2; min-width: 0; align-self: start; padding: 0 2px 0 0;
+}
+#app.immersive-game .killer-frenzy-meter { margin: 0 0 5px !important; }
+#app.immersive-game .killer-frenzy-meter>div:first-child,
+#app.immersive-game .killer-special-resources .stalk-label {
+  color: #e0d1c5; font-size: 10px; text-shadow: 0 1px 4px #000;
+}
+#app.immersive-game .killer-frenzy-track,
+#app.immersive-game .killer-special-resources .stalk-track {
+  height: 7px; margin-top: 4px; background: rgba(15,10,10,.92); box-shadow: 0 1px 5px #000;
+}
+#app.immersive-game .killer-special-resources { gap: 5px; margin: 5px 0 0; }
+#app.immersive-game .killer-special-resources .stalk-meter { margin: 0; }
+@media (max-width: 900px) {
+  #app.immersive-game .killer-ability-panel {
+    left: 10px !important; right: auto !important; bottom: 10px !important;
+    width: 250px !important; grid-template-columns: 92px 1fr; column-gap: 8px;
+  }
+  #app.immersive-game .killer-face.ability-portrait { flex-basis: 112px; width: 92px; height: 112px; }
+  #app.immersive-game .killer-hud-portrait b { max-width: 92px; font-size: 10px; }
+  #app.immersive-game .killer-power-grid { grid-template-columns: repeat(2, 44px); gap: 5px; }
+  #app.immersive-game .killer-power-grid .btn.power { width: 44px !important; min-width: 44px !important; height: 44px !important; min-height: 44px !important; }
+  #app.immersive-game .killer-power-grid .power-art { width: 25px !important; height: 25px !important; }
+}
+@media (max-width: 700px) {
+  #app.immersive-game .killer-ability-panel { left: 6px !important; bottom: 6px !important; width: 190px !important; grid-template-columns: 70px 1fr; column-gap: 6px; row-gap: 5px; }
+  #app.immersive-game .killer-face.ability-portrait { flex-basis: 88px; width: 70px; height: 88px; }
+  #app.immersive-game .killer-hud-portrait b { max-width: 70px; font-size: 8px; }
+  #app.immersive-game .killer-power-grid { grid-template-columns: repeat(2, 38px); gap: 4px; }
+  #app.immersive-game .killer-power-grid .btn.power { width: 38px !important; min-width: 38px !important; height: 38px !important; min-height: 38px !important; }
+  #app.immersive-game .killer-power-grid .power-art { width: 22px !important; height: 22px !important; }
+  #app.immersive-game .killer-frenzy-meter>div:first-child,
+  #app.immersive-game .killer-special-resources .stalk-label { font-size: 8px; }
+}
+
+/* Impact motion follows the survivor's latest trail direction when one exists. */
+#app.immersive-game .room-people .person-chip.attack-ghost.blood-hit {
+  animation: survivorImpactDirectional .72s cubic-bezier(.15,.7,.2,1) forwards;
+}
+@keyframes survivorImpactDirectional {
+  0% { opacity: 1; filter: brightness(1); transform: translate(0,0) scale(1); }
+  16% { opacity: 1; filter: brightness(2.2) sepia(.5) saturate(2); transform: translate(var(--escape-back-x,-5px),var(--escape-back-y,0px)) rotate(-3deg) scale(1.06); }
+  38% { opacity: 1; filter: brightness(.75) sepia(.7) saturate(2); transform: translate(var(--escape-x,8px),var(--escape-y,0px)) rotate(3deg) scale(.96); }
+  68% { opacity: .92; filter: brightness(.62) sepia(.8) saturate(2); transform: translate(calc(var(--escape-x,8px) * .35),calc(var(--escape-y,0px) * .35)) scale(1); }
+  100% { opacity: 0; filter: brightness(.5) sepia(1) saturate(2); transform: translate(var(--escape-x,8px),var(--escape-y,0px)) translateY(7px) scale(.94); }
+}
