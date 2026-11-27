@@ -158,7 +158,7 @@ function roomFeatures(state: GameState, roomId: RoomId): string {
       ? `<button type="button" class="room-feature pallet barricade-action" data-action="break-barricade" data-room="${roomId}" title="破坏木板需要 1 点行动点">${icon('obstacle', 'ui-icon tiny')}<b>破坏木板</b></button>`
       : `<span class="room-feature pallet" title="木板已封住入口">${icon('obstacle', 'ui-icon tiny')}<b>木板封门</b></span>`);
   }
-  if (OBSTACLE_ROOMS.includes(roomId) && !cleared) parts.push(`<span class="room-feature obstacle" title="木板障碍：进入时需要花费额外行动点">${icon('obstacle', 'ui-icon tiny')}<b>木板</b></span>`);
+  if (OBSTACLE_ROOMS.includes(roomId) && !cleared) parts.push(`<span class="room-feature obstacle" title="固定障碍物：进入时需要花费额外行动点">${icon('obstacle', 'ui-icon tiny')}<b>障碍物</b></span>`);
   return parts.join('');
 }
 
