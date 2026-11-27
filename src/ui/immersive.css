@@ -3152,10 +3152,11 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
   pointer-events: auto !important;
 }
 
-#app.immersive-game .person-world-actions .score-execution-btn {
+#app.immersive-game .map-person-wrap.score-unlocked > .score-execution-btn {
   position: absolute;
   left: 50%;
-  bottom: calc(100% + 6px);
+  top: 0;
+  bottom: auto;
   transform: translateX(-50%);
   z-index: 30;
   white-space: nowrap;
@@ -3165,7 +3166,7 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
   box-shadow: 0 0 12px rgba(242, 196, 107, .42);
   font-weight: 800;
 }
-#app.immersive-game .person-world-actions .score-execution-btn:disabled {
+#app.immersive-game .map-person-wrap.score-unlocked > .score-execution-btn:disabled {
   opacity: .5;
   filter: grayscale(.6);
   box-shadow: none;
@@ -3378,4 +3379,15 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
 #app.immersive-game .killer-face.ability-portrait {
   display: block !important;
   margin: 0 auto !important;
+}
+
+#app.immersive-game .map-person-wrap.score-unlocked {
+  padding-top: 62px !important;
+}
+#app.immersive-game .map-person-wrap.score-unlocked .person-world-actions {
+  top: 28px !important;
+}
+@media (max-width: 700px) {
+  #app.immersive-game .map-person-wrap.score-unlocked { padding-top: 56px !important; }
+  #app.immersive-game .map-person-wrap.score-unlocked .person-world-actions { top: 24px !important; }
 }
