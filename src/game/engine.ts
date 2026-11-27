@@ -1,5 +1,5 @@
 import { random, randomOf, shuffle } from './random';
-import { getExecutionMethod, type ExecutionMethodId } from './executions';
+import { EXECUTION_METHODS, getExecutionMethod, type ExecutionMethodId } from './executions';
 import { nearestOf, roomDistance } from './navigation';
 import { awarenessStage, myersStalkGain } from './npc/awareness';
 import { ESCAPE_ROOMS, BASE_AP, SABOTAGE_COST, ITEM_BOX_CHARGES, POSSESS_TURNS, SURVIVOR_MAX_HP, SURVIVOR_INJURED_HP } from './constants';
@@ -1163,6 +1163,19 @@ function checkCond(state: GameState, cond: Cond): boolean {
       return state.possessed;
     case 'visibleSurvivor':
       return npcs(state).some((person) => person.role !== 'police' && person.hp > 0 && isPersonVisible(state, person));
+    case 'survivorNearby':
+      return standing(state).some((person) => person.role !== 'police' && !person.hidden && roomDistance(person.room, state.playerRoom) <= 1);
+    case 'carryingPerson': {
+      const carried = state.carryPersonId ? state.people.find((person) => person.id === state.carryPersonId) : undefined;
+      return !!carried && carried.hp <= 0;
+    }
+    case 'currentDestructible': {
+      const room = state.playerRoom;
+      return state.powerCircuits.some((circuit) => circuit.breakerRoom === room && !circuit.broken)
+        || state.siteItems.some((item) => item.room === room && !item.broken && item.charges > 0)
+        || (PHONE_ROOMS.includes(room) && !state.phoneCut)
+        || (RADIO_ROOMS.includes(room) && !state.sabotage.includes('radio'));
+    }
     case 'flag':
       if (cond.key === 'phoneCut') return state.phoneCut;
       if (cond.key === 'wiretap') return state.wiretap;
@@ -1212,6 +1225,14 @@ export function runOps(state: GameState, ops: Op[]): void {
     scoutRoom, npcs, peopleInRoom, standing, nextStepToward,
     healPerson, rescuePerson, checkCond,
     sabotageContext: (current) => sabotageSiteItem(current, { free: true, suppressAfterAction: true }),
+    destroyCurrentObject: (current) => {
+      const room = current.playerRoom;
+      const hasObject = current.powerCircuits.some((circuit) => circuit.breakerRoom === room && !circuit.broken)
+        || current.siteItems.some((item) => item.room === room && !item.broken && item.charges > 0)
+        || (PHONE_ROOMS.includes(room) && !current.phoneCut)
+        || (RADIO_ROOMS.includes(room) && !current.sabotage.includes('radio'));
+      return hasObject && sabotageSiteItem(current, { free: true, suppressAfterAction: true });
+    },
   });
   if (!phoneWasCut && state.phoneCut) state.huntStats.environmentActions += 1;
 }
@@ -3697,11 +3718,6 @@ function trapPlacementBlockReason(state: GameState): string | null {
   if (state.killer !== '设陷者') return '只有设陷者可以布设捕兽夹。';
   if (state.trapInventory <= 0) return '没有可用的捕兽夹；寻找地图上的补给点。';
   if (state.energy < 1) return '行动点不足：布设捕兽夹需要 1 点。';
-  if ([ENTRY_ROOM, EXIT_ROOM, 'garden'].includes(state.playerRoom)) return '这里是出入口或室外通道，不适合布设捕兽夹。';
-  if (ROOM_MAP[state.playerRoom].neighbors.length < 2) return '这里是死路或单一通道，不能布设捕兽夹。';
-  if (state.objectiveRooms.includes(state.playerRoom)) return '幸存者团队目标点不能布设捕兽夹。';
-  if (state.bearTraps.some((trap) => trap.room === state.playerRoom && trap.armed)) return '这个房间已经有一只有效捕兽夹。';
-  if (state.bearTraps.some((trap) => trap.armed && roomDistance(trap.room, state.playerRoom) <= 1)) return '附近已有捕兽夹；陷阱之间至少间隔一间房。';
   return null;
 }
 
@@ -3892,7 +3908,7 @@ export function usePower(state: GameState, powerId: string): boolean {
       armed: true,
       discovered: false,
     });
-    log(state, `你在${roomName(state.playerRoom)}布设了一只捕兽夹。这里不是单一必经通道，且附近没有其他陷阱。`);
+    log(state, `你在${roomName(state.playerRoom)}布设了一只捕兽夹。现在可以在任何房间连续布设，不再受地点和间距限制。`);
     state.attackReady = true;
     afterPlayerAction(state);
     checkImmediateWin(state);
