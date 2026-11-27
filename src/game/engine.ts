@@ -1,5 +1,5 @@
 import { random, randomOf, shuffle } from './random';
-import { EXECUTION_METHODS, getExecutionMethod, type ExecutionMethodId } from './executions';
+import { getExecutionMethod, type ExecutionMethodId } from './executions';
 import { nearestOf, roomDistance } from './navigation';
 import { awarenessStage, myersStalkGain } from './npc/awareness';
 import { ESCAPE_ROOMS, BASE_AP, SABOTAGE_COST, ITEM_BOX_CHARGES, POSSESS_TURNS, SURVIVOR_MAX_HP, SURVIVOR_INJURED_HP } from './constants';
