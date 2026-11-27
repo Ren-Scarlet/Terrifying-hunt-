@@ -191,7 +191,7 @@ function doorMarkersHtml(state: GameState): string {
 
 /** 把最近发生的关键行动投射到地图上；完整记录仍保留在情报抽屉。 */
 function mapEventFeedHtml(state: GameState): string {
-  const important = /没能再起来|停止了呼吸|处决了|特殊处决|砸毁了|砸烂了|你砸了|立即断电|电话线被剪断|封锁了|踩中捕兽夹|报警成功|成功逃离|逃出了房子|翻出了后院|已抵达逃生点|地图出现两个逃生点|逃生点开启|大门开启|警报升高！猎场出现逃生点|被警察逮捕|被同伴救起|【环境事件】|雷雨|电话突然响起|玻璃碎裂声|灯光突然闪烁/;
+  const important = /没能再起来|停止了呼吸|处决了|特殊处决|分数处决|砸毁了|砸烂了|你砸了|立即断电|电话线被剪断|封锁了|放下木板|踩中捕兽夹|报警成功|成功逃离|逃出了房子|翻出了后院|已抵达逃生点|地图出现两个逃生点|逃生点开启|大门开启|警报升高！猎场出现逃生点|被警察逮捕|被同伴救起|【环境事件】|雷雨|电话突然响起|玻璃碎裂声|灯光突然闪烁|飞斧未投出|行动点不足|无法|不能|需要|未能|没有|尚未|不在|失败/;
   const recent = state.log.filter((line) => {
     const match = line.match(/^\[第 (\d+) 回合\]/);
     const turn = match ? Number(match[1]) : state.turn;
@@ -199,7 +199,7 @@ function mapEventFeedHtml(state: GameState): string {
   }).slice(0, 5).reverse();
   if (!recent.length) return '';
   return `<div class="map-event-feed" aria-live="polite">
-    <span class="map-event-feed-title">现场动态</span>
+    <span class="map-event-feed-title">现场动态 · 行动反馈</span>
     ${recent.map((line, index) => `<div class="map-event ${index === recent.length - 1 ? 'latest' : ''}">${escape(line.replace(/^\[第 \d+ 回合\]\s*/, ''))}</div>`).join('')}
   </div>`;
 }
@@ -478,7 +478,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
               : barricaded
                 ? '<span class="room-tag bar" title="幸存者刚刚放下木板封门；靠近后花费 1 AP 破坏">木板封门 · 幸存者放置</span>'
                 : obstacleOpen
-                  ? `<span class="room-tag obstacle">木板障碍 · ${cost}点</span>`
+                  ? `<span class="room-tag obstacle" title="固定障碍木板：进入该房间需要额外行动点；也可在相邻房间花费 1 AP 破坏">木板障碍 · ${cost}点</span>`
                   : reachable
                     ? `<span class="room-tag go">可进 · ${cost}点</span>`
                     : adjacent
@@ -789,6 +789,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
           ${statusHtml}${carryStatus}${huntPlanHtml}
           ${facilityOverviewHtml(state)}
           ${state.lookingAround ? '<div class="look-prompt" role="status"><b>选择要查看的房间</b><span>地图上亮起边框的房间都与当前位置相邻。点击其中一个，消耗 1 点行动点查看。</span><button class="btn ghost mini" data-action="look-cancel">取消</button></div>' : ''}
+          ${state.huntressAiming ? '<div class="look-prompt hatchet-prompt" role="status"><b>狩猎飞斧瞄准中</b><span>点击地图上可见的站立幸存者。飞斧只能命中当前房间或正前方直线房间内的目标；无法投出的原因会显示在现场反馈中。</span></div>' : ''}
           ${state.barricades.length ? `<div class="look-prompt barricade-prompt" role="status"><b>幸存者放下了木板</b><span>${state.barricades.map((room) => roomName(room)).join('、')}：地图上的橙色高亮标记就是被封住的入口。靠近该房间后点击「破坏木板 · 1 AP」即可通行。</span></div>` : ''}
           ${state.auraTargeting ? '<div class="look-prompt aura-prompt" role="status"><b>恶灵低语 · 选择房间</b><span>点击地图任意房间，包括你当前所在的房间；也可以取消，不发动显形效果。</span><button class="btn ghost mini" data-action="aura-cancel">取消选择</button></div>' : ''}
           <div class="map-viewport">
