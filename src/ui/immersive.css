@@ -4067,3 +4067,61 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
   height: clamp(38px, 6vw, 96px) !important;
   min-height: clamp(38px, 6vw, 96px) !important;
 }
+
+/* ==========================================================================
+   2026-11-28（作者反馈）：
+   - 远处房间不再显示物件（只有图腾例外）
+   - 障碍物/墙壁不发光、不改色，只在可交互距离（当前/相邻）不透明显示
+   ========================================================================== */
+
+/* 障碍物：去掉整间房描边、去掉琥珀色发光与文字变色 */
+#app.immersive-game:not(.mobile-game-active) .floorplan .room.board-near {
+  box-shadow: none !important;
+  background-color: transparent !important;
+}
+#app.immersive-game:not(.mobile-game-active) .floorplan .room.board-near .room-feature.pallet,
+#app.immersive-game:not(.mobile-game-active) .floorplan .room.board-near .room-feature.pallet .ui-icon,
+#app.immersive-game:not(.mobile-game-active) .room-features .room-feature.pallet .ui-icon {
+  filter: none !important;
+}
+#app.immersive-game:not(.mobile-game-active) .room-features .room-feature.pallet b {
+  color: inherit !important;
+  text-shadow: none !important;
+}
+
+/* 远处房间：物件全部隐藏（图腾除外），不再隔墙看到东西 */
+#app.immersive-game:not(.mobile-game-active) .floorplan .room:not(.current):not(.adjacent) .room-features .room-feature:not(.totem) {
+  display: none !important;
+}
+#app.immersive-game:not(.mobile-game-active) .floorplan .room:not(.current):not(.adjacent) .feature-anchor:not(:has(.totem)),
+#app.immersive-game:not(.mobile-game-active) .floorplan .room:not(.current):not(.adjacent) .totem-anchor:not(:has(.totem)) {
+  display: none !important;
+}
+
+/* 图腾：任何距离都显示，保留原图素材，只让图标发红光 */
+#app.immersive-game:not(.mobile-game-active) .floorplan .room-features .room-feature.totem {
+  display: flex !important;
+  opacity: 1 !important;
+  filter: none !important;
+}
+
+/* 可交互距离（当前 + 相邻）：物件不透明、不压暗，按钮看得清 */
+#app.immersive-game:not(.mobile-game-active) .floorplan .room.adjacent:not(.current) .room-features,
+#app.immersive-game:not(.mobile-game-active) .floorplan .room.adjacent:not(.current) .room-features .room-feature {
+  opacity: 1 !important;
+  filter: none !important;
+}
+
+/* 图腾：去掉黄色方框，只保留原始图标 + 红色光（作者要求） */
+#app.immersive-game:not(.mobile-game-active) .floorplan .room-features .room-feature.totem {
+  border-color: transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+#app.immersive-game:not(.mobile-game-active) .floorplan .room-features .room-feature.totem b {
+  background: rgba(10, 6, 6, .72) !important;
+  border: 0 !important;
+  color: #ffb0a6 !important;
+  text-shadow: 0 0 6px rgba(255, 45, 32, .85) !important;
+}
