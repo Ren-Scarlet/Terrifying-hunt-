@@ -106,9 +106,11 @@ function roomFeatures(state: GameState, roomId: RoomId): string {
               ? '已通电'
               : `修复 ${i.progress}%`;
       const down = i.broken || i.jammedTurns > 0;
-      parts.push(
-        `<span class="room-feature site ${i.kind} ${down ? 'broken' : ''}" title="${label}：${status}。你用不了它，但可以花 ${SABOTAGE_COST} 点行动点砸掉">${icon(i.kind === 'itemBox' ? 'itemBox' : 'generator', 'ui-icon tiny')}<b>${i.kind === 'itemBox' ? '道具箱' : '发电机'}</b></span>`,
-      );
+      const canBreakHere = state.playerRoom === roomId && !down && (i.kind !== 'itemBox' || i.charges > 0) && !state.powerCircuits.some((c) => c.breakerRoom === roomId) && !sabotageBlockReason(state);
+      const feature = `<span class="room-feature site ${i.kind} ${down ? 'broken' : ''}" title="${label}：${status}。你用不了它，但可以花 ${SABOTAGE_COST} 点行动点砸掉">${icon(i.kind === 'itemBox' ? 'itemBox' : 'generator', 'ui-icon tiny')}<b>${i.kind === 'itemBox' ? '道具箱' : '发电机'}</b></span>`;
+      parts.push(canBreakHere
+        ? `<button type="button" class="room-feature site ${i.kind}" data-action="sabotage" title="${label}：${status}。点击花费 ${SABOTAGE_COST} 点行动点破坏">${icon(i.kind === 'itemBox' ? 'itemBox' : 'generator', 'ui-icon tiny')}<b>${i.kind === 'itemBox' ? '破坏道具箱' : '破坏发电机'}</b></button>`
+        : feature);
     });
   // 房间照明由 Canvas 光照系统直接表现，不再用文字或 emoji 标记灯光状态。
   const circuitAt = state.powerCircuits.find((c) => c.breakerRoom === roomId);
@@ -116,7 +118,11 @@ function roomFeatures(state: GameState, roomId: RoomId): string {
     const source = circuitAt.generatorId ? state.siteItems.find((item) => item.id === circuitAt.generatorId) : undefined;
     const sourceOffline = !!source && (source.broken || source.jammedTurns > 0);
     const status = circuitAt.broken ? '控制箱损坏' : circuitAt.enabled === false ? '已拉闸' : sourceOffline ? '发电机停机' : '供电正常';
-    parts.push(`<span class="room-feature breaker ${circuitAt.broken || circuitAt.enabled === false || sourceOffline ? 'broken' : ''}" title="${escape(circuitAt.name)}：${status}，影响 ${circuitAt.affectedRooms.map(roomName).join('、')}">⚡<b>电闸</b></span>`);
+    const breakerTitle = `${escape(circuitAt.name)}：${status}，影响 ${circuitAt.affectedRooms.map(roomName).join('、')}`;
+    const breakerBlocked = breakerBlockReason(state, circuitAt.id) ? 'disabled' : '';
+    parts.push(state.playerRoom === roomId
+      ? `<button type="button" class="room-feature breaker ${circuitAt.broken || circuitAt.enabled === false || sourceOffline ? 'broken' : ''}" data-action="toggle-breaker" data-circuit-id="${circuitAt.id}" ${breakerBlocked} title="${breakerTitle}。点击切换电闸（${BREAKER_SWITCH_COST} AP）">⚡<b>切换电闸</b></button>`
+      : `<span class="room-feature breaker ${circuitAt.broken || circuitAt.enabled === false || sourceOffline ? 'broken' : ''}" title="${breakerTitle}">⚡<b>电闸</b></span>`);
   }
   const placedTrap = state.bearTraps.find((trap) => trap.room === roomId);
   if (placedTrap) {
@@ -359,9 +365,18 @@ function threatRowsHtml(state: GameState): string {
  */
 function trailOverlay(state: GameState): string {
   // 只画当前房间里的鞋印：别处的痕迹不再隔墙可见（引擎里仍保留完整线索给杀戮/追击牌用）
-  const segs = state.trailRevealActions > 0
+  const candidates = (state.trailRevealActions > 0
     ? visibleTrails(state)
-    : visibleTrails(state).filter((t) => t.room === state.playerRoom);
+    : visibleTrails(state).filter((t) => t.room === state.playerRoom))
+    .filter((trail) => state.trailClock - trail.clock <= 3)
+    .sort((a, b) => b.clock - a.clock);
+  const seenPaths = new Set<string>();
+  const segs = candidates.filter((trail) => {
+    const key = trail.room + '|' + trail.to;
+    if (seenPaths.has(key)) return false;
+    seenPaths.add(key);
+    return true;
+  }).slice(0, 10);
   if (!segs.length) return '';
   const centerOf = (id: RoomId) => {
     const r = ROOM_MAP[id].rect;
@@ -382,8 +397,9 @@ function trailOverlay(state: GameState): string {
       // 鞋印默认脚趾朝上：旋转到「朝下一间屋」的方向
       const rot = (Math.atan2(dy, dx) * 180) / Math.PI + 90;
       const age = state.trailClock - t.clock;
-      const cls = `footprint${t.blood ? ' blood' : ''}${age <= 0 ? ' fresh' : ''}`;
-      return `<i class="${cls}" style="left:${x.toFixed(2)}%;top:${y.toFixed(2)}%;--rot:${rot.toFixed(1)}deg"></i>`;
+      const cls = `footprint age-${Math.min(3, age)}${t.blood ? ' blood' : ''}${age <= 0 ? ' fresh' : ''}`;
+      const opacity = Math.max(0.14, 1 - age * 0.27);
+      return `<i class="${cls}" style="left:${x.toFixed(2)}%;top:${y.toFixed(2)}%;--rot:${rot.toFixed(1)}deg;--trail-opacity:${opacity.toFixed(2)}"></i>`;
     })
     .join('');
   return `<div class="trail-layer" aria-hidden="true">${prints}</div>`;
