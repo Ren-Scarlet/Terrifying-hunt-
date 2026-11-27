@@ -13,11 +13,7 @@ export const BASE_AP = 4;
 export const SABOTAGE_COST = 1;
 /** 道具箱初始可领取次数。 */
 export const ITEM_BOX_CHARGES = 3;
-/** 发电机被破坏后的停机回合数。 */
-export const GENERATOR_JAM_TURNS = 2;
 export const ITEM_BOX_COUNT = 2;
-export const GENERATOR_MIN = 1;
-export const GENERATOR_MAX = 2;
 
 /** 恶魔附身的持续回合数。 */
 export const POSSESS_TURNS = 3;
