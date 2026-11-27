@@ -122,7 +122,6 @@ export type FlagKey =
   | 'stealthNext'
   | 'revealAura'
   | 'revealNearestTrail'
-  | 'revealWorkers'
   | 'myersLastBest'
   | 'bitterMurmur'
   | 'bleedNextHit'
@@ -159,7 +158,7 @@ export type Cond =
   | { c: 'room'; is: RoomId }
   | { c: 'markedAlive' }
   | { c: 'escaped'; gte: number }
-  | { c: 'hasThreat'; v: 'alarm' | 'lead' | 'team' | 'spiritual' }
+  | { c: 'hasThreat'; v: 'alarm' | 'lead' | 'spiritual' }
   | { c: 'hasArchetype'; a: 'alert' | 'defiant' | 'caller' | 'rescuer' | 'hider' | 'brave' };
 
 /* ------------------------------------------------------------------ */
