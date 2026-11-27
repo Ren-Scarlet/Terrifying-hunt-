@@ -176,6 +176,12 @@ export function playTrapScream(): void {
   playSfx(Math.random() < 0.5 ? 'voiceFScream' : 'voiceMScream', 0.9);
 }
 
+/** 幸存者死亡时播放死亡提示与对应性别的尖叫。 */
+export function playSurvivorDeath(gender: 'female' | 'male'): void {
+  playSfx('kill', 0.9);
+  playSfx(gender === 'female' ? 'voiceFScream' : 'voiceMScream', 0.96);
+}
+
 export function isMuted(): boolean {
   return muted;
 }
