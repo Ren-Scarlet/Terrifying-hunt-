@@ -2644,7 +2644,7 @@ export function effectiveCost(defId: string, state: GameState): number {
 
 /**
  * 移动到某房间要花几点行动点。
- * 普通障碍房（储藏室/地下室）没清除前多花 1 点；幸存者放下的木板则完全封门。
+ * 地图固定木板与幸存者放下的木板都会封门；迈尔斯恶魔附身可直接撞碎固定木板。
  */
 export function moveCost(state: GameState, room: RoomId): number {
   // 恶魔附身能直接撞开障碍物，不额外花行动点
@@ -2806,7 +2806,7 @@ export function movePlayer(state: GameState, room: RoomId): boolean {
   }
   if (isObstacle(room) && !state.clearedObstacles.includes(room)) {
     state.clearedObstacles.push(room);
-    log(state, `你踢开${roomName(room)}门口堆着的杂物，硬挤了进去。`);
+    log(state, `你借着恶魔附身的力量撞碎${roomName(room)}入口的木板，强行闯入。`);
   }
   // 走出了第一步，刀就收回来了：边走边砍是这个游戏的基本节奏
   state.attackReady = true;
