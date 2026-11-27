@@ -935,7 +935,7 @@ app.addEventListener('click', (event) => {
         pendingMapAttackTarget = personId;
         pendingMapAttackGhost = ghosts.get(personId) ?? null;
         updateAttackGhostEscapeDirection(pendingMapAttackGhost, personId);
-        if (pendingMapAttackTarget && survivorIdsBefore.has(pendingMapAttackTarget)) playSurvivorHit();
+        if (victimIsSurvivor) playSurvivorHit();
       }
       playKillerAttackSound(game);
       if (game.kills > killsBefore) playSfx('kill');
@@ -1089,7 +1089,7 @@ app.addEventListener('click', (event) => {
       pendingMapAttackTarget = game.lastAttackedId ?? null;
       pendingMapAttackGhost = pendingMapAttackTarget ? ghosts.get(pendingMapAttackTarget) ?? null : null;
       if (pendingMapAttackTarget) updateAttackGhostEscapeDirection(pendingMapAttackGhost, pendingMapAttackTarget);
-      if (victimIsSurvivor) playSurvivorHit();
+      if (pendingMapAttackTarget && survivorIdsBefore.has(pendingMapAttackTarget)) playSurvivorHit();
     }
     playKillerAttackSound(game);
     if (game.kills > kills) playSfx('kill');
