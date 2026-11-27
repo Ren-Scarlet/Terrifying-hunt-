@@ -579,19 +579,22 @@ function caseMyersStalkingAndFearRadius(): void {
     euphoriaPlayed && euphoriaCard.energy === 1 && !!euphoriaCard.executionSiteHint &&
     (euphoriaCard.scouted[euphoriaCard.executionSiteHint] ?? 0) >= 1);
 
-  const nurse = createGame(STARTING_DECK, undefined, '护士');
-  const nurseTarget = player(nurse);
-  const blinkRoom = ROOM_MAP[nurse.playerRoom].neighbors[0];
-  nurseTarget.room = blinkRoom;
-  nurseTarget.hidden = false;
-  nurse.energy = 4;
-  check('护士：闪现能力先进入选点状态，不立即消耗行动点',
-    usePower(nurse, 'nurse_blink') && nurse.nurseBlinkTargeting && nurse.energy === 4);
-  check('护士：可以穿过房门闪现到 1 格外房间并开启抓取窗口',
-    blinkPlayer(nurse, blinkRoom) && nurse.playerRoom === blinkRoom && nurse.nurseFollowUp && nurse.nurseFatiguePending && nurse.energy === 3);
-  check('护士：闪现后抓取会打断目标并施加疲惫',
-    nurseGrabPerson(nurse, nurseTarget.id) && nurseTarget.hp === 3 && nurseTarget.blockedTurns === 1 &&
-    nurse.huntStats.nurseBlinks === 1 && nurse.huntStats.nurseGrabs === 1 && nurse.stunTurns === 1 && !nurse.nurseFollowUp && !nurse.nurseFatiguePending);
+  // 抓取判定依赖随机原型（有的幸存者会改伤害/状态），整段固定随机源，避免偶发失败。
+  withRandomSource(createSeededRandom(20261127), () => {
+    const nurse = createGame(STARTING_DECK, undefined, '护士');
+    const nurseTarget = player(nurse);
+    const blinkRoom = ROOM_MAP[nurse.playerRoom].neighbors[0];
+    nurseTarget.room = blinkRoom;
+    nurseTarget.hidden = false;
+    nurse.energy = 4;
+    check('护士：闪现能力先进入选点状态，不立即消耗行动点',
+      usePower(nurse, 'nurse_blink') && nurse.nurseBlinkTargeting && nurse.energy === 4);
+    check('护士：可以穿过房门闪现到 1 格外房间并开启抓取窗口',
+      blinkPlayer(nurse, blinkRoom) && nurse.playerRoom === blinkRoom && nurse.nurseFollowUp && nurse.nurseFatiguePending && nurse.energy === 3);
+    check('护士：闪现后抓取会打断目标并施加疲惫',
+      nurseGrabPerson(nurse, nurseTarget.id) && nurseTarget.hp === 3 && nurseTarget.blockedTurns === 1 &&
+      nurse.huntStats.nurseBlinks === 1 && nurse.huntStats.nurseGrabs === 1 && nurse.stunTurns === 1 && !nurse.nurseFollowUp && !nurse.nurseFatiguePending);
+  });
 
   const nurseAttack = createGame(STARTING_DECK, undefined, '护士');
   const nurseAttackTarget = player(nurseAttack);
@@ -1353,6 +1356,10 @@ function caseSneaky(): void {
   check('W 有老练的幸存者', s.people.some((p) => p.role !== 'police' && p.sneaky), '至少两名知名角色带此技巧');
 }
 
+// 整个回归跑在固定种子的随机源里：地图、幸存者原型、NPC 决策全部可复现，
+// 避免 CI 因为随机分支偶发失败而卡住 GitHub Pages 部署。
+// 换种子做排查：TEST_SEED=123 node .cache/tests/logic.mjs
+withRandomSource(createSeededRandom(Number(process.env.TEST_SEED ?? 1)), () => {
 check('开局行动点为 4', newGame().energy === BASE_AP, String(newGame().energy));
 caseBoltOnEnter();
 caseDefaultWindow();
@@ -1721,26 +1728,29 @@ function caseContractsPowerAndCarry(): void {
   check('AB 破坏独立电闸后对应区域断电', broken && circuit.broken && !isRoomLit(grid, affected));
   check('AB 其他供电回路仍保持照明', isRoomLit(grid, 'bedroom'));
 
-  const carry = newGame();
-  carry.people = carry.people.filter((p) => p.role !== 'police').slice(0, 1);
-  const victim = carry.people[0];
-  victim.room = carry.playerRoom; victim.hp = 0; victim.downedTurns = 2; carry.energy = 30;
-  const picked = carryPerson(carry, victim.id);
-  check('AB 玩家可以抱起同屋倒地幸存者', picked && carry.carryPersonId === victim.id);
-  let frontier: Array<{ room: RoomId; path: RoomId[] }> = [{ room: carry.playerRoom, path: [] }];
-  let route: RoomId[] = []; const seen = new Set<RoomId>([carry.playerRoom]);
-  while (frontier.length && !route.length) {
-    const current = frontier.shift()!;
-    if (current.path.length === 4) { route = current.path; break; }
-    for (const next of ROOM_MAP[current.room].neighbors) if (!seen.has(next)) { seen.add(next); frontier.push({ room: next, path: [...current.path, next] }); }
-  }
-  carry.freeMove = true;
-  for (const room of route.slice(0, 3)) movePlayer(carry, room);
-  const safeCarry = route.length === 4 && carry.playerRoom === route[2] && carry.carryDistance === 3;
-  const failedCheck = route.length === 4 && withRandomSource(() => 0, () => movePlayer(carry, route[3]));
-  check('AB 搬运前三格安全，第四格检定失败会挣脱并恢复受伤状态',
-    safeCarry && !failedCheck && carry.carryPersonId === null && victim.hp === 2 && victim.intent === 'flee',
-    'route=' + route.length + ' distance=' + carry.carryDistance + ' hp=' + victim.hp + ' carried=' + (carry.carryPersonId === victim.id));
+  // 搬运挣脱依赖随机原型与随机房间事件，整段固定随机源，避免偶发失败。
+  withRandomSource(createSeededRandom(20261128), () => {
+    const carry = newGame();
+    carry.people = carry.people.filter((p) => p.role !== 'police').slice(0, 1);
+    const victim = carry.people[0];
+    victim.room = carry.playerRoom; victim.hp = 0; victim.downedTurns = 2; carry.energy = 30;
+    const picked = carryPerson(carry, victim.id);
+    check('AB 玩家可以抱起同屋倒地幸存者', picked && carry.carryPersonId === victim.id);
+    let frontier: Array<{ room: RoomId; path: RoomId[] }> = [{ room: carry.playerRoom, path: [] }];
+    let route: RoomId[] = []; const seen = new Set<RoomId>([carry.playerRoom]);
+    while (frontier.length && !route.length) {
+      const current = frontier.shift()!;
+      if (current.path.length === 4) { route = current.path; break; }
+      for (const next of ROOM_MAP[current.room].neighbors) if (!seen.has(next)) { seen.add(next); frontier.push({ room: next, path: [...current.path, next] }); }
+    }
+    carry.freeMove = true;
+    for (const room of route.slice(0, 3)) movePlayer(carry, room);
+    const safeCarry = route.length === 4 && carry.playerRoom === route[2] && carry.carryDistance === 3;
+    const failedCheck = route.length === 4 && withRandomSource(() => 0, () => movePlayer(carry, route[3]));
+    check('AB 搬运前三格安全，第四格检定失败会挣脱并恢复受伤状态',
+      safeCarry && !failedCheck && carry.carryPersonId === null && victim.hp === 2 && victim.intent === 'flee',
+      'route=' + route.length + ' distance=' + carry.carryDistance + ' hp=' + victim.hp + ' carried=' + (carry.carryPersonId === victim.id));
+  });
   const special = newGame();
   special.people = special.people.filter((p) => p.role !== 'police').slice(0, 1);
   const target = special.people[0]; target.room = 'kitchen'; target.hp = 0; target.downedTurns = 0;
@@ -2180,6 +2190,7 @@ check('苦涩低语：出牌后会等待下一次人类死亡，再触发全场�
   revealGuard.bitterMurmurReady && revealGuard.people.filter((p) => p.role !== 'police' && p.hp > 0).every((p) => !(p.revealedActions ?? 0)));
 
 caseNewPerkSystem();
+});
 
 console.log(`\n规则回归 ${pass} 通过 / ${fail} 失败`);
 if (fail > 0) process.exitCode = 1;

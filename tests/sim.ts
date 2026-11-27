@@ -27,6 +27,7 @@ import {
 } from '../src/game/engine';
 import { ROOM_MAP, ROOMS } from '../src/game/rooms';
 import { generateMission } from '../src/game/missions';
+import { createSeededRandom, withRandomSource } from '../src/game/random';
 import type { GameState, RoomId } from '../src/game/types';
 
 const has = (id: string, op: string): boolean => (CARD_MAP[id]?.ops ?? []).some((o) => o.op === op);
@@ -199,9 +200,12 @@ function playOneGame(killer: string): void {
   if (guard >= 160) stat.stuck += 1;
 }
 
-for (const killer of STARTER_KILLERS) {
-  for (let i = 0; i < PER_KILLER; i++) playOneGame(killer);
-}
+// 固定种子：冒烟结果可复现，CI 不会因为随机布局偶发卡死而误报。
+withRandomSource(createSeededRandom(Number(process.env.SIM_SEED ?? 1)), () => {
+  for (const killer of STARTER_KILLERS) {
+    for (let i = 0; i < PER_KILLER; i++) playOneGame(killer);
+  }
+});
 
 const g = stat.games;
 console.log(`整局冒烟：跑完 ${g} 局（${STARTER_KILLERS.length} 位开放杀手 × ${PER_KILLER}）`);
