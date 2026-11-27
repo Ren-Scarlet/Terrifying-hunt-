@@ -265,7 +265,7 @@ export function personDetailHtml(state: GameState, personId: string): string {
       paras.push(`位置：${roomName(person.lastSeenRoom)}（最后确认于第 ${person.lastSeenTurn} 回合，现在不知道在哪）。`);
     }
     if (person.hidden) paras.push('他躲起来了：点左下角的「搜索」翻柜子（1 点行动点），不然打不到他。');
-    if (person.sneaky) paras.push('老练：有时会踮着脚走路，不留鞋印、也不惊动乌鸦——但不会一直这样。');
+    if (person.sneaky) paras.push('老练：有时会踮着脚走路，鞋印仍会留下，但不会惊动乌鸦——这种状态不会一直持续。');
     if (person.armed) paras.push('他手里有武器：进门时可能反击，让你下回合少走一步。');
     if (health === 'downed') paras.push(`倒地：现在即可处决；如果暂时放过他，同伴仍可能赶来救援，${Math.max(0, BLEEDOUT_TURNS - person.downedTurns)} 回合后会因失血死亡。`);
     if (threat) paras.push(`威胁：这名角色会主动对抗你，别把他当普通平民。`);
