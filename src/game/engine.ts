@@ -1340,7 +1340,7 @@ function shout(state: GameState, person: Person, base = 18): void {
 }
 
 /** 玩家踏进房间的瞬间 */
-function npcOnPlayerEnter(state: GameState): void {
+function npcOnPlayerEnter(state: GameState, barricadedEntry = false): void {
   const hidden = playerIsHidden(state);
   const ambush = ambushActive(state);
   const before = snapshotRooms(state);
@@ -1460,7 +1460,13 @@ function npcOnPlayerEnter(state: GameState): void {
     if (flasher) {
       consumeItem(state, flasher);
       interruptPlayer(state, `${flasher.name} 早在门后等着，手电筒一下子照白了你的视野。`, flasher.id);
-    } else if (obstacleHere && trapper && random() < 0.55) {
+    } else if (barricadedEntry) {
+      interruptPlayer(
+        state,
+        `你撞上幸存者刚刚放倒的家具，沉重的杂物砸得你眼前一黑！`,
+        trapper?.id ?? 'dropped-obstacle',
+      );
+    } else if (obstacleHere && trapper && random() < 0.75) {
       interruptPlayer(
         state,
         `${trapper.name} 猛地推倒${roomName(state.playerRoom)}门口的杂物，正好砸在你身上。`,
@@ -1663,6 +1669,17 @@ function finishCall(state: GameState, person: Person, device: string): void {
 
 /** 按行为类型行动一步 */
 function actByArchetype(state: GameState, person: Person): void {
+  // 拉扯型、反抗型与英勇型会在近距离追逐中放倒家具，给自己争取逃跑时间。
+  const counterArchetype = person.archetype === 'defiant' || person.archetype === 'brave' || person.archetype === 'kiter';
+  const inPursuit = person.alert >= 55 && roomDistance(person.room, state.playerRoom) <= 2;
+  if (counterArchetype && inPursuit && !state.barricades.includes(person.room) && random() < 0.72) {
+    const blockedRoom = person.room;
+    barricadeRoom(state, person);
+    if (fleeAway(state, person)) person.movesThisTurn = Math.min(REACT_MOVE_CAP, person.movesThisTurn + 1);
+    person.activity = `放倒家具阻挡追击后逃离${roomName(blockedRoom)}`;
+    log(state, `${person.name} 趁你追近时猛地放倒家具堵住门口，转身逃向远处！`);
+    return;
+  }
   // 房间锁作用于整扇门，任何原型都不能从锁住的房间直接穿门离开。
   if (isLocked(state, person.room)) {
     person.activity = '房门被封锁，无法离开';
@@ -2697,11 +2714,10 @@ export function movePlayer(state: GameState, room: RoomId): boolean {
       ? `你借着潜行掠到${roomName(room)}（不耗行动点）。`
       : `你移动到${roomName(room)}（消耗 ${cost} 点行动点${cost > 1 ? '，撞开了门' : ''}）。`,
   );
-  if (state.barricades.includes(room)) {
-    state.barricades = state.barricades.filter((r) => r !== room);
-  }
-  // 先让屋里的人对「推门」做反应（障碍伏击要在杂物被踢开之前判定）
-  npcOnPlayerEnter(state);
+  const barricadedEntry = state.barricades.includes(room);
+  // 先让屋里的人对「推门」做反应；障碍伏击结算后再清掉路障。
+  npcOnPlayerEnter(state, barricadedEntry);
+  if (barricadedEntry) state.barricades = state.barricades.filter((r) => r !== room);
   if (state.carryPersonId) {
     const carried = state.people.find((person) => person.id === state.carryPersonId);
     if (carried) npcWitnessEvent(state, room, 'abduction', carried.id);
@@ -2949,7 +2965,7 @@ export function attack(state: GameState, targetId?: string, options: { costOverr
       p.alert >= 40 &&
       (p.room === state.playerRoom || ROOM_MAP[state.playerRoom].neighbors.includes(p.room)),
   );
-  if (flasher && random() < 0.55) {
+  if (flasher && random() < 0.82) {
     consumeItem(state, flasher);
     if (flasher.room !== state.playerRoom) flasher.room = state.playerRoom;
     interruptPlayer(
