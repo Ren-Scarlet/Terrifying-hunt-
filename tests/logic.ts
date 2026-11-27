@@ -1147,10 +1147,11 @@ function caseDisturbance(): void {
 }
 
 /** S：警报阈值开放逃生点，警报满值进入最终阶段。 */
-function caseTeamGoal(): void {
+function caseAlarmThresholds(): void {
   const s = newGame();
   s.alarm = 50;
   addAlarm(s, 10);
+  check('S 正向警报增长会刷新本回合活动标记', s.heatTurn === s.turn);
   check('S 警报值达到 60 后开放两个动态逃生点', s.escapeRooms.length === 2 && !s.emergencyActive);
   addAlarm(s, -15);
   check('S 警报值可以下降', s.alarm === 45 && s.escapeRooms.length === 2);
@@ -1387,7 +1388,7 @@ caseActionPoints();
 caseAdjacentHidden();
 caseSearch();
 caseDisturbance();
-caseTeamGoal();
+caseAlarmThresholds();
 caseDisturbanceDecay();
 caseFrenzy();
 caseFrenzyMobility();
