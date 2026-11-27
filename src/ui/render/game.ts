@@ -841,7 +841,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
             <div class="killer-power-grid">${powerButtonHtml(state, killer)}</div>
           </div>
           <div class="killer-hud-resources">
-            <div class="killer-frenzy-meter"><div><span>杀戮值</span><b>${state.frenzy}/${FRENZY_MAX}</b></div><div class="killer-frenzy-track"><i style="width:${state.frenzy / FRENZY_MAX * 100}%"></i></div></div>
+            <div class="killer-frenzy-meter"><div><span><img class="killer-frenzy-icon" src="${uiIcon('statusKill')}" alt="" aria-hidden="true">杀戮值</span><b>${state.frenzy}/${FRENZY_MAX}</b></div><div class="killer-frenzy-track"><i style="width:${state.frenzy / FRENZY_MAX * 100}%"></i></div></div>
             ${meter || myersMarks ? `<div class="killer-special-resources">${meter}${myersMarks}</div>` : ''}
           </div>
           <div class="ap-display killer-ap-display" aria-label="当前行动力">
