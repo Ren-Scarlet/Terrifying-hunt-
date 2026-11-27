@@ -122,7 +122,7 @@ export type FlagKey =
   | 'hexNoed'
   | 'scourgeShrine'
   | 'distressing'
-  | 'hexRuin'
+ 
   | 'stealthNext'
   | 'revealAura'
   | 'revealNearestTrail'
