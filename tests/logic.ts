@@ -594,6 +594,17 @@ function caseMyersStalkingAndFearRadius(): void {
     nurseGrabPerson(nurse, nurseTarget.id) && nurseTarget.hp === 3 && nurseTarget.blockedTurns === 1 &&
     nurse.huntStats.nurseBlinks === 1 && nurse.huntStats.nurseGrabs === 1 && nurse.stunTurns === 1 && !nurse.nurseFollowUp && !nurse.nurseFatiguePending);
 
+  const nurseAttack = createGame(STARTING_DECK, undefined, '护士');
+  const nurseAttackTarget = player(nurseAttack);
+  nurseAttackTarget.room = ROOM_MAP[nurseAttack.playerRoom].neighbors[0];
+  nurseAttackTarget.hidden = false;
+  nurseAttack.energy = 4;
+  usePower(nurseAttack, 'nurse_blink');
+  blinkPlayer(nurseAttack, nurseAttackTarget.room);
+  nurseAttack.energy = 4;
+  check('护士：闪现后使用普通攻击也能完成专属额外任务',
+    attack(nurseAttack, nurseAttackTarget.id) && nurseAttack.huntStats.nurseGrabs === 1 && !nurseAttack.nurseFollowUp);
+
   const huntress = createGame(STARTING_DECK, undefined, '女猎手');
   const hatchetTarget = player(huntress);
   hatchetTarget.room = huntress.playerRoom;
@@ -601,8 +612,9 @@ function caseMyersStalkingAndFearRadius(): void {
   huntress.energy = 4;
   check('女猎手：开局携带 3 把飞斧并可进入瞄准状态',
     huntress.hatchets === 3 && usePower(huntress, 'huntress_axe') && huntress.huntressAiming);
-  check('女猎手：投掷飞斧消耗 1 把并对选中目标造成 1 点伤害',
-    throwHuntressHatchet(huntress, hatchetTarget.id) && huntress.hatchets === 2 && hatchetTarget.hp === 3 && huntress.huntStats.hatchetHits === 1);
+  check('女猎手：投掷飞斧消耗 1 把、造成伤害，并使幸存者恐慌逃离',
+    throwHuntressHatchet(huntress, hatchetTarget.id) && huntress.hatchets === 2 && hatchetTarget.hp === 3 &&
+    huntress.huntStats.hatchetHits === 1 && hatchetTarget.fear === 100 && hatchetTarget.room !== huntress.playerRoom);
   huntress.playerRoom = CABINET_ROOMS[0];
   huntress.hatchets = 1;
   huntress.energy = 4;
