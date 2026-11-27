@@ -628,7 +628,7 @@ function play(state: GameState, defId: string): boolean {
 
 /**
  * 取一个「走得到」的隔壁房间。
- * 障碍房现在也能撞开（多花 1 点行动点），但测试仍优先挑普通房间，
+ * 固定木板需要先破坏，但测试仍优先挑普通房间，
  * 免得用例被随机户型和额外消耗搞成假失败。
  */
 function openNeighbor(from: RoomId): RoomId {
