@@ -757,7 +757,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
       <div><b>${escape(m.title)}</b><span>${escape(ground.name)} · ${state.people.filter((p) => p.role !== 'police' && p.hp > 0).length} 名幸存者仍存活 · 奖励 ${m.reward}</span></div>
     </div>
     <div class="right-tools">
-      <button class="tool" data-action="toggle-task-drawer" aria-label="任务详情"><span>☷</span><em>任务详情 · T</em></button>
+      <button class="tool task-tool" data-action="toggle-task-drawer" aria-label="任务列表" title="打开任务列表（T）"><span>☷</span><em>任务列表 · T</em></button>
       <button class="tool" data-action="toggle-intel-drawer" aria-label="现场情报"><span>⌕</span><em>现场情报</em></button>
       <button class="tool" data-action="toggle-game-hud" aria-label="隐藏界面"><span>◉</span><em>隐藏界面 · H</em></button>
     </div>
@@ -834,7 +834,10 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
           </div>
           <button class="hand-toggle" data-action="toggle-hand" title="收起 / 展开手牌" aria-label="收起或展开手牌" aria-expanded="true">⌄</button>
           ${mapEventFeedHtml(state)}
-          <details class="activity-log-panel"><summary>活动日志 · ${state.log.length}</summary><div class="activity-log-list">${state.log.slice(0, 24).map((line) => `<div>${escape(line)}</div>`).join('')}</div></details>
+          <div class="activity-log-panel">
+            <button type="button" class="activity-log-toggle" data-action="toggle-activity-log" aria-expanded="false">活动日志 · ${state.log.length}</button>
+            <div class="activity-log-list" hidden>${state.log.slice(0, 24).map((line) => `<div>${escape(line)}</div>`).join('')}</div>
+          </div>
         </div>
         <section class="killer-ability-panel" aria-label="杀手能力 HUD">
           <div class="killer-hud-portrait">
@@ -845,12 +848,15 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
             <div class="killer-power-grid">${powerButtonHtml(state, killer)}</div>
           </div>
           <div class="killer-hud-resources">
-            <div class="killer-frenzy-meter"><div><span><img class="killer-frenzy-icon" src="${uiIcon('statusKill')}" alt="" aria-hidden="true">杀戮值</span><b>${state.frenzy}/${FRENZY_MAX}</b></div><div class="killer-frenzy-track"><i style="width:${state.frenzy / FRENZY_MAX * 100}%"></i></div></div>
+            <div class="killer-frenzy-meter">
+              <div class="killer-resource-line"><img class="killer-frenzy-icon" src="${uiIcon('statusKill')}" alt="" aria-hidden="true"><span>杀戮值：</span><b>${state.frenzy}/${FRENZY_MAX}</b></div>
+              <div class="killer-frenzy-track"><i style="width:${state.frenzy / FRENZY_MAX * 100}%"></i></div>
+            </div>
             ${meter || myersMarks ? `<div class="killer-special-resources">${meter}${myersMarks}</div>` : ''}
           </div>
-          <div class="ap-display killer-ap-display" aria-label="当前行动力">
-            <b>${state.energy}<i>/${state.maxEnergy}</i></b>
-            <small>行动点</small>
+          <div class="ap-display killer-ap-display" aria-label="当前行动点">
+            <img class="killer-ap-icon" src="${uiIcon('trail')}" alt="" aria-hidden="true">
+            <span>行动点：</span><b>${state.energy}<i>/${state.maxEnergy}</i></b>
           </div>
         </section>
       </div>
