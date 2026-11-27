@@ -951,8 +951,10 @@ function damagePerson(state: GameState, person: Person, amount: number, suppress
   state.frenzy = 0;
 
   const before = person.hp;
+  const wasAlreadyPanicked = person.fear >= 100;
   person.fear = clamp(person.fear + Math.max(28, dmg * 24), 0, 100);
-  if (person.fear >= 100) dmg = Math.max(dmg, before);
+  // 恐惧是在本次命中中刚好达到 100：先受伤并逃跑；只有命中前已经满恐惧，才会被这次攻击直接击倒。
+  if (wasAlreadyPanicked) dmg = Math.max(dmg, before);
   person.hidden = false;
   person.blockedTurns = 0;
 
