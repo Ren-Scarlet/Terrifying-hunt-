@@ -78,7 +78,7 @@ import {
 import { renderAdmin } from './ui/admin';
 import { initCloudAuth, loadCloudConfig, saveCloudConfig, verifyGitHubToken, clearGitHubToken } from './game/cloud';
 import { mountFloorplanScene, type SceneHandle } from './ui/scene';
-import { playSfx, setMusic, toggleMute, unlockAudio } from './ui/audio';
+import { playSfx, playSurvivorHit, setMusic, toggleMute, unlockAudio } from './ui/audio';
 import type { SfxName } from './ui/audio';
 import { currentMenuMap, rollMenuMap } from './ui/mapArt';
 
@@ -118,8 +118,9 @@ let scene: SceneHandle | null = null;
 let lastKills = 0;
 let lastWanted = 0;
 /** 成功攻击后由下一次 render 消费，纯表现层，不进入存档或战斗状态。 */
+type AttackGhost = { roomId: string; element: HTMLElement; left: number; top: number; width: number; height: number; escapeAngle: number; trailClock: number };
 let pendingMapAttackTarget: string | null = null;
-let pendingMapAttackGhost: { roomId: string; element: HTMLElement; left: number; top: number; width: number; height: number; escapeAngle: number } | null = null;
+let pendingMapAttackGhost: AttackGhost | null = null;
 let heldMoveKey: string | null = null;
 let heldMoveTimer = 0;
 let pendingMapWalk = false;
@@ -131,8 +132,8 @@ const app = document.getElementById('app')!;
  * 保留原有 viewport / floorplan / Canvas，只替换房间交互层和人物标记，
  * 这样房间切换时旧场景持续显示，镜头可以从旧位置平滑过渡到新位置。
  */
-function captureAttackGhosts(): Map<string, { roomId: string; element: HTMLElement; left: number; top: number; width: number; height: number; escapeAngle: number }> {
-  const captured = new Map<string, { roomId: string; element: HTMLElement; left: number; top: number; width: number; height: number; escapeAngle: number }>();
+function captureAttackGhosts(): Map<string, AttackGhost> {
+  const captured = new Map<string, AttackGhost>();
   app.querySelectorAll<HTMLElement>('.room[data-room] .person-chip[data-person-id]').forEach((chip) => {
     const id = chip.dataset.personId;
     const room = chip.closest<HTMLElement>('.room[data-room]');
@@ -159,9 +160,33 @@ function captureAttackGhosts(): Map<string, { roomId: string; element: HTMLEleme
       roomId: room.dataset.room ?? '', element: clone,
       left: chip.offsetLeft, top: chip.offsetTop,
       width: chip.offsetWidth, height: chip.offsetHeight, escapeAngle,
+      trailClock: game?.trailClock ?? 0,
     });
   });
   return captured;
+}
+
+function updateAttackGhostEscapeDirection(ghost: AttackGhost | null, personId: string): void {
+  if (!ghost || !game) return;
+  const person = game.people.find((candidate) => candidate.id === personId);
+  if (!person) return;
+  const freshTrails = game.trails
+    .filter((trail) => trail.clock >= ghost.trailClock && trail.to === person.room)
+    .sort((a, b) => b.clock - a.clock);
+  const trail = freshTrails.find((candidate) => candidate.room === ghost.roomId) ?? freshTrails[0];
+  if (!trail) return;
+  const from = ROOM_MAP[trail.room].rect;
+  const to = ROOM_MAP[trail.to].rect;
+  ghost.escapeAngle = Math.atan2(
+    (to.top + to.height / 2) - (from.top + from.height / 2),
+    (to.left + to.width / 2) - (from.left + from.width / 2),
+  );
+}
+
+function playKillerAttackSound(state: GameState): void {
+  if (state.killer === '护士') playSfx('nurseAttack');
+  else if (state.killer === '迈克尔·迈尔斯') playSfx('myersAttack');
+  else playSfx('attack');
 }
 
 function clearHeldMovement(): void {
@@ -900,13 +925,16 @@ app.addEventListener('click', (event) => {
     const personId = target.dataset.personId;
     if (personId) {
       const ghosts = captureAttackGhosts();
+      const victimIsSurvivor = game.people.some((person) => person.id === personId && person.role !== 'police');
       const killsBefore = game.kills;
       const hit = attack(game, personId);
       if (hit) {
         pendingMapAttackTarget = personId;
         pendingMapAttackGhost = ghosts.get(personId) ?? null;
+        updateAttackGhostEscapeDirection(pendingMapAttackGhost, personId);
+        if (victimIsSurvivor) playSurvivorHit();
       }
-      playSfx('attack');
+      playKillerAttackSound(game);
       if (game.kills > killsBefore) playSfx('kill');
       lastLogHead = game.log[0] ?? '';
     }
@@ -961,7 +989,9 @@ app.addEventListener('click', (event) => {
     if (!game || screen !== 'game') return;
     const powerId = target.dataset.power;
     const wasPossessed = game.possessed;
-    if (powerId) usePower(game, powerId);
+    const used = powerId ? usePower(game, powerId) : false;
+    if (used && powerId === 'trap_set') playSfx('trapSet');
+    if (used && (powerId === 'wraith_bell' || powerId === 'wraith_rush')) playSfx('wraithPower');
     if (!wasPossessed && game.possessed && game.killer === '迈克尔·迈尔斯') {
       playSfx('possess');
       if ((game.log[0] ?? '').includes('恶魔附身：')) lastLogHead = game.log[0];
@@ -973,8 +1003,7 @@ app.addEventListener('click', (event) => {
   if (action === 'blink-select') {
     if (!game || screen !== 'game') return;
     const room = target.dataset.room as RoomId | undefined;
-    if (room) blinkPlayer(game, room);
-    playSfx('step');
+    if (room && blinkPlayer(game, room)) playSfx('nurseBlink');
     afterAction();
     return;
   }
@@ -982,7 +1011,15 @@ app.addEventListener('click', (event) => {
   if (action === 'hatchet-target') {
     if (!game || screen !== 'game') return;
     const personId = target.dataset.personId;
-    if (personId && throwHuntressHatchet(game, personId)) playSfx('attack');
+    const ghosts = captureAttackGhosts();
+    const victimIsSurvivor = !!personId && game.people.some((person) => person.id === personId && person.role !== 'police');
+    if (personId && throwHuntressHatchet(game, personId)) {
+      pendingMapAttackTarget = personId;
+      pendingMapAttackGhost = ghosts.get(personId) ?? null;
+      updateAttackGhostEscapeDirection(pendingMapAttackGhost, personId);
+      playSfx('huntressAxe');
+      if (victimIsSurvivor) playSurvivorHit();
+    }
     afterAction();
     return;
   }
@@ -990,7 +1027,15 @@ app.addEventListener('click', (event) => {
   if (action === 'nurse-grab-target') {
     if (!game || screen !== 'game') return;
     const personId = target.dataset.personId;
-    if (personId && nurseGrabPerson(game, personId)) playSfx('attack');
+    const ghosts = captureAttackGhosts();
+    const victimIsSurvivor = !!personId && game.people.some((person) => person.id === personId && person.role !== 'police');
+    if (personId && nurseGrabPerson(game, personId)) {
+      pendingMapAttackTarget = personId;
+      pendingMapAttackGhost = ghosts.get(personId) ?? null;
+      updateAttackGhostEscapeDirection(pendingMapAttackGhost, personId);
+      playSfx('nurseAttack');
+      if (victimIsSurvivor) playSurvivorHit();
+    }
     afterAction();
     return;
   }
@@ -1034,13 +1079,17 @@ app.addEventListener('click', (event) => {
 
   if (action === 'attack') {
     const ghosts = captureAttackGhosts();
+    const victimId = game.people.find((person) => person.room === game?.playerRoom && person.role !== 'police' && person.hp > 0 && !person.hidden)?.id ?? null;
+    const victimIsSurvivor = !!victimId;
     const kills = game.kills;
     const hit = attack(game);
     if (hit) {
       pendingMapAttackTarget = game.lastAttackedId ?? null;
       pendingMapAttackGhost = pendingMapAttackTarget ? ghosts.get(pendingMapAttackTarget) ?? null : null;
+      if (pendingMapAttackTarget) updateAttackGhostEscapeDirection(pendingMapAttackGhost, pendingMapAttackTarget);
+      if (victimIsSurvivor) playSurvivorHit();
     }
-    playSfx('attack');
+    playKillerAttackSound(game);
     if (game.kills > kills) playSfx('kill');
     lastLogHead = game.log[0] ?? '';
     afterAction();
@@ -1108,6 +1157,7 @@ app.addEventListener('click', (event) => {
 
   if (action === 'play') {
     const ghosts = captureAttackGhosts();
+    const survivorIdsBefore = new Set(game.people.filter((person) => person.role !== 'police').map((person) => person.id));
     const oldLogs = new Set(game.log);
     const cardUid = target.dataset.uid;
     if (cardUid) playCard(game, cardUid);
@@ -1115,6 +1165,9 @@ app.addEventListener('click', (event) => {
     if (game.lastAttackedId && newLogs.some((line) => line.includes('你挥刀砍向') || line.includes('你俯身补上一刀'))) {
       pendingMapAttackTarget = game.lastAttackedId;
       pendingMapAttackGhost = ghosts.get(game.lastAttackedId) ?? null;
+      updateAttackGhostEscapeDirection(pendingMapAttackGhost, game.lastAttackedId);
+      if (survivorIdsBefore.has(game.lastAttackedId)) playSurvivorHit();
+      playKillerAttackSound(game);
     }
     playSfx('click');
     afterAction();
