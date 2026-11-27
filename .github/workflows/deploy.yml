@@ -45,6 +45,7 @@ jobs:
       - name: Build immersive HUD preview
         run: |
           npm ci --prefix preview-source
+          npm run check --prefix preview-source
           npm run build --prefix preview-source
       - name: Combine production site and isolated preview
         run: |
@@ -57,7 +58,7 @@ jobs:
           path: dist
 
   deploy:
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/feature/in-game-map-hud')
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: build
     runs-on: ubuntu-latest
     environment:
