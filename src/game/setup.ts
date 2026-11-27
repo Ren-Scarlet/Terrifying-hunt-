@@ -230,6 +230,7 @@ export function createGame(
     palletDropCount: 0,
     crowAlertCount: 0,
     crowAlerts: {},
+    crowTriggered: [],
     brokenPhones: [],
     totemInteractions: [],
     bonusEnergyNextTurn: 0,

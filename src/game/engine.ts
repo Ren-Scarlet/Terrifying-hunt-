@@ -2136,6 +2136,8 @@ function crowAlertFor(state: GameState, person: Person): void {
   if (state.trailClock - last < 2) return;
   state.crowAlerts[person.room] = state.trailClock;
   state.crowAlertCount = (state.crowAlertCount ?? 0) + 1;
+  state.crowTriggered ??= [];
+  if (!state.crowTriggered.includes(person.room)) state.crowTriggered.push(person.room);
   state.disturbances.push({ room: person.room, turn: state.turn, clock: state.trailClock, label: '乌鸦被惊起' });
   if (state.disturbances.length > 24) state.disturbances.splice(0, state.disturbances.length - 24);
   log(state, `${roomName(person.room)}方向传来一阵乌鸦扑棱棱的振翅声——有人在那里动了。`);

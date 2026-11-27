@@ -613,6 +613,8 @@ export interface GameState {
   crowAlertCount: number;
   /** 每间屋上次乌鸦被惊动的行动计数，用来做冷却 */
   crowAlerts: Record<string, number>;
+  /** 本局已经被幸存者惊动过乌鸦的房间（地图上乌鸦图标要一直红着） */
+  crowTriggered: RoomId[];
   /** 本局随机布置的电话所在房间 */
   phones: RoomId[];
   /** 已经被玩家砸坏的电话（按房间记） */

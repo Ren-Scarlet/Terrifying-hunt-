@@ -142,7 +142,7 @@ const EXECUTION_STYLES: Record<string, ExecutionStyle> = {
   '医生': { motion: 'doctor', title: '电刑实验', line: '放松，实验还没结束。', action: '医生启动电流，刺眼白光骤然闪烁' },
   '门徒': { motion: 'pig', title: '游戏结束', line: '游戏结束了。', action: '门徒压低身形，面具后的刀锋突然逼近' },
 };
-let pendingExecutionScene: { roomId: RoomId; title: string; description: string; style: string; success: boolean } | null = null;
+let pendingExecutionScene: { roomId: RoomId; title: string; description: string; style: string; success: boolean; x?: number; y?: number } | null = null;
 
 function applyExecutionQteOutcome(outcome: ExecutionQteOutcome, style: ExecutionStyle): void {
   if (!game) return;
@@ -178,6 +178,7 @@ function applyExecutionQteOutcome(outcome: ExecutionQteOutcome, style: Execution
 function runScoreExecution(personId: string | undefined, outcome: 'perfect' | 'miss'): void {
   const game = currentGame();
   if (!personId) return;
+  const spot = personRoomPercent(personId);
   const ghosts = captureAttackGhosts();
   const executed = executeScoreSpecial(game, personId);
   if (executed) {
@@ -192,6 +193,7 @@ function runScoreExecution(personId: string | undefined, outcome: 'perfect' | 'm
       description: style.action + '。' + style.line + (perfect ? ' 分数处决完成，QTE 完美，额外获得 25 分。' : ' 分数处决仍然完成，但 QTE 失败，按普通处决处理，没有额外分数。'),
       style: style.motion,
       success: true,
+      ...(spot ?? {}),
     };
     playSfx('execute');
     playSfx(SURVIVOR_MAP[personId]?.gender === 'female' ? 'voiceFScream' : 'voiceMScream', 0.96);
@@ -291,6 +293,9 @@ function showPendingExecutionScene(): void {
   room.querySelector('.execution-scene-overlay')?.remove();
   const overlay = document.createElement('div');
   overlay.className = 'execution-scene-overlay execution-style-' + event.style + (event.success ? ' execution-qte-success' : ' execution-qte-miss');
+  // 血光跟着目标头像的位置走，而不是永远在房间正中（作者反馈动画和头像对不上）
+  overlay.style.setProperty('--exec-x', `${(event.x ?? 50).toFixed(1)}%`);
+  overlay.style.setProperty('--exec-y', `${(event.y ?? 54).toFixed(1)}%`);
   overlay.setAttribute('aria-hidden', 'true');
   const flash = document.createElement('div');
   flash.className = 'execution-scene-flash';
@@ -1124,6 +1129,20 @@ function isCabinetRoom(state: GameState): boolean {
   );
 }
 
+/** 幸存者头像在所属房间里的相对位置（百分比）：处决血光要跟着头像走。 */
+function personRoomPercent(personId: string): { x: number; y: number } | null {
+  const chip = app.querySelector<HTMLElement>(`.person-chip[data-person-id="${personId}"]`);
+  const room = chip?.closest<HTMLElement>('.room');
+  if (!chip || !room) return null;
+  const chipRect = chip.getBoundingClientRect();
+  const roomRect = room.getBoundingClientRect();
+  if (!roomRect.width || !roomRect.height) return null;
+  return {
+    x: ((chipRect.left + chipRect.width / 2 - roomRect.left) / roomRect.width) * 100,
+    y: ((chipRect.top + chipRect.height / 2 - roomRect.top) / roomRect.height) * 100,
+  };
+}
+
 /** 返回大厅：丢弃对局，并重置只属于表现层的选择状态。 */
 function leaveToMenu(): void {
   game = null;
@@ -1224,6 +1243,7 @@ function createGameActions(): ActionTable {
       const methodInfo = method ? getExecutionMethod(method) : undefined;
       const carriedId = game.carryPersonId;
       const carried = carriedId ? game.people.find((person) => person.id === carriedId) : undefined;
+      const carriedSpot = carriedId ? personRoomPercent(carriedId) : null;
       if (method && executeCarriedPerson(game, method)) {
         const style = executionStyleOf(game);
         if (methodInfo && carried) {
@@ -1233,6 +1253,7 @@ function createGameActions(): ActionTable {
             description: style.action + '。' + methodInfo.flavor(carried.name) + ' ' + style.line,
             style: style.motion,
             success: true,
+            ...(carriedSpot ?? {}),
           };
         }
         playSfx('execute');
@@ -1513,6 +1534,7 @@ function createGameActions(): ActionTable {
     const personId = action === 'execute-target' ? target.dataset.personId : undefined;
     const ghosts = captureAttackGhosts();
     const downedId = personId ?? game.people.find((person) => person.role !== 'police' && person.hp <= 0 && person.room === game.playerRoom)?.id;
+    const downedSpot = downedId ? personRoomPercent(downedId) : null;
     const executed = executeDownedPerson(game, personId);
     if (executed) {
       if (downedId) {
@@ -1526,6 +1548,7 @@ function createGameActions(): ActionTable {
         description: style.action + '。' + style.line,
         style: style.motion,
         success: true,
+        ...(downedSpot ?? {}),
       };
       playSfx('execute');
       if (downedId) playSfx(SURVIVOR_MAP[downedId]?.gender === 'female' ? 'voiceFScream' : 'voiceMScream', 0.96);

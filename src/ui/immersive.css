@@ -3190,11 +3190,7 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
   display: none !important;
 }
 
-/* 被放下的木板：堵路房间整间橙色高亮，一眼能看到 */
-#app.immersive-game .floorplan .room.barricaded {
-  box-shadow: inset 0 0 0 2px rgba(231, 161, 93, .85), inset 0 0 26px rgba(231, 120, 60, .35) !important;
-  background-color: rgba(120, 62, 20, .12) !important;
-}
+/* 2026-11-28：堵门房间不再整间套黄框（作者要求删除）；只保留门上的木板图标与相邻房间的角标 */
 #app.immersive-game .floorplan .room.barricaded .room-feature.pallet {
   filter: drop-shadow(0 0 6px rgba(255, 150, 70, .95)) !important;
   opacity: 1 !important;
@@ -3357,9 +3353,7 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
   background: rgba(40, 18, 8, .95) !important;
   border: 1px solid rgba(231, 161, 93, .8) !important;
 }
-#app.immersive-game .floorplan .room:has(.room-tag.noise.loud) {
-  box-shadow: inset 0 0 0 1px rgba(231, 161, 93, .55), inset 0 0 18px rgba(231, 120, 60, .25) !important;
-}
+/* 2026-11-28：动静不再给整间房套黄框（作者要求删除），只保留房间角标 */
 
 /* 相邻木板：更强的橙色高亮 */
 #app.immersive-game .floorplan .room.board-near {
@@ -3957,4 +3951,68 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
 }
 #app.immersive-game.panel-collapsed:not(.mobile-game-active) .killer-hud-portrait > .killer-face.ability-portrait {
   width: 120px !important; height: 148px !important; flex: 0 0 148px !important;
+}
+
+/* ==========================================================================
+   2026-11-28 · 地图信标 / 处决动画对齐
+   ========================================================================== */
+
+/* 相邻木板：不再整间套亮黄框，只留一层细高亮 + 角标 */
+#app.immersive-game:not(.mobile-game-active) .floorplan .room.board-near {
+  box-shadow: inset 0 0 0 1px rgba(255, 170, 80, .55), inset 0 0 16px rgba(255, 120, 40, .16) !important;
+  background-color: rgba(120, 66, 22, .10) !important;
+}
+
+/* 信标层：不放进 .room-features，所以不会被「非当前房间 opacity .24」压暗 */
+#app.immersive-game:not(.mobile-game-active) .floorplan .room-beacons {
+  position: absolute !important;
+  right: 6px !important; top: 6px !important;
+  display: flex !important; flex-wrap: wrap !important; justify-content: flex-end !important;
+  gap: 4px !important;
+  max-width: 78% !important;
+  z-index: 12 !important;
+  pointer-events: none !important;
+}
+#app.immersive-game:not(.mobile-game-active) .room-beacon {
+  display: inline-flex !important; align-items: center !important; gap: 4px !important;
+  padding: 2px 7px 2px 5px !important;
+  border: 1px solid rgba(240, 70, 55, .88) !important;
+  border-radius: 10px !important;
+  background: rgba(40, 8, 6, .94) !important;
+  color: #ffd7cf !important;
+  font-size: 9px !important; line-height: 1.3 !important; letter-spacing: .5px !important;
+  white-space: nowrap !important;
+  box-shadow: 0 0 10px rgba(255, 60, 40, .5), inset 0 0 8px rgba(255, 60, 40, .22) !important;
+  animation: beaconPulse 1.9s ease-in-out infinite !important;
+}
+#app.immersive-game:not(.mobile-game-active) .room-beacon .ui-icon {
+  width: 16px !important; height: 16px !important;
+  filter: drop-shadow(0 0 4px rgba(255, 70, 50, .95)) !important;
+}
+#app.immersive-game:not(.mobile-game-active) .room-beacon.pallet {
+  border-color: rgba(240, 180, 80, .85) !important;
+  background: rgba(42, 26, 6, .94) !important;
+  color: #ffe9bf !important;
+  box-shadow: 0 0 10px rgba(255, 170, 60, .42) !important;
+}
+#app.immersive-game:not(.mobile-game-active) .room-beacon.pallet .ui-icon {
+  filter: drop-shadow(0 0 4px rgba(255, 180, 80, .9)) !important;
+}
+@keyframes beaconPulse { 0%, 100% { opacity: .9; } 50% { opacity: 1; } }
+
+/* 逃生大门开启：房间本身也持续泛红，隔着半个地图都能看见 */
+#app.immersive-game:not(.mobile-game-active) .floorplan .room:has(.room-beacon.escape) {
+  box-shadow: inset 0 0 0 2px rgba(226, 58, 44, .72), inset 0 0 22px rgba(200, 30, 20, .28) !important;
+}
+
+/* 处决血光跟着目标头像走（位置由 main.ts 写入 --exec-x / --exec-y） */
+#app.immersive-game .execution-scene-flash {
+  background: radial-gradient(ellipse at var(--exec-x, 50%) var(--exec-y, 54%),
+    rgba(165, 18, 22, .58), rgba(80, 7, 10, .2) 35%, transparent 72%) !important;
+}
+
+/* 兜底：旧的 .room.barricaded 淡黄描边一并去掉 */
+#app.immersive-game:not(.mobile-game-active) .floorplan .room.barricaded {
+  box-shadow: none !important;
+  background-color: transparent !important;
 }
