@@ -1176,7 +1176,6 @@ app.addEventListener('click', (event) => {
     const ghosts = captureAttackGhosts();
     const executed = !!personId && executeScoreSpecial(game, personId);
     if (executed && personId) {
-      const person = game.people.find((candidate) => candidate.id === personId);
       pendingMapAttackTarget = personId;
       pendingMapAttackGhost = ghosts.get(personId) ?? null;
       const style = EXECUTION_STYLES[game.killer] ?? EXECUTION_STYLES['设陷者'];
@@ -1190,7 +1189,7 @@ app.addEventListener('click', (event) => {
         success: true,
       };
       playSfx('execute');
-      if (person) playSfx(SURVIVOR_MAP[person.id]?.gender === 'female' ? 'voiceFScream' : 'voiceMScream', 0.96);
+      playSfx(SURVIVOR_MAP[personId]?.gender === 'female' ? 'voiceFScream' : 'voiceMScream', 0.96);
       window.setTimeout(() => playSfx('wipe'), 260);
       lastLogHead = game.log[0] ?? '';
     }
