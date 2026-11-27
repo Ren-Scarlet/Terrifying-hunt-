@@ -154,6 +154,22 @@ export function createPeople(mission: Mission): Person[] {
     people.push(makePerson(s, 'civilian', nextRoom(), 4, false));
   });
 
+  // 每局至少安排两名手电筒携带者，让照晕反制不再依赖极低概率的随机道具分配。
+  const flashlightCarriers = shuffle(people.filter((person) => person.item !== 'flashlight'))
+    .slice(0, Math.max(0, 2 - people.filter((person) => person.item === 'flashlight').length));
+  flashlightCarriers.forEach((person) => {
+    person.item = 'flashlight';
+    person.itemUses = itemUsesFor('flashlight');
+  });
+
+  // 至少保留一名专职躲藏者，确保柜子/床底机制每局都有机会出现。
+  if (!people.some((person) => person.archetype === 'hider')) {
+    const hider = randomOf(people);
+    hider.archetype = 'hider';
+    hider.goal = 'hide';
+    hider.routineIndex = Math.floor(Math.random() * ROUTINE_PROFILE.hider.rooms.length);
+  }
+
   people.push({
     id: 'police-0',
     name: '巡逻警员',
