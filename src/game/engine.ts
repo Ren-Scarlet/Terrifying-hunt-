@@ -74,8 +74,6 @@ export const LOOK_COST = 1;
 export const DRAW_CARD_COST = 1;
 /** 手牌上限；超过时必须由玩家选择弃牌。 */
 export const HAND_LIMIT = 6;
-/** 每次牌库耗尽并洗回弃牌堆，幸存者团队进度增加。 */
-const DECK_SHUFFLE_TEAM_GAIN = 5;
 /**
  * 一个人一回合最多能跑几间屋（含被砍后夺路而逃的那两步）。
  * 玩家一回合 4 点行动点，这个数字必须比它能走的格数小，否则永远追不上；
@@ -100,12 +98,6 @@ export const FRENZY_AP_BONUS = 2;
 /** 每跟对一段脚印涨多少，跟丢一次掉多少 */
 const FRENZY_GAIN = 25;
 const FRENZY_LOSS = 20;
-/** 幸存者团队目标：满了他们就集体逃走，玩家直接失败 */
-export const TEAM_GOAL_MAX = 100;
-export const TEAM_STAGE_COUNT = 4;
-export const TEAM_STAGE_SIZE = TEAM_GOAL_MAX / TEAM_STAGE_COUNT;
-/** 一个人在目标房间待一回合推进的进度 */
-const OBJECTIVE_GAIN = 5;
 
 /* ---------- 本轮新增：擦刀 / 守尸 / 追击热度 / 眩晕致盲 / 鬼面夜幕 ---------- */
 /** 擦刀：原地花 1 点收回刀锋，但这一次动作幸存者也会跟着动 */
@@ -143,30 +135,6 @@ function cabinetRoomsFor(state: GameState): RoomId[] {
     : CABINET_ROOMS;
 }
 
-/** 同伴一个个倒下，剩下的人会红着眼拼命：击杀数与场上倒地者都会催他们干活更快 */
-function workPressure(state: GameState): number {
-  const downed = state.people.some((p) => p.role !== 'police' && p.hp <= 0);
-  return Math.min(KILL_PRESSURE_MAX, state.kills * KILL_PRESSURE) + (downed ? DOWNED_URGENCY : 0);
-}
-
-/** 幸存者行动效率受猎杀压力影响；长时间追踪单一目标不再提供团队进度或效率奖励。 */
-function scaleSurvivorProgress(state: GameState, person: Person, amount: number): number {
-  const radius = effectiveFearRadius(state);
-  let multiplier = state.distressingActive && radius > 0 && roomDistance(person.room, state.playerRoom) <= radius ? 0.8 : 1;
-  if (state.killer === '迈克尔·迈尔斯' && state.myersEclipseMarks > 0) {
-    const marks = Math.min(5, state.myersEclipseMarks);
-    multiplier *= person.bloodSacrifice ? 1 + marks * 0.05 : Math.max(0.65, 1 - marks * 0.05);
-  }
-  return Math.max(1, Math.round(amount * multiplier));
-}
-
-function teamWorkGain(state: GameState, person: Person): number {
-  const base = Math.round(
-    OBJECTIVE_GAIN * (1 + workPressure(state)),
-  );
-  return scaleSurvivorProgress(state, person, base);
-}
-
 /* ---------- 场地物品：道具箱 ---------- */
 const ITEM_BOX_COUNT = 2;
 
@@ -199,18 +167,6 @@ function farthestRoomPair(): RoomId[] {
     }
   }
   return pairs.length ? randomOf(pairs) : [ENTRY_ROOM, EXIT_ROOM];
-}
-
-/** 旧团队进度系统已废弃；NPC 不再通过设施劳动推进集体逃生。 */
-function addTeamProgress(state: GameState, amount: number): void {
-  // 旧团队进度系统已废弃；保留空函数以兼容尚未改版的卡牌脚本。
-  void state; void amount;
-}
-
-/** 破坏设施只能拖慢当前阶段，不能抹掉已经完成的阶段。 */
-function reduceTeamProgress(state: GameState, amount: number): void {
-  // 旧团队进度系统已废弃。
-  void state; void amount;
 }
 
 /** 健康 / 受伤 / 倒地，由血量推导，不单独存一份避免不同步 */
@@ -2027,10 +1983,6 @@ function npcTurn(state: GameState): void {
     // 日常生活阶段不会因为房间亮着灯就逐渐怀疑异常。
     if (isRoomLit(state, person.room) && person.awareness > 0) {
       person.alert = clamp(person.alert + 4, 0, 100);
-      if (person.awareness >= 2 && (person.goal === 'objective' || person.goal === 'key' || person.intent === 'work')) {
-        addTeamProgress(state, scaleSurvivorProgress(state, person, 2));
-        log(state, `${roomName(person.room)}仍有照明，${person.name}借着灯光加快了行动（团队进度 +2）。`);
-      }
     }
 
     // 流血
@@ -2213,7 +2165,7 @@ function npcTurn(state: GameState): void {
     }
 
     // 低警觉：不再漫无目的地乱晃，各自朝这一局的个人目标走一步。
-    // 到了目标房间就「做事」——推进团队进度，同时弄出动静给玩家一条线索。
+    // 低警觉幸存者按个人习惯、补给需求和现场状况行动。
     person.intent = 'idle';
     // 路过没被砸烂的道具箱就翻一件：他们多一条路，你就多一个要盯的地方
     if (tryTakeSupply(state, person)) continue;
@@ -2226,16 +2178,12 @@ function npcTurn(state: GameState): void {
     const goalTargets: RoomId[] = toolboxCircuitRooms.length
       ? toolboxCircuitRooms
       : (
-      person.goal === 'routine'
-        ? [routineRoom]
-        : person.goal === 'objective'
-          ? state.objectiveRooms
-        : person.goal === 'key'
-          ? [EXIT_ROOM]
-          : person.goal === 'supply'
-            ? usableItemBoxes(state).map((i) => i.room)
-            : person.goal === 'phone'
-              ? PHONE_ROOMS
+          person.goal === 'routine'
+            ? [routineRoom]
+            : person.goal === 'supply'
+              ? usableItemBoxes(state).map((i) => i.room)
+              : person.goal === 'phone'
+                ? PHONE_ROOMS
                 : person.goal === 'weapon' || person.goal === 'gather'
                   ? WEAPON_ROOMS
                   : person.goal === 'hide'
@@ -2251,16 +2199,6 @@ function npcTurn(state: GameState): void {
         person.activity = routine.activity;
         person.intent = 'idle';
         person.routineIndex = ((person.routineIndex ?? 0) + 1) % routine.rooms.length;
-      } else if ((person.goal === 'objective' || person.goal === 'key') && state.teamProgress < TEAM_GOAL_MAX) {
-        // 工具箱：按你的设计，推进团队目标也更快。
-        const hasToolbox = person.item === 'toolbox' && person.itemUses > 0;
-        const gain = teamWorkGain(state, person) * (hasToolbox ? 2 : 1);
-        if (hasToolbox) consumeItem(state, person);
-        addTeamProgress(state, gain);
-        person.intent = 'work';
-        person.activity = `在${roomName(person.room)}${state.teamGoalLabel}`;
-        addDisturbance(state, person.room);
-        log(state, `${person.name} 在${roomName(person.room)}${state.teamGoalLabel}（团队进度 ${state.teamProgress}/${TEAM_GOAL_MAX}）。`);
       } else {
         person.activity = randomOf(ACTIVITIES);
       }
@@ -2549,9 +2487,8 @@ function pickSupply(state: GameState, person: Person): SurvivorItem {
   const circuitsNeedRepair = state.powerCircuits.some((circuit) => circuit.broken || circuit.enabled === false);
   const score: Record<SurvivorItem, number> = {
     medkit: (downed ? 5 : 0) + (injured ? 2 : 0) + (person.archetype === 'rescuer' ? 4 : 0),
-    toolbox: circuitsNeedRepair ? 4 + (person.goal === 'objective' ? 3 : 0) : 0,
+    toolbox: circuitsNeedRepair ? 4 : 0,
     flare: (state.alarm < 45 ? 3 : 1) + (person.archetype === 'caller' ? 4 : 0),
-    key: state.teamProgress < 60 ? 3 + (person.goal === 'key' ? 2 : 0) : 1,
     weapon: (person.archetype === 'defiant' || person.archetype === 'brave' ? 5 : 0) + (state.alarm >= 45 ? 2 : 0),
     smoke: (person.alert >= 25 ? 4 : 1) + (person.sneaky ? 2 : 0),
     flashlight: (person.archetype === 'defiant' || person.archetype === 'kiter' ? 3 : 1) + (person.alert >= 40 ? 2 : 0),
@@ -2633,16 +2570,6 @@ function useSurvivorItem(state: GameState, person: Person): boolean {
       log(state, `${person.name} 打出信号弹，整栋房子的警戒往上窜了一截。`);
       addDisturbance(state, person.room);
       addAlarm(state, 14);
-      return true;
-    }
-    case 'key': {
-      if (state.teamProgress >= TEAM_GOAL_MAX) return false;
-      consumeItem(state, person);
-      addTeamProgress(state, scaleSurvivorProgress(state, person, 12));
-      person.intent = 'work';
-      person.activity = '用钥匙捅开了后门的锁';
-      log(state, `${person.name} 用钥匙捅开了后门锁（团队进度 ${state.teamProgress}/${TEAM_GOAL_MAX}）。`);
-      addDisturbance(state, person.room);
       return true;
     }
     case 'smoke': {
@@ -3703,12 +3630,6 @@ export function sabotageSiteItem(state: GameState, options: { free?: boolean; su
     const circuit = state.powerCircuits.find((c) => c.breakerRoom === state.playerRoom && !c.broken);
     const item = state.siteItems.find((i) => i.room === state.playerRoom && !i.broken && (i.kind === 'itemBox' ? i.charges > 0 : true));
     if (!circuit && !item) return false;
-  if (state.hexRuinActive && !state.hexRuinUsed) {
-    state.hexRuinUsed = true;
-    reduceTeamProgress(state, 10);
-    log(state, '粉碎希望触发：首次破坏使团队进度额外倒退 10。');
-  }
-
   if (target.kind === 'facility' && circuit) {
     circuit.broken = true;
     circuit.enabled = false;
@@ -4138,15 +4059,9 @@ export function currentScore(state: GameState): number {
   );
 }
 
-/** 从牌库抽牌；每次耗尽并洗回弃牌堆都会推进幸存者团队进度。 */
+/** 从牌库抽牌；牌库耗尽时正常洗回弃牌堆。 */
 function drawForPlayer(state: GameState, count: number): number {
-  const reshuffles = drawCards(state, count);
-  if (reshuffles > 0) {
-    const gain = reshuffles * DECK_SHUFFLE_TEAM_GAIN;
-    addTeamProgress(state, gain);
-    log(state, `牌库耗尽，弃牌堆重新洗牌（幸存者团队进度 +${gain}）。`);
-  }
-  return reshuffles;
+  return drawCards(state, count);
 }
 
 /** 主动抽 1 张牌，消耗 1 点行动点；手牌超限时必须先弃牌。 */
