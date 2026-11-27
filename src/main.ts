@@ -160,6 +160,12 @@ function applyExecutionQteOutcome(outcome: ExecutionQteOutcome, style: Execution
   const affected = game.people.filter((person) => person.role !== 'police' && person.hp > 0 && !person.hidden && (outcome === 'perfect' || nearby(person)));
   if (outcome === 'perfect') {
     game.specialExecutionBonus += 25;
+    if (game.result) {
+      const existing = game.scoreBreakdown.find((line) => line.label === '完美处决 QTE 奖励');
+      if (existing) existing.value += 25;
+      else game.scoreBreakdown.push({ label: '完美处决 QTE 奖励', value: 25 });
+      game.score = Math.max(0, Math.round(game.scoreBreakdown.reduce((sum, line) => sum + line.value, 0)));
+    }
     affected.forEach((person) => {
       person.fear = Math.min(100, person.fear + 22);
       person.alert = Math.min(100, person.alert + 8);
@@ -176,6 +182,7 @@ function applyExecutionQteOutcome(outcome: ExecutionQteOutcome, style: Execution
 
 function startExecutionQte(button: HTMLElement): void {
   if (executionQteActive || !game) return;
+  unlockAudio();
   executionQteActive = true;
   const digits = Array.from({ length: 4 }, () => String(Math.floor(Math.random() * 10)));
   const style = EXECUTION_STYLES[game.killer] ?? EXECUTION_STYLES['设陷者'];
