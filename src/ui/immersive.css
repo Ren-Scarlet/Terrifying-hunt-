@@ -3130,3 +3130,24 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
   #app.immersive-game .killer-hud-resources .killer-ap-display>span { font-size:9px!important; }
   #app.immersive-game .killer-hud-resources .killer-ap-display>b { font-size:12px!important; }
 }
+
+/* Clear visual feedback for survivor-placed boards and hoverable alarm help. */
+#app.immersive-game .floorplan > .room.barricaded {
+  outline: 3px solid #f0a34b !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 4px rgba(240, 163, 75, .28), inset 0 0 24px rgba(240, 163, 75, .22), 0 0 22px rgba(240, 163, 75, .42) !important;
+  z-index: 5 !important;
+}
+#app.immersive-game .floorplan > .room.barricaded .room-tag.bar {
+  color: #fff0d6 !important;
+  background: rgba(112, 57, 20, .96) !important;
+  border: 1px solid #f0a34b !important;
+  font-weight: 800 !important;
+}
+#app.immersive-game .barricade-prompt {
+  border-color: rgba(240, 163, 75, .85) !important;
+  background: rgba(74, 43, 22, .94) !important;
+}
+#app.immersive-game .statusline .alarm-stat {
+  pointer-events: auto !important;
+}
