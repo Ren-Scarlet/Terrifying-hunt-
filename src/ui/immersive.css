@@ -3173,3 +3173,198 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
   filter: grayscale(.6);
   box-shadow: none;
 }
+
+/* Authoritative killer HUD layout: keep the panel clear of the status strip and bottom action dock. */
+#app.immersive-game .killer-ability-panel {
+  position: fixed !important;
+  left: 16px !important;
+  right: auto !important;
+  bottom: 150px !important;
+  z-index: 28 !important;
+  display: grid !important;
+  grid-template-columns: 104px minmax(0, 218px) !important;
+  grid-template-rows: auto auto !important;
+  align-items: center !important;
+  column-gap: 10px !important;
+  row-gap: 8px !important;
+  width: 340px !important;
+  max-width: calc(100vw - 32px) !important;
+  max-height: 52vh !important;
+  height: auto !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  box-sizing: border-box !important;
+  padding: 9px !important;
+  border: 1px solid rgba(176, 105, 77, .5) !important;
+  border-radius: 9px !important;
+  background: linear-gradient(155deg, rgba(24,20,19,.96), rgba(7,9,11,.96)) !important;
+  box-shadow: 0 12px 32px rgba(0,0,0,.68) !important;
+  backdrop-filter: blur(10px) !important;
+  pointer-events: auto !important;
+}
+#app.immersive-game .killer-hud-portrait {
+  grid-column: 1 !important;
+  grid-row: 1 / span 2 !important;
+  min-width: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 5px !important;
+}
+#app.immersive-game .killer-face.ability-portrait {
+  width: 96px !important;
+  height: 122px !important;
+  flex: 0 0 122px !important;
+  object-fit: contain !important;
+}
+#app.immersive-game .killer-hud-portrait > b {
+  max-width: 100px !important;
+  font-size: 11px !important;
+  text-align: center !important;
+}
+#app.immersive-game .killer-hud-abilities {
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+  min-width: 0 !important;
+}
+#app.immersive-game .killer-power-grid {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 6px !important;
+  min-width: 0 !important;
+}
+#app.immersive-game .killer-power-grid .btn.power {
+  display: grid !important;
+  grid-template-columns: 34px minmax(0, 1fr) !important;
+  align-items: center !important;
+  gap: 6px !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 46px !important;
+  padding: 4px 5px !important;
+}
+#app.immersive-game .killer-power-grid .power-art {
+  width: 32px !important;
+  height: 32px !important;
+}
+#app.immersive-game .killer-power-grid .power-body {
+  min-width: 0 !important;
+}
+#app.immersive-game .killer-power-grid .power-body > b {
+  font-size: 10px !important;
+  line-height: 1.2 !important;
+  white-space: normal !important;
+}
+#app.immersive-game .killer-power-grid .power-body > small,
+#app.immersive-game .killer-power-grid .power-pips {
+  display: none !important;
+}
+#app.immersive-game .killer-hud-resources {
+  grid-column: 2 !important;
+  grid-row: 2 !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  grid-template-rows: auto auto !important;
+  align-items: center !important;
+  gap: 6px 8px !important;
+  min-width: 0 !important;
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 6px 7px !important;
+  box-sizing: border-box !important;
+  border: 1px solid rgba(205,222,231,.18) !important;
+  border-radius: 6px !important;
+  background: rgba(7,10,13,.82) !important;
+}
+#app.immersive-game .killer-hud-resources .killer-frenzy-meter {
+  grid-column: 1 !important;
+  grid-row: 1 !important;
+  min-width: 0 !important;
+  width: 100% !important;
+  margin: 0 !important;
+}
+#app.immersive-game .killer-hud-resources .killer-ap-display {
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+  display: flex !important;
+  min-width: 88px !important;
+  width: auto !important;
+  height: 38px !important;
+  min-height: 38px !important;
+  margin: 0 !important;
+  padding: 3px 5px !important;
+  gap: 4px !important;
+  border: 0 !important;
+  border-left: 1px solid rgba(205,222,231,.18) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+}
+#app.immersive-game .killer-hud-resources .killer-special-resources {
+  grid-column: 1 / -1 !important;
+  grid-row: 2 !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+}
+#app.immersive-game .statusline {
+  top: 132px !important;
+  bottom: auto !important;
+  left: 18px !important;
+  right: auto !important;
+  z-index: 19 !important;
+  max-width: min(54vw, 720px) !important;
+}
+@media (max-width: 900px) {
+  #app.immersive-game .killer-ability-panel {
+    left: 8px !important;
+    bottom: 126px !important;
+    grid-template-columns: 82px minmax(0, 1fr) !important;
+    width: 278px !important;
+    max-width: min(66vw, 278px) !important;
+    max-height: 44vh !important;
+    padding: 7px !important;
+    column-gap: 7px !important;
+  }
+  #app.immersive-game .killer-face.ability-portrait {
+    width: 76px !important;
+    height: 100px !important;
+    flex-basis: 100px !important;
+  }
+  #app.immersive-game .killer-hud-portrait > b { font-size: 9px !important; }
+  #app.immersive-game .statusline { top: 112px !important; left: 8px !important; }
+}
+@media (max-width: 700px) {
+  #app.immersive-game .killer-ability-panel {
+    left: 6px !important;
+    bottom: 112px !important;
+    grid-template-columns: 62px minmax(0, 1fr) !important;
+    width: 226px !important;
+    max-width: calc(100vw - 12px) !important;
+    max-height: 39vh !important;
+    padding: 5px !important;
+    gap: 5px !important;
+  }
+  #app.immersive-game .killer-face.ability-portrait {
+    width: 58px !important;
+    height: 82px !important;
+    flex-basis: 82px !important;
+  }
+  #app.immersive-game .killer-hud-portrait > b { font-size: 8px !important; }
+  #app.immersive-game .killer-power-grid { gap: 4px !important; }
+  #app.immersive-game .killer-power-grid .btn.power {
+    grid-template-columns: 28px minmax(0, 1fr) !important;
+    min-height: 38px !important;
+    padding: 3px !important;
+    gap: 4px !important;
+  }
+  #app.immersive-game .killer-power-grid .power-art {
+    width: 26px !important;
+    height: 26px !important;
+  }
+  #app.immersive-game .killer-power-grid .power-body > b { font-size: 8px !important; }
+  #app.immersive-game .killer-hud-resources { padding: 4px !important; gap: 4px !important; }
+  #app.immersive-game .killer-hud-resources .killer-ap-display { min-width: 68px !important; height: 32px !important; min-height: 32px !important; }
+  #app.immersive-game .killer-hud-resources .killer-ap-icon { width: 20px !important; height: 20px !important; flex-basis: 20px !important; }
+  #app.immersive-game .killer-hud-resources .killer-ap-display > span { font-size: 8px !important; }
+  #app.immersive-game .killer-hud-resources .killer-ap-display > b { font-size: 11px !important; }
+  #app.immersive-game .statusline { top: 98px !important; left: 6px !important; max-width: calc(100vw - 12px) !important; }
+}
