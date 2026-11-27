@@ -155,9 +155,12 @@ export function createPeople(mission: Mission): Person[] {
   });
 
   // 每局至少安排两名手电筒携带者，让照晕反制不再依赖极低概率的随机道具分配。
-  const flashlightCarriers = shuffle(people.filter((person) => person.item !== 'flashlight'))
-    .slice(0, Math.max(0, 2 - people.filter((person) => person.item === 'flashlight').length));
-  flashlightCarriers.forEach((person) => {
+  const missingFlashlightCarriers = Math.max(0, 2 - people.filter((person) => person.item === 'flashlight').length);
+  const flashlightCandidates = [
+    ...shuffle(people.filter((person) => person.item === null)),
+    ...shuffle(people.filter((person) => person.item !== null && person.item !== 'flashlight')),
+  ];
+  flashlightCandidates.slice(0, missingFlashlightCarriers).forEach((person) => {
     person.item = 'flashlight';
     person.itemUses = itemUsesFor('flashlight');
   });
