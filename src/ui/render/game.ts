@@ -127,10 +127,13 @@ function roomFeatures(state: GameState, roomId: RoomId): string {
   const executionSites = executionMethodsAtRoom(roomId);
   if (executionSites.length) {
     const carried = state.carryPersonId ? state.people.find((person) => person.id === state.carryPersonId) : undefined;
-    if (carried && carried.hp <= 0 && state.playerRoom === roomId) {
+    const downedHere = isRoomVisible(state, roomId) && state.people.some((person) => person.room === roomId && person.role !== 'police' && person.hp <= 0);
+    const canExecuteHere = !!carried && carried.hp <= 0 && state.playerRoom === roomId;
+    if (canExecuteHere || downedHere) {
       executionSites.forEach((method) => {
         const glyph = method.id === 'fridge' ? '❄' : method.id === 'microwave' ? '▦' : method.id === 'garage_crush' ? '▤' : method.id === 'bathroom_tub' ? '♨' : method.id === 'laundry_dryer' ? '◉' : '⚒';
-        parts.push(`<button type="button" class="room-feature execution-site execution-action" data-action="execute-special" data-method="${method.id}" title="${escape(method.description)}"><span aria-hidden="true">${glyph}</span><b>${escape(method.name)}</b></button>`);
+        const hint = canExecuteHere ? method.description : '先抱起这里的倒地幸存者，再将其带到此处使用特殊处决。';
+        parts.push(`<button type="button" class="room-feature execution-site execution-action" data-action="execute-special" data-method="${method.id}" ${canExecuteHere ? '' : 'disabled'} title="${escape(hint)}"><span aria-hidden="true">${glyph}</span><b>${escape(method.name)}</b></button>`);
       });
     } else {
       parts.push(`<span class="room-feature execution-site" title="特殊处决地点：${executionSites.map((method) => escape(method.name)).join(' / ')}">☠<b>处决点 ${executionSites.length}</b></span>`);
@@ -346,7 +349,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
     lastDiscoveryMissionId = m.id;
     discoveredSurvivorIds.clear();
   }
-  const newlyDiscovered = state.people.filter((person) => person.role !== 'police' && !person.hidden && isRoomVisible(state, person.room) && !discoveredSurvivorIds.has(person.id));
+  const newlyDiscovered = state.people.filter((person) => person.role !== 'police' && person.hp > 0 && !person.hidden && isRoomVisible(state, person.room) && !discoveredSurvivorIds.has(person.id));
   if (newlyDiscovered.length) {
     newlyDiscovered.forEach((person) => discoveredSurvivorIds.add(person.id));
     playSfx('survivorFound');
