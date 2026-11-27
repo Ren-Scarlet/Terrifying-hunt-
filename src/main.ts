@@ -485,8 +485,17 @@ function playVoice(head: string, kind: 'Hurt' | 'Hit' | 'Scream' | 'Startle'): v
 
 /** 引擎日志里刚发生的事 → 补上对应音效（不侵入纯逻辑层） */
 let lastLogHead = '';
+const playedDeathLogMessages = new Set<string>();
 function sfxFromLogs(): void {
   if (!game) return;
+  // 死亡记录可能被目击/结算日志顶到第二行以后，不能只检查 log[0]。
+  for (const line of game.log.slice(0, 24)) {
+    if (/停止了呼吸/.test(line) && !playedDeathLogMessages.has(line)) {
+      playedDeathLogMessages.add(line);
+      playSfx('kill');
+      playVoice(line, 'Scream');
+    }
+  }
   const head = game.log[0] ?? '';
   if (head === lastLogHead) return;
   lastLogHead = head;
@@ -509,7 +518,6 @@ function sfxFromLogs(): void {
   else if (/受伤了（|在流血/.test(head)) playVoice(head, 'Hurt');
   else if (/喊了一声|警觉升到|尖叫/.test(head)) playVoice(head, 'Scream');
   else if (/猛一回头|忽然抬头|察觉到异常|发抖/.test(head)) playVoice(head, 'Startle');
-  else if (/停止了呼吸/.test(head)) { playSfx('kill'); playVoice(head, 'Scream'); }
   else if (/致盲|击晕|手电筒|逼退/.test(head)) playSfx('stun');
   else if (/乌鸦|动静/.test(head)) playSfx('crow');
   else if (/翻出了|拾起|拿到了武器/.test(head)) playSfx('pickup');
