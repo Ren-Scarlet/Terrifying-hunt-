@@ -1849,7 +1849,7 @@ function caseNpcLocksAndPersistentTrails(): void {
     walker.awareness = 2;
     walker.archetype = 'kiter';
     walker.fear = 0;
-    walker.item = undefined;
+    walker.item = null;
     walker.itemUses = 0;
     walker.movesThisTurn = 0;
     tracks.trails = [];
