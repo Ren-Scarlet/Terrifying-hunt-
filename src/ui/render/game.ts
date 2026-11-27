@@ -138,9 +138,7 @@ function roomFeatures(state: GameState, roomId: RoomId): string {
   // 电话只在已探索过的房间显示：没进去过就不该知道那儿有线
   if (state.explored.includes(roomId) && (state.phones ?? []).includes(roomId)) {
     const phoneBroken = (state.brokenPhones ?? []).includes(roomId) || state.phoneCut;
-    parts.push(phoneBroken
-      ? `<span class="room-feature telephone broken" title="电话已被砸坏：这间屋子没法报警了"><b>电话已坏</b></span>`
-      : `<button type="button" class="room-feature telephone on phone-action" data-action="break-phone" title="这间屋子的电话还能用，幸存者会来这里报警。点此砸坏它（1 AP）"><b>砸坏电话 · 1 AP</b></button>`);
+    if (phoneBroken) parts.push(`<span class="room-feature telephone broken" title="电话已被砸坏：这间屋子没法报警了"><b>电话已坏</b></span>`);
   }
   if (RADIO_ROOMS.includes(roomId)) {
     const radioBroken = state.sabotage.includes('radio');
@@ -162,20 +160,14 @@ function roomFeatures(state: GameState, roomId: RoomId): string {
   }
   if (roomId === EXIT_ROOM) parts.push(`<span class="room-feature escape" title="撤离点：任务完成的撤离位置">${icon('escape', 'ui-icon tiny')}</span>`);
   if (state.escapeRooms.includes(roomId)) parts.push(`<span class="room-feature escape-npc" title="警报达到阈值后开放的逃生点">${icon('escape', 'ui-icon tiny')}</span>`);
-  if (TOTEM_ROOMS.includes(roomId)) {
-    if (state.totems.includes(roomId) && state.playerRoom === roomId && !state.totemInteractions.includes(roomId)) {
-      parts.push(`<div class="room-feature totem totem-interaction">${icon('totem', 'ui-icon tiny')}<b>图腾</b><button type="button" data-action="totem-draw" title="本局仅可从这座图腾领取一次奖励">抽 1 张牌</button><button type="button" data-action="totem-energy" title="本局仅可从这座图腾领取一次奖励">+1 行动点</button></div>`);
-    } else {
-      const label = state.totems.includes(roomId) ? (state.totemInteractions.includes(roomId) ? '已汲取' : '图腾') : '已熄灭';
-      parts.push(`<span class="room-feature totem ${state.totems.includes(roomId) ? 'cursed' : 'broken'}" title="${label}：幸存者可以拆除；杀手可从每座存续图腾领取一次奖励">${icon('totem', 'ui-icon tiny')}<b>${label}</b></span>`);
-    }
+  if (TOTEM_ROOMS.includes(roomId) || state.totems.includes(roomId)) {
+    const alive = state.totems.includes(roomId);
+    const taken = state.totemInteractions.includes(roomId);
+    const label = alive ? (taken ? '已汲取' : '图腾') : '已熄灭';
+    parts.push(`<span class="room-feature totem ${alive ? 'cursed lit' : 'broken'}" title="${label}：幸存者可以拆除；杀手可从每座存续图腾领取一次奖励">${icon('totem', 'ui-icon tiny')}<b>${label}</b></span>`);
   }
-  if (state.totems.includes(roomId) && !TOTEM_ROOMS.includes(roomId)) {
-      const taken = state.totemInteractions.includes(roomId);
-      parts.push(`<span class="room-feature totem cursed" title="厄咒图腾：支撑难逃一死；幸存者可能发现并破坏">${icon('totem', 'ui-icon tiny')}<b>${taken ? '已汲取' : '图腾'}</b></span>`);
-    }
   if (state.trailRevealActions > 0 && visibleTrails(state).some((trail) => trail.room === roomId || trail.to === roomId)) parts.push('<span class="room-feature trail-highlight" title="猎鹿者显现的脚印路线">👣</span>');
-  if (state.scourgeShrineRoom === roomId) parts.push('<span class="room-feature shrine" title="鬼魔神龛：等待有人踏入">☠<b>神龛</b></span>');
+  if (state.scourgeShrineRoom === roomId) parts.push(`<span class="room-feature shrine" title="鬼魔神龛：等待有人踏入">${icon('totem', 'ui-icon tiny')}<b>神龛</b></span>`);
   if (CABINET_ROOMS.includes(roomId) || (state.mapId === 'badham' && ['nursery', 'storage', 'guestroom'].includes(roomId))) {
     const cabinetHere = state.playerRoom === roomId;
     const cabinetLabel = state.killer === '女猎手' ? '补给飞斧' : '搜索柜子';
@@ -391,7 +383,6 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
   const ground = getHuntingGround(state.mapId);
   const here = state.people.filter((p) => p.room === state.playerRoom && p.role !== 'police');
   const policeHere = state.people.some((p) => p.room === state.playerRoom && p.role === 'police');
-  const auraActive = state.people.some((person) => person.role !== 'police' && person.hp > 0 && ((person.revealedActions ?? 0) > 0 || (state.revealAuraActions > 0 && (person.room === state.playerRoom || ROOM_MAP[state.playerRoom].neighbors.includes(person.room)))));
   const redFigures = state.people.filter((person) => {
     if (person.role === 'police' || person.hp <= 0 || person.hidden || isRoomVisible(state, person.room)) return false;
     const aura = state.revealAuraActions > 0 && (person.room === state.playerRoom || ROOM_MAP[state.playerRoom].neighbors.includes(person.room));
@@ -435,6 +426,38 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
     const rewardText = task.optional && (task.reward ?? 0) > 0 ? `<small class="mission-task-reward">+ ${task.reward} 分</small>` : '';
     return `<span class="mission-task ${done ? 'done' : failed ? 'failed' : ''} ${task.optional ? 'optional' : 'required'}"><b>${done ? '✓' : failed ? '✕' : '○'}</b> ${escape(task.label)} <em>${progressText}</em>${rewardText}${targetNames}</span>`;
   }).join('');
+
+/**
+ * 房间点位上的互动标记：能破坏 / 能互动的东西都做成按钮，
+ * 和人物头上的「抱起 / 处决」同一套观感，不再依赖底部动作条。
+ */
+function roomActionsHtml(state: GameState, roomId: RoomId): string {
+  if (state.phase !== 'playing') return '';
+  const here = state.playerRoom === roomId;
+  const adjacent = ROOM_MAP[state.playerRoom].neighbors.includes(roomId);
+  const actions: string[] = [];
+
+  if (here && state.totems.includes(roomId) && !state.totemInteractions.includes(roomId)) {
+    actions.push(`<button class="btn" data-action="totem-draw" title="本局仅可从这座图腾领取一次奖励">抽 1 张牌</button>`);
+    actions.push(`<button class="btn" data-action="totem-energy" title="本局仅可从这座图腾领取一次奖励">+1 行动点</button>`);
+  }
+
+  const dynamicBoard = state.barricades.includes(roomId);
+  const fixedBoard = OBSTACLE_ROOMS.includes(roomId) && !state.clearedObstacles.includes(roomId) && !state.possessed;
+  if (adjacent && (dynamicBoard || fixedBoard)) {
+    actions.push(`<button class="btn" data-action="break-barricade" data-room="${roomId}" ${state.energy < 1 ? 'disabled' : ''} title="砸碎这扇门上的木板：1 AP">破坏木板 · 1 AP</button>`);
+  }
+
+  if (adjacent && isLocked(state, roomId)) {
+    actions.push(`<button class="btn" data-action="break-door" data-room="${roomId}" ${state.energy < 1 ? 'disabled' : ''} title="强行撞开这扇电子门锁：1 AP">破门 · 1 AP</button>`);
+  }
+
+  if (here && phoneWorks(state, roomId)) {
+    actions.push(`<button class="btn" data-action="break-phone" ${state.energy < 1 ? 'disabled' : ''} title="砸坏这间屋子的电话：1 AP">砸坏电话 · 1 AP</button>`);
+  }
+
+  return actions.length ? `<div class="room-actions">${actions.join('')}</div>` : '';
+}
 
   const rooms = ROOMS.map((room) => {
     const visible = isRoomVisible(state, room.id);
@@ -480,9 +503,8 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
     const r = room.rect;
     const style = `left:${r.left}%;top:${r.top}%;width:${r.width}%;height:${r.height}%`;
     return `
-      <div class="room ${isPlayer ? 'current' : ''} ${reachable ? 'reachable' : 'disabled'} ${adjacent ? 'adjacent' : ''} ${state.lookingAround && adjacent ? 'look-target' : ''} ${state.auraTargeting ? 'aura-target' : ''} ${blinkSelectable ? 'blink-target' : ''} ${obstacleOpen ? 'obstacle' : ''} ${state.totems.includes(room.id) ? 'totem-lit' : ''} ${darkRoom ? 'dark-room' : 'lit-room'} ${room.id === 'garden' ? 'outdoor' : ''} room-size-${room.size} ${locked ? 'locked' : ''} ${barricaded ? 'barricaded' : ''} ${explored ? 'explored' : 'unexplored'} ${visible ? 'in-sight' : 'fogged'}"
+      <div class="room ${isPlayer ? 'current' : ''} ${reachable ? 'reachable' : 'disabled'} ${adjacent ? 'adjacent' : ''} ${state.lookingAround && adjacent ? 'look-target' : ''} ${state.auraTargeting ? 'aura-target' : ''} ${blinkSelectable ? 'blink-target' : ''} ${obstacleOpen ? 'obstacle' : ''} ${darkRoom ? 'dark-room' : 'lit-room'} ${room.id === 'garden' ? 'outdoor' : ''} room-size-${room.size} ${locked ? 'locked' : ''} ${barricaded ? 'barricaded' : ''} ${explored ? 'explored' : 'unexplored'} ${visible ? 'in-sight' : 'fogged'}"
         style="${style}" data-room="${room.id}" data-aura-count="${sensed}" title="${escape(room.name)}${explored ? `：${escape(room.desc)}` : '：还没进去过'}">
-        ${state.totems.includes(room.id) ? '<span class="totem-aura" aria-hidden="true"></span>' : ''}
         ${state.auraTargeting
           ? `<button type="button" class="room-hit aura-hit" data-action="aura-select" data-room="${room.id}" aria-label="选择${escape(room.name)}，显示其中人类的气场">显形</button>`
           : state.nurseBlinkTargeting
@@ -536,6 +558,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
           ${ghosts.map(() => '<span class="ghost-chip" title="最后确认位置：人可能已经走了">?</span>').join('')}
         </div>
         ${sensed ? `<div class="room-shadows" title="你感觉到这里有人，但看不清是谁">${shadowFigures(sensed)}</div>` : ''}
+        ${roomActionsHtml(state, room.id)}
       </div>
     `;
   }).join('');
@@ -703,11 +726,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
   const sabotageHere = state.powerCircuits.some((c) => c.breakerRoom === state.playerRoom && !c.broken) || state.siteItems.some((item) => item.room === state.playerRoom && !item.broken) ? '破坏现场设施' : phoneWorks(state, state.playerRoom) ? '砸坏电话' : RADIO_ROOMS.includes(state.playerRoom) && !state.sabotage.includes('radio') ? '破坏备用无线电' : lockedDoor ? `撞开通往${roomName(lockedDoor)}的门锁` : '破坏现场设施';
   const sabotageTitle = sabotageReason ?? `${sabotageHere}。消耗 ${SABOTAGE_COST} 点行动点；强行破门会惊动屋内的人。`;
   const sabotageMeta = sabotageReason ? escape(sabotageReason) : `${SABOTAGE_COST} 点 · ${sabotageHere}`;
-  const sabotageBtn = `<button class="btn sabotage ${sabotageReason ? 'spent' : ''}" data-action="sabotage" ${sabotageReason ? 'disabled' : ''}
-      title="${escape(sabotageTitle)}">
-      <span class="atk-name">破坏</span>
-      <span class="atk-meta">${sabotageMeta}</span>
-    </button>`;
+  // 破坏类操作已经做成房间点位上的互动标记，底部不再保留「破坏」按钮。
   const atkTitle = possessed
     ? `恶魔附身（剩 ${state.possessTurns} 回合）：攻击站立的幸存者，每刀造成 2 点伤害。消耗 ${ATTACK_COST} 点行动点。`
     : `攻击：只对站立的幸存者造成伤害，消耗 ${ATTACK_COST} 点行动点；倒地者请使用独立的「处决」按钮。砍完要再做一件事（或花 ${WIPE_COST} 点擦刀）才能再次攻击。`;
@@ -818,7 +837,6 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
           ${state.huntressAiming ? '<div class="look-prompt hatchet-prompt" role="status"><b>狩猎飞斧瞄准中</b><span>点击地图上可见的站立幸存者。飞斧只能命中当前房间或正前方直线房间内的目标；无法投出的原因会显示在现场反馈中。</span></div>' : ''}
           ${state.barricades.length ? `<div class="look-prompt barricade-prompt" role="status"><b>幸存者放下了木板</b><span>${state.barricades.map((room) => roomName(room)).join('、')}：地图上的橙色高亮标记就是被封住的入口。靠近该房间后点击「破坏木板 · 1 AP」即可通行。</span></div>` : ''}
           ${state.auraTargeting ? '<div class="look-prompt aura-prompt" role="status"><b>恶灵低语 · 选择房间</b><span>点击地图任意房间，包括你当前所在的房间；也可以取消，不发动显形效果。</span><button class="btn ghost mini" data-action="aura-cancel">取消选择</button></div>' : ''}
-          ${auraActive ? `<div class="aura-callout" role="status"><b>气场显形</b><span>地图上红色发光的人就是被显形的幸存者；气场按「行动次数」倒计时，走完就熄灭。</span></div>` : ''}
           <div class="map-viewport">
             <div class="floorplan" style="--ar:${layoutAspectNum().toFixed(4)};aspect-ratio:${layoutAspect()}">
               ${rooms}
@@ -875,7 +893,6 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
               ${wipeBtn}
               ${searchBtn}
               ${lookBtn}
-              ${sabotageBtn}
               ${trapCacheBtn}${trapRecoverBtn}${hatchetRefillBtn}
 
               <button class="btn search wait-action" data-action="wait" ${selectingDiscards || state.energy < 1 ? 'disabled' : ''} title="消耗 1 点行动点；幸存者各自行动一次，你继续观察当前房间与刚离开的房间。">等待 · 1 AP</button>

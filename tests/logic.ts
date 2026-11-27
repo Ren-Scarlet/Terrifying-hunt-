@@ -33,6 +33,7 @@ import {
   triggerBearTrapForPerson,
   sabotageSiteItem,
   breakPhone,
+  breakDoor,
   addAlarm,
   workingPhones,
   phoneWorks,
@@ -2650,6 +2651,18 @@ function caseHexPhonesAndAlarm(): void {
   check('乌鸦：幸存者在乌鸦房间行动会发出动静',
     crowGame.log.some((line) => line.includes('乌鸦')) || crowGame.disturbances.some((d) => d.label.includes('乌鸦')),
     `crowRooms=${crowGame.crows.join(',')} log=${crowGame.log.slice(0, 2).join(' / ')}`);
+
+  // 破门：相邻且上锁的门，1 AP 撞开
+  const doorGame = createGame(STARTING_DECK, undefined, '设陷者');
+  const doorRoom = ROOM_MAP[doorGame.playerRoom].neighbors[0];
+  doorGame.roomLocks = { [doorRoom]: 3 };
+  doorGame.energy = 4;
+  doorGame.people.forEach((person) => {
+    if (person.role !== 'police') person.room = 'attic';
+  });
+  const doorBroken = breakDoor(doorGame, doorRoom);
+  check('破门：相邻上锁的门 1 AP 撞开', doorBroken && !isLocked(doorGame, doorRoom) && doorGame.energy === 3,
+    `broken=${doorBroken} locked=${isLocked(doorGame, doorRoom)} energy=${doorGame.energy}`);
 }
 
 caseHexPhonesAndAlarm();

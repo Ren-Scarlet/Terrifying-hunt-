@@ -40,6 +40,7 @@ import {
   searchRoom,
   sabotageSiteItem,
   breakPhone,
+  breakDoor,
   togglePowerCircuit,
   usePower,
   wipeBlade,
@@ -674,16 +675,20 @@ let lastAuraActions = 0;
  * 回合结束、普通重绘都不会再误响。
  */
 function pulseAuraHeartbeat(): void {
-  if (!game) return;
-  const signature = game.people
-    .filter((person) => person.role !== 'police' && person.hp > 0 && (person.revealedActions ?? 0) > 0)
+  const state = game;
+  if (!state) return;
+  const signature = state.people
+    .filter((person) => person.role !== 'police' && person.hp > 0 && (
+      (person.revealedActions ?? 0) > 0
+      || (state.revealAuraActions > 0 && (person.room === state.playerRoom || ROOM_MAP[state.playerRoom].neighbors.includes(person.room)))
+    ))
     .map((person) => person.id)
     .sort()
     .join('|');
-  const refreshed = game.revealAuraActions > lastAuraActions;
+  const refreshed = state.revealAuraActions > lastAuraActions;
   if (signature && (signature !== lastAuraSignature || refreshed)) playHeartbeat();
   lastAuraSignature = signature;
-  lastAuraActions = game.revealAuraActions;
+  lastAuraActions = state.revealAuraActions;
 }
 /** 已经见过的幸存者：只在第一次看见时播放发现音效。 */
 let knownSurvivorIds = new Set<string>();
@@ -1102,8 +1107,14 @@ function createGameActions(): ActionTable {
     },
 
     'break-phone': () => {
-      breakPhone(currentGame());
-      playSfx('smash');
+      if (breakPhone(currentGame())) playSfx('smash');
+      afterAction();
+    },
+
+    'break-door': ({ target }) => {
+      const room = target.dataset.room as RoomId | undefined;
+      if (!room) return;
+      if (breakDoor(currentGame(), room)) playSfx('barricadeSmash');
       afterAction();
     },
 
@@ -1148,6 +1159,7 @@ function createGameActions(): ActionTable {
       if (room) selectAuraRoom(game, room);
       playSfx('click');
       render();
+      pulseAuraHeartbeat();
     },
 
     'aura-cancel': () => {

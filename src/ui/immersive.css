@@ -2793,31 +2793,7 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
   width: 16px !important; height: 16px !important; flex: 0 0 16px !important;
 }
 
-/* 气场显形：黄色说明条，和普通提示区分开 */
-#app.immersive-game .aura-callout {
-  position: fixed; left: 50%; top: 96px; transform: translateX(-50%);
-  z-index: 34; display: flex; align-items: baseline; gap: 8px;
-  max-width: min(680px, 76vw); padding: 6px 12px;
-  border: 1px solid rgba(235, 200, 96, .75);
-  border-radius: 8px;
-  background: rgba(28, 24, 12, .92);
-  color: #ffe9a8;
-  font-size: 12px; line-height: 1.35;
-  box-shadow: 0 0 16px rgba(235, 200, 96, .22);
-  pointer-events: none;
-}
-#app.immersive-game .aura-callout b {
-  color: #ffd24a; font-size: 12px; letter-spacing: .04em; white-space: nowrap;
-}
-#app.immersive-game .aura-callout span { color: #f0dfae; }
 
-@media (max-width: 920px) and (pointer: coarse) {
-  #app.immersive-game.mobile-game-active .aura-callout {
-    top: calc(var(--mob-top, 121px) + 44px);
-    left: 6px; right: 6px; transform: none;
-    max-width: none; font-size: 10px; padding: 4px 8px;
-  }
-}
 
 /* 幸存者放下的木板：整块显示，不做半透明提示 */
 #app.immersive-game .floorplan .room-feature.pallet,
@@ -2920,4 +2896,55 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
   padding: 1px 2px !important;
   gap: 2px !important;
   font-size: 11px !important;
+}
+
+
+/* ------------------------------------------------------------------ */
+/* 房间点位上的互动标记（图腾领取 / 破木板 / 破门 / 砸电话）            */
+/* ------------------------------------------------------------------ */
+#app.immersive-game .floorplan .room-actions {
+  position: absolute;
+  left: 50%;
+  bottom: 4px;
+  transform: translateX(-50%);
+  z-index: 6;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+  max-width: 96%;
+  pointer-events: auto;
+}
+#app.immersive-game .floorplan .room-actions .btn {
+  min-height: 22px;
+  padding: 3px 7px;
+  border: 1px solid rgba(226, 190, 155, .62);
+  border-radius: 6px;
+  background: rgba(10, 13, 16, .95);
+  color: #f1e6d9;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  pointer-events: auto;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .8);
+}
+#app.immersive-game .floorplan .room-actions .btn:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+/* 图腾：发光的应该是图标本身，不是整间房 */
+#app.immersive-game .floorplan .room-feature.totem.lit .ui-icon,
+#app.immersive-game .floorplan .room-feature.totem.cursed .ui-icon {
+  filter: drop-shadow(0 0 5px rgba(255, 92, 44, .95)) drop-shadow(0 0 12px rgba(255, 46, 18, .6));
+  animation: totemIconPulse 2s ease-in-out infinite;
+}
+#app.immersive-game .floorplan .room-feature.shrine .ui-icon {
+  filter: drop-shadow(0 0 5px rgba(255, 92, 44, .9)) drop-shadow(0 0 10px rgba(255, 46, 18, .55));
+}
+@keyframes totemIconPulse {
+  0%, 100% { opacity: .78; }
+  50% { opacity: 1; }
 }

@@ -2920,6 +2920,34 @@ export function breakBarricade(state: GameState, room: RoomId): boolean {
   return true;
 }
 
+/**
+ * 破门：只对相邻、且确实上锁的门生效。
+ * 和「破坏现场设施」分开，做成房间点位上的独立互动标记。
+ */
+export function breakDoor(state: GameState, room: RoomId): boolean {
+  if (state.phase !== 'playing') return false;
+  if (!ROOM_MAP[state.playerRoom].neighbors.includes(room) || !isLocked(state, room)) {
+    log(state, '这里没有可以撞开的门锁。');
+    return false;
+  }
+  if (state.energy < 1) {
+    log(state, '行动点不足：破门需要 1 点。');
+    return false;
+  }
+  state.energy -= 1;
+  state.roomLocks[room] = 0;
+  log(state, `你用蛮力撞开通往${roomName(room)}的门锁，屋里的人被巨响惊动。`);
+  npcs(state).filter((person) => person.room === room && person.hp > 0).forEach((person) => {
+    person.alert = clamp(person.alert + 24, 0, 100);
+    person.fear = clamp(person.fear + 12, 0, 100);
+  });
+  addAlarm(state, 5);
+  state.attackReady = true;
+  afterPlayerAction(state);
+  checkImmediateWin(state);
+  return true;
+}
+
 export function waitAction(state: GameState): boolean {
   if (state.phase !== 'playing') return false;
   if (state.energy < 1) { log(state, '行动点不足，无法等待。'); return false; }

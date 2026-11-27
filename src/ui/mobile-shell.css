@@ -707,10 +707,10 @@
     z-index: 9 !important;
   }
 
-  /* 电话是可互动点：例外放行，并盖在移动热区之上 */
-  #app.immersive-game.mobile-game-active .floorplan .room-feature.phone-action {
+  /* 房间点位上的互动标记放行，并盖在移动热区之上 */
+  #app.immersive-game.mobile-game-active .floorplan .room-actions {
     pointer-events: auto !important;
-    z-index: 8 !important;
+    z-index: 9 !important;
   }
 
   /* 玩家标记按比例缩小，避免盖住相邻三间房 */
