@@ -1692,3 +1692,116 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
 #app.immersive-game .killer-power-grid [data-power="doctor_madness"] .power-art::after { content: '⌁'; }
 #app.immersive-game .killer-power-grid [data-power="pig_ambush"] .power-art::after { content: '⌄'; }
 #app.immersive-game .killer-power-grid [data-power="pig_baptism"] .power-art::after { content: '☠'; }
+
+
+/* 2026-11-27: enlarge killer portrait and restore every power glyph. */
+#app.immersive-game .killer-ability-panel {
+  grid-template-columns: 150px 1fr !important;
+  width: min(370px, 34vw) !important;
+  column-gap: 14px !important;
+}
+#app.immersive-game .killer-face.ability-portrait {
+  flex-basis: 188px !important;
+  width: 150px !important;
+  height: 188px !important;
+}
+#app.immersive-game .killer-hud-portrait b { max-width: 150px !important; font-size: 12px !important; }
+#app.immersive-game .killer-power-grid .power-art {
+  display: grid !important; place-items: center; flex: 0 0 30px;
+}
+#app.immersive-game .killer-power-grid .power-art img { display: none !important; }
+#app.immersive-game .killer-power-grid .power-art::after {
+  display: block; color: #f0dfd2; font-family: Georgia,serif;
+  font-size: 27px; font-weight: 700; line-height: 1;
+  text-shadow: 0 1px 7px rgba(0,0,0,.95), 0 0 8px rgba(207,151,117,.3);
+}
+#app.immersive-game .killer-power-grid .btn.power[data-power="trap_set"] .power-art::after { content: '⌗'; }
+#app.immersive-game .killer-power-grid .btn.power[data-power="wraith_bell"] .power-art::after { content: '♧'; }
+#app.immersive-game .killer-power-grid .btn.power[data-power="wraith_rush"] .power-art::after { content: '➤'; }
+#app.immersive-game .killer-power-grid .btn.power[data-power="nurse_blink"] .power-art::after { content: '✧'; }
+#app.immersive-game .killer-power-grid .btn.power[data-power="huntress_axe"] .power-art::after { content: '╱'; }
+#app.immersive-game .killer-power-grid .btn.power[data-power="ghost_stalk"] .power-art::after { content: '◉'; }
+#app.immersive-game .killer-power-grid .btn.power[data-power="ghost_nightfall"] .power-art::after { content: '☾'; }
+#app.immersive-game .killer-power-grid .btn.power[data-power="myers_gaze"] .power-art::after { content: '◎'; }
+#app.immersive-game .killer-power-grid .btn.power[data-power="sadako_deluge"] .power-art::after { content: '〰'; }
+#app.immersive-game .killer-power-grid .btn.power[data-power="sadako_tape"] .power-art::after { content: '▤'; }
+#app.immersive-game .killer-power-grid .btn.power[data-power="freddy_sleep"] .power-art::after { content: 'Z'; }
+#app.immersive-game .killer-power-grid .btn.power[data-power="freddy_nightmare"] .power-art::after { content: '◌'; }
+#app.immersive-game .killer-power-grid .btn.power[data-power="cannibal_sprint"] .power-art::after { content: '↗'; }
+#app.immersive-game .killer-power-grid .btn.power[data-power="cannibal_slaughter"] .power-art::after { content: '✕'; }
+#app.immersive-game .killer-power-grid .btn.power[data-power="executioner_chain"] .power-art::after { content: '⛓'; }
+#app.immersive-game .killer-power-grid .btn.power[data-power="executioner_judge"] .power-art::after { content: '⚖'; }
+#app.immersive-game .killer-power-grid .btn.power[data-power="demogorgon_portal"] .power-art::after { content: '◉'; }
+#app.immersive-game .killer-power-grid .btn.power[data-power="demogorgon_maul"] .power-art::after { content: '⌁'; }
+#app.immersive-game .killer-power-grid .btn.power[data-power="doctor_shock"] .power-art::after { content: 'ϟ'; }
+#app.immersive-game .killer-power-grid .btn.power[data-power="doctor_madness"] .power-art::after { content: '⌁'; }
+#app.immersive-game .killer-power-grid .btn.power[data-power="pig_ambush"] .power-art::after { content: '⌄'; }
+#app.immersive-game .killer-power-grid .btn.power[data-power="pig_baptism"] .power-art::after { content: '☠'; }
+@media (max-width: 900px) {
+  #app.immersive-game .killer-ability-panel { grid-template-columns: 116px 1fr !important; width: 290px !important; }
+  #app.immersive-game .killer-face.ability-portrait { flex-basis: 146px !important; width: 116px !important; height: 146px !important; }
+  #app.immersive-game .killer-hud-portrait b { max-width: 116px !important; }
+}
+@media (max-width: 700px) {
+  #app.immersive-game .killer-ability-panel { grid-template-columns: 88px 1fr !important; width: 225px !important; }
+  #app.immersive-game .killer-face.ability-portrait { flex-basis: 112px !important; width: 88px !important; height: 112px !important; }
+  #app.immersive-game .killer-hud-portrait b { max-width: 88px !important; font-size: 9px !important; }
+}
+
+/* Larger readable hand cards; keep the row horizontally scrollable. */
+#app.immersive-game .hand { max-width: min(46vw, 860px) !important; }
+#app.immersive-game .hand-row { gap: 9px !important; padding: 4px 7px 7px !important; }
+#app.immersive-game .hand-row .card {
+  flex-basis: 102px !important; width: 102px !important; min-width: 102px !important;
+  max-width: 102px !important; height: 144px !important; min-height: 144px !important;
+  max-height: 144px !important; padding: 29px 8px 7px !important;
+  grid-template-rows: 34px minmax(0,1fr) 19px !important;
+}
+#app.immersive-game .hand-row .card .card-type { font-size: 8px !important; }
+#app.immersive-game .hand-row .card .card-cost { width: 21px !important; height: 21px !important; font-size: 11px !important; }
+#app.immersive-game .hand-row .card .card-name {
+  font-size: 11px !important; line-height: 1.25 !important;
+  max-height: 32px !important;
+}
+#app.immersive-game .hand-row .card .card-desc {
+  font-size: 9px !important; line-height: 1.42 !important;
+  -webkit-line-clamp: 5 !important;
+}
+#app.immersive-game .hand-row .card .card-flavor { font-size: 8px !important; }
+@media (max-width: 900px) {
+  #app.immersive-game .hand { max-width: 54vw !important; }
+  #app.immersive-game .hand-row .card {
+    flex-basis: 92px !important; width: 92px !important; min-width: 92px !important;
+    max-width: 92px !important; height: 132px !important; min-height: 132px !important; max-height: 132px !important;
+  }
+}
+@media (max-width: 700px) {
+  #app.immersive-game .hand { max-width: 58vw !important; }
+  #app.immersive-game .hand-row .card {
+    flex-basis: 82px !important; width: 82px !important; min-width: 82px !important;
+    max-width: 82px !important; height: 118px !important; min-height: 118px !important; max-height: 118px !important;
+  }
+  #app.immersive-game .hand-row .card .card-name { font-size: 9px !important; }
+  #app.immersive-game .hand-row .card .card-desc { font-size: 8px !important; }
+}
+
+/* Floating full-card detail preview, with independent scrolling for long effects. */
+.card-hover-preview {
+  position: fixed; z-index: 10000; display: none; overflow: hidden;
+  padding: 12px; border: 1px solid rgba(191,143,111,.72); border-radius: 10px;
+  background: linear-gradient(155deg,rgba(23,25,28,.98),rgba(7,10,13,.98));
+  box-shadow: 0 18px 50px rgba(0,0,0,.86), 0 0 0 1px rgba(255,255,255,.035) inset;
+  color: #e9e1da; pointer-events: none; backdrop-filter: blur(12px);
+}
+.card-hover-preview.visible { display: block; }
+.card-hover-preview .detail-card { display: flex; flex-direction: column; min-height: 0; height: 100%; border: 0; background: transparent; box-shadow: none; }
+.card-hover-preview .detail-header { flex: 0 0 auto; padding: 8px 5px 11px; }
+.card-hover-preview .detail-header h2 { font-size: 19px; line-height: 1.25; }
+.card-hover-preview .detail-header p { font-size: 11px; }
+.card-hover-preview .detail-body {
+  flex: 1 1 auto; min-height: 0; max-height: min(390px, calc(72vh - 100px));
+  overflow-y: auto; overscroll-behavior: contain; padding: 10px 8px 12px 4px;
+  scrollbar-width: thin; scrollbar-color: rgba(181,135,108,.8) rgba(255,255,255,.06);
+}
+.card-hover-preview .detail-body p { font-size: 13px; line-height: 1.65; margin: 0 0 12px; }
+.card-hover-preview .detail-body .dbd-perk { width: 56px; height: 56px; }
