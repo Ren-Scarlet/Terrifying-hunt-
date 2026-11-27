@@ -2578,3 +2578,45 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
 #app.immersive-game .killer-power-grid .power-art .power-icon-bg{
   position:absolute!important;inset:0!important;margin:auto!important;width:100%!important;height:100%!important;
 }
+
+/* ==========================================================================
+   UI 布局修正：当前任务左移、人物详情加宽、红光保留
+   ========================================================================== */
+
+/* 1) 当前任务：从右上角移到左上（紧贴任务条下方），并允许滚动 */
+#app.immersive-game .task-pop{
+  right:auto!important;left:74px!important;top:96px!important;
+  width:min(384px,44vw)!important;max-height:62vh!important;overflow:auto!important;
+  padding:16px 18px!important;border-radius:2px!important;
+  background:linear-gradient(165deg,rgba(10,14,17,.96),rgba(5,7,9,.96))!important;
+  border:1px solid rgba(150,92,66,.34)!important;
+  box-shadow:0 22px 60px rgba(0,0,0,.85)!important;backdrop-filter:none!important;
+}
+#app.immersive-game .task-pop h3{font-size:11px!important;letter-spacing:2.4px!important;color:#c9a86c!important;}
+#app.immersive-game .task-pop p{font-size:12px!important;line-height:1.8!important;}
+@media(max-width:900px){
+  #app.immersive-game .task-pop{left:10px!important;top:84px!important;width:min(88vw,384px)!important;}
+}
+
+/* 2) 人物详情：加宽侧栏，正文改为单列、放大行距，头像不再挤成一条 */
+#app.immersive-game .hunt-sidebar.hunt-sidebar-left{
+  width:min(400px,calc(100vw - 84px))!important;
+}
+#app.immersive-game .person-dossier-panel .detail-card{display:block!important;}
+#app.immersive-game .person-dossier-panel .detail-body{
+  max-height:min(56vh,560px)!important;overflow-y:auto!important;
+  font-size:12.5px!important;line-height:1.8!important;
+}
+#app.immersive-game .person-dossier-panel .detail-body p{font-size:12.5px!important;line-height:1.8!important;margin:0 0 10px!important;}
+#app.immersive-game .person-dossier-panel .person-detail-lead{
+  display:block!important;float:none!important;margin:0 0 12px!important;
+}
+#app.immersive-game .person-dossier-panel .person-detail-lead img{
+  width:100%!important;max-width:170px!important;height:auto!important;display:block!important;
+}
+#app.immersive-game .person-dossier-panel .detail-header{display:block!important;}
+
+/* 3) 冷色调滤镜减弱：之前 saturate(.52) 把杀手手电的深红压成了灰，红光看起来像消失 */
+#app.immersive-game .map-viewport{
+  filter:contrast(1.08) brightness(.93) saturate(.9)!important;
+}

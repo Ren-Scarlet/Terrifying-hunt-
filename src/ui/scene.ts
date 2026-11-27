@@ -1076,14 +1076,14 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
     // 手电在地面形成深红光斑；以 screen 混合保留材质纹理，不绘制符号或光源图标。
     ctx.save();
     ctx.globalCompositeOperation = 'screen';
-    ctx.globalAlpha = 0.34;
+    ctx.globalAlpha = 0.42;
     ctx.drawImage(refs.coneCv, 0, 0, w, h);
     ctx.restore();
 
     // 空气中的暗红体积光，边缘弥散，不再形成几何三角形。
     ctx.save();
     ctx.globalCompositeOperation = 'screen';
-    ctx.globalAlpha = 0.30;
+    ctx.globalAlpha = 0.36;
     ctx.beginPath();
     ctx.rect(pr.x + 1, pr.y + 1, pr.w - 2, pr.h - 2);
     ctx.clip();
