@@ -152,13 +152,14 @@ function roomFeatures(state: GameState, roomId: RoomId): string {
       ? `<button type="button" class="room-feature cabinet cabinet-action" data-action="cabinet-interact" title="${state.killer === '女猎手' ? '从柜子补充飞斧' : '打开柜子，检查是否藏有幸存者'}">${icon('cabinet', 'ui-icon tiny')}<b>${cabinetLabel}</b></button>`
       : `<span class="room-feature cabinet" title="柜子：幸存者可以躲藏">${icon('cabinet', 'ui-icon tiny')}<b>柜子</b></span>`);
   }
-  if (state.barricades.includes(roomId)) {
+  const boardBlocksRoom = state.barricades.includes(roomId) || (OBSTACLE_ROOMS.includes(roomId) && !cleared && !state.possessed);
+  if (boardBlocksRoom) {
     const canBreak = ROOM_MAP[state.playerRoom].neighbors.includes(roomId);
     parts.push(canBreak
       ? `<button type="button" class="room-feature pallet barricade-action" data-action="break-barricade" data-room="${roomId}" title="破坏木板需要 1 点行动点">${icon('obstacle', 'ui-icon tiny')}<b>破坏木板</b></button>`
       : `<span class="room-feature pallet" title="木板已封住入口">${icon('obstacle', 'ui-icon tiny')}<b>木板封门</b></span>`);
   }
-  if (OBSTACLE_ROOMS.includes(roomId) && !cleared) parts.push(`<span class="room-feature obstacle" title="固定障碍物：进入时需要花费额外行动点">${icon('obstacle', 'ui-icon tiny')}<b>障碍物</b></span>`);
+
   return parts.join('');
 }
 
@@ -173,7 +174,7 @@ function doorMarkersHtml(state: GameState): string {
     const adjacent = state.playerRoom === room.id || state.playerRoom === neighborId;
     const targetRoom = state.playerRoom === room.id ? neighborId : state.playerRoom === neighborId ? room.id : null;
     const locked = isLocked(state, room.id) || isLocked(state, neighborId);
-    const barricaded = !!targetRoom && state.barricades.includes(targetRoom);
+    const barricaded = !!targetRoom && (state.barricades.includes(targetRoom) || (OBSTACLE_ROOMS.includes(targetRoom) && !state.clearedObstacles.includes(targetRoom) && !state.possessed));
     const canPass = !!targetRoom && !locked && canMoveTo(state, targetRoom);
     const shortOnAp = adjacent && !locked && !canPass;
     const status = locked ? 'blocked' : barricaded ? 'barricaded' : canPass ? 'active' : shortOnAp ? 'low-ap' : 'open';
