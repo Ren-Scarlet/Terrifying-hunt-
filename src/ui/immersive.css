@@ -1929,6 +1929,7 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
   opacity: var(--trail-opacity,.92) !important;
   transition: opacity .2s ease, filter .2s ease;
 }
+#app.immersive-game .floorplan .footprint:not(.fresh) { animation: none !important; }
 #app.immersive-game .floorplan .footprint.age-1 {
   filter: drop-shadow(0 0 2px rgba(255,190,145,.5)) drop-shadow(0 0 4px rgba(255,90,48,.45));
 }
