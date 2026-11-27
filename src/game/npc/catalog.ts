@@ -32,7 +32,7 @@ export const GOAL_LABEL: Record<NpcGoal, string> = {
   phone: '想打电话报警',
   exit: '想从后院逃走',
   hide: '想找个地方躲起来',
-  gather: '想把人聚起来',
+  gather: '想与附近幸存者会合',
   weapon: '想找东西反抗',
   panic: '只想活下去',
   help: '想救同伴',
