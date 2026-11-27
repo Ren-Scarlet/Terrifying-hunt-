@@ -33,6 +33,7 @@ import {
   movePlayer,
   moveBlockReason,
   noteToPlayer,
+  lootPayout,
   playCard,
   searchRoom,
   sabotageSiteItem,
@@ -701,7 +702,7 @@ function afterAction(): void {
       let darkCells = save.darkCells;
       if (game.result === 'win') {
         wins += 1;
-        credits += Math.max(10, Math.round(game.score / 5)) + game.huntStyleBonus;
+        credits += lootPayout(game) + game.huntStyleBonus;
         if (game.score >= 150) darkCells += 1;
         game.rewardCards.forEach((id) => {
           if (CARD_MAP[id] && !unlocked.includes(id)) {

@@ -26,6 +26,7 @@ import {
   conditionOf,
   currentScore,
   scoreLines,
+  lootPayout,
   effectiveCost,
   getStars,
   isLocked,
@@ -830,6 +831,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
               <div class="stat survivor-count"><b>${state.people.filter((p) => p.role !== 'police' && p.hp > 0).length}/${state.survivorTotal}</b><small>存活</small></div>
               
               <div class="stat score"><b>${currentScore(state)}</b><small>预计得分</small></div>
+              <div class="stat loot-stat"><b>${state.loot}</b><small>战利品</small></div>
             </div>
             <details class="score-details">
               <summary>得分构成 · 怎么加分</summary>
@@ -967,6 +969,7 @@ export function renderResult(state: GameState, newCard: string | null): string {
         </div>
         <div class="result-grid">
           <div><small>最终评分</small><b>${state.score}</b></div>
+          <div><small>战利品</small><b>${state.loot} → ${lootPayout(state)}</b></div>
           <div><small>击杀人数</small><b>${state.kills}</b></div>
           <div><small>逃走人数</small><b>${state.escaped}</b></div>
           <div><small>最终警报值</small><b>${state.alarm}/${ALARM_MAX}</b></div>

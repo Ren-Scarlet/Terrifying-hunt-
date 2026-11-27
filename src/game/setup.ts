@@ -110,6 +110,7 @@ export function createGame(
     lastCrimeRoom: null,
     result: null,
     score: 0,
+    loot: 0,
     scoreBreakdown: [],
     huntStats: {
       routineInsights: 0,

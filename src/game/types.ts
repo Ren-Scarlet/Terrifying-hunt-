@@ -468,6 +468,8 @@ export interface GameState {
   lastCrimeRoom: RoomId | null;
   result: ResultKind | null;
   score: number;
+  /** 本局累积的战利品（血点）。撤离/胜利才能完整带出，失败只保留一部分。 */
+  loot: number;
   /** 结算面板的加分/扣分明细，由 finish() 生成 */
   scoreBreakdown: ScoreLine[];
   /** 猎杀风格评价独立于契约总分；高评价会带来额外血点。 */

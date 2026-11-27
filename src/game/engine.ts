@@ -902,6 +902,7 @@ function killPerson(state: GameState, person: Person): void {
   }
   state.kills += 1;
   if (person.role !== 'police') state.survivorKills += 1;
+  if (person.role !== 'police') state.loot += LOOT_KILL;
   // 同一回合的第二个及之后的击杀算「连杀」，鼓励用控制/范围效果制造连锁。
   if (person.role !== 'police' && state.killsThisTurn >= 1) state.huntStats.comboKills += 1;
   state.killsThisTurn += 1;
@@ -1076,6 +1077,7 @@ function executePerson(state: GameState, person: Person): void {
   }
   addAlarm(state, 8);
   state.executions += 1;
+  if (person.role !== 'police') state.loot += LOOT_EXECUTION;
   log(state, `你处决了 ${person.name}。`);
   killPerson(state, person);
 }
@@ -4205,6 +4207,19 @@ export const SCORE_RULES = {
   timeout: 50,
   failed: 40,
 } as const;
+
+/**
+ * 战利品规则：局内累积血点，撤离（胜利/自由猎杀）才完整入账，失败只保留三成。
+ * 这是「搜打撤」的骨架——想拿得多，就得活着把东西带出去。
+ */
+export const LOOT_KILL = 20;
+export const LOOT_EXECUTION = 15;
+export const LOOT_FAILURE_KEEP = 0.3;
+
+export function lootPayout(state: GameState): number {
+  const keep = state.mission.mode === 'free' || state.result === 'win' ? 1 : LOOT_FAILURE_KEEP;
+  return Math.round(state.loot * keep);
+}
 
 export function scoreLines(state: GameState, result: ResultKind | null = null): ScoreLine[] {
   const R = SCORE_RULES;

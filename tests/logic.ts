@@ -28,6 +28,7 @@ import {
   currentScore,
   scoreLines,
   fearBand,
+  lootPayout,
   calculateHuntStyleRating,
   triggerBearTrapForPerson,
   sabotageSiteItem,
@@ -2313,6 +2314,16 @@ check('苦涩低语：出牌后会等待下一次人类死亡，再触发全场�
   check('商店卡池：4 张待解锁卡', shopCards.length === 4 && shopCards.every((card) => !card.unlocked), `count=${shopCards.length}`);
   check('商店卡池：不进初始牌组', shopCards.every((card) => !STARTING_DECK.includes(card.id)));
   check('商店卡池：进入构筑池（买后可用）', shopCards.every((card) => deckCardsForKiller('设陷者').some((poolCard) => poolCard.id === card.id)));
+}
+
+// 战利品：撤离成功才完整入账
+{
+  const lp = newGame();
+  lp.loot = 100;
+  lp.result = 'win';
+  check('战利品：胜利全额带出', lootPayout(lp) === 100, `payout=${lootPayout(lp)}`);
+  lp.result = 'timeout';
+  check('战利品：失败只保留三成', lootPayout(lp) === 30, `payout=${lootPayout(lp)}`);
 }
 
 caseNewPerkSystem();
