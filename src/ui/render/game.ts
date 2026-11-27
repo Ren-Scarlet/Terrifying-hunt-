@@ -450,7 +450,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
     const style = `left:${r.left}%;top:${r.top}%;width:${r.width}%;height:${r.height}%`;
     return `
       <div class="room ${isPlayer ? 'current' : ''} ${reachable ? 'reachable' : 'disabled'} ${adjacent ? 'adjacent' : ''} ${state.lookingAround && adjacent ? 'look-target' : ''} ${state.auraTargeting ? 'aura-target' : ''} ${blinkSelectable ? 'blink-target' : ''} ${obstacleOpen ? 'obstacle' : ''} ${isObjective ? 'objective' : ''} ${darkRoom ? 'dark-room' : 'lit-room'} ${room.id === 'garden' ? 'outdoor' : ''} room-size-${room.size} ${locked ? 'locked' : ''} ${barricaded ? 'barricaded' : ''} ${explored ? 'explored' : 'unexplored'} ${visible ? 'in-sight' : 'fogged'}"
-        style="${style}" data-room="${room.id}" title="${escape(room.name)}${explored ? `：${escape(room.desc)}` : '：还没进去过'}${isObjective ? ' · 设施热点' : ''}">
+        style="${style}" data-room="${room.id}" data-aura-count="${sensed}" title="${escape(room.name)}${explored ? `：${escape(room.desc)}` : '：还没进去过'}${isObjective ? ' · 设施热点' : ''}">
         ${state.auraTargeting
           ? `<button type="button" class="room-hit aura-hit" data-action="aura-select" data-room="${room.id}" aria-label="选择${escape(room.name)}，显示其中人类的气场">显形</button>`
           : state.nurseBlinkTargeting
