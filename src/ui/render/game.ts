@@ -803,14 +803,18 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
             <small>行动力</small>
           </div>
         </div>
-        <section class="killer-ability-panel" aria-label="杀手能力面板">
-          <div class="killer-panel-heading">
+        <section class="killer-ability-panel" aria-label="杀手能力 HUD">
+          <div class="killer-hud-portrait">
             ${killerFaceHtml(killer, 'ability-portrait')}
-            <div><b>${escape(killer.owner)}</b><small>杀手能力 · 1–4 快捷使用</small></div>
+            <b>${escape(killer.owner)}</b>
           </div>
-          <div class="killer-frenzy-meter"><div><span>杀戮值</span><b>${state.frenzy}/${FRENZY_MAX}</b></div><div class="killer-frenzy-track"><i style="width:${state.frenzy / FRENZY_MAX * 100}%"></i></div></div>
-          ${meter || myersMarks ? `<div class="killer-special-resources">${meter}${myersMarks}</div>` : ''}
-          <div class="killer-power-grid">${powerButtonHtml(state, killer)}</div>
+          <div class="killer-hud-abilities" aria-label="杀手能力图标 · 按 1–4 使用">
+            <div class="killer-power-grid">${powerButtonHtml(state, killer)}</div>
+          </div>
+          <div class="killer-hud-resources">
+            <div class="killer-frenzy-meter"><div><span>杀戮值</span><b>${state.frenzy}/${FRENZY_MAX}</b></div><div class="killer-frenzy-track"><i style="width:${state.frenzy / FRENZY_MAX * 100}%"></i></div></div>
+            ${meter || myersMarks ? `<div class="killer-special-resources">${meter}${myersMarks}</div>` : ''}
+          </div>
         </section>
       </div>
       <aside class="hunt-sidebar hunt-sidebar-right">
