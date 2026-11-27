@@ -752,22 +752,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
               ${mapWorldActions}
               ${mapEventFeedHtml(state)}
           </div>
-          <div class="map-legend">
-            <span>${icon('escape', 'ui-icon tiny')} 逃生点（第4阶段开启）</span>
-            <span>${icon('totem', 'ui-icon tiny')} 图腾</span>
-            <span>${icon('cabinet', 'ui-icon tiny')} 柜子</span>
-            <span>${icon('obstacle', 'ui-icon tiny')} 障碍物</span>
-            <span>⚡ 电闸</span>
-            <span>☎ 电话 / ▣ 无线电</span>
-            <span>⚒ 捕兽夹 / ＋ 陷阱补给（设陷者）</span>
-            <span class="legend-intent"><i class="intent-dot i-flee"></i> 逃跑中 <i class="intent-dot i-call"></i> 打电话 <i class="intent-dot i-escape"></i> 翻篱笆 <i class="intent-dot i-rescue"></i> 救援</span>
-            <span class="legend-fog">？ 最后确认位置</span>
-            <span class="legend-trail"><i class="legend-claw"></i> 鞋印：只看得见当前房间，跟丢了就断</span>
-            <span class="legend-noise">${icon('crow', 'crow-icon tiny')} 动静：乌鸦叫 / 地板响，有人刚经过（短线索）</span>
-            <span class="legend-objective">蓝框：设施热点</span>
-            <span class="legend-sites">${icon('itemBox', 'ui-icon tiny')} 道具箱 ${icon('generator', 'ui-icon tiny')} 发电机：幸存者可使用，你可以破坏</span>
-          </div>
-        </div>
+       </div>
 
         <div class="panel intel-log-panel">
           <div class="panel-heading"><h2>完整行动记录</h2><span>最新记录在最上方</span></div>
@@ -803,7 +788,7 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
               ${lookBtn}
               ${sabotageBtn}${specialExecution}
               ${trapCacheBtn}${trapRecoverBtn}${hatchetRefillBtn}
-              <div class="power-row">${powerButtonHtml(state, killer)}</div>
+
               <button class="btn search wait-action" data-action="wait" ${selectingDiscards || state.energy < 1 ? 'disabled' : ''} title="消耗 1 点行动点；幸存者各自行动一次，你继续观察当前房间与刚离开的房间。">等待 · 1 AP</button>
               <button class="btn primary end-turn" data-action="end-turn" ${selectingDiscards ? 'disabled' : ''}>结束回合</button>
               <button class="btn ghost" data-action="${m.mode === 'free' ? 'finish-free-hunt' : objectiveDone ? 'finish-contract' : 'give-up'}">${m.mode === 'free' ? '结束猎杀' : objectiveDone ? '完成主目标 · 结算' : '放弃任务'}</button>
@@ -819,6 +804,15 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
             <small>行动力</small>
           </div>
         </div>
+        <section class="killer-ability-panel" aria-label="杀手能力面板">
+          <div class="killer-panel-heading">
+            ${killerFaceHtml(killer, 'ability-portrait')}
+            <div><b>${escape(killer.owner)}</b><small>杀手能力 · 1–4 快捷使用</small></div>
+          </div>
+          <div class="killer-frenzy-meter"><div><span>杀戮值</span><b>${state.frenzy}/${FRENZY_MAX}</b></div><div class="killer-frenzy-track"><i style="width:${state.frenzy / FRENZY_MAX * 100}%"></i></div></div>
+          ${meter || myersMarks ? `<div class="killer-special-resources">${meter}${myersMarks}</div>` : ''}
+          <div class="killer-power-grid">${powerButtonHtml(state, killer)}</div>
+        </section>
       </div>
       <aside class="hunt-sidebar hunt-sidebar-right">
         <details class="intel-drawer">
