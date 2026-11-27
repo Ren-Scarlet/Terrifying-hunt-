@@ -559,6 +559,8 @@ function recordTrails(state: GameState, before: Map<string, RoomId>): void {
     // 所有实际移动都会留下可追踪的脚印；潜行只压低声音，不再让路线凭空消失。
     pushTrail(state, from, p.room, p.hp <= SURVIVOR_INJURED_HP || p.bleed > 0);
     if (!isQuietMove(state, p)) addDisturbance(state, p.room);
+    // 只有幸存者「走进/走到」乌鸦房间时才惊起它们；屠夫进门、原地反应都不算。
+    if ((state.crows ?? []).includes(p.room)) crowAlertFor(state, p);
   });
 }
 
@@ -2155,6 +2157,7 @@ function npcTurn(state: GameState): void {
     if (totemIndex >= 0 && person.hp > 0 && (person.awareness >= 1 || person.alert >= 25) && (person.id.charCodeAt(0) + state.turn) % 2 === 0) {
       state.totems.splice(totemIndex, 1);
       log(state, `${person.name} 在${roomName(person.room)}发现并破坏了图腾。`);
+      log(state, `【图腾被拆】${roomName(person.room)}的图腾已被幸存者拆毁，地图上不再显示。剩余 ${state.totems.length} 座。`);
     }
 
     // 已被发现的捕兽夹可以被幸存者拆除，避免陷阱成为永久封路工具。
@@ -2193,7 +2196,6 @@ function npcTurn(state: GameState): void {
     }
 
     // 乌鸦：停在这间屋的人一动就会惊起它们
-    crowAlertFor(state, person);
     if ((person.statusEffects.deepWound ?? 0) > 0) person.bleed = Math.max(person.bleed, 1);
     // 即时警觉值可以下降，但已经确认的危险不会被忘记。
     person.awareness = Math.max(person.awareness, person.alert >= 75 ? 3 : person.alert >= 40 ? 2 : person.alert >= 12 ? 1 : 0);

@@ -2680,13 +2680,16 @@ function caseHexPhonesAndAlarm(): void {
   endTurn(calm);
   check('恐惧：安全时会从恐慌中回落', scared.fear < 90, `fear=${scared.fear}`);
 
-  // 乌鸦：停在有乌鸦房间的人一动就会惊起乌鸦
+  // 乌鸦：只有「幸存者换房间」才会惊起乌鸦（屠夫进门不算）
   const crowGame = createGame(STARTING_DECK, undefined, '设陷者');
   const bird = crowGame.people.find((person) => person.role !== 'police')!;
-  crowGame.crows = [bird.room];
+  crowGame.crows = Object.keys(ROOM_MAP) as RoomId[];
   crowGame.crowAlerts = {};
   crowGame.log = [];
   bird.sneaky = false;
+  bird.alert = 100;
+  bird.fear = 100;
+  bird.intent = 'flee';
   endTurn(crowGame);
   check('乌鸦：幸存者在乌鸦房间行动会发出动静',
     (crowGame.log.some((line) => line.includes('乌鸦')) || crowGame.disturbances.some((d) => d.label.includes('乌鸦')))

@@ -36,6 +36,25 @@ export function progressOf(map: ProgressMap | undefined, killer: string): Killer
 }
 
 /** 累计等级（跨转生）：用来算「每 30 级共享一张专属卡」。 */
+/** 升下一级要花多少血点：50 起，每级 +15。 */
+export const BLOODWEB_BASE_COST = 50;
+export const BLOODWEB_COST_STEP = 15;
+
+export function bloodwebCost(progress: KillerProgress): number {
+  return BLOODWEB_BASE_COST + Math.max(0, progress.level - 1) * BLOODWEB_COST_STEP;
+}
+
+/** 花血点买一级（100 级自动转生）。 */
+export function addLevel(progress: KillerProgress): KillerProgress {
+  let level = progress.level + 1;
+  let prestige = progress.prestige;
+  if (level > LEVELS_PER_PRESTIGE) {
+    level = 1;
+    prestige += 1;
+  }
+  return { ...progress, level, prestige };
+}
+
 export function totalLevel(progress: KillerProgress): number {
   return progress.prestige * LEVELS_PER_PRESTIGE + progress.level;
 }

@@ -23,7 +23,7 @@ import { ACTIVE_KILLERS } from '../../game/killers';
 import type { SaveData } from '../../game/types';
 import type { RogueOffer, RogueRun } from '../../game/rogue';
 import type { BloodwebOffer, KillerProgress } from '../../game/progress';
-import { LEVELS_PER_PRESTIGE, XP_PER_LEVEL, totalLevel } from '../../game/progress';
+import { LEVELS_PER_PRESTIGE, bloodwebCost, totalLevel } from '../../game/progress';
 import { currentMenuMap, mapArtSrc } from '../mapArt';
 import { detailCardHtml, addonIconHtml, escape, getKiller, icon, killerFaceHtml, perkIconHtml, powerIconHtml, TYPE_NAMES } from './shared';
 
@@ -124,7 +124,7 @@ export function renderMenu(save: SaveData, ante = false): string {
           ${save.rogue ? '<button class="btn ghost" data-action="rogue-abandon">放弃肉鸽进度</button>' : ''}
           <button class="btn" data-action="deck">编辑牌组</button>
           <button class="btn" data-action="accessories">配件装配</button>
-          <button class="btn" data-action="bloodweb">血网升级${(save.progress?.[killer.owner]?.pending ?? 0) > 0 ? `（${save.progress?.[killer.owner]?.pending ?? 0}）` : ''}</button>
+          <button class="btn" data-action="bloodweb">血网升级</button>
           <button class="btn" data-action="shop">卡牌商店</button>
           <button class="btn ghost" data-action="guide">玩法指引</button>
         </div>
@@ -298,24 +298,41 @@ export function renderShop(save: SaveData): string {
  * 出发前的配件装配界面：最多 2 个槽位，配件买过即永久拥有。
  * pendingRun=true 时由「准备开始 / 自由猎杀」进入，确认后直接开猎场。
  */
-export function renderBloodweb(killer: string, progress: KillerProgress, offers: BloodwebOffer[] | null): string {
-  const pending = progress.pending;
+export function renderBloodweb(
+  killer: string,
+  progress: KillerProgress,
+  credits: number,
+  offers: BloodwebOffer[] | null,
+  killers: readonly string[],
+): string {
+  const cost = bloodwebCost(progress);
+  const canAfford = credits >= cost;
   return `
     <div class="overlay">
       <div class="modal bloodweb-modal">
         <div class="subtitle">BLOODWEB</div>
         <h1>血网升级</h1>
-        <p class="bloodweb-killer">${escape(killer)} · 等级 <b>${progress.level}</b> / ${LEVELS_PER_PRESTIGE}${progress.prestige > 0 ? ` · <b>${progress.prestige} 转</b>` : ''} · 累计 ${totalLevel(progress)} 级</p>
-        <div class="bloodweb-xp"><span style="width:${(progress.xp / XP_PER_LEVEL) * 100}%"></span></div>
-        <div class="bloodweb-xp-text">${progress.xp} / ${XP_PER_LEVEL} 经验 · 待领取 <b>${pending}</b> 次</div>
-        ${pending <= 0 || !offers
-          ? '<p class="bloodweb-empty">现在没有可领取的血网。打一局（胜利或失败都算）就能攒经验，每 100 经验升 1 级。</p>'
-          : `<div class="bloodweb-offers">${offers.map((offer, index) => `
+        <div class="bloodweb-killers">
+          ${killers.map((name) => `<button class="bloodweb-killer ${name === killer ? 'active' : ''}" data-action="bloodweb-killer" data-id="${escape(name)}">${escape(name)}</button>`).join('')}
+        </div>
+        <p class="bloodweb-killer-line">${escape(killer)} · 等级 <b>${progress.level}</b> / ${LEVELS_PER_PRESTIGE}${progress.prestige > 0 ? ` · <b>${progress.prestige} 转</b>` : ''} · 累计 ${totalLevel(progress)} 级</p>
+        <div class="bloodweb-buy">
+          <div>
+            <small>升到 ${progress.level + 1} 级需要</small>
+            <b>${cost} 血点</b>
+          </div>
+          <span>现有 <b>${credits}</b> 血点</span>
+          <button class="btn primary" data-action="bloodweb-level" ${canAfford ? '' : 'disabled'}>${canAfford ? `花 ${cost} 血点升级` : '血点不够'}</button>
+        </div>
+        ${offers
+          ? `<div class="bloodweb-offers">${offers.map((offer, index) => `
               <button class="bloodweb-offer ${offer.kind}" data-action="bloodweb-pick" data-index="${index}">
                 <small>${offer.kind === 'accessory' ? '配件' : offer.kind === 'card' ? '卡牌' : '血点'}</small>
                 <b>${escape(offer.name)}</b>
                 <span>${escape(offer.desc)}</span>
-              </button>`).join('')}</div>`}
+              </button>`).join('')}</div>`
+          : '<p class="bloodweb-empty">花血点升一级，就能从下面三条随机路线里领一个：配件库存 / 永久解锁卡牌 / 返还血点。每位杀手等级独立，血点想给谁花就给谁花。</p>'}
+        <div class="bloodweb-note">每 100 级自动转生（等级回 1、转生 +1）；每累计 30 级把该杀手一张专属卡放进公共池，其他杀手也能构筑。</div>
         <div class="actions">
           <button class="btn ghost" data-action="bloodweb-close">关闭</button>
         </div>

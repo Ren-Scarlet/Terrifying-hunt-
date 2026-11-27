@@ -170,12 +170,12 @@ function roomFeatures(state: GameState, roomId: RoomId): string {
     parts.push(`<span class="feature-anchor"><span class="room-feature door-lock" title="电子门锁：切断对应区域电力可解除，也可在门外强行破门">🔒<b>电子门锁</b></span><button type="button" class="feature-action" data-action="break-door" data-room="${roomId}" ${state.energy < 1 ? 'disabled' : ''} title="强行撞开这扇电子门锁：1 AP">破门 · 1 AP</button></span>`);
   }
   if (state.escapeRooms.includes(roomId)) parts.push(`<span class="room-feature escape-npc" title="警报达到阈值后开放的逃生点">${icon('escape', 'ui-icon tiny')}</span>`);
-  if (TOTEM_ROOMS.includes(roomId) || state.totems.includes(roomId)) {
-    const alive = state.totems.includes(roomId);
+  // 只有「还在」的图腾才显示；被幸存者拆掉之后直接从地图上消失，避免留一个误导性的“已熄灭”。
+  if (state.totems.includes(roomId)) {
     const taken = state.totemInteractions.includes(roomId);
-    const label = alive ? (taken ? '已汲取' : '图腾') : '已熄灭';
-    const canTake = alive && !taken && state.playerRoom === roomId;
-    parts.push(`<span class="totem-anchor"><span class="room-feature totem ${alive ? 'cursed lit' : 'broken'}" title="${label}：幸存者可以拆除；杀手可从每座存续图腾领取一次奖励">${icon('totem', 'ui-icon tiny')}<b>${label}</b></span>${canTake ? `<span class="totem-actions"><button type="button" data-action="totem-draw" title="本局仅可从这座图腾领取一次奖励">抽 1 张牌</button><button type="button" data-action="totem-energy" title="本局仅可从这座图腾领取一次奖励">+1 行动点</button></span>` : ''}</span>`);
+    const label = taken ? '已汲取' : '图腾';
+    const canTake = !taken && state.playerRoom === roomId;
+    parts.push(`<span class="totem-anchor"><span class="room-feature totem cursed lit" title="${label}：幸存者可以拆除；杀手可从每座存续图腾领取一次奖励">${icon('totem', 'ui-icon tiny')}<b>${label}</b></span>${canTake ? `<span class="totem-actions"><button type="button" data-action="totem-draw" title="本局仅可从这座图腾领取一次奖励">抽 1 张牌</button><button type="button" data-action="totem-energy" title="本局仅可从这座图腾领取一次奖励">+1 行动点</button></span>` : ''}</span>`);
   }
   if (state.trailRevealActions > 0 && visibleTrails(state).some((trail) => trail.room === roomId || trail.to === roomId)) parts.push(`<span class="room-feature trail-highlight" title="猎鹿者显现的脚印路线">${icon('trail', 'ui-icon tiny')}</span>`);
   if (state.scourgeShrineRoom === roomId) parts.push(`<span class="room-feature shrine" title="鬼魔神龛：等待有人踏入">${icon('totem', 'ui-icon tiny')}<b>神龛</b></span>`);

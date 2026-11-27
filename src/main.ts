@@ -49,7 +49,7 @@ import { loadSave, writeSave } from './game/save';
 import { generateFreeHunt, generateMission, withAnte } from './game/missions';
 import { applyTuning } from './game/tuning';
 import { advanceRogue, applyRogueFloor, rollRogueOffers, startRogueRun } from './game/rogue';
-import { gainXp, progressOf, rollBloodweb, syncSharedCards, xpForGame } from './game/progress';
+import { addLevel, bloodwebCost, progressOf, rollBloodweb, syncSharedCards } from './game/progress';
 import type { BloodwebOffer } from './game/progress';
 import type { RogueOffer, RogueRun } from './game/rogue';
 import { CABINET_ROOMS, ROOM_MAP } from './game/rooms';
@@ -115,6 +115,7 @@ let killerPanelCollapsed = localStorage.getItem('nightfall-panel-collapsed') ===
 let rogueOffers: RogueOffer[] | null = null;
 /** 血网升级面板：是否打开 + 当前三选一 */
 let bloodwebOpen = false;
+let bloodwebKiller: string | null = null;
 let bloodwebOffers: BloodwebOffer[] | null = null;
 /** 平面图下方的场景画布 */
 let scene: SceneHandle | null = null;
@@ -539,8 +540,14 @@ function render(): void {
   } else if (view.screen === 'menu' || !game) {
     html = renderMenu(save, session.anteArmed);
     if (bloodwebOpen) {
-      const killer = save.killer ?? '迈克尔·迈尔斯';
-      html += renderBloodweb(killer, progressOf(save.progress, killer), bloodwebOffers);
+      const killer = bloodwebKiller ?? save.killer ?? '迈克尔·迈尔斯';
+      html += renderBloodweb(
+        killer,
+        progressOf(save.progress, killer),
+        save.credits,
+        bloodwebOffers,
+        save.unlockedKillers,
+      );
     }
   } else {
     html = renderGame(game, getKiller(save.killer));
@@ -603,6 +610,7 @@ function render(): void {
 let hudHeightObserver: ResizeObserver | null = null;
 let lastEscaped = 0;
 let lastEscapeRoomCount = 0;
+let lastTotemCount = -1;
 let lastEmergency = false;
 let lastTurnsLeft = 99;
 let lastLogTop = '';
@@ -645,6 +653,7 @@ function syncHuntAlerts(): void {
     alertGameRef = game;
     lastEscaped = game.escaped;
     lastEscapeRoomCount = game.escapeRooms.length;
+    lastTotemCount = game.totems.length;
     lastEmergency = game.emergencyActive;
     lastTurnsLeft = Math.max(0, game.mission.turns - game.turn + 1);
     lastLogTop = game.log[0] ?? '';
@@ -655,6 +664,15 @@ function syncHuntAlerts(): void {
     pushHuntAlert(`有幸存者逃出去了！累计逃走 ${game.escaped} 人`, 'danger');
   }
   lastEscaped = game.escaped;
+  if (lastTotemCount >= 0 && game.totems.length < lastTotemCount) {
+    pushHuntAlert(
+      game.totems.length === 0
+        ? '最后一尊图腾被拆毁：厄咒效果全部消失'
+        : `图腾被幸存者拆毁！还剩 ${game.totems.length} 座`,
+      'danger',
+    );
+  }
+  lastTotemCount = game.totems.length;
   if (game.escapeRooms.length > lastEscapeRoomCount) {
     const names = game.escapeRooms.map((id) => ROOM_MAP[id]?.name ?? id).join('、');
     pushHuntAlert(`逃生点开启：${names}（幸存者会往这里跑）`, 'warn');
@@ -694,6 +712,13 @@ function publishBottomHudHeight(): void {
     const status = app.querySelector<HTMLElement>('.statusline');
     const statusHeight = status ? Math.ceil(status.getBoundingClientRect().height) : 0;
     if (statusHeight > 0) app.style.setProperty('--status-h', `${statusHeight}px`);
+    // 动作条如果居中/靠右，左边这块是空的，杀手面板就可以贴到底部；
+    // 只有当动作条压到左边（宽屏）时才需要抬到动作条上方。
+    const hudLeft = hud.getBoundingClientRect().left;
+    const panel = app.querySelector<HTMLElement>('.killer-ability-panel');
+    const panelRight = panel ? panel.getBoundingClientRect().right : 400;
+    const bottom = hudLeft > panelRight + 8 ? 18 : height + 36;
+    app.style.setProperty('--panel-bottom', `${bottom}px`);
   };
   write();
   window.requestAnimationFrame(write);
@@ -790,7 +815,7 @@ function sfxFromLogs(): void {
   else if (!suppressVoiceBeat && /喊了一声|警觉升到|尖叫/.test(head)) playVoice(head, 'Scream');
   else if (!suppressVoiceBeat && freshSightings === 0 && /猛一回头|忽然抬头|察觉到异常|发抖/.test(head)) playVoice(head, 'Startle');
   else if (/致盲|击晕|手电筒|逼退/.test(head)) playSfx('stun');
-  else if (/乌鸦|动静/.test(head)) playSfx('crow');
+  else if (/乌鸦被惊起|乌鸦扑棱|一阵乌鸦/.test(head)) playSfx('crow');
   else if (/翻出了|拾起|拿到了武器/.test(head)) playSfx('pickup');
   else if (/发现并破坏了|破坏了图腾/.test(head)) playSfx('smash');
   else if (/发电机/.test(head)) playSfx('generator');
@@ -933,26 +958,12 @@ function afterAction(): void {
         });
       }
       save = { ...save, bestScore: newBest, wins, credits, darkCells, unlockedCards: unlocked };
-      grantGameXp(game);
       writeSave(save);
     }
   }
   render();
 }
 
-
-/** 一局结束给当前杀手经验；升级了就在结算/log 里提示。 */
-function grantGameXp(state: GameState): void {
-  const killer = state.killer;
-  const current = progressOf(save.progress, killer);
-  const gained = xpForGame(state);
-  const { progress, levels } = gainXp(current, gained);
-  const map = { ...(save.progress ?? {}), [killer]: progress };
-  save = { ...save, progress: map, sharedCards: syncSharedCards(map, save.sharedCards) };
-  if (levels > 0) {
-    state.log.unshift(`【血网】${killer} 升到 ${progress.level} 级（${progress.prestige} 转），获得 ${levels} 次血网三选一。`);
-  }
-}
 
 function startGame(freeHunt = false, loadout: string[] = []): void {
   playedDeathLogMessages.clear();
@@ -1581,41 +1592,63 @@ registry.register('菜单与面板', createMenuActions({
 registry.register('平衡面板', createAdminActions({ render }));
 registry.register('血网', {
   bloodweb: () => {
-    const killer = save.killer ?? '迈克尔·迈尔斯';
-    const progress = progressOf(save.progress, killer);
+    bloodwebKiller = save.killer ?? '迈克尔·迈尔斯';
     bloodwebOpen = true;
-    bloodwebOffers = progress.pending > 0
-      ? rollBloodweb(killer, save.unlockedCards, save.accessories ?? {})
-      : null;
+    bloodwebOffers = null;
+    render();
+  },
+  'bloodweb-killer': ({ target }) => {
+    const id = target.dataset.id;
+    if (!id || !(save.unlockedKillers ?? []).includes(id)) return;
+    bloodwebKiller = id;
+    bloodwebOffers = null;
+    render();
+  },
+  'bloodweb-level': () => {
+    const killer = bloodwebKiller ?? save.killer ?? '迈克尔·迈尔斯';
+    const progress = progressOf(save.progress, killer);
+    const cost = bloodwebCost(progress);
+    if (save.credits < cost) {
+      pushHuntAlert('血点不够，先打一局吧', 'warn');
+      return;
+    }
+    const nextProgress = addLevel(progress);
+    save = {
+      ...save,
+      credits: save.credits - cost,
+      progress: { ...(save.progress ?? {}), [killer]: nextProgress },
+      sharedCards: syncSharedCards({ ...(save.progress ?? {}), [killer]: nextProgress }, save.sharedCards),
+    };
+    writeSave(save);
+    playSfx('stage');
+    bloodwebOffers = rollBloodweb(killer, save.unlockedCards, save.accessories ?? {});
     render();
   },
   'bloodweb-pick': ({ target }) => {
-    const killer = save.killer ?? '迈克尔·迈尔斯';
-    const progress = progressOf(save.progress, killer);
+    const killer = bloodwebKiller ?? save.killer ?? '迈克尔·迈尔斯';
     const index = Number(target.dataset.index);
     const offer = bloodwebOffers?.[Number.isInteger(index) ? index : -1];
-    if (!offer || progress.pending <= 0) return;
-    const nextProgress = { ...progress, pending: progress.pending - 1 };
-    const nextSave = { ...save, progress: { ...(save.progress ?? {}), [killer]: nextProgress } };
+    if (!offer) return;
     if (offer.kind === 'accessory') {
-      nextSave.accessories = { ...(nextSave.accessories ?? {}), [offer.id]: (nextSave.accessories?.[offer.id] ?? 0) + 1 };
+      save = {
+        ...save,
+        accessories: { ...(save.accessories ?? {}), [offer.id]: (save.accessories?.[offer.id] ?? 0) + 1 },
+      };
     } else if (offer.kind === 'card') {
-      nextSave.unlockedCards = nextSave.unlockedCards.includes(offer.id) ? nextSave.unlockedCards : [...nextSave.unlockedCards, offer.id];
+      if (!save.unlockedCards.includes(offer.id)) save = { ...save, unlockedCards: [...save.unlockedCards, offer.id] };
     } else {
       const amount = Number(offer.id.replace('credits_', '')) || 40;
-      nextSave.credits = nextSave.credits + amount;
+      save = { ...save, credits: save.credits + amount };
     }
-    save = nextSave;
     writeSave(save);
     playSfx('pickup');
-    bloodwebOffers = nextProgress.pending > 0
-      ? rollBloodweb(killer, save.unlockedCards, save.accessories ?? {})
-      : null;
+    bloodwebOffers = null;
     render();
   },
   'bloodweb-close': () => {
     bloodwebOpen = false;
     bloodwebOffers = null;
+    bloodwebKiller = null;
     render();
   },
 });

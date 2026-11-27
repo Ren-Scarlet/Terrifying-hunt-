@@ -3816,3 +3816,28 @@ button, .room-hit, .hand-row { touch-action: manipulation; }
 .bloodweb-offer.credits { border-color: rgba(200, 80, 70, .55); }
 .bloodweb-empty { color: #a89a8e; font-size: 12px; line-height: 1.7; }
 @media (max-width: 720px) { .bloodweb-offers { grid-template-columns: 1fr; } }
+
+/* 血网：角色切换 + 花血点升级 */
+.bloodweb-killers { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 8px; }
+.bloodweb-killer {
+  padding: 4px 11px;
+  border: 1px solid #3a322b;
+  border-radius: 3px;
+  background: #14100e;
+  color: #b8a99c;
+  font-size: 12px;
+  cursor: pointer;
+}
+.bloodweb-killer.active { border-color: #d0603f; color: #ffd9c4; background: #241511; }
+.bloodweb-killer-line { color: #d8c9bc; font-size: 13px; margin: 4px 0 10px; }
+.bloodweb-buy {
+  display: flex; align-items: center; gap: 16px;
+  margin: 8px 0 14px; padding: 10px 12px;
+  border: 1px solid #4a3c30;
+  background: rgba(32, 19, 15, .62);
+}
+.bloodweb-buy small { display: block; font-size: 10px; color: #9a8d84; letter-spacing: 1px; }
+.bloodweb-buy b { font-size: 16px; color: #ffd9c4; }
+.bloodweb-buy span { font-size: 12px; color: #9a8d84; margin-left: auto; }
+.bloodweb-buy span b { font-size: 13px; color: #f0dcc8; }
+.bloodweb-note { font-size: 11px; line-height: 1.65; color: #8b8078; margin: 2px 0 12px; }

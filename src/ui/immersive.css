@@ -4030,3 +4030,40 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
   color: #ffd9a0 !important;
   text-shadow: 0 0 6px rgba(255, 160, 50, .7) !important;
 }
+
+/* ==========================================================================
+   2026-11-28 · 面板下移 / 受击动画恢复 / 地图图标响应式尺寸
+   ========================================================================== */
+
+/* 动作条不占左边时（窄屏/居中），杀手面板直接贴到底部 */
+#app.immersive-game:not(.mobile-game-active) .killer-ability-panel {
+  bottom: var(--panel-bottom, calc(26px + var(--hud-h, 197px))) !important;
+}
+
+/* 受击动画：恢复原头像的抖动/泛红（上一轮 animation:none 把它一起关掉了） */
+#app.immersive-game:not(.mobile-game-active) .floorplan .room-people .person-chip.attack-hit {
+  animation: victimHit .48s ease-out !important;
+  filter: drop-shadow(0 0 10px rgba(230, 60, 45, .85)) !important;
+}
+
+/* 地图上的物件图标：按视口宽度缩放，手机上不再是一个个 72px 的大块 */
+#app.immersive-game .floorplan .room-features .room-feature .ui-icon,
+#app.immersive-game.mobile-game-active .floorplan .room-features .room-feature .ui-icon {
+  width: clamp(24px, 4.2vw, 72px) !important;
+  height: clamp(24px, 4.2vw, 72px) !important;
+  max-width: none !important;
+  max-height: none !important;
+}
+#app.immersive-game .floorplan .room-feature .execution-site-icon,
+#app.immersive-game.mobile-game-active .floorplan .room-feature .execution-site-icon {
+  width: clamp(24px, 4.2vw, 72px) !important;
+  height: clamp(24px, 4.2vw, 72px) !important;
+}
+#app.immersive-game .floorplan .room-features .room-feature,
+#app.immersive-game.mobile-game-active .floorplan .room-features .room-feature {
+  flex-basis: clamp(38px, 6vw, 96px) !important;
+  width: clamp(38px, 6vw, 96px) !important;
+  min-width: clamp(38px, 6vw, 96px) !important;
+  height: clamp(38px, 6vw, 96px) !important;
+  min-height: clamp(38px, 6vw, 96px) !important;
+}
