@@ -47,7 +47,10 @@ jobs:
           npm run check --prefix production
           npm run build --prefix production
 
+      # 手机预览来自独立分支：它坏掉不应该拖住正式站发布，所以标记成「允许失败」，
+      # 下面组装时如果 mobile-source/dist 不存在就跳过 /mobile-preview/。
       - name: Install and validate mobile preview source
+        continue-on-error: true
         run: |
           npm ci --prefix mobile-source
           npm run check --prefix mobile-source
@@ -58,7 +61,11 @@ jobs:
           mkdir -p dist/preview dist/mobile-preview
           cp -a production/dist/. dist/
           cp -a production/dist/. dist/preview/
-          cp -a mobile-source/dist/. dist/mobile-preview/
+          if [ -d mobile-source/dist ]; then
+            cp -a mobile-source/dist/. dist/mobile-preview/
+          else
+            echo "::warning::手机预览分支构建失败，本次只发布正式站与 /preview/"
+          fi
 
       - uses: actions/configure-pages@v5
 
