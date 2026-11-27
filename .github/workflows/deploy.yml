@@ -1,9 +1,10 @@
-# 正式主线已切换为原 HUD 预览分支的当前稳定版本；后续功能直接在 main 上迭代。
-# UI HUD 原型与厨房美术预览共用隔离的 /preview/ 构建产物；原型支持地图点击移动、人物与门的场景热点。
+# 单一构建：正式站与 /preview/ 使用同一份产物。
+# 之前 /preview/ 单独从 feature/in-game-map-hud 构建，导致每次改动要推两次、两条分支还会漂移。
+# 现在只维护 main：推一次 main，正式站和 /preview/ 同时更新。
 
 on:
   push:
-    branches: [main, feature/in-game-map-hud]
+    branches: [main]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -21,49 +22,36 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      # 正式网站从 main 构建，隔离预览从功能分支构建；预览资源放在 /preview/。
       - uses: actions/checkout@v4
         with:
           ref: main
-          path: main-source
-      - uses: actions/checkout@v4
-        with:
-          ref: feature/in-game-map-hud
-          path: preview-source
+          path: source
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: |
-            main-source/package-lock.json
-            preview-source/package-lock.json
-      - name: Build production site from main
+          cache-dependency-path: source/package-lock.json
+      - name: Typecheck, rules and smoke
         run: |
-          npm ci --prefix main-source
-          npm run check --prefix main-source
-          npm run build --prefix main-source
-      - name: Build immersive HUD preview
-        run: |
-          npm ci --prefix preview-source
-          npm run check --prefix preview-source
-          npm run build --prefix preview-source
-      - name: Combine production site and isolated preview
+          npm ci --prefix source
+          npm run check --prefix source
+          npm run build --prefix source
+      - name: Publish to root and /preview/
         run: |
           mkdir -p dist/preview
-          cp -a main-source/dist/. dist/
-          cp -a preview-source/dist/. dist/preview/
+          cp -a source/dist/. dist/
+          cp -a source/dist/. dist/preview/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
 
   deploy:
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/feature/in-game-map-hud')
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: build
     runs-on: ubuntu-latest
     environment:
-      # main 部署到正式 Pages；功能分支仍只部署到隔离预览环境。
-      name: ${{ github.ref == 'refs/heads/main' && 'github-pages' || 'github-pages-preview' }}
+      name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
