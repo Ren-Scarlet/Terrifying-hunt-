@@ -1187,7 +1187,7 @@ app.addEventListener('click', (event) => {
         title: style.title + ' · 分数处决' + (perfect ? ' · 完美 QTE' : ''),
         description: style.action + '。' + style.line + (perfect ? ' 分数处决完成，QTE 完美，额外获得 25 分。' : ' 分数处决仍然完成，但 QTE 失误，没有额外分数。'),
         style: style.motion,
-        success: perfect,
+        success: true,
       };
       playSfx('execute');
       if (person) playSfx(SURVIVOR_MAP[person.id]?.gender === 'female' ? 'voiceFScream' : 'voiceMScream', 0.96);
