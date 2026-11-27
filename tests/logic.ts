@@ -626,9 +626,19 @@ function caseMyersStalkingAndFearRadius(): void {
   hatchetTarget.fear = 80;
   check('女猎手：开局携带 3 把飞斧并可进入瞄准状态',
     huntress.hatchets === 3 && usePower(huntress, 'huntress_axe') && huntress.huntressAiming);
-  check('女猎手：投掷飞斧消耗 1 把、造成伤害，并使幸存者恐慌逃离',
+  check('女猎手：投掷飞斧消耗 1 把、造成伤害，并迫使幸存者逃离',
     throwHuntressHatchet(huntress, hatchetTarget.id) && huntress.hatchets === 2 && hatchetTarget.hp === 3 &&
     huntress.huntStats.hatchetHits === 1 && hatchetTarget.fear === 80 && hatchetTarget.room !== huntress.playerRoom);
+
+  const highFearHuntress = createGame(STARTING_DECK, undefined, '女猎手');
+  const highFearTarget = player(highFearHuntress);
+  highFearTarget.room = highFearHuntress.playerRoom;
+  highFearTarget.fear = 100;
+  highFearHuntress.energy = 4;
+  usePower(highFearHuntress, 'huntress_axe');
+  check('女猎手：飞斧强制逃跑不受恐惧值 100 阻断，也不修改恐惧值',
+    throwHuntressHatchet(highFearHuntress, highFearTarget.id) && highFearTarget.hp === 3 &&
+    highFearTarget.fear === 100 && highFearTarget.room !== highFearHuntress.playerRoom);
   huntress.playerRoom = CABINET_ROOMS[0];
   huntress.hatchets = 1;
   huntress.energy = 4;
