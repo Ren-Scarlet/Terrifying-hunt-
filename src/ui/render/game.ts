@@ -51,6 +51,7 @@ import {
 } from '../../game/engine';
 import { roomDistance } from '../../game/navigation';
 import { executionMethodsAtRoom } from '../../game/executions';
+import { SURVIVOR_MAP } from '../../game/survivors';
 import { getHuntingGround } from '../../game/maps';
 import { KILLERS, KILLER_MAP, type KillerProfile } from '../../game/killers';
 import { roomName } from '../../game/missions';
@@ -103,10 +104,13 @@ function roomFeatures(state: GameState, roomId: RoomId): string {
       ? `<button type="button" class="room-feature breaker ${circuitAt.broken || circuitAt.enabled === false ? 'broken' : ''}" data-action="toggle-breaker" data-circuit-id="${circuitAt.id}" ${breakerBlocked} title="${breakerTitle}。点击切换电闸（${BREAKER_SWITCH_COST} AP）">${icon('generator', 'ui-icon tiny')}<b>切换电闸</b></button>`
       : `<span class="room-feature breaker ${circuitAt.broken || circuitAt.enabled === false ? 'broken' : ''}" title="${breakerTitle}">${icon('generator', 'ui-icon tiny')}<b>电闸</b></span>`);
   }
-  const placedTrap = state.bearTraps.find((trap) => trap.room === roomId);
-  if (placedTrap) {
-    const trapStatus = placedTrap.armed ? (placedTrap.discovered ? '已被幸存者发现，可能被拆除' : '已布设，等待触发') : '已触发或拆除，可由设陷者回收';
-    parts.push(`<span class="room-feature bear-trap ${placedTrap.armed ? 'armed' : 'spent'}" title="捕兽夹：${trapStatus}">${icon('bearTrap', 'ui-icon tiny')}<b>捕兽夹</b></span>`);
+  const placedTraps = state.bearTraps.filter((trap) => trap.room === roomId);
+  if (placedTraps.length) {
+    const armedCount = placedTraps.filter((trap) => trap.armed).length;
+    const triggeredCount = placedTraps.filter((trap) => !!trap.triggeredBy).length;
+    const trapStatus = `${armedCount} 只待触发${triggeredCount ? ` · ${triggeredCount} 只已触发` : ''}${placedTraps.some((trap) => trap.discovered && trap.armed) ? ' · 有陷阱已被发现' : ''}`;
+    const trapClass = triggeredCount ? 'triggered' : armedCount ? 'armed' : 'spent';
+    parts.push(`<span class="room-feature bear-trap ${trapClass}" title="捕兽夹：${trapStatus}">${icon('bearTrap', 'ui-icon tiny')}<b>捕兽夹${placedTraps.length > 1 ? ` ×${placedTraps.length}` : ''}</b></span>`);
   }
   if (state.trapCaches.includes(roomId)) {
     parts.push('<span class="room-feature trap-cache" title="捕兽夹补给：设陷者可在此收集额外捕兽夹">＋<b>陷阱补给</b></span>');
@@ -126,10 +130,10 @@ function roomFeatures(state: GameState, roomId: RoomId): string {
     if (canExecuteHere || downedHere) {
       executionSites.forEach((method) => {
         const hint = canExecuteHere ? method.description : '先抱起这里的倒地幸存者，再将其带到此处使用特殊处决。';
-        parts.push(`<button type="button" class="room-feature execution-site execution-action" data-action="execute-special" data-method="${method.id}" ${canExecuteHere ? '' : 'disabled'} title="${escape(hint)}"><img class="execution-site-icon" src="${uiIcon('executionSite')}" alt="" aria-hidden="true" onerror="this.style.display='none'"><b>${escape(method.name)}</b></button>`);
+        parts.push(`<button type="button" class="room-feature execution-site execution-action ${state.executionSiteHint === roomId ? 'nearest' : ''}" data-action="execute-special" data-method="${method.id}" ${canExecuteHere ? '' : 'disabled'} title="${escape(hint)}"><img class="execution-site-icon" src="${uiIcon('executionSite')}" alt="" aria-hidden="true" onerror="this.style.display='none'"><b>${escape(method.name)}</b></button>`);
       });
     } else {
-      parts.push(`<span class="room-feature execution-site" title="特殊处决地点：${executionSites.map((method) => escape(method.name)).join(' / ')}"><img class="execution-site-icon" src="${uiIcon('executionSite')}" alt="" aria-hidden="true" onerror="this.style.display='none'"><b>处决点 ${executionSites.length}</b></span>`);
+      parts.push(`<span class="room-feature execution-site ${state.executionSiteHint === roomId ? 'nearest' : ''}" title="特殊处决地点：${executionSites.map((method) => escape(method.name)).join(' / ')}"><img class="execution-site-icon" src="${uiIcon('executionSite')}" alt="" aria-hidden="true" onerror="this.style.display='none'"><b>处决点 ${executionSites.length}</b></span>`);
     }
   }
   if (roomId === EXIT_ROOM) parts.push(`<span class="room-feature escape" title="撤离点：任务完成的撤离位置">${icon('escape', 'ui-icon tiny')}</span>`);
@@ -368,7 +372,8 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
   const newlyDiscovered = state.people.filter((person) => person.role !== 'police' && person.hp > 0 && !person.hidden && isRoomVisible(state, person.room) && !discoveredSurvivorIds.has(person.id));
   if (newlyDiscovered.length) {
     newlyDiscovered.forEach((person) => discoveredSurvivorIds.add(person.id));
-    playSfx('survivorFound');
+    const firstFound = newlyDiscovered[0];
+    playSurvivorStartle(SURVIVOR_MAP[firstFound.id]?.gender ?? 'male');
   }
   const isMyers = killer.owner === '迈克尔·迈尔斯';
   if (state.turn === 1 && state.trailClock === 0) {
@@ -378,7 +383,9 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
     lastRenderedTrapTriggerCount = state.trapTriggerCount;
     lastRedFigureSignature = '';
   } else if (state.trapTriggerCount > lastRenderedTrapTriggerCount) {
-    playTrapScream();
+    const triggeredTrap = [...state.bearTraps].reverse().find((trap) => !!trap.triggeredBy);
+    const trapGender = triggeredTrap ? SURVIVOR_MAP[triggeredTrap.triggeredBy!]?.gender ?? 'male' : 'male';
+    playTrapScream(trapGender);
     playSfx('trapTrigger');
     playHeartbeat();
     lastRenderedTrapTriggerCount = state.trapTriggerCount;
