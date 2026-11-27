@@ -1,5 +1,5 @@
+# 正式主线已切换为原 HUD 预览分支的当前稳定版本；后续功能直接在 main 上迭代。
 # UI HUD 原型与厨房美术预览共用隔离的 /preview/ 构建产物；原型支持地图点击移动、人物与门的场景热点。
-name: Deploy to GitHub Pages
 
 on:
   push:
@@ -21,7 +21,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      # 正式网站始终从 main 构建，预览版从独立 HUD 实装分支构建；预览资源隔离在 /preview/。
+      # 正式网站从 main 构建，隔离预览从功能分支构建；预览资源放在 /preview/。
       - uses: actions/checkout@v4
         with:
           ref: main
@@ -62,7 +62,7 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     environment:
-      # 功能分支使用独立环境，避免正式 Pages 环境只允许 main 的部署保护规则。
+      # main 部署到正式 Pages；功能分支仍只部署到隔离预览环境。
       name: ${{ github.ref == 'refs/heads/main' && 'github-pages' || 'github-pages-preview' }}
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
