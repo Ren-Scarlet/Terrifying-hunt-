@@ -3932,6 +3932,20 @@ export function calculateHuntStyleRating(state: GameState, result: ResultKind): 
   return { score, rank, bonus, breakdown };
 }
 
+/** 主动策略行为的结算分：鼓励观察习惯、利用环境与精准使用杀手能力。 */
+function huntActionScore(state: GameState): number {
+  const stats = state.huntStats;
+  return Math.min(60,
+    stats.routineInsights * 5 +
+    stats.environmentActions * 3 +
+    stats.trapTriggers * 10 +
+    stats.hatchetHits * 6 +
+    stats.nurseGrabs * 8 +
+    stats.myersBurstHits * 8 +
+    stats.quietKills * 5,
+  );
+}
+
 function finish(state: GameState, result: ResultKind): void {
   if (state.result) return;
   state.result = result;
@@ -3948,6 +3962,8 @@ function finish(state: GameState, result: ResultKind): void {
   if (bonusTasks.length) lines.push({ label: `额外挑战 · ${bonusTasks.length} 项`, value: bonusTaskScore });
   if (state.specialExecutionBonus > 0) lines.push({ label: '地形处决奖励', value: state.specialExecutionBonus });
   if (state.cardBonusScore > 0) lines.push({ label: '卡牌猎杀奖励', value: state.cardBonusScore });
+  const actionScore = huntActionScore(state);
+  if (actionScore > 0) lines.push({ label: '策略猎杀 · 观察习惯、环境操作、陷阱与专属能力', value: actionScore });
   lines.push({ label: `凶残 · 击杀 ${state.kills} 人`, value: state.kills * 14 });
   if (state.escaped > 0) lines.push({ label: `逃走 ${state.escaped} 人的失分（每人 -15）`, value: -state.escaped * 15 });
   if (state.alarm >= 60) lines.push({ label: `暴露度 ${state.alarm} 的代价`, value: -Math.round(state.alarm / 5) });
@@ -3974,7 +3990,7 @@ export function currentScore(state: GameState): number {
     0,
     Math.round(
       state.mission.reward +
-        state.kills * 14 + state.specialExecutionBonus -
+        state.kills * 14 + state.specialExecutionBonus + state.cardBonusScore + huntActionScore(state) -
         state.escaped * 15 -
         Math.round(state.alarm / 5),
     ),
