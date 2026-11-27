@@ -920,26 +920,28 @@ export function mountFloorplanScene(initialHost: HTMLElement, initialState: Game
     cc.rotate(facing);
 
     // 环境漫反射：照到墙面和地板上的宽阔暗红色光晕。
-    const halo = cc.createRadialGradient(coneLen * 0.42, 0, coneLen * 0.06, coneLen * 0.42, 0, coneLen * 0.78);
-    halo.addColorStop(0, 'rgba(235,24,34,.34)');
-    halo.addColorStop(0.42, 'rgba(194,10,24,.20)');
-    halo.addColorStop(0.76, 'rgba(130,5,18,.07)');
+    const halo = cc.createRadialGradient(coneLen * 0.42, 0, coneLen * 0.02, coneLen * 0.42, 0, coneLen * 0.92);
+    halo.addColorStop(0, 'rgba(255,38,48,.29)');
+    halo.addColorStop(0.28, 'rgba(224,18,34,.22)');
+    halo.addColorStop(0.56, 'rgba(176,9,25,.13)');
+    halo.addColorStop(0.78, 'rgba(124,4,18,.045)');
     halo.addColorStop(1, 'rgba(70,0,8,0)');
     cc.fillStyle = halo;
     cc.beginPath();
-    cc.ellipse(coneLen * 0.42, 0, coneLen * 0.72, coneLen * 0.39, 0, 0, Math.PI * 2);
+    cc.ellipse(coneLen * 0.42, 0, coneLen * 0.82, coneLen * 0.48, 0, 0, Math.PI * 2);
     cc.fill();
 
     // 主光束采用弧形边缘与渐隐，不会出现机械的直线三角边。
     const beamGradient = cc.createLinearGradient(0, 0, coneLen, 0);
     beamGradient.addColorStop(0, 'rgba(255,54,64,.58)');
     beamGradient.addColorStop(0.18, 'rgba(230,24,38,.42)');
-    beamGradient.addColorStop(0.56, 'rgba(178,10,26,.20)');
-    beamGradient.addColorStop(0.88, 'rgba(120,4,16,.06)');
+    beamGradient.addColorStop(0.42, 'rgba(198,12,29,.24)');
+    beamGradient.addColorStop(0.68, 'rgba(150,6,22,.11)');
+    beamGradient.addColorStop(0.86, 'rgba(110,3,15,.025)');
     beamGradient.addColorStop(1, 'rgba(80,0,8,0)');
     cc.fillStyle = beamGradient;
     cc.shadowColor = 'rgba(235,18,35,.42)';
-    cc.shadowBlur = Math.max(12, coneLen * 0.16);
+    cc.shadowBlur = Math.max(22, coneLen * 0.28);
     cc.beginPath();
     cc.moveTo(0, 0);
     cc.bezierCurveTo(coneLen * 0.18, -coneLen * 0.11, coneLen * 0.68, -coneLen * 0.30, coneLen, -coneLen * 0.045);
