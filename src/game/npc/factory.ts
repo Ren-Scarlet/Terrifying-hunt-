@@ -167,7 +167,7 @@ export function createPeople(mission: Mission): Person[] {
     const hider = randomOf(people);
     hider.archetype = 'hider';
     hider.goal = 'hide';
-    hider.routineIndex = Math.floor(Math.random() * ROUTINE_PROFILE.hider.rooms.length);
+    hider.routineIndex = Math.floor(random() * ROUTINE_PROFILE.hider.rooms.length);
   }
 
   people.push({
