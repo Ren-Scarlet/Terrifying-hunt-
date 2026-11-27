@@ -1,6 +1,6 @@
 import './style.css';
 import './ui/immersive.css';
-import { handleImmersiveAction, installImmersiveKeys, syncImmersiveCamera } from './ui/immersive';
+import { handleImmersiveAction, installImmersiveKeys, openIntelDrawer, syncImmersiveCamera } from './ui/immersive';
 import { CARD_MAP, deckCardsForKiller, STARTING_DECK } from './game/cards';
 import {
   attack,
@@ -936,13 +936,9 @@ app.addEventListener('click', (event) => {
     const personId = target.dataset.personId;
     if (personId && game && screen === 'game') {
       const panel = document.getElementById('cardDetail');
-      if (selectedPersonId === personId) {
-        selectedPersonId = null;
-        if (panel) panel.innerHTML = defaultDetailHtml();
-      } else {
-        selectedPersonId = personId;
-        if (panel) panel.innerHTML = personDetailHtml(game, personId);
-      }
+      selectedPersonId = personId;
+      if (panel) panel.innerHTML = personDetailHtml(game, personId);
+      openIntelDrawer();
       detailCardUid = null;
     }
     return;
