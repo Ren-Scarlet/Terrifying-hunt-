@@ -3441,7 +3441,7 @@ function triggerEnvironmentalEvent(state: GameState): void {
 
 export const BREAKER_SWITCH_COST = 1;
 
-/** 电闸只能在所在房间操作；合闸需要对应发电机正常供电。 */
+/** 电闸只能在所在房间操作；每组电路独立控制对应区域供电。 */
 export function breakerBlockReason(state: GameState, circuitId?: string): string | null {
   if (state.phase !== 'playing') return '这一局已经结束了。';
   const circuit = state.powerCircuits.find((item) =>
@@ -3478,7 +3478,7 @@ export function togglePowerCircuit(state: GameState, circuitId?: string): boolea
   return true;
 }
 
-/** 统一破坏入口：相邻门锁、电话线、无线电、电闸、发电机与道具箱。 */
+/** 统一破坏入口：相邻门锁、电话线、无线电、电闸与道具箱。 */
 function sabotageTarget(state: GameState): { kind: 'door'; room: RoomId } | { kind: 'phone' | 'radio' } | { kind: 'facility' } | null {
   const breaker = state.powerCircuits.some((c) => c.breakerRoom === state.playerRoom && !c.broken);
   const item = state.siteItems.some((i) => i.room === state.playerRoom && !i.broken && i.charges > 0);
