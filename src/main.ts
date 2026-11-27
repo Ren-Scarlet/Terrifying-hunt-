@@ -46,7 +46,8 @@ import {
   wipeBlade,
 } from './game/engine';
 import { loadSave, writeSave } from './game/save';
-import { bootCustomAccessories, importCustomAccessories, isCustomAccessory, removeCustomAccessory, upsertCustomAccessory } from './game/customContent';
+import { bootCustomAccessories, customAccessoriesForPublish, importCustomAccessories, isCustomAccessory, removeCustomAccessory, upsertCustomAccessory } from './game/customContent';
+import { publishAccessoryPack, verifyGitHubToken } from './game/cloud';
 import { ACCESSORY_MAP } from './game/data/accessories';
 import { generateFreeHunt, generateMission, withAnte } from './game/missions';
 import { applyTuning } from './game/tuning';
@@ -120,6 +121,8 @@ let selectedPersonId: string | null = null;
 let killerPanelCollapsed = localStorage.getItem('nightfall-panel-collapsed') === '1';
 /** 肉鸽：层间三选一的待选项 */
 let rogueOffers: RogueOffer[] | null = null;
+/** 当前这一局是不是肉鸽层；普通模式就算存档里残留 rogue 也不能弹三选一 */
+let rogueGame = false;
 /** 血网升级面板：是否打开 + 当前三选一 */
 let bloodwebOpen = false;
 let bloodwebKiller: string | null = null;
@@ -701,7 +704,6 @@ function syncHuntAlerts(): void {
   const turnsLeft = Math.max(0, game.mission.turns - game.turn + 1);
   if (turnsLeft <= 3 && turnsLeft < lastTurnsLeft) {
     pushHuntAlert(turnsLeft <= 0 ? '契约回合已经耗尽！' : `只剩 ${turnsLeft} 个回合，主目标还没完成！`, turnsLeft <= 1 ? 'danger' : 'warn');
-    if (turnsLeft === 1) playSfx('heartbeat');
   }
   lastTurnsLeft = turnsLeft;
 }
@@ -929,7 +931,7 @@ function afterAction(): void {
   }
   if (game && game.phase === 'gameover' && ui().screen !== 'result') {
     // 肉鸽：过关不结算，先给三选一奖励；失败则清掉本轮进度。
-    if (save.rogue) {
+    if (save.rogue && rogueGame) {
       if (game.result === 'win') {
         playSfx('win');
         rogueOffers = rollRogueOffers(save.rogue);
@@ -975,6 +977,7 @@ function afterAction(): void {
 
 
 function startGame(freeHunt = false, loadout: string[] = []): void {
+  rogueGame = false;
   playedDeathLogMessages.clear();
   knownSurvivorIds = new Set();
   freshSightings = 0;
@@ -1021,6 +1024,7 @@ function startRogueFloor(run: RogueRun): void {
   selectedPersonId = null;
   rogueOffers = null;
   save = { ...save, rogue: run };
+  rogueGame = true;
   writeSave(save);
   playSfx('ready');
   window.setTimeout(() => playSfx('enterMap'), 190);
@@ -1628,6 +1632,28 @@ registry.register('配件工坊', {
   'workshop-mod-add': () => { addDraftMod(); render(); },
   'workshop-mod-remove': ({ target }) => { removeDraftMod(Number(target.dataset.index) || 0); render(); },
   'workshop-icon-clear': () => { if (workshopState.editing) { delete workshopState.editing.iconData; render(); } },
+  'workshop-login': () => {
+    const token = workshopState.token.trim();
+    if (!token) { workshopState.status = '先粘贴 GitHub 密钥'; render(); return; }
+    workshopState.status = '验证中…';
+    render();
+    void verifyGitHubToken(token)
+      .then((login) => { workshopState.status = '已授权：' + login + '，可以点发布了'; })
+      .catch((error: unknown) => { workshopState.status = '验证失败：' + (error instanceof Error ? error.message : '未知错误'); })
+      .finally(() => render());
+  },
+  'workshop-publish': () => {
+    const list = customAccessoriesForPublish();
+    if (!list.length) { workshopState.status = '还没有自定义配件，先做一个再发布'; render(); return; }
+    workshopState.status = '发布中…';
+    render();
+    void publishAccessoryPack(list as unknown as Array<Record<string, unknown>>)
+      .then((result) => {
+        workshopState.status = '已提交 ' + result.count + ' 件（图标 ' + result.icons + ' 张）。等 1-2 分钟 Actions 部署完成，刷新页面所有玩家就能看到。';
+      })
+      .catch((error: unknown) => { workshopState.status = '发布失败：' + (error instanceof Error ? error.message : '未知错误'); })
+      .finally(() => render());
+  },
   'workshop-export': () => {
     downloadJson(exportCustomAccessories());
     workshopState.message = '已导出 custom-accessories.json';
@@ -1839,6 +1865,7 @@ window.addEventListener('blur', clearHeldMovement);
 document.addEventListener('input', (event) => {
   const el = event.target as HTMLInputElement | HTMLSelectElement | null;
   if (!el || !document.querySelector('.workshop-modal')) return;
+  if (el.hasAttribute('data-ws-token')) { workshopState.token = (el as HTMLInputElement).value; return; }
   const field = el.getAttribute('data-acc');
   if (field) { updateDraftField(field as never, el.value); return; }
   const modKey = el.getAttribute('data-acc-mod-key');

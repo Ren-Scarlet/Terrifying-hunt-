@@ -1,4 +1,5 @@
 import { ACCESSORIES, ACCESSORY_MAP } from './data/accessories';
+import publishedRaw from './data/published-accessories.json';
 import type { AccessoryDef } from './types';
 
 /**
@@ -12,6 +13,37 @@ import type { AccessoryDef } from './types';
  */
 
 const KEY = 'nightfall-custom-accessories-v1';
+const HIDDEN_KEY = 'nightfall-custom-accessories-hidden-v1';
+
+/** 已发布（写进仓库）的配件：随构建进游戏，所有人可见。 */
+const PUBLISHED: AccessoryDef[] = (Array.isArray(publishedRaw) ? publishedRaw : []).filter(isAccessoryDef);
+
+function loadHiddenIds(): string[] {
+  try {
+    const raw = localStorage.getItem(HIDDEN_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+function persistHiddenIds(ids: string[]): void {
+  try { localStorage.setItem(HIDDEN_KEY, JSON.stringify(ids)); } catch { /* 忽略 */ }
+}
+
+export function isPublishedAccessory(id: string): boolean {
+  return PUBLISHED.some((def) => def.id === id);
+}
+
+/** 已发布 + 本地自定义（同 id 本地优先），并排除本地隐藏掉的。 */
+export function allCustomAccessories(): AccessoryDef[] {
+  const hidden = new Set(loadHiddenIds());
+  const map = new Map<string, AccessoryDef>();
+  for (const def of PUBLISHED) if (!hidden.has(def.id)) map.set(def.id, def);
+  for (const def of loadCustomAccessories()) map.set(def.id, def);
+  return [...map.values()];
+}
 
 /** 当前这批自定义配件的 id，删改时用来定位。 */
 const customIds = new Set<string>();
@@ -68,8 +100,18 @@ export function customAccessoryList(): AccessoryDef[] {
   return ACCESSORIES.filter((def) => customIds.has(def.id));
 }
 
+/** 全部自定义（含已发布），供发布用。 */
+export function customAccessoriesForPublish(): AccessoryDef[] {
+  return allCustomAccessories();
+}
+
 /** 从注册表里删掉一件自定义配件（内置的删不掉）。 */
 export function removeCustomAccessory(id: string): AccessoryDef[] {
+  if (isPublishedAccessory(id)) {
+    const hidden = loadHiddenIds();
+    if (!hidden.includes(id)) hidden.push(id);
+    persistHiddenIds(hidden);
+  }
   const next = customAccessoryList().filter((def) => def.id !== id);
   applyCustomAccessories(next);
   persistCustomAccessories(next);
@@ -87,7 +129,7 @@ export function upsertCustomAccessory(def: AccessoryDef): AccessoryDef[] {
 
 /** 启动时调用：读 localStorage 并注册。 */
 export function bootCustomAccessories(): void {
-  applyCustomAccessories(loadCustomAccessories());
+  applyCustomAccessories(allCustomAccessories());
 }
 
 /** 导出成 JSON 文本（给「导出」按钮用）。 */

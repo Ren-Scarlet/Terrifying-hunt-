@@ -563,6 +563,8 @@ function personSlotStyle(roomId: RoomId, personId: string, index: number): strin
     const reachable = canMoveTo(state, room.id);
     const blinkSelectable = state.nurseBlinkTargeting && blinkWithinRange(state, room.id);
     const locked = isLocked(state, room.id);
+    // 电子门锁：从门外看不到里面的东西（家具、幸存者、描述都不显示）
+    const lockedHidden = locked && !isPlayer;
     const barricaded = state.barricades.includes(room.id);
     const cost = moveCost(state, room.id);
     const adjacent = ROOM_MAP[state.playerRoom].neighbors.includes(room.id);
@@ -612,13 +614,15 @@ function personSlotStyle(roomId: RoomId, personId: string, index: number): strin
                       ? '<span class="room-tag short">行动点不足</span>'
                       : ''}
         </div>
-        ${explored
-          ? `<div class="room-desc">${escape(room.desc)}</div>
-             <div class="room-features">${roomFeatures(state, room.id)}</div>`
-          : `<div class="room-unknown">未探索</div>
-             <div class="room-features">${roomFeatures(state, room.id)}</div>`}
+        ${lockedHidden
+          ? `<div class="room-unknown">门锁挡住了视线</div>`
+          : explored
+            ? `<div class="room-desc">${escape(room.desc)}</div>
+               <div class="room-features">${roomFeatures(state, room.id)}</div>`
+            : `<div class="room-unknown">未探索</div>
+               <div class="room-features">${roomFeatures(state, room.id)}</div>`}
         <div class="room-people ${adjacent && people.length ? 'adjacent-survivors' : ''}">
-          ${people.map((p) => p.hp <= 0 && p.room === state.playerRoom && !state.carryPersonId
+          ${lockedHidden ? '' : people.map((p) => p.hp <= 0 && p.room === state.playerRoom && !state.carryPersonId
             ? `<div class="map-person-wrap ${currentScore(state) >= SCORE_EXECUTION_THRESHOLD ? 'score-unlocked' : ''}" style="${personSlotStyle(room.id, p.id, people.indexOf(p))}">${personChip(p, false, false, undefined, !isRoomLit(state, p.room))}
                 <div class="person-world-actions">
                   ${currentScore(state) >= SCORE_EXECUTION_THRESHOLD ? `<button class="btn score-execution-btn" data-action="execute-score-special" data-person-id="${p.id}" ${scoreExecutionBlockReason(state, p.id) ? 'disabled' : ''} title="分数处决：猎杀评分达到 ${SCORE_EXECUTION_THRESHOLD} 分后解锁，消耗 1 AP 并触发 QTE">分数处决 · QTE</button>` : ''}
@@ -634,8 +638,8 @@ function personSlotStyle(roomId: RoomId, personId: string, index: number): strin
                 !isRoomLit(state, p.room),
                 personSlotStyle(room.id, p.id, people.indexOf(p)),
               )).join('')}
-          ${police ? personChip(police) : ''}
-          ${ghosts.map(() => '<span class="ghost-chip" title="最后确认位置：人可能已经走了">?</span>').join('')}
+          ${lockedHidden ? '' : (police ? personChip(police) : '')}
+          ${lockedHidden ? '' : ghosts.map(() => '<span class="ghost-chip" title="最后确认位置：人可能已经走了">?</span>').join('')}
         </div>
         ${sensed ? `<div class="room-shadows" title="你感觉到这里有人，但看不清是谁">${shadowFigures(sensed)}</div>` : ''}
       </div>

@@ -3879,3 +3879,20 @@ button, .room-hit, .hand-row { touch-action: manipulation; }
 .ws-row-body em { font-size: 10px; font-style: normal; color: #c99a7a; }
 .ws-row-actions { display: flex; gap: 6px; }
 @media (max-width: 860px) { .ws-grid { grid-template-columns: 1fr 1fr; } }
+
+/* 配件工坊：发布到仓库 */
+.ws-publish {
+  display: flex; flex-direction: column; gap: 6px;
+  margin-bottom: 14px; padding: 10px 12px;
+  border: 1px solid #3a322b; border-radius: 4px;
+  background: rgba(18, 12, 10, .5);
+}
+.ws-publish b { font-size: 13px; color: #f0dcc8; }
+.ws-publish span { font-size: 11px; color: #9a8d84; line-height: 1.6; }
+.ws-publish-row { display: flex; gap: 8px; }
+.ws-publish-row input {
+  flex: 1; padding: 6px 8px;
+  border: 1px solid #3a322b; border-radius: 3px;
+  background: #0d0b0a; color: #e8ddd2; font-size: 12px;
+}
+.ws-status { min-height: 16px; margin: 0; font-size: 11px; color: #ffd9a8; }

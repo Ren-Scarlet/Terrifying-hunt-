@@ -1,6 +1,6 @@
 import { ACCESSORIES, ACCESSORY_RARITY_LABEL, accessoryPrice } from '../game/data/accessories';
 import { ACCESSORY_MAP } from '../game/data/accessories';
-import { customAccessoryList, isCustomAccessory, exportCustomAccessories } from '../game/customContent';
+import { customAccessoryList, isCustomAccessory, isPublishedAccessory, exportCustomAccessories } from '../game/customContent';
 import { MOD_KEYS, modifierLabel } from '../game/modifiers';
 import { ACTIVE_KILLERS } from '../game/data/killers';
 import type { AccessoryDef, AccessoryMod, AccessoryRarity } from '../game/types';
@@ -19,9 +19,11 @@ export interface WorkshopState {
   editing: AccessoryDef | null;
   isNew: boolean;
   message: string;
+  token: string;
+  status: string;
 }
 
-export const workshopState: WorkshopState = { editing: null, isNew: false, message: '' };
+export const workshopState: WorkshopState = { editing: null, isNew: false, message: '', token: '', status: '' };
 
 const RARITIES = Object.keys(ACCESSORY_RARITY_LABEL) as AccessoryRarity[];
 
@@ -101,7 +103,7 @@ export function renderWorkshop(): string {
       ${addonIconHtml(def.id, def.rarity, 'card')}
       <div class="ws-row-body">
         <b>${escape(def.name)}</b>
-        <small>${escape(def.owner)} · ${ACCESSORY_RARITY_LABEL[def.rarity]} · <code>${escape(def.id)}</code>${custom.has(def.id) ? ' · 自定义' : ''}</small>
+        <small>${escape(def.owner)} · ${ACCESSORY_RARITY_LABEL[def.rarity]} · <code>${escape(def.id)}</code>${custom.has(def.id) ? ' · 自定义' : ''}${isPublishedAccessory(def.id) ? ' · 已发布' : ''}</small>
         <span>${escape(def.desc)}</span>
         <em>${def.mods.map((mod) => `${modifierLabel(mod.key)} ${mod.value > 0 ? '+' : ''}${mod.value}`).join(' · ') || '无效果'}</em>
       </div>
@@ -126,6 +128,16 @@ export function renderWorkshop(): string {
           <button class="btn ghost" data-action="workshop-close">返回大厅</button>
         </div>
         ${workshopState.editing ? editorHtml(workshopState.editing, workshopState.isNew) : ''}
+        <div class="ws-publish">
+          <b>发布到仓库</b>
+          <span>把自定义配件写进 GitHub 仓库，Actions 部署后所有玩家可见（图标会存成 public/assets/custom/*.png）</span>
+          <div class="ws-publish-row">
+            <input id="wsToken" type="password" autocomplete="off" placeholder="粘贴 GitHub Fine-grained Token（Contents: Read and write）" data-ws-token>
+            <button class="btn mini" data-action="workshop-login">验证密钥</button>
+            <button class="btn mini primary" data-action="workshop-publish">发布</button>
+          </div>
+          <p class="ws-status">${escape(workshopState.status)}</p>
+        </div>
         <div class="ws-list">${rows}</div>
       </div>
     </div>

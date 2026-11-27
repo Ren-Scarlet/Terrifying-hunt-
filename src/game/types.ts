@@ -159,6 +159,8 @@ export interface AccessoryDef {
   mods: AccessoryMod[];
   /** 作者自定义配件：上传图标后以 dataURL 存这里（内置配件为空） */
   iconData?: string;
+  /** 已发布配件：图标文件路径（public/assets/custom/...） */
+  iconPath?: string;
 }
 
 export type PersonRole = 'target' | 'civilian' | 'police';

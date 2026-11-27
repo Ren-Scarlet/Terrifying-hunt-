@@ -4004,8 +4004,8 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
 #app.immersive-game:not(.mobile-game-active) .room-features .room-feature.totem.cursed.lit .ui-icon,
 #app.immersive-game:not(.mobile-game-active) .room-features .room-feature.escape-npc .ui-icon,
 #app.immersive-game:not(.mobile-game-active) .room-features .room-feature.crow-room.triggered .ui-icon {
-  filter: sepia(1) saturate(9) hue-rotate(-32deg) brightness(1.4)
-    drop-shadow(0 0 7px rgba(255, 45, 32, .95)) drop-shadow(0 0 16px rgba(255, 40, 28, .55)) !important;
+  /* 保持原始素材颜色，只加红色光晕（作者要求：不要改色） */
+  filter: drop-shadow(0 0 4px rgba(255, 45, 32, .95)) drop-shadow(0 0 11px rgba(255, 40, 28, .6)) !important;
 }
 #app.immersive-game:not(.mobile-game-active) .room-features .room-feature.totem.cursed.lit b,
 #app.immersive-game:not(.mobile-game-active) .room-features .room-feature.escape-npc b,

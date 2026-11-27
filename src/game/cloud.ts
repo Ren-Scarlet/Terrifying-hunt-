@@ -74,3 +74,60 @@ export async function saveCloudConfig(config: CloudConfig): Promise<void> {
     throw new Error('上传云端失败（HTTP ' + response.status + '）：' + (detail.message ?? '未知错误'));
   }
 }
+
+/* ==========================================================================
+   配件发布：把工坊做的配件写回仓库（commit 到 main，Actions 部署后全员可见）
+   ========================================================================== */
+const ACCESSORY_PUBLISH_PATH = 'src/game/data/published-accessories.json';
+const ACCESSORY_ICON_DIR = 'public/assets/custom';
+
+async function putRepoFile(path: string, contentBase64: string, message: string): Promise<void> {
+  if (!githubToken || githubLogin !== REPO_OWNER) throw new Error('请先在平衡调整里验证 GitHub 管理密钥。');
+  const url = 'https://api.github.com/repos/' + REPO_OWNER + '/' + REPO_NAME + '/contents/' + path;
+  const headers = { ...apiHeaders(), 'Content-Type': 'application/json' };
+  const current = await fetch(url + '?ref=' + BRANCH, { headers });
+  let sha: string | undefined;
+  if (current.ok) {
+    const file = await current.json() as { sha?: string };
+    sha = file.sha;
+  } else if (current.status !== 404) {
+    throw new Error('检查 ' + path + ' 失败（HTTP ' + current.status + '）');
+  }
+  const body: Record<string, string> = { message, content: contentBase64, branch: BRANCH };
+  if (sha) body.sha = sha;
+  const response = await fetch(url, { method: 'PUT', headers, body: JSON.stringify(body) });
+  if (!response.ok) {
+    const detail = await response.json().catch(() => ({})) as { message?: string };
+    if (response.status === 401 || response.status === 403) throw new Error('GitHub 拒绝写入：请确认密钥有 Contents: Read and write 权限。');
+    if (response.status === 409 || response.status === 422) throw new Error('仓库文件冲突，请刷新后重试。');
+    throw new Error('上传 ' + path + ' 失败（HTTP ' + response.status + '）：' + (detail.message ?? '未知错误'));
+  }
+}
+
+export interface PublishResult { count: number; icons: number }
+
+/** 把配件列表发布进仓库：图标单独存成文件，JSON 里只留路径。 */
+export async function publishAccessoryPack(defs: Array<Record<string, unknown>>): Promise<PublishResult> {
+  const cleaned: Array<Record<string, unknown>> = [];
+  let icons = 0;
+  for (const def of defs) {
+    const copy: Record<string, unknown> = { ...def };
+    const iconData = typeof copy.iconData === 'string' ? copy.iconData : '';
+    const match = /^data:image\/(png|jpeg|jpg|webp);base64,(.+)$/.exec(iconData);
+    if (match) {
+      const ext = match[1] === 'jpeg' ? 'jpg' : match[1];
+      const path = ACCESSORY_ICON_DIR + '/' + String(copy.id) + '.' + ext;
+      await putRepoFile(path, match[2], 'assets: accessory icon ' + copy.id);
+      copy.iconPath = 'assets/custom/' + String(copy.id) + '.' + ext;
+      delete copy.iconData;
+      icons += 1;
+    }
+    cleaned.push(copy);
+  }
+  await putRepoFile(
+    ACCESSORY_PUBLISH_PATH,
+    encodeBase64Utf8(JSON.stringify(cleaned, null, 2)),
+    'data: publish custom accessories (' + cleaned.length + ')',
+  );
+  return { count: cleaned.length, icons };
+}
