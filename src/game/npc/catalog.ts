@@ -36,7 +36,6 @@ export const GOAL_LABEL: Record<NpcGoal, string> = {
   weapon: '想找东西反抗',
   panic: '只想活下去',
   help: '想救同伴',
-  key: '在找后门钥匙',
   supply: '想去道具箱找点能用的',
   routine: '按自己的习惯活动',
 };
