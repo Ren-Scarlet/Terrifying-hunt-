@@ -90,6 +90,7 @@ function contractDefinitions(): ContractDefinition[] {
       reward: 180,
       targetCount: 0,
       tasks: [
+        { id: 'primary-score-threshold', kind: 'score_threshold', label: '主目标：猎杀评分达到 200', target: 200, reward: 0 },
         { id: 'primary-score-execution', kind: 'score_execute', label: '主目标：完成 1 次分数处决', target: 1, reward: 0 },
         { id: 'primary-score-kills', kind: 'kill_count', label: '主目标：至少击杀 2 名幸存者', target: 2, reward: 0 },
       ],
