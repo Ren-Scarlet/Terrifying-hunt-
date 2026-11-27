@@ -157,8 +157,6 @@ export function createGame(
     hexNoedActive: false,
     hexNoedBonusGranted: false,
     distressingActive: false,
-    hexRuinActive: false,
-    hexRuinUsed: false,
     totems: [...TOTEM_ROOMS],
     totemInteractions: [],
     bonusEnergyNextTurn: 0,
