@@ -1662,8 +1662,12 @@ function actByArchetype(state: GameState, person: Person): void {
   const inPursuit = (person.alert >= 40 || state.chaseTargetId === person.id) && roomDistance(person.room, state.playerRoom) <= 2;
   if (counterArchetype && inPursuit && !state.barricades.includes(person.room) && random() < 0.72) {
     const blockedRoom = person.room;
+    const alertBeforeEscape = person.alert;
     barricadeRoom(state, person);
-    if (fleeAway(state, person)) person.movesThisTurn = Math.min(REACT_MOVE_CAP, person.movesThisTurn + 1);
+    if (fleeAway(state, person)) {
+      person.movesThisTurn = Math.min(REACT_MOVE_CAP, person.movesThisTurn + 1);
+      person.alert = Math.max(person.alert, alertBeforeEscape);
+    }
     person.activity = `放倒家具阻挡追击后逃离${roomName(blockedRoom)}`;
     log(state, `${person.name} 趁你追近时猛地放倒家具堵住门口，转身逃向远处！`);
     return;
