@@ -70,4 +70,8 @@ export interface NpcHost {
   getChasedId(): string | null;
   /** 结束这一局（胜负结算） */
   finish(state: GameState, result: 'win' | 'caught' | 'timeout' | 'failed'): void;
+  /** 报警成功：暴露度大涨、警察赶来 */
+  finishCall(state: GameState, person: Person, device: string): void;
+  /** 目击者对暴露度的贡献（受布局牌削弱） */
+  witnessWanted(state: GameState, base: number): number;
 }
