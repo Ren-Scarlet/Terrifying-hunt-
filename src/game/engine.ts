@@ -49,6 +49,10 @@ import {
   standingPeople as standing,
 } from './world/roomState';
 export { isLocked, isRoomLit, lockedRoomsOf } from './world/roomState';
+import { canMoveTo, moveBlockReason, moveCost } from './world/movement';
+import { phoneWorks, workingPhones } from './world/phones';
+export { canMoveTo, moveBlockReason, moveCost } from './world/movement';
+export { phoneWorks, workingPhones } from './world/phones';
 import { SURVIVOR_MAP } from './survivors';
 import type {
   Archetype,
@@ -347,21 +351,6 @@ function witnessWanted(state: GameState, base: number): number {
 }
 
 export { roomName };
-
-/**
- * 本局随机布置的电话：只有「这间房有电话 + 没被砸坏 + 线路没被整体切断」时可用。
- * 电话位置在 setup.ts 里每局随机抽取，不再写死 study/hall。
- */
-export function phoneWorks(state: GameState, room: RoomId): boolean {
-  return (state.phones ?? []).includes(room)
-    && !(state.brokenPhones ?? []).includes(room)
-    && !state.phoneCut;
-}
-
-/** 所有还能用的电话房间 */
-export function workingPhones(state: GameState): RoomId[] {
-  return (state.phones ?? []).filter((room) => phoneWorks(state, room));
-}
 
 /** 玩家砸坏当前房间的电话：1 AP，只影响这一部，不封死全图通讯。 */
 export function breakPhone(state: GameState): boolean {
@@ -2831,54 +2820,9 @@ export function effectiveCost(defId: string, state: GameState): number {
   return Math.max(0, card.cost - state.discount);
 }
 
-/**
- * 移动到某房间要花几点行动点。
- * 地图固定木板与幸存者放下的木板都会封门；迈尔斯恶魔附身可直接撞碎固定木板。
- */
-export function moveCost(state: GameState, room: RoomId): number {
-  // 恶魔附身能直接撞开障碍物，不额外花行动点
-  const stalkingSlowdown = state.killer === '迈克尔·迈尔斯' && state.myersStalking ? 1 : 0;
-  return 1 + stalkingSlowdown;
-}
-
-/**
- * 为什么走不进这个房间：返回 null 表示可以走。
- *
- * 纯查询：不扣行动点、不掷搬运检定、不撞木板。UI 的悬停提示和点击拦截都用它，
- * 这样「点了没反应」可以变成一句具体的原因，而不是静默失败。
- */
-export function moveBlockReason(state: GameState, room: RoomId): string | null {
-  if (state.phase !== 'playing') return '现在还不能行动。';
-  if (room === state.playerRoom) return '你已经在这个房间了。';
-  const adjacent = ROOM_MAP[state.playerRoom].neighbors.includes(room);
-  if (!adjacent && !state.freeMove) return `${roomName(room)}不相邻：只能一间一间走过去。`;
-  if (state.barricades.includes(room)) return `${roomName(room)}门口堆着木板，先点「破坏木板」。`;
-  if (isLocked(state, room)) return `${roomName(room)}的门被锁住了。`;
-  if (isLocked(state, state.playerRoom)) return '你所在的房间被锁住了，先想办法出去。';
-  if (isObstacle(room) && !state.clearedObstacles.includes(room) && !state.possessed) {
-    return `${roomName(room)}入口被木板封住，先破坏木板。`;
-  }
-  const cost = state.freeMove ? 0 : moveCost(state, room);
-  if (state.energy < cost) return `行动点不够：进入${roomName(room)}需要 ${cost} 点。`;
-  return null;
-}
-
 /** 把一句话写进对局日志：给界面做即时反馈用（例如点击了走不进去的房间）。 */
 export function noteToPlayer(state: GameState, text: string): void {
   log(state, text);
-}
-
-export function canMoveTo(state: GameState, room: RoomId): boolean {
-  if (state.phase !== 'playing') return false;
-  if (room === state.playerRoom) return false;
-  // freeMove 是卡牌 / 能力买来的特权：无视相邻限制，而且这一步不耗行动点
-  const cost = state.freeMove ? 0 : moveCost(state, room);
-  if (state.energy < cost) return false;
-  if (state.barricades.includes(room)) return false;
-  if (isObstacle(room) && !state.clearedObstacles.includes(room) && !state.possessed) return false;
-  if (state.freeMove) return !isLocked(state, room) && !isLocked(state, state.playerRoom);
-  if (isLocked(state, room) || isLocked(state, state.playerRoom)) return false;
-  return ROOM_MAP[state.playerRoom].neighbors.includes(room);
 }
 
 /**

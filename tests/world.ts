@@ -7,6 +7,7 @@
  * 运行：npm run check
  */
 import { STARTING_DECK } from '../src/game/data/cards';
+import { ROOM_MAP } from '../src/game/rooms';
 import { createGame } from '../src/game/setup';
 import {
   cabinetRoomsFor,
@@ -18,6 +19,8 @@ import {
   peopleInRoom,
   standingPeople,
 } from '../src/game/world/roomState';
+import { canMoveTo, moveBlockReason, moveCost } from '../src/game/world/movement';
+import { phoneWorks, workingPhones } from '../src/game/world/phones';
 
 let pass = 0;
 let fail = 0;
@@ -102,6 +105,53 @@ check('巴德姆幼儿园额外开放玩具仓库 / 值班室 / 幼儿教室',
 check('其他地图不额外开放这三间',
   !['guestroom'].some((room) => midwichRooms.includes(room as never)),
   `rooms=${midwichRooms.join(',')}`);
+
+/* ---------------- 电话 ---------------- */
+
+const phoneGame = createGame(STARTING_DECK, undefined, '设陷者');
+const phoneRoom = phoneGame.phones[0];
+check('默认布局：电话可用', phoneWorks(phoneGame, phoneRoom), `room=${phoneRoom}`);
+phoneGame.brokenPhones = [phoneRoom];
+check('砸坏的房间不再可用', !phoneWorks(phoneGame, phoneRoom), `room=${phoneRoom}`);
+check('workingPhones 不会列出被砸坏的电话',
+  !workingPhones(phoneGame).includes(phoneRoom), `working=${workingPhones(phoneGame).join(',')}`);
+phoneGame.brokenPhones = [];
+phoneGame.phoneCut = true;
+check('整条线路被切断：所有电话失效', workingPhones(phoneGame).length === 0, 'phoneCut');
+
+/* ---------------- 移动 ---------------- */
+
+const moveGame = createGame(STARTING_DECK, undefined, '设陷者');
+const inside = moveGame.playerRoom;
+check('站在自己的房间：不能移动到原地',
+  moveBlockReason(moveGame, inside) === '你已经在这个房间了。', `room=${inside}`);
+
+const nextRoom = ROOM_MAP[inside].neighbors.find((room) => room !== 'storage' && room !== 'basement')
+  ?? ROOM_MAP[inside].neighbors[0];
+check('相邻房间：行动点够时可以走', moveBlockReason(moveGame, nextRoom) === null && canMoveTo(moveGame, nextRoom),
+  `room=${nextRoom}`);
+check('默认走一步 1 点', moveCost(moveGame, nextRoom) === 1, `cost=${moveCost(moveGame, nextRoom)}`);
+
+moveGame.energy = 0;
+check('行动点不够时给出原因', (moveBlockReason(moveGame, nextRoom) ?? '').includes('行动点不够'),
+  `reason=${moveBlockReason(moveGame, nextRoom)}`);
+moveGame.energy = 4;
+
+moveGame.barricades = [nextRoom];
+check('门口有木板：不能直接走', (moveBlockReason(moveGame, nextRoom) ?? '').includes('木板'),
+  `reason=${moveBlockReason(moveGame, nextRoom)}`);
+moveGame.barricades = [];
+
+moveGame.roomLocks = { [nextRoom]: 3 };
+check('门被锁住：不能走', (moveBlockReason(moveGame, nextRoom) ?? '').includes('门被锁住了'),
+  `reason=${moveBlockReason(moveGame, nextRoom)}`);
+moveGame.roomLocks = {};
+
+moveGame.killer = '迈克尔·迈尔斯';
+moveGame.myersStalking = true;
+check('迈尔斯尾随模式：走一步要 2 点', moveCost(moveGame, nextRoom) === 2,
+  `cost=${moveCost(moveGame, nextRoom)}`);
+moveGame.myersStalking = false;
 
 console.log(`\n世界查询 ${pass} 通过 / ${fail} 失败`);
 if (fail > 0) process.exitCode = 1;
