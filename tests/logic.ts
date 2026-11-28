@@ -10,7 +10,6 @@ import {
   BLEEDOUT_TURNS,
   blinkPlayer,
   canPlaceBarricade,
-  collectTrapCache,
   refillHuntressHatchets,
   throwHuntressHatchet,
   HAND_LIMIT,
@@ -80,7 +79,7 @@ import {
   nextStepToward,
   updateNpcDialogue,
 } from '../src/game/engine';
-import { CABINET_ROOMS, OBSTACLE_ROOMS, PHONE_ROOMS, RADIO_ROOMS, ROOM_MAP, ROOMS, buildLayout, doorMarkerPosition, layoutAspect } from '../src/game/rooms';
+import { CABINET_ROOMS, OBSTACLE_ROOMS, PHONE_ROOMS, ROOM_MAP, ROOMS, buildLayout, doorMarkerPosition, layoutAspect } from '../src/game/rooms';
 import { cardImage } from '../src/game/assetMap';
 import { readdirSync } from 'node:fs';
 import { getKiller, personChip, personDetailHtml } from '../src/ui/render/shared';
@@ -193,15 +192,10 @@ function casePhoneLineCoordination(): void {
   const adjacentRoom = ROOM_MAP.hall.neighbors[0];
   s.phoneCut = true;
   check('电话线：剪断后仍可在同屋协调救援', canCoordinateRescue(s, 'hall', 'hall'));
-  check('电话线：无线电正常时保留有限远程协调（3 格内）',
+  check('电话线：剪断后仍保留有限远程协调（3 格内）',
     canCoordinateRescue(s, 'hall', adjacentRoom) &&
     (!farRoom || !canCoordinateRescue(s, 'hall', farRoom)),
-    '备用无线电范围为 3 格');
-  s.sabotage.push('radio');
-  check('电话线与无线电都被破坏时，只能同屋或相邻呼救',
-    canCoordinateRescue(s, 'hall', adjacentRoom) &&
-    (!farRoom || !canCoordinateRescue(s, 'hall', farRoom)),
-    '无线电失效后协调范围缩至 1 格');
+    '协调范围为 3 格');
   s.phoneCut = false;
   check('电话线路正常时恢复全屋远程救援协调',
     !farRoom || canCoordinateRescue(s, 'hall', farRoom));
@@ -487,8 +481,6 @@ function caseMyersStalkingAndFearRadius(): void {
   check('设陷者：陷阱可在室外和已有陷阱的房间连续布设',
     firstFreePlacement && secondFreePlacement && unrestrictedTrapper.bearTraps.filter((trap) => trap.room === 'garden' && trap.armed).length === 2 &&
     unrestrictedTrapper.trapInventory === 0 && unrestrictedTrapper.energy === 2);
-  check('设陷者：地图随机生成额外捕兽夹补给点',
-    trapper.trapCaches.length === 2, `caches=${trapper.trapCaches.length}`);
   const trappedPerson = player(trapper);
   trappedPerson.room = trapRoom;
   trappedPerson.hp = 4;
@@ -512,14 +504,6 @@ function caseMyersStalkingAndFearRadius(): void {
   endTurn(disarmGame);
   check('设陷者：发现陷阱的 NPC 会在自己的回合拆除陷阱',
     !disarmGame.bearTraps[0].armed && disarmGame.trapTriggerCount === 0);
-
-  if (trapper.trapCaches.length) {
-    trapper.playerRoom = trapper.trapCaches[0];
-    trapper.energy = 4;
-    const beforeCache = trapper.trapInventory;
-    check('设陷者：可以在地图补给点收集额外捕兽夹',
-      collectTrapCache(trapper) && trapper.trapInventory === beforeCache + 1);
-  }
 
   const trapperCardPool = deckCardsForKiller('设陷者').map((card) => card.id);
   check('设陷者：三张专属卡只加入设陷者卡池',
@@ -1177,7 +1161,7 @@ function caseWitnessFearAndUnifiedSabotage(): void {
   const poweredDoorRooms = new Set((Object.keys(ROOM_MAP) as RoomId[]).filter((room) => isRoomLit(door, room)));
   const doorRoom = (Object.keys(ROOM_MAP) as RoomId[]).find((room) =>
     ROOM_MAP[room].neighbors.some((next) => poweredDoorRooms.has(next)) &&
-    !PHONE_ROOMS.includes(room) && !RADIO_ROOMS.includes(room) &&
+    !PHONE_ROOMS.includes(room) &&
     !door.powerCircuits.some((c) => c.breakerRoom === room),
   )!;
   door.playerRoom = doorRoom;
@@ -1829,11 +1813,17 @@ function caseNpcChapterOne(): void {
 
   const shots = newGame();
   const shooter = shots.people.find((person) => person.role === 'police')!;
+  shots.people = shots.people.filter((person) => person.role !== 'police' || person.id === shooter.id);
   shots.policeAssaulted = true;
   for (let i = 0; i < 3; i += 1) {
     shooter.room = shots.playerRoom;
+    shooter.hp = 6;
+    shooter.fear = 0;
     shooter.alert = 100;
     shots.energy = 4;
+    shots.lastCrimeRoom = shots.playerRoom;
+    shots.noiseRoom = shots.playerRoom;
+    shots.decoyRoom = null;
     endTurn(shots);
   }
   check('警察：累计三次枪击后跳过玩家一回合',

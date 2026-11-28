@@ -7,7 +7,7 @@ import { SURVIVOR_INJURED_HP } from '../constants';
 import { KILLER_MAP } from '../killers';
 import { roomDistance } from '../navigation';
 import { randomOf } from '../random';
-import { RADIO_ROOMS, ROOM_MAP } from '../rooms';
+import { ROOM_MAP } from '../rooms';
 import { SURVIVOR_MAP } from '../survivors';
 import type { Cond, Who } from '../effect';
 import type { GameState, Person } from '../types';
@@ -99,8 +99,7 @@ export function checkCond(host: NpcHost, state: GameState, cond: Cond): boolean 
     case 'currentDestructible': {
       const room = state.playerRoom;
       return state.powerCircuits.some((circuit) => circuit.breakerRoom === room && !circuit.broken)
-        || phoneWorks(state, room)
-        || (RADIO_ROOMS.includes(room) && !state.sabotage.includes('radio'));
+        || phoneWorks(state, room);
     }
     case 'flag':
       if (cond.key === 'phoneCut') return state.phoneCut;

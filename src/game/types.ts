@@ -221,7 +221,7 @@ export interface Person {
   downedTurns: number;
   /** 已经跑到逃生点的人，再待一回合就会真的逃出去（0 未开始，1 正在翻篱笆） */
   escapeProgress: number;
-  /** 打电话 / 用无线电的进度：电话 1 回合，无线电要 2 回合 */
+  /** 打电话报警的进度 */
   callTurns: number;
   /** 躲在柜子/床底：不搜出来就看不见，也吃不到大部分卡牌 */
   hidden: boolean;
@@ -503,14 +503,14 @@ export interface GameState {
   rewardCards: string[];
 
   phoneCut: boolean;
-  /** 设陷者的可布设捕兽夹、携带数量与地图补给点。 */
+  /** 设陷者的可布设捕兽夹与携带数量。 */
   bearTraps: BearTrap[];
   /** 本局捕兽夹触发次数；供界面播放一次尖叫音效。 */
   trapTriggerCount: number;
   /** 最近一次触发捕兽夹的幸存者 ID，供性别匹配的音效使用。 */
   lastTrapTriggerId: string | null;
   trapInventory: number;
-  trapCaches: RoomId[];
+
   /** 女猎手瞄准状态与当前剩余飞斧。 */
   huntressAiming: boolean;
   hatchets: number;

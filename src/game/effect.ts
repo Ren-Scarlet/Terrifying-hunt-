@@ -52,7 +52,7 @@ import type { RoomId } from './types';
  *   move       强制移动              { who, to, clearAlert? }
  *   teleportPlayer  把自己挪走        { to }
  *   lockRoom   锁住房间 N 回合        { room, turns }
- *   sabotage   破坏设施              { key: 'phone' | 'exit' | 'radio' | 'lights' }
+ *   sabotage   破坏设施              { key: 'phone' | 'exit' | 'lights' }
  *   flag       设置一个全局开关        { key, value? }
  *
  * —— 潜行与追击（把「进门就惊动」「跑了追不上」交给卡牌）——
@@ -127,7 +127,7 @@ export type FlagKey =
   | 'bleedNextHit'
   | 'noAttackTurn';
 
-export type SabotageKey = 'phone' | 'exit' | 'radio' | 'lights';
+export type SabotageKey = 'phone' | 'exit' | 'lights';
 
 /* ------------------------------------------------------------------ */
 /* 条件                                                                */

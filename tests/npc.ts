@@ -120,11 +120,8 @@ game.phoneCut = false;
 check('电话正常：多远都能协调', canCoordinateRescue(game, farPair![0], farPair![1]));
 game.phoneCut = true;
 game.sabotage = [];
-check('线路被剪、无线电正常：3 格内可协调', canCoordinateRescue(game, midPair![0], midPair![1]));
-check('线路被剪、无线电正常：超过 3 格无法协调', !canCoordinateRescue(game, farPair![0], farPair![1]));
-game.sabotage = ['radio'];
-check('无线电也被毁：相邻仍可协调', canCoordinateRescue(game, nearPair![0], nearPair![1]));
-check('无线电也被毁：隔两格就不行', !canCoordinateRescue(game, midPair![0], midPair![1]));
+check('线路被剪：3 格内仍可协调', canCoordinateRescue(game, midPair![0], midPair![1]));
+check('线路被剪：超过 3 格无法协调', !canCoordinateRescue(game, farPair![0], farPair![1]));
 
 /* ---------------- 潜行移动 ---------------- */
 

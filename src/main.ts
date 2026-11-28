@@ -10,7 +10,6 @@ import {
   carryPerson,
   dropCarriedPerson,
   blinkPlayer,
-  collectTrapCache,
   recoverBearTrap,
   refillHuntressHatchets,
   throwHuntressHatchet,
@@ -1209,11 +1208,6 @@ function createGameActions(): ActionTable {
         if (game.kills > killsBefore) playSurvivorDeath(SURVIVOR_MAP[personId]?.gender ?? 'male');
         lastLogHead = game.log[0] ?? '';
       }
-      afterAction();
-    },
-
-    'collect-trap': () => {
-      collectTrapCache(currentGame());
       afterAction();
     },
 

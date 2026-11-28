@@ -86,11 +86,10 @@ export function canPlaceBarricade(state: GameState, person: Person): boolean {
 
 /**
  * 电话线路承担跨区域求救协调。
- * 线路正常时，幸存者能远程得知倒地同伴的位置；剪断后只能依靠无线电有限协调，
- * 无线电也被破坏时，就只能响应同屋或相邻房间的呼救。
+ * 线路正常时，幸存者能远程得知倒地同伴的位置；剪断后只能响应 3 格内的呼救。
  */
 export function canCoordinateRescue(state: GameState, fromRoom: RoomId, downedRoom: RoomId): boolean {
   if (!state.phoneCut) return true;
-  const range = state.sabotage.includes('radio') ? 1 : 3;
+  const range = 3;
   return roomDistance(fromRoom, downedRoom) <= range;
 }

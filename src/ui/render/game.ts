@@ -56,7 +56,6 @@ import {
   CABINET_ROOMS,
   EXIT_ROOM,
   OBSTACLE_ROOMS,
-  RADIO_ROOMS,
   ROOM_MAP,
   ROOMS,
   TOTEM_ROOMS,
@@ -117,9 +116,6 @@ function roomFeatures(state: GameState, roomId: RoomId): string {
     const trapClass = triggeredCount ? 'triggered' : armedCount ? 'armed' : 'spent';
     parts.push(`<span class="room-feature bear-trap ${trapClass}" title="捕兽夹：${trapStatus}">${icon('bearTrap', 'ui-icon tiny')}<b>捕兽夹${placedTraps.length > 1 ? ` ×${placedTraps.length}` : ''}</b></span>`);
   }
-  if (state.trapCaches.includes(roomId)) {
-    parts.push('<span class="room-feature trap-cache" title="捕兽夹补给：设陷者可在此收集额外捕兽夹">＋<b>陷阱补给</b></span>');
-  }
   // 电话只在已探索过的房间显示：没进去过就不该知道那儿有线
   if (state.explored.includes(roomId) && (state.phones ?? []).includes(roomId)) {
     const phoneBroken = (state.brokenPhones ?? []).includes(roomId) || state.phoneCut;
@@ -128,10 +124,6 @@ function roomFeatures(state: GameState, roomId: RoomId): string {
     } else if (state.playerRoom === roomId) {
       parts.push(`<span class="feature-anchor"><span class="room-feature telephone on" title="这间屋子的电话还能用：幸存者会来这里报警">${icon('phone', 'ui-icon tiny')}<b>电话</b></span><button type="button" class="feature-action" data-action="break-phone" ${state.energy < 1 ? 'disabled' : ''} title="砸坏这间屋子的电话：1 AP">砸坏电话 · 1 AP</button></span>`);
     }
-  }
-  if (RADIO_ROOMS.includes(roomId)) {
-    const radioBroken = state.sabotage.includes('radio');
-    parts.push(`<span class="room-feature radio ${radioBroken ? 'broken' : 'on'}" title="备用无线电：${radioBroken ? '已被破坏' : '电话中断时可进行有限范围协调'}">▣<b>无线电</b></span>`);
   }
   const executionSites = executionMethodsAtRoom(roomId);
   if (executionSites.length) {
@@ -279,9 +271,8 @@ function huntOpportunityHtml(state: GameState): string {
 function facilityOverviewHtml(state: GameState): string {
   const darkCircuits = state.powerCircuits.filter((circuit) => circuit.broken || circuit.enabled === false).length;
   const itemBoxes = state.itemBoxes.filter((box) => !box.broken && box.charges > 0).length;
-  const radioBroken = state.sabotage.includes('radio');
   const killerSupplies = state.killer === '设陷者'
-    ? `<span class="facility-pill"><i>⚒</i><b>捕兽夹</b><strong>${state.trapInventory}/4 携带 · ${state.bearTraps.filter((trap) => trap.armed).length} 已布设 · ${state.trapCaches.length} 补给点</strong></span>`
+    ? `<span class="facility-pill"><i>⚒</i><b>捕兽夹</b><strong>${state.trapInventory}/4 携带 · ${state.bearTraps.filter((trap) => trap.armed).length} 已布设</strong></span>`
     : state.killer === '女猎手'
       ? `<span class="facility-pill"><i>➶</i><b>狩猎飞斧</b><strong>${state.hatchets}/${hatchetMax(state)}</strong></span>`
       : '';
@@ -292,7 +283,6 @@ function facilityOverviewHtml(state: GameState): string {
       <span class="facility-pill">${icon('generator', 'ui-icon tiny')}<b>电闸</b><strong>${darkCircuits} 组断电</strong></span>
       
       <span class="facility-pill ${state.phoneCut || (state.brokenPhones ?? []).length >= (state.phones ?? []).length ? 'offline' : ''}"><b>电话线</b><strong>${state.phoneCut ? '中断' : '正常'}</strong></span>
-      <span class="facility-pill ${radioBroken ? 'offline' : ''}"><i>▤</i><b>备用无线电</b><strong>${radioBroken ? '已破坏' : '可用'}</strong></span>
       ${killerSupplies}
     </div>
   </section>`;
@@ -303,13 +293,13 @@ function threatRowsHtml(state: GameState): string {
   const downed = state.people.filter((p) => p.role !== 'police' && p.hp <= 0);
   const atExit = alive.filter((p) => state.escapeRooms.includes(p.room));
   const leaving = alive.filter((p) => p.escapeProgress > 0);
-  const calling = alive.filter((p) => /电话|无线电/.test(p.activity));
+  const calling = alive.filter((p) => /电话/.test(p.activity));
   const caring = alive.filter((p) => /救|包扎|拖/.test(p.activity));
   const armed = alive.filter((p) => p.armed);
   const hiding = state.people.filter((p) => p.role !== 'police' && p.hidden);
   const rows: Array<{ name: string; count: number; hint: string; level: 'warn' | 'hot' }> = [];
   if (atExit.length || leaving.length) rows.push({ name: '逃生行动', count: atExit.length + leaving.length, hint: atExit.length ? atExit.length + ' 人已抵达逃生点，可能很快逃离。优先封锁出口或拦截。' : leaving.length + ' 人正在前往逃生点，查看地图上的逃生路线。', level: atExit.length ? 'hot' : 'warn' });
-  if (calling.length) rows.push({ name: '通讯求救', count: calling.length, hint: state.phoneCut ? '电话线路已中断；正在尝试无线电或寻找其他求救途径。' : '有人正在使用电话或无线电。破坏通讯设施可以打断这次求救。', level: 'hot' });
+  if (calling.length) rows.push({ name: '通讯求救', count: calling.length, hint: state.phoneCut ? '电话线路已中断；幸存者只能挨家挨户敲门求救。' : '有人正在使用电话。破坏电话可以打断这次求救。', level: 'hot' });
   if (downed.length) rows.push({ name: '救援风险', count: downed.length, hint: caring.length ? caring.length + ' 人正在救援或治疗倒地同伴。隔离救援者，或及时处决目标。' : downed.length + ' 人倒地，暂时无人救援；同伴仍可能改变行动前来营救。', level: caring.length ? 'hot' : 'warn' });
   if (armed.length) rows.push({ name: '武装反抗', count: armed.length, hint: armed.length + ' 名幸存者持有武器，近身接触可能让你失去行动点。考虑伏击或远程手段。', level: armed.length > 1 ? 'hot' : 'warn' });
   if (hiding.length) rows.push({ name: '藏匿目标', count: hiding.length, hint: hiding.length + ' 人藏在柜子或床底，需要搜索所在房间才能发现。', level: 'warn' });
@@ -810,7 +800,7 @@ function personSlotStyle(roomId: RoomId, personId: string, index: number): strin
   const possessed = state.possessed;
   const sabotageReason = sabotageBlockReason(state);
   const lockedDoor = ROOM_MAP[state.playerRoom].neighbors.find((room) => isLocked(state, room));
-  const sabotageHere = state.powerCircuits.some((c) => c.breakerRoom === state.playerRoom && !c.broken) ? '破坏现场设施' : phoneWorks(state, state.playerRoom) ? '砸坏电话' : RADIO_ROOMS.includes(state.playerRoom) && !state.sabotage.includes('radio') ? '破坏备用无线电' : lockedDoor ? `撞开通往${roomName(lockedDoor)}的门锁` : '破坏现场设施';
+  const sabotageHere = state.powerCircuits.some((c) => c.breakerRoom === state.playerRoom && !c.broken) ? '破坏现场设施' : phoneWorks(state, state.playerRoom) ? '砸坏电话' : lockedDoor ? `撞开通往${roomName(lockedDoor)}的门锁` : '破坏现场设施';
   const sabotageTitle = sabotageReason ?? `${sabotageHere}。消耗 ${SABOTAGE_COST} 点行动点；强行破门会惊动屋内的人。`;
   const sabotageMeta = sabotageReason ? escape(sabotageReason) : `${SABOTAGE_COST} 点 · ${sabotageHere}`;
   // 破坏类操作已经做成房间点位上的互动标记，底部不再保留「破坏」按钮。
@@ -847,9 +837,6 @@ function personSlotStyle(roomId: RoomId, personId: string, index: number): strin
       </div>`
     : '';
   const carryStatus = carried ? `<div class="status-badge carrying">抱着 ${escape(carried.name)} · 搬运 ${state.carryDistance}/3 格</div>` : '';
-  const trapCacheBtn = state.killer === '设陷者' && state.trapCaches.includes(state.playerRoom)
-    ? `<button class="btn search" data-action="collect-trap" ${state.energy < 1 || state.trapInventory >= 4 ? 'disabled' : ''}>收集捕兽夹补给 · +1</button>`
-    : '';
   const trapRecoverBtn = state.killer === '设陷者' && state.bearTraps.some((trap) => trap.room === state.playerRoom && !trap.armed)
     ? `<button class="btn search" data-action="recover-trap" ${state.energy < 1 || state.trapInventory >= 4 ? 'disabled' : ''}>回收已触发捕兽夹</button>`
     : '';
@@ -941,7 +928,7 @@ function personSlotStyle(roomId: RoomId, personId: string, index: number): strin
               ${left <= 3 ? `<div class="stat turn-warning ${left <= 1 ? 'final' : ''}" title="契约回合快用完了：回合耗尽会直接判猎场终止"><b>${left}</b><small>剩余回合</small></div>` : ''}
               <div class="stat alarm-stat ${state.alarm >= 70 ? 'hot' : state.alarm >= 40 ? 'warm' : ''}" tabindex="0" role="note" aria-label="警报值说明">
   <b>${state.alarm}<i>/${ALARM_MAX}</i></b><div class="alarm-track"><span style="width:${state.alarm}%"></span></div><small>警报 ⓘ</small>
-  <span class="alarm-tooltip-content"><strong>警报值（0–100）</strong><br>上升：被幸存者目击或发现、攻击/处决、成功报警或呼救，以及部分破坏和卡牌效果；电话或无线电求救会大幅增加。<br>降低：每回合结束通常 −6；本回合没有新的暴露度增加时额外 −4；部分卡牌和环境事件也能降低。<br>阈值：达到 100 触发最终危机，并开放两个彼此最远的逃生点（普通杀手引来警察，灵异杀手迫使幸存者全面逃亡）。</span>
+  <span class="alarm-tooltip-content"><strong>警报值（0–100）</strong><br>上升：被幸存者目击或发现、攻击/处决、成功报警或呼救，以及部分破坏和卡牌效果；电话求救会大幅增加。<br>降低：每回合结束通常 −6；本回合没有新的暴露度增加时额外 −4；部分卡牌和环境事件也能降低。<br>阈值：达到 100 触发最终危机，并开放两个彼此最远的逃生点（普通杀手引来警察，灵异杀手迫使幸存者全面逃亡）。</span>
 </div>
               <div class="stat"><b>${state.kills}</b><small>击杀</small></div>
               <div class="stat survivor-count"><b>${state.people.filter((p) => p.role !== 'police' && p.hp > 0).length}/${state.survivorTotal}</b><small>存活</small></div>
@@ -975,7 +962,7 @@ function personSlotStyle(roomId: RoomId, personId: string, index: number): strin
               ${wipeBtn}
               ${searchBtn}
               ${lookBtn}
-              ${trapCacheBtn}${trapRecoverBtn}${hatchetRefillBtn}
+              ${trapRecoverBtn}${hatchetRefillBtn}
 
               <button class="btn search wait-action" data-action="wait" ${selectingDiscards || state.energy < 1 ? 'disabled' : ''} title="消耗 1 点行动点；幸存者各自行动一次，你继续观察当前房间与刚离开的房间。">等待 · 1 AP</button>
               <button class="btn primary end-turn" data-action="end-turn" ${selectingDiscards ? 'disabled' : ''}>结束回合</button>

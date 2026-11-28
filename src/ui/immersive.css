@@ -1191,8 +1191,6 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
 
 #app.immersive-game .floorplan .room-features .room-feature.breaker,
 #app.immersive-game .floorplan .room-features .room-feature.telephone,
-#app.immersive-game .floorplan .room-features .room-feature.radio,
-#app.immersive-game .floorplan .room-features .room-feature.trap-cache,
 #app.immersive-game .floorplan .room-features .room-feature.execution-site,
 #app.immersive-game .floorplan .room-features .room-feature.shrine,
 #app.immersive-game .floorplan .room-features .room-feature.trail-highlight {

@@ -8,7 +8,7 @@ import { SURVIVOR_INJURED_HP } from '../../constants';
 import { roomName } from '../../missions';
 import { roomDistance } from '../../navigation';
 import { random } from '../../random';
-import { RADIO_ROOMS } from '../../rooms';
+
 import type { GameState, Person } from '../../types';
 import { nextStepToward } from '../../world/pathfinding';
 import { peopleInRoom, npcPeople as npcs } from '../../world/roomState';
@@ -76,27 +76,12 @@ export function tryAidRun(host: NpcHost, state: GameState, person: Person): bool
   return true;
 }
 
-/** 求救型：打电话（1 回合）或用无线电（2 回合）报警 */
+/** 求救型：在电话旁报警 */
 export function tryCall(host: NpcHost, state: GameState, person: Person): boolean {
   if (person.blockedTurns > 0) return false;
-  const canPhone = phoneWorks(state, person.room);
-  const canRadio = !state.sabotage.includes('radio') && RADIO_ROOMS.includes(person.room);
-
-  if (canPhone) {
-    person.activity = '按住电话线的手指在抖';
-    return true;
-  }
-  if (canRadio) {
-    person.callTurns += 1;
-    if (person.callTurns >= 2) {
-      finishCall(host, state, person, '无线电');
-      return true;
-    }
-    person.activity = '在无线电前调频，还差一回合';
-    host.log(state, `${person.name} 正在调无线电，再有一回合就能把消息发出去。`);
-    return true;
-  }
-  return false;
+  if (!phoneWorks(state, person.room)) return false;
+  person.activity = '按住电话线的手指在抖';
+  return true;
 }
 
 export function finishCall(host: NpcHost, state: GameState, person: Person, device: string): void {

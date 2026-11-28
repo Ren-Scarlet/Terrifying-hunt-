@@ -50,7 +50,6 @@ import {
   EXIT_ROOM,
   OBSTACLE_ROOMS,
   POLICE_START,
-  RADIO_ROOMS,
   ROOM_MAP,
   ROOMS,
   TOTEM_ROOMS,
@@ -154,7 +153,6 @@ import { cancelAuraSelection as aiCancelAuraSelection, playCard as aiPlayCard, s
 import {
   blinkPlayer as aiBlinkPlayer,
   canUsePower as aiCanUsePower,
-  collectTrapCache as aiCollectTrapCache,
   powerBlockReason as aiPowerBlockReason,
   recoverBearTrap as aiRecoverBearTrap,
   refillHuntressHatchets as aiRefillHuntressHatchets,
@@ -837,8 +835,7 @@ export function runOps(state: GameState, ops: Op[]): void {
     destroyCurrentObject: (current) => {
       const room = current.playerRoom;
       const hasObject = current.powerCircuits.some((circuit) => circuit.breakerRoom === room && !circuit.broken)
-        || phoneWorks(current, room)
-        || (RADIO_ROOMS.includes(room) && !current.sabotage.includes('radio'));
+        || phoneWorks(current, room);
       return hasObject && sabotageSiteItem(current, { free: true, suppressAfterAction: true });
     },
   });
@@ -1310,10 +1307,6 @@ export function sabotageSiteItem(state: GameState, options: { free?: boolean; su
     awardBlood(state, 'control', `破坏电话 · ${roomName(target.room)}`, BLOOD.phone, { key: `phone:${target.room}`, limit: 1 });
     log(state, `你砸烂了${roomName(target.room)}的电话，这间屋子暂时没法报警了。`);
     addAlarm(state, 2);
-  } else if (target.kind === 'radio') {
-    state.sabotage.push('radio');
-    log(state, '你砸毁了备用无线电，幸存者无法再通过它协调求救。');
-    addAlarm(state, 2);
   } else {
     const circuit = state.powerCircuits.find((c) => c.breakerRoom === state.playerRoom && !c.broken);
     if (!circuit) return false;
@@ -1340,7 +1333,6 @@ export function powerCooldown(state: GameState, powerId: string): number {
 export function blinkPlayer(state: GameState, room: RoomId): boolean { return aiBlinkPlayer(aiHost, state, room); }
 export function throwHuntressHatchet(state: GameState, targetId: string): boolean { return aiThrowHuntressHatchet(aiHost, state, targetId); }
 export function refillHuntressHatchets(state: GameState): boolean { return aiRefillHuntressHatchets(aiHost, state); }
-export function collectTrapCache(state: GameState): boolean { return aiCollectTrapCache(aiHost, state); }
 export function recoverBearTrap(state: GameState): boolean { return aiRecoverBearTrap(aiHost, state); }
 export function canUsePower(state: GameState, powerId: string): boolean { return aiCanUsePower(aiHost, state, powerId); }
 export function powerBlockReason(state: GameState, powerId: string): string { return aiPowerBlockReason(aiHost, state, powerId); }

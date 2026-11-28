@@ -25,7 +25,7 @@ export interface NpcHost {
   shout(state: GameState, person: Person, base?: number): void;
   /** 放下木板封门 */
   barricadeRoom(state: GameState, person: Person): boolean;
-  /** 打电话 / 用无线电报警 */
+  /** 打电话报警 */
   tryCall(state: GameState, person: Person): boolean;
   /** 拉起同屋倒地的同伴 */
   tryRescue(state: GameState, person: Person): boolean;

@@ -134,7 +134,7 @@ export function triggerEnvironmentalEvent(host: NpcHost, state: GameState): void
 
   if (event === 'phone' && workingPhones(state).length) {
     const callers = npcs(state).filter((person) =>
-      person.hp > 0 && !person.hidden && !/电话|无线电/.test(person.activity),
+      person.hp > 0 && !person.hidden && !/电话/.test(person.activity),
     );
     if (callers.length) {
       const person = randomOf(callers);

@@ -9,7 +9,7 @@ import { KILLER_MAP } from '../killers';
 import { roomName } from '../missions';
 import { roomDistance } from '../navigation';
 import { randomOf } from '../random';
-import { RADIO_ROOMS, ROOM_MAP } from '../rooms';
+import { ROOM_MAP } from '../rooms';
 import type { GameState, Person, RoomId } from '../types';
 import { nextStepToward } from '../world/pathfinding';
 import { workingPhones } from '../world/phones';
@@ -26,7 +26,7 @@ function policeShootLog(host: NpcHost, state: GameState, officer: Person): void 
 export function policeNextStep(host: NpcHost, state: GameState, police: Person): RoomId {
   const freshCrime = state.heatTurn >= state.turn - 1 || state.policeAssaulted;
   const caller = state.people.find((person) =>
-    person.role !== 'police' && person.hp > 0 && !person.hidden && /电话|无线电/.test(person.activity),
+    person.role !== 'police' && person.hp > 0 && !person.hidden && /电话/.test(person.activity),
   );
   let destination: RoomId | null =
     state.emergencyActive
@@ -36,10 +36,9 @@ export function policeNextStep(host: NpcHost, state: GameState, police: Person):
         ?? caller?.room
         ?? state.noiseRoom;
 
-  // 没有报警或犯罪线索时，警员不再随机游荡，而是巡查电话、无线电、电闸与逃生点。
+  // 没有报警或犯罪线索时，警员不再随机游荡，而是巡查电话、电闸与逃生点。
   const patrolPoints = [...new Set<RoomId>([
     ...workingPhones(state),
-    ...RADIO_ROOMS,
     ...state.powerCircuits.map((circuit) => circuit.breakerRoom),
     ...ESCAPE_ROOMS,
   ])];

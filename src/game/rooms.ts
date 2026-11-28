@@ -23,7 +23,7 @@ const CORE_BLUEPRINTS: Array<Pick<Room, 'id' | 'name' | 'desc'>> = [
   { id: 'corridor', name: '走廊', desc: '狭长的过道，尽头传来潮湿的通风声。' },
   { id: 'conservatory', name: '温室', desc: '玻璃顶棚蒙着雾，花架上插着修剪刀，泥土里埋着什么东西。' },
   { id: 'kitchen', name: '厨房', desc: '刀架整齐，水槽里还有未洗的杯子——反抗的人会来这里。' },
-  { id: 'basement', name: '地下室', desc: '水泥墙上的水渍像一张模糊的脸，角落里有一台旧无线电。' },
+  { id: 'basement', name: '地下室', desc: '水泥墙上的水渍像一张模糊的脸，角落里堆着废弃的旧家具。' },
   { id: 'laundry', name: '洗衣房', desc: '洗衣机还在转，地上全是水；烘干机后面能藏人。' },
   { id: 'garage', name: '车库', desc: '卷帘门半掩，汽车里还有余温，是撤离点。' },
   { id: 'garden', name: '后院', desc: '杂草没过脚踝，篱笆外是警笛的声音。' },
@@ -80,8 +80,7 @@ export const CABINET_ROOMS: RoomId[] = ['bedroom', 'nursery', 'study', 'laundry'
 export const OBSTACLE_ROOMS: RoomId[] = ['storage', 'basement'];
 /** 有电话的房间：求救型 NPC 在这里报警 */
 export const PHONE_ROOMS: RoomId[] = ['study', 'hall'];
-/** 无线电：电话断了之后的备用报警手段，需要多花一回合 */
-export const RADIO_ROOMS: RoomId[] = ['basement'];
+
 /** 厨房 / 车库 / 温室：反抗型与英勇型 NPC 来这里找武器 */
 export const WEAPON_ROOMS: RoomId[] = ['kitchen', 'garage', 'conservatory'];
 

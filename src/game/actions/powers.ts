@@ -20,7 +20,7 @@ function visibleMyersStalkTargets(host: NpcHost, state: GameState) {
 
 function trapPlacementBlockReason(host: NpcHost, state: GameState): string | null {
   if (state.killer !== '设陷者') return '只有设陷者可以布设捕兽夹。';
-  if (state.trapInventory <= 0) return '没有可用的捕兽夹；寻找地图上的补给点。';
+  if (state.trapInventory <= 0) return '没有可用的捕兽夹；可以回收已触发的陷阱，或通过卡牌补充。';
   if (state.energy < 1) return '行动点不足：布设捕兽夹需要 1 点。';
   return null;
 }
@@ -96,19 +96,6 @@ export function refillHuntressHatchets(host: NpcHost, state: GameState): boolean
   const restored = max - state.hatchets;
   state.hatchets = max;
   host.log(state, `你从柜子里取出 ${restored} 把飞斧，补充至 ${max}/${max}。`);
-  host.afterPlayerAction(state);
-  return true;
-}
-
-export function collectTrapCache(host: NpcHost, state: GameState): boolean {
-  if (state.killer !== '设陷者' || !state.trapCaches.includes(state.playerRoom) || state.trapInventory >= 4 || state.energy < 1) {
-    host.log(state, '这里没有可收集的捕兽夹补给，或携带数量已达上限。');
-    return false;
-  }
-  state.energy -= 1;
-  state.trapCaches = state.trapCaches.filter((room) => room !== state.playerRoom);
-  state.trapInventory += 1;
-  host.log(state, `你从补给点收集到 1 个捕兽夹（携带 ${state.trapInventory}/4）。`);
   host.afterPlayerAction(state);
   return true;
 }

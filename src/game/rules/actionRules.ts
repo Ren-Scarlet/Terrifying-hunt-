@@ -6,7 +6,7 @@
  * 这样界面可以直接拿这些话做悬停提示，而不会误触发动作。
  */
 import { SABOTAGE_COST } from '../constants';
-import { RADIO_ROOMS, ROOM_MAP } from '../rooms';
+import { ROOM_MAP } from '../rooms';
 import type { GameState, RoomId } from '../types';
 import { phoneWorks } from '../world/phones';
 import { isLocked } from '../world/roomState';
@@ -41,17 +41,15 @@ export function breakerBlockReason(state: GameState, circuitId?: string): string
 export type SabotageTarget =
   | { kind: 'door'; room: RoomId }
   | { kind: 'phone'; room: RoomId }
-  | { kind: 'radio' }
   | { kind: 'facility' };
 
-/** 统一破坏入口：相邻门锁、电话线、无线电与电闸。 */
+/** 统一破坏入口：相邻门锁、电话线、电闸。 */
 export function sabotageTarget(state: GameState): SabotageTarget | null {
   const breaker = state.powerCircuits.some((c) => c.breakerRoom === state.playerRoom && !c.broken);
   if (breaker) return { kind: 'facility' };
   const lockedNeighbor = ROOM_MAP[state.playerRoom].neighbors.find((room) => isLocked(state, room));
   if (lockedNeighbor) return { kind: 'door', room: lockedNeighbor };
   if (phoneWorks(state, state.playerRoom)) return { kind: 'phone', room: state.playerRoom };
-  if (RADIO_ROOMS.includes(state.playerRoom) && !state.sabotage.includes('radio')) return { kind: 'radio' };
   if (lockedNeighbor) return { kind: 'door', room: lockedNeighbor };
   return isLocked(state, state.playerRoom) ? { kind: 'door', room: state.playerRoom } : null;
 }

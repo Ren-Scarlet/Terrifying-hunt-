@@ -37,7 +37,7 @@ export const STATUS_OPTIONS = [
 ] as const;
 
 export const SABOTAGE_OPTIONS = [
-  ['phone', '电话线'], ['radio', '无线电'], ['exit', '后院门'], ['lights', '电闸'],
+  ['phone', '电话线'], ['exit', '后院门'], ['lights', '电闸'],
 ] as const;
 
 /** DSL 指令的编辑器描述集中维护，避免新增指令时 UI 字段配置散落。 */

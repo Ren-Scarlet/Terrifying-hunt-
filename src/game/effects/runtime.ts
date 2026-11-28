@@ -247,14 +247,10 @@ export function executeOps(state: GameState, ops: Op[], runtime: EffectRuntime):
         if (op.key === 'phone') {
           state.phoneCut = true;
           if (!state.sabotage.includes('phone')) state.sabotage.push('phone');
-          log(state, '电话线被你剪断，求救的路只剩下一台旧无线电。');
+          log(state, '电话线被你剪断，求救的路只剩下一扇扇敲开的门。');
         } else if (op.key === 'exit') {
           state.exitBlockedTurns = Math.max(state.exitBlockedTurns, 2);
           log(state, '后院的门被你从里面钉死了。');
-        } else if (op.key === 'radio') {
-          if (!state.sabotage.includes('radio')) state.sabotage.push('radio');
-          state.phoneCut = true;
-          log(state, '无线电的真空管被你踩碎，地下室里再没有声音能传出去。');
         } else if (op.key === 'lights') {
           if (!state.sabotage.includes('lights')) state.sabotage.push('lights');
           state.noAlarmTurn = true;

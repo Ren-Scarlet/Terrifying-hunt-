@@ -215,7 +215,7 @@ export function attack(host: NpcHost, state: GameState, targetId?: string, optio
     host.log(state, `夜幕锁定 ${target.name}：这一刀直接把他放倒。`);
   }
   const hpBeforeHit = target.hp;
-  const wasInteracting = /电话|无线电|电闸|修复|维修|翻找|包扎|拖|救/.test(target.activity);
+  const wasInteracting = /电话|电闸|修复|维修|翻找|包扎|拖|救/.test(target.activity);
   // 卡牌联动：定位、控制、伏击都能转化成真正的猎杀优势，而不是只提供一段说明文字。
   const trackingCombo = target.role !== 'police' && target.trackedTurns > 0;
   const controlCombo = target.role !== 'police' && target.blockedTurns > 0;

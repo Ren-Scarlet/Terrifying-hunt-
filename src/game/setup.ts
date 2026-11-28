@@ -181,7 +181,6 @@ export function createGame(
     trapTriggerCount: 0,
     lastTrapTriggerId: null,
     trapInventory: killerId === '设陷者' ? Math.max(0, 2 + modifiers.trapCount) : 0,
-    trapCaches: [],
     huntressAiming: false,
     hatchets: killerId === '女猎手' ? Math.max(1, 3 + modifiers.hatchetCount) : 0,
     nurseBlinkTargeting: false,
@@ -263,23 +262,13 @@ export function createGame(
 
   // 场地固定设施只有电闸；照明由独立电闸控制，不再依赖发电机。
   const breakerRooms = state.powerCircuits.map((circuit) => circuit.breakerRoom);
-  if (killerId === '设陷者') {
-    const occupied = new Set([
-      ...breakerRooms,
-      ENTRY_ROOM,
-      EXIT_ROOM,
-    ]);
-    state.trapCaches = shuffle(
-      ROOMS.map((room) => room.id).filter((room) => !occupied.has(room) && ROOM_MAP[room].neighbors.length >= 2),
-    ).slice(0, 2);
-  }
 
 
   // 道具箱：每局 2 个，幸存者可翻出修理箱 / 手电筒 / 医疗箱，杀手可以砸毁。
   const itemBoxRooms = shuffle(ROOMS.map((room) => room.id).filter((room) =>
     room !== ENTRY_ROOM && room !== EXIT_ROOM &&
     !ESCAPE_ROOMS.includes(room) && !OBSTACLE_ROOMS.includes(room) &&
-    !breakerRooms.includes(room) && !state.trapCaches.includes(room),
+    !breakerRooms.includes(room),
   )).slice(0, ITEM_BOX_COUNT);
   state.itemBoxes = itemBoxRooms.map((room, index): ItemBox => ({
     id: `item-box-${index}`,

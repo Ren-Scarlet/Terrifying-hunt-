@@ -371,7 +371,7 @@ const FLAG_VALUES = new Set([
   'revealNearestTrail', 'revealWorkers', 'myersLastBest', 'bitterMurmur', 'bleedNextHit', 'noAttackTurn',
 ]);
 const STATUS_VALUES = new Set(['blind', 'undetectable', 'danger', 'deepWound', 'oblivious', 'incurable', 'cursed']);
-const SABOTAGE_VALUES = new Set(['phone', 'exit', 'radio', 'lights']);
+const SABOTAGE_VALUES = new Set(['phone', 'exit', 'lights']);
 const DEST_VALUES = new Set([
   'here', 'adjacent', 'far', 'exit', 'garden', 'attic', 'nursery', 'bedroom',
   'study', 'storage', 'hall', 'corridor', 'kitchen', 'basement', 'laundry',

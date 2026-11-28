@@ -2846,8 +2846,8 @@ button, .room-hit, .hand-row { touch-action: manipulation; }
 }
 .room-feature b { font-size: 10px; line-height: 1.15; color: #eee5d5; white-space: nowrap; }
 .room-feature .ui-icon { width: 23px; height: 23px; opacity: 1; }
-.room-feature.telephone, .room-feature.radio { color: #e3c88e; font-size: 20px; }
-.room-feature.telephone.broken, .room-feature.radio.broken { border-color: #9b5148; color: #e08b80; background: #21110fef; }
+.room-feature.telephone { color: #e3c88e; font-size: 20px; }
+.room-feature.telephone.broken { border-color: #9b5148; color: #e08b80; background: #21110fef; }
 .room-feature.breaker, .room-feature.light { border-color: #8a7958; }
 .room-people .person-chip { min-height: 60px; gap: 8px; padding: 3px 10px 3px 3px; font-size: 15px; }
 .room-people .person-chip img { width: 56px; height: 56px; object-fit: cover; }

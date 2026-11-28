@@ -97,7 +97,7 @@ export function npcReact(host: NpcHost, state: GameState): void {
     if (wantsToLeave(state, person)) continue;
 
     const fleeing = person.alert >= 75 || person.escapeProgress > 0;
-    const busy = /电话|无线电|包扎|拖|救/.test(person.activity);
+    const busy = /电话|包扎|拖|救/.test(person.activity);
     if (!fleeing && !busy) continue;
 
     person.movesThisTurn += 1;
