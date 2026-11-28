@@ -157,21 +157,9 @@ export function npcTurn(host: NpcHost, state: GameState): void {
       person.awareness = 2;
     }
 
-    // 没有任何异常线索时，幸存者继续自己的日常，不修逃生设施、不报警、不集体行动。
+    // 没有任何异常线索时，交给新决策继续日常（大部分时间只是换一句日常动作）
     if (person.awareness === 0) {
-      person.intent = 'idle';
-      if (random() < 0.18) {
-        const options = ROOM_MAP[person.room].neighbors.filter((room) => room !== state.playerRoom && !isLocked(state, room));
-        const next = options.length ? randomOf(options) : null;
-        if (next) {
-          person.room = next;
-          person.activity = randomOf(ACTIVITIES);
-        } else {
-          person.activity = randomOf(ACTIVITIES);
-        }
-      } else {
-        person.activity = randomOf(ACTIVITIES);
-      }
+      host.runDecision(state, person);
       continue;
     }
 

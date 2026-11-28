@@ -136,4 +136,6 @@ export interface NpcHost {
   forwardRoom(state: GameState): RoomId | null;
   /** 杀手能力剩余冷却 */
   powerCooldown(state: GameState, powerId: string): number;
+  /** 用新决策给这个人选一个动作并执行 */
+  runDecision(state: GameState, person: Person): void;
 }

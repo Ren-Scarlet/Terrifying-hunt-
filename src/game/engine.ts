@@ -110,7 +110,6 @@ import {
 } from './npc/ai/predicates';
 export { canCoordinateRescue, canPlaceBarricade, fearBand, type FearBand } from './npc/ai/predicates';
 import { fleeAway as aiFleeAway, shout as aiShout } from './npc/ai/actions';
-import { actByArchetype as aiActByArchetype } from './npc/ai/decide';
 import {
   barricadeRoom as aiBarricadeRoom,
   consumeItem as aiConsumeItem,
@@ -121,6 +120,7 @@ import {
   tryRescue as aiTryRescue,
 } from './npc/ai/support';
 import { npcTurn as aiNpcTurn } from './npc/ai/turn';
+import { executeDecision, tickAllChase } from './npc/ai/runtime';
 import {
   npcOnPlayerEnter as aiNpcOnPlayerEnter,
   npcReact as aiNpcReact,
@@ -265,6 +265,7 @@ const aiHost: NpcHost = {
   isPersonVisible,
   forwardRoom,
   powerCooldown,
+  runDecision: (state, person) => executeDecision(aiHost, state, person),
 };
 import { SURVIVOR_MAP } from './survivors';
 import type {
@@ -972,9 +973,9 @@ function survivorsActOnce(state: GameState, actorId: string): void {
 
 
 /** 按行为类型行动一步 */
-/** 主决策已经搬到 npc/ai/decide.ts；这里保留引擎侧入口（签名不变）。 */
+/** 决策入口：新 AI（npc/ai/runtime.ts）。旧的性格决策已经删除。 */
 function actByArchetype(state: GameState, person: Person): void {
-  aiActByArchetype(aiHost, state, person);
+  executeDecision(aiHost, state, person);
 }
 
 /** 尾随不是自动挂机：每次点击能力都要花 1 AP，并承担被目标察觉的风险。 */
@@ -1052,9 +1053,10 @@ function crowAlertFor(state: GameState, person: Person): void {
   log(state, `${roomName(person.room)}方向传来一阵乌鸦扑棱棱的振翅声——有人在那里动了。`);
 }
 
-/** 回合循环已经搬到 npc/ai/turn.ts；这里保留引擎侧入口（签名不变）。 */
+/** 回合循环还在 npc/ai/turn.ts；决策已经换成新 AI（actByArchetype 下面的入口）。 */
 function npcTurn(state: GameState): void {
   aiNpcTurn(aiHost, state);
+  tickAllChase(state);
 }
 
 /** 根据 NPC 真正掌握的信息与当前行为生成头顶短对白。 */

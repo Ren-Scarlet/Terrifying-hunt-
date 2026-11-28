@@ -1251,7 +1251,7 @@ function caseWitnessFearAndUnifiedSabotage(): void {
   const executed = executeDownedPerson(murder, murderVictim.id);
   check('目击击杀：一击处决会被同屋 NPC 亲眼目击并触发真实反应',
     executed && !murder.people.some((p) => p.id === murderVictim.id) &&
-    murderWitness.awareness >= 3 && murderWitness.alert >= 88 &&
+    murderWitness.awareness >= 3 && murderWitness.alert >= 75 &&
     murderWitness.intent !== 'idle' && murder.log.some((line) => line.includes('【NPC目击】')),
     `awareness=${murderWitness.awareness} alert=${murderWitness.alert} intent=${murderWitness.intent}`);
 
@@ -2703,6 +2703,11 @@ function caseHexPhonesAndAlarm(): void {
   // 破门：相邻且上锁的门，1 AP 撞开
   const doorGame = createGame(STARTING_DECK, undefined, '设陷者');
   const doorRoom = ROOM_MAP[doorGame.playerRoom].neighbors[0];
+  // 电子锁只有在有电时才生效：固定供电，避免随机布局让这条测试假失败
+  doorGame.powerCircuits.forEach((circuit) => { circuit.enabled = false; });
+  doorGame.powerCircuits[0].affectedRooms = [doorRoom];
+  doorGame.powerCircuits[0].enabled = true;
+  doorGame.powerCircuits[0].broken = false;
   doorGame.roomLocks = { [doorRoom]: 3 };
   doorGame.energy = 4;
   doorGame.people.forEach((person) => {

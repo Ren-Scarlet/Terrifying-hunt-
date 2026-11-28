@@ -123,6 +123,13 @@ export function decide(ctx: DecisionContext, roll: () => number = () => 0.5): De
   if (ctx.allyDownedHere && canDo('rescue')) return { kind: 'rescue', reason: 'ally_downed' };
   if (ctx.allyInjuredHere && canDo('heal')) return { kind: 'heal', reason: 'ally_injured' };
 
+  // 崩溃：不一定还认得路，但会本能地想跑；也可能当场腿软
+  if (fear === 'broken') {
+    if (roll() < BROKEN_FREEZE_CHANCE) return { kind: 'idle', reason: 'broken_freeze' };
+    if (canDo('flee') && canFlee(ctx.chase)) return { kind: 'flee', reason: 'broken' };
+    return { kind: 'idle', reason: 'broken_freeze' };
+  }
+
   // 被追：先放板/锁门/躲，再考虑硬跑
   if (ctx.chased) {
     if (ctx.canBarricadeHere && canDo('barricade')) return { kind: 'barricade', reason: 'chased' };
