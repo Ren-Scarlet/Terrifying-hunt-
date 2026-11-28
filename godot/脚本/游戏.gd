@@ -10,6 +10,7 @@ var info_label: RichTextLabel
 var log_label: RichTextLabel
 var hand_box: HBoxContainer
 var action_box: HBoxContainer
+var settlement_button: Button
 
 func _ready() -> void:
 	game = ENGINE.new()
@@ -41,6 +42,8 @@ func _build_ui() -> void:
 	header.add_child(spacer)
 	var end_turn := _button("结束回合", _end_turn)
 	header.add_child(end_turn)
+	settlement_button = _button("结算本局", _settle_run)
+	header.add_child(settlement_button)
 	var stats := HBoxContainer.new()
 	stats.name = "状态栏"
 	root_ui.add_child(stats)
@@ -159,7 +162,15 @@ func _end_turn() -> void:
 	game.end_turn()
 	_render()
 
+func _settle_run() -> void:
+	if not game.finished or SaveManager.was_settled: return
+	SaveManager.settle_run(game.score, game.kills, game.executions)
+	message = "本局已结算，获得 %d 血点。" % maxi(10, game.score)
+	game._add_log("[color=#d9b36c]本局结算完成，血点已保存。[/color]")
+	_render()
+
 func _restart() -> void:
 	game.start_run(true)
+	SaveManager.was_settled = false
 	selected_room = game.player_room
 	_render()
