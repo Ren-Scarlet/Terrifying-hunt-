@@ -24,7 +24,6 @@
     ],
     "asar": true,
     "compression": "normal",
-    "artifactName": "${productName}-${version}-${target}-${arch}.${ext}",
     "win": {
       "target": [
         {
@@ -46,7 +45,11 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "deleteAppDataOnUninstall": false
+      "deleteAppDataOnUninstall": false,
+      "artifactName": "${productName}-${version}-安装版.${ext}"
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-便携版.${ext}"
     }
   }
 }
