@@ -6,6 +6,7 @@
  * 依赖方向就变成 engine -> ai 单向，AI 才能真正独立出去。
  */
 import type { GameState, Person, RoomId, SiteItem } from '../../types';
+import type { Cond, Op, Who } from '../../effect';
 
 export interface NpcHost {
   /** 往对局日志写一行 */
@@ -119,4 +120,12 @@ export interface NpcHost {
   executionWitnessed(state: GameState, victim: Person): boolean;
   /** 真正执行处决（扣人数、加分数、触发结算） */
   executePerson(state: GameState, person: Person): void;
+  /** 卡牌前置条件判定 */
+  checkCond(state: GameState, cond: Cond): boolean;
+  /** 按 who 选择目标人群 */
+  selectPeople(state: GameState, who: Who): Person[];
+  /** 卡牌实际消耗（受折扣影响） */
+  effectiveCost(defId: string, state: GameState): number;
+  /** 执行一串卡牌效果 */
+  runOps(state: GameState, ops: Op[]): void;
 }
