@@ -18,4 +18,16 @@ export interface NpcHost {
   addDisturbance(state: GameState, room: RoomId): void;
   /** 移动进入房间时结算捕兽夹 */
   triggerBearTrapForPerson(state: GameState, person: Person): void;
+  /** 往离玩家最远的方向跑一步 */
+  fleeAway(state: GameState, person: Person, quiet?: boolean, ignoreFear?: boolean): boolean;
+  /** 喊叫：把警戒传给同屋与隔壁 */
+  shout(state: GameState, person: Person, base?: number): void;
+  /** 放下木板封门 */
+  barricadeRoom(state: GameState, person: Person): boolean;
+  /** 打电话 / 用无线电报警 */
+  tryCall(state: GameState, person: Person): boolean;
+  /** 拉起同屋倒地的同伴 */
+  tryRescue(state: GameState, person: Person): boolean;
+  /** 用掉手里的幸存者道具 */
+  consumeItem(state: GameState, person: Person): void;
 }

@@ -17,3 +17,10 @@ export const ITEM_BOX_COUNT = 2;
 
 /** 恶魔附身的持续回合数。 */
 export const POSSESS_TURNS = 3;
+
+/**
+ * 一个人一回合最多能跑几间屋（含被砍后夺路而逃的那两步）。
+ * 玩家一回合 4 点行动点，这个数字必须比它能走的格数小，否则永远追不上；
+ * 但它也不能太小，否则「警觉就跑得很远」只是一句台词。
+ */
+export const REACT_MOVE_CAP = 3;
