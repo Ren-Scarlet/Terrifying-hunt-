@@ -91,7 +91,7 @@ export const ACCESSORIES: AccessoryDef[] = [
     name: '灰暗手镯',
     owner: '护士',
     rarity: 'uncommon',
-    desc: '撤离战利品 +30%，但所有能力冷却 +1 回合。',
+    desc: '结算血点 +30%，但所有能力冷却 +1 回合。',
     sourceSkill: 'Dull Bracelet',
     sourceText: '闪现最大距离减少20%；精准闪现得分事件增加100%血点。',
     mods: [{ key: 'bloodPointPct', value: 30 }, { key: 'cooldown', value: 1 }],

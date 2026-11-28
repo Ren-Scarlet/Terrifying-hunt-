@@ -108,7 +108,7 @@ export type AccessoryModKey =
   | 'fearOnHit'
   /** 开局警报值（负数=更安静） */
   | 'startAlarm'
-  /** 撤离时战利品百分比（正负都允许） */
+  /** 结算时额外血点百分比（正负都允许） */
   | 'bloodPointPct'
   /** 专属能力冷却回合（负数=更快） */
   | 'cooldown'
