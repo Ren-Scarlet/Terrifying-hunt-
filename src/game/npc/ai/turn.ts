@@ -1,23 +1,16 @@
 /**
- * 回合结束后，逐个幸存者结算「他这一回合做了什么」。
+ * 回合结束后，逐个幸存者结算这一回合。
  *
- * 这是旧 AI 的回合循环，暂时原样搬出来，行为一个字没改。
- * 它按固定优先级检查：被控 → 倒地 → 躲藏 → 同屋逃跑 → 救援 → 道具 →
- * 目标移动 → 日常，靠 continue 互斥。
+ * 底层（倒地、流血、被控、躲藏、陷阱）仍在这里；
+ * "他决定做什么"已经全部交给新 AI（runtime.executeDecision）。
  */
-import { BLEEDOUT_TURNS, ESCAPE_ROOMS, REACT_MOVE_CAP, SURVIVOR_INJURED_HP } from '../../constants';
+import { BLEEDOUT_TURNS, REACT_MOVE_CAP, SURVIVOR_INJURED_HP } from '../../constants';
 import { roomName } from '../../missions';
-import { nearestOf, roomDistance } from '../../navigation';
-import { random, randomOf } from '../../random';
-import { ROOM_MAP, WEAPON_ROOMS } from '../../rooms';
-import type { GameState, Person, RoomId } from '../../types';
-import { nextStepToward } from '../../world/pathfinding';
-import { workingPhones } from '../../world/phones';
-import { cabinetRoomsFor, isLocked, isRoomLit, npcPeople as npcs, peopleInRoom } from '../../world/roomState';
-import { ROUTINE_PROFILE } from '../catalog';
-import { ACTIVITIES } from '../factory';
+import { roomDistance } from '../../navigation';
+import { ROOM_MAP } from '../../rooms';
+import type { GameState, Person } from '../../types';
+import { isLocked, isRoomLit, npcPeople as npcs, peopleInRoom } from '../../world/roomState';
 import type { NpcHost } from './host';
-import { canPlaceBarricade, wantsToLeave } from './predicates';
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
@@ -157,172 +150,21 @@ export function npcTurn(host: NpcHost, state: GameState): void {
       person.awareness = 2;
     }
 
-    // 没有任何异常线索时，交给新决策继续日常（大部分时间只是换一句日常动作）
-    if (person.awareness === 0) {
-      host.runDecision(state, person);
-      continue;
-    }
-
-    // 只有察觉到异常但尚未确认危险的人会停下来倾听、查看，不会立刻逃生。
-    if (person.awareness === 1 && person.alert < 40 && person.room !== state.playerRoom) {
-      person.intent = 'wary';
-      person.activity = randomOf(['停下手里的事，侧耳听着', '四处看了看，像是在找声音来源', '有些疑惑地检查周围']);
-      continue;
-    }
-
-    // 第四阶段开启后，所有幸存者都以两个动态逃生点为目标，不再执行原本的个人工作。
-    if (state.emergencyActive && state.escapeRooms.length === 2) {
-      person.goal = 'exit'; person.intent = 'escape'; person.alert = 100;
-      if (state.escapeRooms.includes(person.room)) {
-        person.activity = person.escapeProgress > 0 ? '正在翻越逃生点' : '已抵达逃生点';
-        continue;
-      }
-      const exitTarget = nearestOf(person.room, state.escapeRooms);
-      const exitStep = person.room === state.playerRoom ? null : nextStepToward(state, person.room, exitTarget, [state.playerRoom]);
-      if (exitStep) {
-        const from = person.room; person.room = exitStep;
-        person.activity = `正赶往${roomName(exitTarget)}`;
-        host.pushTrail(state, from, exitStep, person.hp <= SURVIVOR_INJURED_HP);
-      } else if (person.room === state.playerRoom) host.fleeAway(state, person);
-      continue;
-    }
-
-    // 玩家就在这一间：先跑，跑不掉再对抗
-    if (person.room === state.playerRoom && !cannotSenseKiller) {
-      // 同屋幸存者在回合结算时必须获得一次最终逃跑机会。
-      // 本回合行动期间的反应移动次数不能让玩家把受伤目标留在原地反复攻击。
-      if (
-        person.archetype === 'defiant' &&
-        person.armed &&
-        person.movesThisTurn < REACT_MOVE_CAP &&
-        random() < 0.6
-      ) {
-        host.counterAttack(state, person);
-      }
-      // 反抗者可以先反击，但回合结束前仍会尝试撤离，不能站在原地等玩家下回合再砍。
-      if (host.fleeAway(state, person)) {
-        person.movesThisTurn = Math.min(REACT_MOVE_CAP, person.movesThisTurn + 1);
-        continue;
-      }
-      if (person.archetype === 'defiant' && person.movesThisTurn < REACT_MOVE_CAP && canPlaceBarricade(state, person)) {
-        host.barricadeRoom(state, person);
-      } else {
-        person.intent = 'wary';
-        person.activity = person.movesThisTurn >= REACT_MOVE_CAP ? '跑不动了，靠着墙喘气' : '贴在墙边，盯着你';
-      }
-      continue;
-    }
-
-    // 决定要走的人站在后院里：不再听性格指挥，专心翻篱笆
-    if (wantsToLeave(state, person)) {
-      person.intent = 'escape';
-      person.activity = person.escapeProgress >= 1 ? '正翻上篱笆' : '正在翻后院篱笆';
-      continue;
-    }
-
-    // 玩家离开后：救援优先于一切
+    // 保命优先：救援、手里的道具、赶去救倒地的人，先于一切日常决策。
     if (host.tryRescue(state, person)) continue;
-
-    // 手里有道具的人会挑时机用掉它（救人、报警、开后门、抹掉脚印…）
     if (host.useSurvivorItem(state, person)) continue;
-
-    // 还有人倒在地上：没被吓破胆的人会放下手里的活，朝那边赶过去
     if (person.intent !== 'escape' && person.intent !== 'call' && host.tryAidRun(state, person)) continue;
+    // 低警戒、没被追时才会顺手翻补给；追着人的时候没空。
+    if (person.alert < 40 && !state.chaseTargetId && host.tryTakeSupply(state, person)) continue;
 
-    // 跑了一整回合的人会喘不上气：找个角落停下来，甚至钻进柜子。
-    // 这就是「痕迹」能兑现的地方——你不是追上他，是跟着地板上的划痕找到他。
-    const ranFar = person.movesThisTurn >= 2 && roomDistance(state.playerRoom, person.room) >= 2;
-    if (ranFar && person.intent !== 'call' && person.intent !== 'escape' && random() < 0.7) {
-      person.alert = Math.max(0, person.alert - 30);
-      person.intent = 'wary';
-      person.activity = '跑不动了，蹲在原地喘气';
-      if (cabinetRoomsFor(state).includes(person.room) && random() < 0.55) {
-        person.hidden = true;
-        person.activity = '钻进柜子，屏住呼吸';
-        host.log(state, `${person.name} 躲进了${roomName(person.room)}的柜子——地板上的痕迹到这里就断了。`);
-      }
-      continue;
-    }
-
-    // 这一回合已经跑满了：再急也只能靠着墙缓一口
-    if (person.movesThisTurn >= REACT_MOVE_CAP) {
-      person.activity = '靠在墙上喘气，跑不动了';
-      continue;
-    }
-
-    // 已经决定要跑/要打电话的人不会因为稍微冷静就放弃
-    const committed = person.intent === 'escape' || person.intent === 'call';
-    person.alert = Math.max(0, person.alert - (committed ? 6 : 18 - Math.floor(state.alarm / 12)));
-
-    if (committed && person.alert >= 14) {
-      if (person.intent === 'call' && host.tryCall(state, person)) continue;
-      host.actByArchetype(state, person);
-      continue;
-    }
-    if (person.alert >= 42) {
-      host.actByArchetype(state, person);
-      continue;
-    }
-    if (person.alert >= 22) {
-      person.intent = 'wary';
-      if (random() < 0.5) host.actByArchetype(state, person);
-      else person.activity = '紧张地四处张望';
-      continue;
-    }
-
-    // 房门被封锁时，NPC 不能离开当前房间；保留原意图，等待封锁解除。
+    // 房门被封锁时，NPC 不能离开当前房间。
     if (isLocked(state, person.room)) {
       person.activity = '房门被封锁，无法离开';
       continue;
     }
 
-    // 低警觉：不再漫无目的地乱晃，各自朝这一局的个人目标走一步。
-    // 低警觉幸存者按个人习惯、补给需求和现场状况行动。
-    person.intent = 'idle';
-    // 路过没被砸烂的道具箱就翻一件：他们多一条路，你就多一个要盯的地方
-    if (host.tryTakeSupply(state, person)) continue;
-
-    const routine = ROUTINE_PROFILE[person.archetype];
-    const routineRoom = routine.rooms[(person.routineIndex ?? 0) % routine.rooms.length];
-    const toolboxCircuitRooms = person.item === 'toolbox'
-      ? state.powerCircuits.filter((circuit) => circuit.broken || circuit.enabled === false).map((circuit) => circuit.breakerRoom)
-      : [];
-    const goalTargets: RoomId[] = toolboxCircuitRooms.length
-      ? toolboxCircuitRooms
-      : (
-          person.goal === 'routine'
-            ? [routineRoom]
-            : person.goal === 'supply'
-              ? host.usableItemBoxes(state).map((i) => i.room)
-              : person.goal === 'phone'
-                ? workingPhones(state)
-                : person.goal === 'weapon' || person.goal === 'gather'
-                  ? WEAPON_ROOMS
-                  : person.goal === 'hide'
-                    ? cabinetRoomsFor(state)
-                    : person.goal === 'help'
-                      ? [nearestOf(person.room, cabinetRoomsFor(state))]
-                      : person.goal === 'exit' || person.goal === 'panic'
-                        ? ESCAPE_ROOMS
-                        : [person.room]);
-    const target = nearestOf(person.room, goalTargets.length ? goalTargets : [person.room]);
-    if (target === person.room) {
-      if (person.goal === 'routine') {
-        person.activity = routine.activity;
-        person.intent = 'idle';
-        person.routineIndex = ((person.routineIndex ?? 0) + 1) % routine.rooms.length;
-      } else {
-        person.activity = randomOf(ACTIVITIES);
-      }
-    } else {
-      const step = nextStepToward(state, person.room, target, [state.playerRoom]);
-      if (step) {
-        person.room = step;
-        person.activity = `朝${roomName(target)}摸过去`;
-      } else {
-        person.activity = randomOf(ACTIVITIES);
-      }
-    }
+    // 其余全部交给新决策：逃/躲/放板/报警/拆图腾/观察/日常。
+    host.runDecision(state, person, true);
   }
   // 结算 NPC 本轮移动进入的陷阱；即时反应与直接移动也由统一入口处理。
   host.resolveTrapEntries(state, before);

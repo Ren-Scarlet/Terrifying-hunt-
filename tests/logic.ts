@@ -594,6 +594,9 @@ function caseMyersStalkingAndFearRadius(): void {
   panicTarget.room = panicRoom;
   panicTarget.hidden = false;
   panicTarget.blockedTurns = 2;
+  // 清掉随机布局可能带上的门锁/木板，避免这条测试因地图而假失败
+  panicCard.roomLocks = {};
+  panicCard.barricades = [];
   panicTarget.fear = 0;
   panicCard.hand = [{ uid: 'test-trapper-panic', defId: 'trapper_panic' }];
   panicCard.energy = 0;
@@ -1939,8 +1942,13 @@ function caseNpcAwarenessAndDialogue(): void {
   target.intent = 'idle';
   target.awareness = 0;
   target.alert = 20;
+  // 排除随机图腾房干扰：这条只测'低强度异常→起疑'
+  suspicious.totems = [];
+  // 也不让随机开局道具（信号弹）抢在'起疑'之前触发
+  target.item = null;
+  target.itemUses = 0;
   endTurn(suspicious);
-  check('AC 低强度异常只让 NPC 起疑，不直接进入求生', target.awareness === 1 && target.intent === 'wary' && target.dialogue.length > 0);
+  check('AC 低强度异常只让 NPC 起疑，不直接进入求生', target.awareness === 1 && target.intent === 'wary' && target.dialogue.length > 0, `awareness=${target.awareness} intent=${target.intent} alert=${target.alert} activity=${target.activity}`);
 
   const panic = newGame();
   const witness = player(panic);

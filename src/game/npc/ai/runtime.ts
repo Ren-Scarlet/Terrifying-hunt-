@@ -13,6 +13,7 @@ import { phoneWorks } from '../../world/phones';
 import { cabinetRoomsFor, isRoomLit, peopleInRoom } from '../../world/roomState';
 import { decide, type ActionKind, type DecisionContext } from './behavior';
 import { type ChaseState, afterFlee, canFlee, createChaseState, tickChase } from './chase';
+import { decayAlert } from './model';
 import type { NpcHost } from './host';
 import { ACTIVITIES } from '../factory';
 import { canPlaceBarricade } from './predicates';
@@ -140,7 +141,7 @@ function perform(host: NpcHost, state: GameState, person: Person, kind: ActionKi
  * 新决策入口：给这个幸存者选一件事并执行。
  * 选出的动作做不成时，退回日常移动，避免"站着不动"。
  */
-export function executeDecision(host: NpcHost, state: GameState, person: Person): void {
+export function executeDecision(host: NpcHost, state: GameState, person: Person, endOfTurn = false): void {
   const ctx = buildContext(state, person);
   const decision = decide(ctx);
   person.intent = decision.kind === 'escape' ? 'escape'
@@ -151,7 +152,8 @@ export function executeDecision(host: NpcHost, state: GameState, person: Person)
             : decision.kind === 'flee' ? 'flee'
               : decision.kind === 'barricade' ? 'barricade'
                 : decision.kind === 'totem' ? 'work'
-                  : 'idle';
+                  : decision.kind === 'observe' ? 'wary'
+                    : 'idle';
   if (!perform(host, state, person, decision.kind)) {
     // 崩溃的人跑不动时会缩在角落，而不是若无其事地开始日常
     if (person.fear >= 85 && decision.kind === 'flee') {
@@ -161,6 +163,12 @@ export function executeDecision(host: NpcHost, state: GameState, person: Person)
     if (!perform(host, state, person, 'move')) {
       person.activity = '无处可去，只能待在原地';
     }
+  }
+
+  // 回合末：没被追、也不在玩家眼前时，警戒才会回落（慌乱衰减减半）
+  if (endOfTurn && !ctx.chased && !ctx.sameRoomKiller) {
+    const safe = distanceToPlayer(state, person) >= 2 && isRoomLit(state, person.room);
+    decayAlert(person, safe);
   }
 }
 

@@ -265,7 +265,7 @@ const aiHost: NpcHost = {
   isPersonVisible,
   forwardRoom,
   powerCooldown,
-  runDecision: (state, person) => executeDecision(aiHost, state, person),
+  runDecision: (state, person, endOfTurn) => executeDecision(aiHost, state, person, endOfTurn),
 };
 import { SURVIVOR_MAP } from './survivors';
 import type {
