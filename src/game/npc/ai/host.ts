@@ -111,4 +111,12 @@ export interface NpcHost {
   refillHuntressHatchets(state: GameState): boolean;
   /** 目击事件：同屋的人看到攻击/死亡/被抱走 */
   npcWitnessEvent(state: GameState, room: RoomId, event: 'attack' | 'murder' | 'abduction', subjectId: string): number;
+  /** 房间里能下手的受害者（按目标优先级挑） */
+  findVictim(state: GameState, room: RoomId, maxHp?: number, allowDowned?: boolean, targetId?: string): Person | undefined;
+  /** 这个人现在能不能被处决 */
+  canExecuteNow(person: Person): boolean;
+  /** 处决是否有目击者 */
+  executionWitnessed(state: GameState, victim: Person): boolean;
+  /** 真正执行处决（扣人数、加分数、触发结算） */
+  executePerson(state: GameState, person: Person): void;
 }
