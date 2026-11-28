@@ -66,6 +66,11 @@ func start_run(free_hunt: bool = false) -> void:
 	executions = 0
 	finished = false
 	contract = {"title":"自由猎杀","description":"没有强制目标，尽情狩猎","goal":999,"type":"free"} if free_hunt else CONTRACTS.pick_random().duplicate(true)
+	if contract.type == "target":
+		var target_index := randi_range(0, survivors.size() - 1)
+		survivors[target_index].marked = true
+		contract["target_id"] = target_index
+		contract["description"] = "击杀指定目标：" + str(survivors[target_index].name)
 	deck = CARD_DATA.duplicate(true)
 	deck.shuffle()
 	hand.clear()
@@ -214,7 +219,7 @@ func _kill(p: Dictionary, execution: bool) -> void:
 	if execution: executions += 1
 	score += 14 + (10 if execution else 0)
 	_add_log("[color=#c65c5c]%s 已被杀死。[/color]" % p.name)
-	if p.marked and contract.type == "target": _add_log("名单目标已完成。")
+	if p.marked and contract.type == "target": _add_log("[color=#d9b36c]名单目标已完成。[/color]")
 	_check_contract()
 
 func _draw_card() -> void:
@@ -224,7 +229,9 @@ func _draw_card() -> void:
 
 func _check_contract() -> void:
 	if contract.type == "kills" and kills >= int(contract.goal): finished = true
-	elif contract.type == "target" and kills >= int(contract.goal): finished = true
+	elif contract.type == "target":
+		for p in survivors:
+			if p.marked and p.dead: finished = true
 	elif contract.type == "executions" and executions >= int(contract.goal): finished = true
 	if finished: _add_log("[color=#d9b36c]契约主目标达成！可以结束本局。[/color]")
 	if kills >= survivors.size(): finished = true
