@@ -14,6 +14,12 @@ import type { NpcHost } from '../npc/ai/host';
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
+function retireCard(state: GameState, card: { uid: string; defId: string }, def: { exhaust?: boolean; power?: boolean }): void {
+  if (def.exhaust) state.exhaustPile.push(card);
+  else if (def.power) state.powerPile.push(card.defId);
+  else state.discardPile.push(card);
+}
+
 /** 基础条件检查（不消耗能量、不弃牌） */
 function precheckFailed(host: NpcHost, state: GameState, defId: string): string | null {
   const def = CARD_MAP[defId];
@@ -93,7 +99,7 @@ export function playCard(host: NpcHost, state: GameState, cardUid: string): bool
     if (!victim) { host.log(state, '当前目标范围内没有可以攻击的站立幸存者。'); return false; }
     const reason = attackBlockReason(host, state, victim.id, cost);
     if (reason) { host.log(state, reason); return false; }
-    state.hand.splice(index, 1); state.discardPile.push(card);
+    state.hand.splice(index, 1); retireCard(state, card, def);
     state.cardsPlayed.push(card.defId);
     host.log(state, `你打出「${def.name}」，对 ${victim.name} 发动攻击。`);
     return attack(host, state, victim.id, { costOverride: cost, bleedTurns: attackOp.bleedTurns, hitStatus: attackOp.statusTurns > 0 ? attackOp.status : undefined, hitStatusTurns: attackOp.statusTurns });
@@ -101,7 +107,7 @@ export function playCard(host: NpcHost, state: GameState, cardUid: string): bool
 
   state.energy -= cost;
   state.hand.splice(index, 1);
-  state.discardPile.push(card);
+  retireCard(state, card, def);
   state.cardsPlayed.push(card.defId);
   host.log(state, `你打出「${def.name}」（消耗 ${cost} 点行动点）。`);
 

@@ -717,6 +717,7 @@ function sfxFromLogs(): void {
   else if (/砸晕|木板突然向你砸来/.test(head)) playSfx('palletStun');
   else if (/放下木板/.test(head)) playSfx('palletDrop');
   else if (/木板砸碎|砸碎.*木板/.test(head)) playSfx('barricadeSmash');
+  else if (/踩中捕兽夹|捕兽夹.*咬|触发.*捕兽夹/.test(head)) playSfx('trapTrigger');
   else if (/电话突然响起|正在尝试报警|已经被报警|电话线/.test(head)) playSfx('phone');
   else if (/砸毁|断电|控制箱|电闸/.test(head)) {
     playSfx('breaker');

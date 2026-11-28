@@ -77,6 +77,10 @@ export interface CardDef {
   ops: Op[];
   /** 打出后不推进 NPC 行动、状态计时与世界时间 */
   noAction?: boolean;
+  /** 消耗：打出后移入消耗堆，本局不再回到牌库 */
+  exhaust?: boolean;
+  /** 强化：提供整场持续效果，打出后从本局移除（不进入消耗堆） */
+  power?: boolean;
   /** 出牌前的条件检查：不满足时不消耗行动点、不弃牌 */
   precheck?: Precheck;
   /** initial = 通用初始卡；killer = 对应杀手专属卡；未标记的旧卡仅保留兼容。 */
@@ -672,6 +676,9 @@ export interface GameState {
   freePowerTurn: number;
   /** 闪现前的位置：带「回到原位」配件时可由护士再次按键返回 */
   blinkReturnRoom: RoomId | null;
+  /** 本局已经打出的消耗牌 / 强化牌（不再回到牌库） */
+  exhaustPile: CardInstance[];
+  powerPile: string[];
   /** 独立区域电闸及其供电范围 */
   powerCircuits: PowerCircuit[];
   /** 贞子：是否处于录像带隐匿状态（无法侦测、无法攻击） */

@@ -2,7 +2,7 @@ import { ACCESSORIES, ACCESSORY_RARITY_LABEL, accessoryPrice } from '../game/dat
 import { ACCESSORY_MAP } from '../game/data/accessories';
 import { customAccessoryList, isCustomAccessory, isPublishedAccessory, exportCustomAccessories } from '../game/customContent';
 import { MOD_KEYS, modifierLabel } from '../game/modifiers';
-import { EFFECT_ACTIONS, EFFECT_TRIGGERS } from '../game/accessoryEffects';
+import { EFFECT_ACTIONS, EFFECT_ACTION_GROUPS, EFFECT_TRIGGERS, EFFECT_TRIGGER_GROUPS } from '../game/accessoryEffects';
 import { ACTIVE_KILLERS } from '../game/data/killers';
 import type { AccessoryDef, AccessoryEffect, AccessoryMod, AccessoryRarity } from '../game/types';
 import { accessoryImage } from '../game/assetMap';
@@ -47,10 +47,10 @@ function effectRows(def: AccessoryDef): string {
       (effect, index) => `
       <div class="ws-mod" data-effect-index="${index}">
         <select data-acc-effect-trigger="${index}">
-          ${(Object.keys(EFFECT_TRIGGERS) as Array<keyof typeof EFFECT_TRIGGERS>).map((trigger) => `<option value="${trigger}" ${effect.trigger === trigger ? 'selected' : ''}>${escape(EFFECT_TRIGGERS[trigger])}</option>`).join('')}
+          ${EFFECT_TRIGGER_GROUPS.map((group) => `<optgroup label="${escape(group.label)}">${group.triggers.map((trigger) => `<option value="${trigger}" ${effect.trigger === trigger ? 'selected' : ''}>${escape(EFFECT_TRIGGERS[trigger])}</option>`).join('')}</optgroup>`).join('')}
         </select>
         <select data-acc-effect-action="${index}">
-          ${(Object.keys(EFFECT_ACTIONS) as Array<keyof typeof EFFECT_ACTIONS>).map((action) => `<option value="${action}" ${effect.action === action ? 'selected' : ''}>${escape(EFFECT_ACTIONS[action])}</option>`).join('')}
+          ${EFFECT_ACTION_GROUPS.map((group) => `<optgroup label="${escape(group.label)}">${group.actions.map((action) => `<option value="${action}" ${effect.action === action ? 'selected' : ''}>${escape(EFFECT_ACTIONS[action])}</option>`).join('')}</optgroup>`).join('')}
         </select>
         <input type="number" step="1" data-acc-effect-value="${index}" value="${effect.value ?? 1}" aria-label="数值">
         <button type="button" class="btn mini ghost" data-action="workshop-effect-remove" data-index="${index}">删除</button>

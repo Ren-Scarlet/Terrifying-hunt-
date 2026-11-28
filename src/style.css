@@ -4045,3 +4045,24 @@ button, .room-hit, .hand-row { touch-action: manipulation; }
   50% { background-position: 3px 5px, -4px 2px; opacity: .9; }
   100% { background-position: -2px 7px, 5px -3px; opacity: .7; }
 }
+/* 卡牌关键字：消耗 / 强化 */
+.card-keyword {
+  flex: 0 0 auto; padding: 1px 4px; border-radius: 2px;
+  font-size: 9px; letter-spacing: .06em;
+}
+.card-keyword.exhaust { border: 1px solid #8a5a3c; color: #e0b18a; background: #1d130d; }
+.card-keyword.power { border: 1px solid #596f9a; color: #b9d0f2; background: #0e1422; }
+/* 逃生大门开启：常驻高亮条 */
+.escape-gate-banner {
+  display: flex; align-items: center; gap: 10px;
+  margin: 8px 0; padding: 8px 12px;
+  border: 1px solid rgba(255, 214, 108, .9);
+  border-radius: 5px;
+  background: linear-gradient(90deg, rgba(64, 48, 14, .95), rgba(24, 20, 10, .95));
+  color: #ffe6a6;
+  box-shadow: 0 0 22px rgba(255, 210, 90, .35), inset 0 0 18px rgba(255, 210, 90, .12);
+  animation: gateBannerPulse 1.8s ease-in-out infinite;
+}
+.escape-gate-banner b { font-size: 12px; letter-spacing: .08em; }
+.escape-gate-banner span { color: #d8c18a; font-size: 11px; }
+@keyframes gateBannerPulse { 0%,100% { border-color: rgba(255,214,108,.55); } 50% { border-color: rgba(255,235,160,1); } }

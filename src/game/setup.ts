@@ -249,6 +249,8 @@ export function createGame(
     survivorTotal: people.filter((person) => person.role !== 'police').length,
     itemBoxes: [],
     corpseRooms: [],
+    exhaustPile: [],
+    powerPile: [],
     sadakoHidden: killerId === '贞子',
     freePowerTurn: 0,
     blinkReturnRoom: null,    tvRooms: killerId === '贞子'

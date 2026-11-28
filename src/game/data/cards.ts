@@ -382,6 +382,11 @@ export const CARDS: CardDef[] = [
   },
 ];
 
+// 厄咒 / 天灾钩子属于强化：打出后本局持续生效，并从牌堆移除。
+for (const card of CARDS) {
+  if (card.id.startsWith('hex_') || card.id.startsWith('scourge_')) card.power = true;
+}
+
 export const CARD_MAP: Record<string, CardDef> = CARDS.reduce(
   (acc, card) => {
     acc[card.id] = card;

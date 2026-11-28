@@ -1,6 +1,18 @@
 import { ACCESSORY_MAP } from './data/accessories';
 import type { AccessoryEffect, AccessoryEffectAction, AccessoryEffectTrigger, GameState } from './types';
 
+export const EFFECT_TRIGGER_GROUPS: Array<{ label: string; triggers: AccessoryEffectTrigger[] }> = [
+  { label: '通用 / 能力', triggers: ['passive', 'usePower', 'firstPower', 'draw'] },
+  { label: '尾随 / 恶魔附身', triggers: ['stalk', 'possessEnter', 'possessExit', 'possessHit', 'kill'] },
+  { label: '护士 / 闪现', triggers: ['blink'] },
+];
+
+export const EFFECT_ACTION_GROUPS: Array<{ label: string; actions: AccessoryEffectAction[] }> = [
+  { label: '资源', actions: ['ap', 'draw', 'blood'] },
+  { label: '压力', actions: ['fear', 'stalk', 'restoreStalk', 'maxStalk'] },
+  { label: '状态', actions: ['undetectable', 'deepWound', 'revealAura', 'noStalkDecay', 'instantExecute', 'freePower', 'returnBlink', 'blinkMisses', 'possessBloodDouble', 'retainStalkOnExit', 'possessDamage'] },
+];
+
 export const EFFECT_TRIGGERS: Record<AccessoryEffectTrigger, string> = {
   passive: '被动（整局）',
   usePower: '使用杀手能力时',

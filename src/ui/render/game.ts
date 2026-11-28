@@ -98,8 +98,11 @@ function roomFeatures(state: GameState, roomId: RoomId): string {
     const breakerTitle = `${escape(circuitAt.name)}：${status}，影响 ${circuitAt.affectedRooms.map(roomName).join('、')}`;
     const breakerBlocked = breakerBlockReason(state, circuitAt.id) ? 'disabled' : '';
     parts.push(state.playerRoom === roomId
-      ? `<button type="button" class="room-feature breaker ${circuitAt.broken || circuitAt.enabled === false ? 'broken' : ''}" data-action="toggle-breaker" data-circuit-id="${circuitAt.id}" ${breakerBlocked} title="${breakerTitle}。点击${circuitAt.enabled === false ? '合闸恢复供电' : '拉闸切断供电'}（${BREAKER_SWITCH_COST} AP）">${icon('generator', 'ui-icon tiny')}<b>${circuitAt.enabled === false ? '合闸' : '拉闸'}</b></button>`
-      : `<span class="room-feature breaker ${circuitAt.broken || circuitAt.enabled === false ? 'broken' : ''}" title="${breakerTitle}">${icon('generator', 'ui-icon tiny')}<b>电闸</b></span>`);
+      ? `<span class="feature-anchor breaker-actions">
+          <button type="button" class="room-feature breaker ${circuitAt.broken || circuitAt.enabled === false ? 'broken' : ''}" data-action="toggle-breaker" data-circuit-id="${circuitAt.id}" ${breakerBlocked} title="${breakerTitle}。点击${circuitAt.enabled === false ? '合闸恢复供电' : '拉闸切断供电'}（${BREAKER_SWITCH_COST} AP）">${icon('generator', 'ui-icon tiny')}<b>${circuitAt.enabled === false ? '合闸' : '拉闸'}</b></button>
+          ${circuitAt.broken ? '<span class="feature-action broken">控制箱已毁</span>' : `<button type="button" class="feature-action danger" data-action="sabotage" ${state.energy < SABOTAGE_COST ? 'disabled' : ''} title="永久砸毁${escape(circuitAt.name)}控制箱，使 ${circuitAt.affectedRooms.map(roomName).join('、')} 断电：${SABOTAGE_COST} AP">破坏电闸 · ${SABOTAGE_COST} AP</button>`}
+        </span>`
+      : `<span class="room-feature breaker ${circuitAt.broken || circuitAt.enabled === false ? 'broken' : ''}" title="${breakerTitle}">${icon('generator', 'ui-icon tiny')}<b>${circuitAt.broken ? '电闸已毁' : '电闸'}</b></span>`);
   }
   state.itemBoxes.filter((box) => box.room === roomId).forEach((box) => {
     const status = box.broken ? '已被砸烂' : box.charges > 0 ? `还能翻 ${box.charges} 件` : '已被翻空';
@@ -140,7 +143,8 @@ function roomFeatures(state: GameState, roomId: RoomId): string {
     }
   }
   if ((state.crows ?? []).includes(roomId) && state.explored.includes(roomId)) {
-    const crowHot = (state.crowTriggered ?? []).includes(roomId);
+    const crowClock = state.crowAlerts?.[roomId];
+    const crowHot = crowClock !== undefined && state.trailClock - crowClock <= 4;
     parts.push(`<span class="room-feature crow-room${crowHot ? ' triggered' : ''}" title="这间屋里有乌鸦：幸存者在这里行动会惊起它们">${icon('crow', 'ui-icon tiny')}<b>乌鸦</b></span>`);
   }
   if (roomId === EXIT_ROOM) parts.push(`<span class="room-feature escape" title="撤离点：任务完成的撤离位置">${icon('escape', 'ui-icon tiny')}</span>`);
@@ -597,7 +601,7 @@ function personSlotStyle(roomId: RoomId, personId: string, index: number): strin
             : !state.lookingAround && !state.huntressAiming && adjacent && !barricaded
               ? `<button type="button" class="room-hit ${reachable ? '' : 'blocked'}" data-action="move" data-room="${room.id}" aria-label="${escape(moveHint)}" title="${escape(moveHint)}"></button>`
               : ''}
-        ${(state.crowTriggered ?? []).includes(room.id)
+        ${(state.crowTriggered ?? []).includes(room.id) && state.crowAlerts?.[room.id] !== undefined && state.trailClock - state.crowAlerts[room.id]! <= 4
           ? `<span class="global-ping crow" title="乌鸦被惊起：${escape(room.name)}有人行动">${icon('crow', 'crow-icon tiny')}</span>`
           : ''}
         ${state.escapeRooms.includes(room.id)
@@ -679,6 +683,8 @@ function personSlotStyle(roomId: RoomId, personId: string, index: number): strin
         <button class="card ${def.type} ${selectingDiscards ? 'discard-choice' : ''}" data-action="${action}" data-uid="${card.uid}" data-card-uid="${card.uid}"
           ${disabled ? 'disabled' : ''} title="${escape(selectingDiscards ? '点击弃掉这张牌' : def.desc)}">
           <span class="card-type">${escape(TYPE_NAMES[def.type] ?? def.type)}</span>
+          ${def.exhaust ? '<span class="card-keyword exhaust" title="消耗：打出后本局不再回到牌库">消耗</span>' : ''}
+          ${def.power ? '<span class="card-keyword power" title="强化：提供整场持续效果，打出后从本局移除">强化</span>' : ''}
           <span class="card-cost">${cost}</span>
           ${isCardTuned(def.id) ? '<span class="card-tuned" title="这张卡使用了你在平衡调整里改过的数值">调</span>' : ''}
           ${perkIconHtml(def.id)}
@@ -923,6 +929,7 @@ function personSlotStyle(roomId: RoomId, personId: string, index: number): strin
             <button class="btn ghost mini audio-toggle" data-action="mute" title="开关音效与背景音乐">${isMuted() ? '音效 关' : '音效 开'}</button>
           </div>
           ${statusHtml}${carryStatus}${huntPlanHtml}
+          ${state.escapeRooms.length ? `<div class="escape-gate-banner" role="status"><b>逃生大门已开启</b><span>${state.escapeRooms.map((room) => roomName(room)).join('、')} · 幸存者正在向这里移动</span></div>` : ''}
           ${facilityOverviewHtml(state)}
           ${state.lookingAround ? '<div class="look-prompt" role="status"><b>选择要查看的房间</b><span>地图上亮起边框的房间都与当前位置相邻。点击其中一个，消耗 1 点行动点查看。</span><button class="btn ghost mini" data-action="look-cancel">取消</button></div>' : ''}
           ${state.huntressAiming ? '<div class="look-prompt hatchet-prompt" role="status"><b>狩猎飞斧瞄准中</b><span>点击地图上可见的站立幸存者。飞斧只能命中当前房间或正前方直线房间内的目标；无法投出的原因会显示在现场反馈中。</span></div>' : ''}
