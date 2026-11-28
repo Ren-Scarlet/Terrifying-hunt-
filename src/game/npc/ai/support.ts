@@ -78,7 +78,7 @@ export function tryAidRun(host: NpcHost, state: GameState, person: Person): bool
 
 /** 求救型：在电话旁报警 */
 export function tryCall(host: NpcHost, state: GameState, person: Person): boolean {
-  if (person.blockedTurns > 0) return false;
+  if (person.blockedTurns > 0 || person.fear >= 85) return false;
   if (!phoneWorks(state, person.room)) return false;
   person.activity = '按住电话线的手指在抖';
   return true;

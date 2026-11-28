@@ -289,6 +289,7 @@ function updateAttackGhostEscapeDirection(ghost: AttackGhost | null, personId: s
 function playKillerAttackSound(state: GameState): void {
   if (state.killer === '护士') playSfx('nurseAttack');
   else if (state.killer === '迈克尔·迈尔斯') playSfx('myersAttack');
+  else if (state.killer === '贞子') playSfx('sadakoAttack');
   else playSfx('attack');
 }
 
@@ -426,8 +427,14 @@ function cycleDisplaySetting(key: keyof DisplaySettings): void {
 
 function render(): void {
   const view = ui();
-  // 菜单（含商店/牌组/平衡面板）放角色选择曲，进入对局换背景曲；同一首不会重播
-  setMusic(view.screen === 'menu' || !game ? 'menu' : 'bgm');
+  // 菜单放角色选择曲；对局中有人被追时切换对应杀手的追逐 BGM。
+  const chaseTrack: import('./ui/audio').MusicTrack =
+    save.killer === '护士' ? 'nurseChase'
+      : save.killer === '迈克尔·迈尔斯' ? 'myersChase'
+        : save.killer === '贞子' ? 'sadakoChase'
+          : save.killer === '鬼面' ? 'ghostfaceChase'
+            : 'bgm';
+  setMusic(view.screen === 'menu' || !game ? 'menu' : game.chaseTargetId ? chaseTrack : 'bgm');
   let html = '';
   // 面板最多只有一个（viewState 保证互斥），因此这里不需要再比较哪个布尔量优先。
   if (view.panel === 'workshop') {
@@ -602,6 +609,7 @@ function syncHuntAlerts(): void {
   lastLogTop = top;
   const turnsLeft = Math.max(0, game.mission.turns - game.turn + 1);
   if (turnsLeft <= 3 && turnsLeft < lastTurnsLeft) {
+    playSfx('turnWarning');
     pushHuntAlert(
       turnsLeft <= 0
         ? '契约回合已经耗尽！'
@@ -717,6 +725,7 @@ function sfxFromLogs(): void {
   else if (/砸晕|木板突然向你砸来/.test(head)) playSfx('palletStun');
   else if (/放下木板/.test(head)) playSfx('palletDrop');
   else if (/木板砸碎|砸碎.*木板/.test(head)) playSfx('barricadeSmash');
+  else if (/咒怨达到 7 层/.test(head)) playSfx('curse7');
   else if (/踩中捕兽夹|捕兽夹.*咬|触发.*捕兽夹/.test(head)) playSfx('trapTrigger');
   else if (/电话突然响起|正在尝试报警|已经被报警|电话线/.test(head)) playSfx('phone');
   else if (/砸毁|断电|控制箱|电闸/.test(head)) {
@@ -1181,6 +1190,7 @@ function createGameActions(): ActionTable {
       const wasPossessed = game.possessed;
       const used = powerId ? usePower(game, powerId) : false;
       if (used && powerId === 'trap_set') playSfx('trapSet');
+      if (used && powerId === 'sadako_deluge' && !game.sadakoHidden) playSfx('sadakoReveal');
       if (used && (powerId === 'wraith_bell' || powerId === 'wraith_rush')) playSfx('wraithPower');
       if (!wasPossessed && game.possessed && game.killer === '迈克尔·迈尔斯') {
         playSfx('possess');
@@ -1311,7 +1321,7 @@ function createGameActions(): ActionTable {
 
     'sadako-tv': ({ target }) => {
       const room = target.dataset.room;
-      if (room && sadakoTeleport(currentGame(), room as RoomId)) playSfx('spark');
+      if (room && sadakoTeleport(currentGame(), room as RoomId)) playSfx('sadakoTv');
       afterAction();
     },
 
@@ -1329,6 +1339,7 @@ function createGameActions(): ActionTable {
       // 翻柜子统一用柜子音效：以前不管房里有柜子没柜子都是“点击声”，和开柜子两套声音。
       if (state.energy < energyBefore) {
         playSfx(isCabinetRoom(state) ? 'cabinet' : 'click');
+        if (isCabinetRoom(state)) window.setTimeout(() => playSfx('cabinetAfter'), 900);
       }
       afterAction();
     },
@@ -1584,6 +1595,7 @@ registry.register('血网', {
     writeSave(save);
     playSfx('stage');
     bloodwebOffers = rollBloodweb(killer);
+    playSfx('bloodwebUp');
     render();
   },
   'bloodweb-pick': ({ target }) => {

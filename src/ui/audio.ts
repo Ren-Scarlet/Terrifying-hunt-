@@ -102,6 +102,14 @@ const SFX_FILES = {
   palletStun: '幸存者放下板子（木板障碍物）砸晕屠夫.ogg',
   executionSite: '点击地图中执行特殊数据的音效.ogg',
   barricadeSmash: '玩家破坏模板障碍物.ogg',
+  // 第五批：作者新上传的音效
+  curse7: 'curse7.ogg',
+  turnWarning: 'turnWarning.ogg',
+  cabinetAfter: 'cabinetAfter.ogg',
+  bloodwebUp: 'bloodwebUp.ogg',
+  sadakoTv: 'sadakoTv.ogg',
+  sadakoAttack: 'sadakoAttack.ogg',
+  sadakoReveal: 'sadakoReveal.ogg',
 } as const;
 
 export type SfxName = keyof typeof SFX_FILES;
@@ -155,9 +163,18 @@ const VOLUME: Partial<Record<SfxName, number>> = {
 };
 
 /* ---------- 背景音乐：菜单一首、对局一首，按界面自动切换 ---------- */
-export type MusicTrack = 'menu' | 'bgm';
-const MUSIC_FILES: Record<MusicTrack, string> = { menu: 'menu.mp3', bgm: '环境底噪1.ogg' };
-const MUSIC_VOLUME: Record<MusicTrack, number> = { menu: 0.4, bgm: 0.22 };
+export type MusicTrack = 'menu' | 'bgm' | 'nurseChase' | 'myersChase' | 'sadakoChase' | 'ghostfaceChase';
+const MUSIC_FILES: Record<MusicTrack, string> = {
+  menu: 'menu.mp3',
+  bgm: '环境底噪1.ogg',
+  nurseChase: 'nurseChase.ogg',
+  myersChase: 'myersChase.ogg',
+  sadakoChase: 'sadakoChase.ogg',
+  ghostfaceChase: 'ghostfaceChase.ogg',
+};
+const MUSIC_VOLUME: Record<MusicTrack, number> = {
+  menu: 0.4, bgm: 0.22, nurseChase: 0.28, myersChase: 0.28, sadakoChase: 0.28, ghostfaceChase: 0.28,
+};
 
 const BASE =
   ((import.meta as unknown as { env?: { BASE_URL?: string } }).env?.BASE_URL) || './';

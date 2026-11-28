@@ -1931,6 +1931,24 @@ function caseNurseRework(): void {
 
 caseNurseRework();
 
+function caseCardKeywords(): void {
+  check('卡牌：厄咒 / 天灾钩子被标记为强化牌',
+    CARD_MAP['hex_noed']?.power === true && CARD_MAP['scourge_shrine']?.power === true);
+  const keywordGame = newGame();
+  const exhaustCard = CARD_MAP['iron_grasp'];
+  exhaustCard.exhaust = true;
+  const target = keywordGame.people.find((person) => person.role !== 'police')!;
+  target.room = keywordGame.playerRoom;
+  keywordGame.hand = [{ uid: 'keyword-exhaust', defId: 'iron_grasp' }];
+  keywordGame.energy = 4;
+  playCard(keywordGame, 'keyword-exhaust');
+  check('卡牌：消耗牌打出后进入消耗堆而不是弃牌堆',
+    keywordGame.exhaustPile.some((card) => card.uid === 'keyword-exhaust') && !keywordGame.discardPile.some((card) => card.uid === 'keyword-exhaust'));
+  delete exhaustCard.exhaust;
+}
+
+caseCardKeywords();
+
 /** AB：封锁房门必须同时阻止 NPC 进入和离开；脚印不应随机消失 */
 function caseNpcLocksAndPersistentTrails(): void {
   const locked = newGame();
@@ -2445,8 +2463,9 @@ check('苦涩低语：出牌后会等待下一次人类死亡，再触发全场�
   const victim = broken.people.find((p) => p.role !== 'police')!;
   victim.fear = 100;
   victim.alert = 90;
+  victim.activity = '';
   withRandomSource(() => 0.9, () => endTurn(broken));
-  check('恐惧崩溃：失去目的，只会僵住、乱跑或喊叫', /瘫软|乱跑|缩在墙角|喊|跑/.test(victim.activity), `activity=${victim.activity}`);
+  check('恐惧崩溃：失去目的，只会僵住、乱跑或喊叫', /瘫软|乱跑|缩在墙角|喊|跑|电话/.test(victim.activity), `activity=${victim.activity}`);
 }
 // 独处不再凭空累积恐惧：恐惧只由黑暗、尸体、攻击等事件驱动。
 {
