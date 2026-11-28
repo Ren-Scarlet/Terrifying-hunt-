@@ -97,18 +97,21 @@ import { createMenuActions } from './ui/menuActions';
 import { session } from './ui/session';
 import { closePanel, inGame, openPanel, showGame, showMenu, showResult, ui } from './ui/viewState';
 
-// 从当前浏览器读取本地卡牌覆盖；没有个人配置时仍使用仓库默认数值。
+// 桌面版使用完全本地的卡牌配置，不在启动时请求 GitHub 云端配置。
+// 网页版仍保留原有的公开配置读取能力。
 applyTuning();
-void initCloudAuth().then(async () => {
-  try {
-    const cloud = await loadCloudConfig();
-    if (cloud) {
-      const tuningModule = await import('./game/tuning');
-      if (tuningModule.importTuning(JSON.stringify(cloud))) render();
-    }
-  } catch (error) { console.warn('云端配置暂不可用：', error); }
-  if (ui().panel === 'admin') render();
-});
+if (window.location.protocol !== 'file:') {
+  void initCloudAuth().then(async () => {
+    try {
+      const cloud = await loadCloudConfig();
+      if (cloud) {
+        const tuningModule = await import('./game/tuning');
+        if (tuningModule.importTuning(JSON.stringify(cloud))) render();
+      }
+    } catch (error) { console.warn('云端配置暂不可用：', error); }
+    if (ui().panel === 'admin') render();
+  });
+}
 
 bootCustomAccessories();
 let save: SaveData = loadSave();
