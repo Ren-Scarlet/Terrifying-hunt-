@@ -23,7 +23,6 @@ export function counterAttack(host: NpcHost, state: GameState, person: Person): 
   state.frenzy = 0;
   state.frenzyStreak = 0;
   person.alert = 100;
-  person.intent = 'wary';
   person.activity = '握着刀挡在门口';
   host.addAlarm(state, 4);
   host.log(state, `${person.name} 抄起武器朝你扑过来——你被逼退了一步（下回合少 1 点行动点）。`);
@@ -31,7 +30,6 @@ export function counterAttack(host: NpcHost, state: GameState, person: Person): 
 
 export function barricadeRoom(host: NpcHost, state: GameState, person: Person): boolean {
   if (!canPlaceBarricade(state, person)) return false;
-  person.intent = 'barricade';
   state.palletDropCount = (state.palletDropCount ?? 0) + 1;
   person.activity = '放下木板堵住入口';
   state.barricades.push(person.room);
@@ -51,14 +49,12 @@ export function tryRescue(host: NpcHost, state: GameState, person: Person): bool
   const downed = allies.find((p) => p.hp <= 0);
   if (downed) {
     host.rescuePerson(state, downed);
-    person.intent = 'rescue';
     person.activity = `正在把 ${downed.name} 从地上拖起来`;
     return true;
   }
   const injured = allies.find((p) => p.hp > 0 && p.hp <= SURVIVOR_INJURED_HP);
   if (injured) {
     host.healPerson(state, injured, 1);
-    person.intent = 'heal';
     person.activity = `正在给 ${injured.name} 包扎`;
     return true;
   }
@@ -76,7 +72,6 @@ export function tryAidRun(host: NpcHost, state: GameState, person: Person): bool
   const step = nextStepToward(state, person.room, downed.room, [state.playerRoom]);
   if (!step) return false;
   person.room = step;
-  person.intent = 'rescue';
   person.activity = `朝${downed.name}倒下的地方赶去`;
   return true;
 }
@@ -88,7 +83,6 @@ export function tryCall(host: NpcHost, state: GameState, person: Person): boolea
   const canRadio = !state.sabotage.includes('radio') && RADIO_ROOMS.includes(person.room);
 
   if (canPhone) {
-    person.intent = 'call';
     person.activity = '按住电话线的手指在抖';
     return true;
   }
@@ -98,7 +92,6 @@ export function tryCall(host: NpcHost, state: GameState, person: Person): boolea
       finishCall(host, state, person, '无线电');
       return true;
     }
-    person.intent = 'call';
     person.activity = '在无线电前调频，还差一回合';
     host.log(state, `${person.name} 正在调无线电，再有一回合就能把消息发出去。`);
     return true;
@@ -111,7 +104,6 @@ export function finishCall(host: NpcHost, state: GameState, person: Person, devi
   host.addWanted(state, 3);
   host.addAlarm(state, 15);
   state.lastCrimeRoom = person.room;
-  person.intent = 'flee';
   person.alert = 100;
   person.callTurns = 0;
   host.log(state, `${person.name} 用${device}联系上了外面：「他在${roomName(person.room)}！」暴露度大涨，警察正赶过去。`);

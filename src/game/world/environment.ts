@@ -35,7 +35,6 @@ export function triggerEnvironmentalEvent(host: NpcHost, state: GameState): void
       const affected = npcs(state).filter((person) => person.hp > 0 && !person.hidden && roomDistance(person.room, room) <= 1);
       affected.forEach((person) => {
         person.alert = clamp(person.alert + 14, 0, 100);
-        if (person.alert >= 40 && person.intent === 'idle') person.intent = 'wary';
         person.activity = '被屋顶积雪坠落的巨响惊动';
       });
       state.disturbances.push({ room, turn: state.turn, clock: state.trailClock, label: '积雪坠落' });
@@ -54,7 +53,6 @@ export function triggerEnvironmentalEvent(host: NpcHost, state: GameState): void
       const affected = npcs(state).filter((person) => person.hp > 0 && !person.hidden && roomDistance(person.room, room) <= 1);
       affected.forEach((person) => {
         person.alert = clamp(person.alert + 10, 0, 100);
-        if (person.intent === 'idle') person.intent = 'wary';
         person.activity = '被幼儿教室断续响起的玩具音乐吸引';
       });
       host.log(state, `【环境事件】巴德姆 · 玩具音乐盒】幼儿教室传出走调的旋律，${affected.length ? affected.map((person) => person.name).join('、') + '开始寻找声音来源' : '空荡荡的走廊里只有音乐在回响'}。`);
@@ -66,7 +64,6 @@ export function triggerEnvironmentalEvent(host: NpcHost, state: GameState): void
       const caller = randomOf(npcs(state).filter((person) => person.hp > 0 && !person.hidden));
       if (caller) {
         caller.alert = clamp(caller.alert + 16, 0, 100);
-        caller.intent = 'wary';
         caller.activity = '听见广播里的求救杂音，正在确认来源';
       }
       host.log(state, `【环境事件】巴德姆 · 失真广播】大厅喇叭突然响起一段听不清的求救录音${caller ? '，' + caller.name + '停下脚步侧耳倾听' : ''}。`);
@@ -91,7 +88,6 @@ export function triggerEnvironmentalEvent(host: NpcHost, state: GameState): void
       const affected = npcs(state).filter((person) => person.hp > 0 && !person.hidden && roomDistance(person.room, room) <= 1);
       affected.forEach((person) => {
         person.alert = clamp(person.alert + 12, 0, 100);
-        if (person.intent === 'idle') person.intent = 'wary';
         person.activity = '被车库外突然响起的汽车警报惊动';
       });
       host.log(state, `【环境事件】兰普金巷 · 汽车警报】车库里的警报器突然尖叫，${affected.length ? affected.map((person) => person.name).join('、') + '被惊动' : '街道上没有人回应'}。`);
@@ -105,7 +101,6 @@ export function triggerEnvironmentalEvent(host: NpcHost, state: GameState): void
     );
     affected.forEach((person) => {
       person.alert = clamp(person.alert + 12, 0, 100);
-      if (person.alert >= 45) person.intent = 'wary';
       person.activity = '被课间铃声惊动，正在寻找声音来源';
     });
     state.disturbances.push({ room, turn: state.turn, clock: state.trailClock, label: '课间铃声' });
@@ -145,7 +140,6 @@ export function triggerEnvironmentalEvent(host: NpcHost, state: GameState): void
       const person = randomOf(callers);
       person.goal = 'phone';
       person.alert = clamp(Math.max(45, person.alert + 18), 0, 100);
-      person.intent = 'call';
       person.activity = '被突然响起的电话吸引，正赶去求救';
       host.log(state, `【环境事件】电话突然响起。${person.name}听见铃声，正朝电话赶去——再不阻止，他可能会报警。`);
       return;
@@ -169,7 +163,6 @@ export function triggerEnvironmentalEvent(host: NpcHost, state: GameState): void
   const startled = npcs(state).filter((person) => person.hp > 0 && !person.hidden && person.room === room.id);
   startled.forEach((person) => {
     person.alert = clamp(person.alert + 12, 0, 100);
-    person.intent = 'wary';
     person.activity = '被玻璃碎裂声惊动，正查看四周';
   });
   host.log(state, `【环境事件】${room.name}突然传来玻璃碎裂声${startled.length ? `，${startled.map((person) => person.name).join('、')}被惊动了` : '，声音在空房间里回荡'}。`);

@@ -19,17 +19,14 @@ export function callPhase(host: NpcHost, state: GameState): void {
   if (!workingPhones(state).length) return;
   if (alarmSuppressed(state)) return;
   npcs(state)
-    .filter((p) => p.intent === 'call' && p.hp > 0 && phoneWorks(state, p.room))
+    .filter((p) => p.hp > 0 && phoneWorks(state, p.room) && /电话|求救/.test(p.activity))
     .forEach((person) => host.finishCall(state, person, '电话'));
 }
 
 /**
  * 已经在逃生点的人真的跑掉了吗
  *
- * 注意这里不能只看 intent === 'escape'：fleeAway() 会把 intent 写成 'flee'，
- * 一个被追到后院的人如果只算「逃跑中」，后院反而成了绝对安全区——玩家把人
- * 逼到院子里却什么都不会发生。所以只要人站在逃生点、并且确实在慌（逃跑中
- * 或者警觉够高），就当他开始翻篱笆。
+ * 只要人站在逃生点、并且确实在慌（警觉够高或已经开始翻篱笆），就当他开始翻篱笆。
  */
 export function escapePhase(host: NpcHost, state: GameState): void {
   if (state.escapeRooms.length !== 2) return;
@@ -46,8 +43,7 @@ export function escapePhase(host: NpcHost, state: GameState): void {
       person.escapeProgress = 0;
       continue;
     }
-    // 站到后院就等于决定要走了，后面 actByArchetype 别再把他劝回去
-    person.intent = 'escape';
+    // 站到后院就等于决定要走了，后面决策别再把他劝回去
     if (state.exitBlockedTurns > 0) {
       person.activity = '逃生点被封锁，暂时无法离开';
       host.log(state, `${person.name} 抵达逃生点，但出口被封锁了。`);

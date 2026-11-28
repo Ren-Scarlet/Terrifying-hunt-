@@ -177,21 +177,6 @@ export type PersonRole = 'target' | 'civilian' | 'police';
  */
 export type Archetype = 'alert' | 'defiant' | 'caller' | 'rescuer' | 'hider' | 'brave' | 'kiter';
 
-/** NPC 这一回合的打算，会显示在平面图上供玩家预判 */
-export type NpcIntent =
-  | 'idle'
-  | 'wary'
-  | 'flee'
-  | 'barricade'
-  | 'call'
-  | 'hide'
-  | 'escape'
-  | 'stunned'
-  | 'heal'
-  | 'rescue'
-  /** 正在处理现场事务 */
-  | 'work';
-
 /** 个人目的：决定他慌乱时往哪跑，是这一局 NPC 的行为主轴 */
 export type NpcGoal =
   | 'phone'
@@ -241,8 +226,6 @@ export interface Person {
   dialogue: string;
   /** 当前行为，用于档案与人物名单 */
   activity: string;
-  /** 这一回合的意图 */
-  intent: NpcIntent;
   /** 个人目的 */
   goal: NpcGoal;
   /** 日常路线的当前停靠点、观察次数与是否已被玩家识破。 */

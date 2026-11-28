@@ -1,5 +1,4 @@
 import { drawCards } from '../deck';
-import { INTENT_LABEL } from '../npc/catalog';
 import { POSSESS_TURNS, SURVIVOR_MAX_HP } from '../constants';
 import { roomDistance } from '../navigation';
 import { EXECUTION_METHODS } from '../executions';
@@ -89,13 +88,11 @@ export function executeOps(state: GameState, ops: Op[], runtime: EffectRuntime):
       case 'alert':
         selectPeople(state, op.who).forEach((p) => {
           p.alert = clamp(p.alert + op.amount, 0, 100);
-          if (op.amount > 0 && p.intent === 'idle') p.intent = 'wary';
         });
         break;
       case 'block':
         selectPeople(state, op.who).forEach((p) => {
           p.blockedTurns = Math.max(p.blockedTurns, op.turns);
-          p.intent = 'stunned';
         });
         break;
       case 'status':
@@ -169,7 +166,6 @@ export function executeOps(state: GameState, ops: Op[], runtime: EffectRuntime):
           const step = nextStepToward(state, p.room, dest, [state.playerRoom]);
           if (step) {
             movePersonTo(state, p, step);
-            p.intent = 'wary';
             p.activity = '循着声音走过去';
           } else if (p.room !== dest) {
             p.room = dest;
@@ -216,7 +212,6 @@ export function executeOps(state: GameState, ops: Op[], runtime: EffectRuntime):
           .sort((a, b) => roomDistance(b, state.playerRoom) - roomDistance(a, state.playerRoom))[0];
         if (escapeRoom) {
           movePersonTo(state, target, escapeRoom);
-          target.intent = 'flee';
           target.activity = '受到恐惧冲击，向远离杀手的方向逃跑';
           log(state, `恐慌降临：${target.name}恐惧 +${op.amount}，并向远离你的方向逃进${roomName(escapeRoom)}。`);
         } else {
@@ -301,7 +296,7 @@ export function executeOps(state: GameState, ops: Op[], runtime: EffectRuntime):
       case 'reveal': {
         const list = npcs(state)
           .filter((p) => !p.hidden)
-          .map((p) => `${p.name}（${roomName(p.room)}·${INTENT_LABEL[p.intent]}）`)
+          .map((p) => `${p.name}（${roomName(p.room)}·${p.activity || '没有明显动作'}）`)
           .join('、');
         log(state, list ? `你摸清了所有人的位置：${list}。` : '房子里安静得没有人。');
         scoutRoom(state, state.playerRoom, 2);

@@ -91,7 +91,6 @@ export function npcTurn(host: NpcHost, state: GameState): void {
         host.killPerson(state, person);
       } else {
         person.activity = `倒在地上，还有 ${BLEEDOUT_TURNS - person.downedTurns} 回合`;
-        person.intent = 'stunned';
       }
       continue;
     }
@@ -115,13 +114,11 @@ export function npcTurn(host: NpcHost, state: GameState): void {
 
     if (person.blockedTurns > 0) {
       person.blockedTurns -= 1;
-      person.intent = person.blockedTurns > 0 ? 'stunned' : 'wary';
       person.activity = person.blockedTurns > 0 ? '被按在原地，动不了' : '扶着墙站起来';
       continue;
     }
     if (state.pinnedPeople.includes(person.id)) {
       person.activity = '被锁链钉住，无法动弹';
-      person.intent = 'stunned';
       continue;
     }
     if (person.hidden && !state.emergencyActive) {
@@ -132,7 +129,6 @@ export function npcTurn(host: NpcHost, state: GameState): void {
           person.movesThisTurn += 1;
         }
       } else {
-        person.intent = 'hide';
         person.activity = '缩在柜子里，不敢出声';
         person.alert = Math.max(0, person.alert - 4);
       }
@@ -150,7 +146,7 @@ export function npcTurn(host: NpcHost, state: GameState): void {
 
     // 保命优先：救援、赶去救倒地的人，先于一切日常决策。
     if (host.tryRescue(state, person)) continue;
-    if (person.intent !== 'escape' && person.intent !== 'call' && host.tryAidRun(state, person)) continue;
+    if (person.alert < 75 && !/电话|无线电/.test(person.activity) && host.tryAidRun(state, person)) continue;
 
     // 房门被封锁时，NPC 不能离开当前房间。
     if (isLocked(state, person.room)) {

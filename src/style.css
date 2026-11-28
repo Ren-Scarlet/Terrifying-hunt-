@@ -1547,32 +1547,6 @@ button { font-family: inherit; cursor: pointer; }
 
 .btn.end-turn { margin-left: auto; }
 
-/* ==========================================================================
-   NPC 意图：地图与名单上的小圆点
-   ========================================================================== */
-
-.intent-dot {
-  display: inline-block;
-  width: 6px; height: 6px; flex: 0 0 auto;
-  border-radius: 50%;
-  background: #5a5348;
-}
-.intent-dot.i-wary { background: #b3945f; box-shadow: 0 0 6px #b3945f66; }
-.intent-dot.i-flee { background: #c07a4a; box-shadow: 0 0 7px #c07a4a77; }
-.intent-dot.i-call { background: #6e8ba3; box-shadow: 0 0 8px #6e8ba3aa; animation: intentPulse 1.4s ease-in-out infinite; }
-.intent-dot.i-escape { background: #9c3f2b; box-shadow: 0 0 9px #9c3f2baa; animation: intentPulse 1s ease-in-out infinite; }
-.intent-dot.i-barricade { background: #8a7a5e; }
-.intent-dot.i-hide { background: #4a5a4a; }
-.intent-dot.i-stunned { background: #3a3d40; }
-
-@keyframes intentPulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: .45; transform: scale(.7); }
-}
-
-.legend-intent { display: inline-flex; align-items: center; gap: 5px; }
-.legend-intent .intent-dot { margin-left: 6px; }
-
 /* 名单里显示目的 */
 .roster-person .goal-line {
   display: block;
@@ -1679,7 +1653,6 @@ button { font-family: inherit; cursor: pointer; }
 .roster-person.unknown small { color: #6f6a62; }
 .roster-person.downed { border-color: #5f2b21; }
 .roster-person.downed small { color: #c88c7c; }
-.intent-dot.i-heal, .intent-dot.i-rescue { background: #7d9a86; box-shadow: 0 0 7px #7d9a8666; }
 .legend-fog { color: #6a655e; }
 
 .admin-overlay { align-items: flex-start; padding: 28px 16px; overflow-y: auto; }

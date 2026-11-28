@@ -1,18 +1,4 @@
-import type { Archetype, Health, NpcGoal, NpcIntent, RoomId } from '../types';
-
-export const INTENT_LABEL: Record<NpcIntent, string> = {
-  idle: '做自己的事',
-  wary: '起疑',
-  flee: '逃跑中',
-  barricade: '正在堵门',
-  call: '正在打电话',
-  hide: '躲起来了',
-  escape: '翻篱笆',
-  stunned: '动不了',
-  heal: '正在治疗',
-  rescue: '正在救援',
-  work: '正在处理现场事务',
-};
+import type { Archetype, Health, NpcGoal, RoomId } from '../types';
 
 export const GOAL_LABEL: Record<NpcGoal, string> = {
   phone: '想打电话报警',

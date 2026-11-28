@@ -74,11 +74,7 @@ export function isQuietMove(state: GameState, person: Person): boolean {
 /** 站在逃生点、且已经决定了要走的人，才会真的翻篱笆 */
 export function wantsToLeave(state: GameState, person: Person): boolean {
   if (!state.escapeRooms.length || !state.escapeRooms.includes(person.room)) return false;
-  return (
-    person.intent === 'escape' ||
-    person.intent === 'flee' ||
-    person.alert >= ESCAPE_ALERT_MIN
-  );
+  return person.alert >= ESCAPE_ALERT_MIN || person.escapeProgress > 0;
 }
 
 /** 只有原始就有木板的房间才能再放一块；同一个房间不能重复封 */

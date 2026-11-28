@@ -47,7 +47,7 @@ export function killPerson(host: NpcHost, state: GameState, person: Person): voi
   // 只有被看见的击杀才会推高暴露度。悄悄做掉的、屋子里没人的，
   // 外面只知道「又少了一个人」——那是暴露度该管的事，不是暴露度。
   const seenBy = npcs(state).filter(
-    (p) => p.room === person.room && p.hp > 0 && !p.hidden && (p.alert >= 25 || p.intent !== 'idle'),
+    (p) => p.room === person.room && p.hp > 0 && !p.hidden && p.alert >= 25,
   );
   if (directWitnesses > 0 || seenBy.length) {
     host.addWanted(state, person.role === 'target' ? 2 : 1);
@@ -90,7 +90,6 @@ export function damagePerson(host: NpcHost, state: GameState, person: Person, am
     person.statusEffects!.danger = 0;
     person.hp = 0;
     person.downedTurns = 0;
-    person.intent = 'stunned';
     person.activity = '受到攻击，危险状态触发并立即倒地';
     person.alert = 100;
     host.log(state, `${person.name} 处于危险状态，受到攻击后立即倒地！`);
@@ -122,7 +121,6 @@ export function damagePerson(host: NpcHost, state: GameState, person: Person, am
   if (person.hp <= 0) {
     person.hp = 0;
     person.downedTurns = 0;
-    person.intent = 'stunned';
     person.activity = '倒在地上，动不了';
     person.alert = 100;
     host.log(state, `${person.name} 被打倒在地上。现在可以直接处决；如果暂时放过，同伴仍可能赶来救援。`);
@@ -133,7 +131,6 @@ export function damagePerson(host: NpcHost, state: GameState, person: Person, am
 
   // 受到伤害后会惊慌逃跑；累计达到 2 点时，状态才正式变为受伤。
   person.alert = 100;
-  person.intent = 'flee';
   person.activity = person.hp <= SURVIVOR_INJURED_HP ? '捂着伤口逃窜' : '受到攻击，惊慌逃窜';
   person.goal = 'exit';
   if (before > SURVIVOR_INJURED_HP && person.hp <= SURVIVOR_INJURED_HP) host.log(state, `${person.name} 受伤了（${person.hp}/${SURVIVOR_MAX_HP}），丢下手里的东西就跑。`);
@@ -241,7 +238,6 @@ export function rescuePerson(host: NpcHost, state: GameState, person: Person): v
   if (person.hp > 0) return;
   person.hp = SURVIVOR_INJURED_HP;
   person.downedTurns = 0;
-  person.intent = 'flee';
   person.activity = '被人从地上拖了起来';
   host.addAlarm(state, 2);
   host.log(state, `${person.name} 被同伴救起，重新站着（受伤）。`);

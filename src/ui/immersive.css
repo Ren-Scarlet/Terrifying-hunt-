@@ -830,9 +830,6 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
 #app.immersive-game .floorplan .room-people .person-chip > span:not(.person-avatar-wrap):not(.person-status-row):not(.chip-sacrifice-frame) {
   font-size: 14px;
 }
-#app.immersive-game .floorplan .room-people .person-chip .intent-dot {
-  display: none !important;
-}
 @media (max-width: 700px) {
   #app.immersive-game .floorplan .room-features .room-feature {
     flex-basis: 64px;

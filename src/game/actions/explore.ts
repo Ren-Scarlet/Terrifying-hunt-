@@ -92,7 +92,6 @@ export function movePlayer(host: NpcHost, state: GameState, room: RoomId): boole
         carried.blockedTurns = 0;
         carried.fear = Math.min(carried.fear, 70);
         carried.alert = 100;
-        carried.intent = 'flee';
         carried.activity = '挣脱搬运，带伤逃跑';
         host.log(state, `${carried.name} 在搬运途中猛然挣脱，恢复为受伤状态并逃走！`);
         state.carryPersonId = null;
@@ -289,7 +288,6 @@ export function searchRoom(host: NpcHost, state: GameState): boolean {
   found.forEach((p) => {
     p.hidden = false;
     p.alert = clamp(p.alert + 35, 0, 100);
-    p.intent = 'flee';
     host.log(state, `${p.name} 被你从藏身处拖了出来。`);
   });
   if (!found.length) {

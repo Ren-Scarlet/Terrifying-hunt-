@@ -20,8 +20,8 @@ export { drawCards } from './deck';
 export { createGame } from './setup';
 export { BASE_AP, SABOTAGE_COST, POSSESS_TURNS, SURVIVOR_MAX_HP, SURVIVOR_INJURED_HP, BLEEDOUT_TURNS, ALARM_MAX, HAND_LIMIT, FRENZY_THRESHOLD, FRENZY_AP_BONUS, SEARCH_COST, LOOK_COST, ATTACK_COST, SCORE_EXECUTION_THRESHOLD, PANIC_HOPS_ON_HIT } from './constants';
 import { ACTIVITIES, createPeople } from './npc/factory';
-import { ARCH_DESC, ARCH_LABEL, GOAL_LABEL, HEALTH_LABEL, INTENT_LABEL, ROUTINE_PROFILE } from './npc/catalog';
-export { ARCH_DESC, ARCH_LABEL, GOAL_LABEL, HEALTH_LABEL, INTENT_LABEL } from './npc/catalog';
+import { ARCH_DESC, ARCH_LABEL, GOAL_LABEL, HEALTH_LABEL, ROUTINE_PROFILE } from './npc/catalog';
+export { ARCH_DESC, ARCH_LABEL, GOAL_LABEL, HEALTH_LABEL } from './npc/catalog';
 export { ESCAPE_ROOMS } from './constants';
 import { CARD_MAP, UNLOCK_REWARDS } from './cards';
 import type { Cond, Dest, Op, Who } from './effect';
@@ -263,7 +263,6 @@ import type {
   Health,
   Mission,
   NpcGoal,
-  NpcIntent,
   Person,
   PersonRole,
   ResultKind,
@@ -411,7 +410,6 @@ function activateEmergency(state: GameState): void {
   for (const person of npcs(state)) {
     if (person.hp <= 0) continue;
     person.alert = Math.max(person.alert, 85);
-    person.intent = 'escape';
     person.goal = 'exit';
     person.escapeProgress = 0;
     person.activity = '警报全面爆发，正在逃离猎场';
@@ -709,7 +707,6 @@ function checkScourgeShrine(state: GameState): void {
     newcomer.fear = clamp(newcomer.fear + 35, 0, 100);
     newcomer.alert = clamp(newcomer.alert + 12, 0, 100);
     newcomer.revealedActions = Math.max(newcomer.revealedActions ?? 0, 4);
-    newcomer.intent = 'wary';
     log(state, `鬼魔神龛触发：${newcomer.name}受到惊吓，恐惧 +35、警觉 +12，气场显现 3 次后续行动！`);
     state.scourgeShrineRoom = null;
     state.scourgeShrineOccupants = [];
@@ -868,9 +865,8 @@ function movePersonTo(state: GameState, person: Person, room: RoomId, clearAlert
 /**
  * 这个人是否已经决定离开这栋房子
  *
- * 后院是唯一的出口。判定不能只看 intent——fleeAway() 把意图写成 'flee'，
- * 结果是「被追到后院」的人反而绝对安全。只要人站在后院并且确实慌了
- * （逃跑中 / 目的就是出口 / 警觉够高），就算他要走。
+ * 后院是唯一的出口。判定不能只看单次移动的结果：只要人站在后院并且确实慌了
+ * （警觉够高或已经开始翻篱笆），就算他要走。
  */
 /** 逃跑与喊人已经搬到 npc/ai/actions.ts，这里只保留引擎侧的同名入口。 */
 function fleeAway(state: GameState, person: Person, quiet = false, ignoreFear = false): boolean {
@@ -956,7 +952,6 @@ export function triggerBearTrapForPerson(state: GameState, person: Person): void
   if (trap.discovered) return;
   if (person.alert >= 40 && random() < 0.4) {
     trap.discovered = true;
-    person.intent = 'wary';
     person.activity = '发现地上的捕兽夹，正小心观察';
     log(state, `${person.name} 在${roomName(person.room)}发现了捕兽夹，暂时没有踩上去。`);
     return;
@@ -974,7 +969,6 @@ export function triggerBearTrapForPerson(state: GameState, person: Person): void
   person.hp = Math.max(0, person.hp - trapDamage);
   person.alert = 100;
   person.blockedTurns = holdTurns;
-  person.intent = 'stunned';
   if (person.hp <= 0) {
     person.hp = 0;
     person.downedTurns = 0;
@@ -1224,7 +1218,7 @@ export function getHuntOpportunities(state: GameState): HuntOpportunity[] {
         detail: routine.label + '：目标正按已确认的日常习惯停留在这里。',
       });
     }
-    if (person.intent === 'work') {
+    if (/修复|电闸|设施|处理/.test(person.activity)) {
       opportunities.push({
         id: 'distracted-' + person.id,
         targetId: person.id,

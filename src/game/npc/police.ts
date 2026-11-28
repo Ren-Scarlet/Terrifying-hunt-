@@ -22,7 +22,7 @@ function clamp(value: number, min: number, max: number): number {
 export function policeNextStep(host: NpcHost, state: GameState, police: Person): RoomId {
   const freshCrime = state.heatTurn >= state.turn - 1 || state.policeAssaulted;
   const caller = state.people.find((person) =>
-    person.role !== 'police' && person.hp > 0 && !person.hidden && person.intent === 'call',
+    person.role !== 'police' && person.hp > 0 && !person.hidden && /电话|无线电/.test(person.activity),
   );
   let destination: RoomId | null =
     state.emergencyActive
@@ -87,7 +87,6 @@ export function policePhase(host: NpcHost, state: GameState): void {
     );
     searched.forEach((person) => {
       person.alert = clamp(person.alert + 10, 0, 100);
-      if (person.alert >= 40 && person.intent === 'idle') person.intent = 'wary';
       person.activity = '听见警员在附近搜查';
     });
     host.addAlarm(state, 4);

@@ -72,14 +72,13 @@ game.killer = '设陷者';
 person.room = 'garden' as RoomId;
 game.escapeRooms = ['garden' as RoomId];
 person.alert = 34;
-person.intent = 'idle';
 check('警觉没到 35：路过后院不算想逃', !wantsToLeave(game, person), `alert=${person.alert}`);
 person.alert = 35;
 check('警觉到 35：会翻篱笆', wantsToLeave(game, person));
 person.alert = 0;
-person.intent = 'escape';
+person.escapeProgress = 1;
 check('已经决定逃的人不受警觉限制', wantsToLeave(game, person));
-person.intent = 'idle';
+person.escapeProgress = 0;
 game.escapeRooms = [];
 check('没有逃生点时谁都不想走', !wantsToLeave(game, person));
 

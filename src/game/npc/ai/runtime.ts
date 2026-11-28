@@ -112,7 +112,6 @@ function perform(host: NpcHost, state: GameState, person: Person, kind: ActionKi
     case 'hide':
       if (!cabinetRoomsFor(state).includes(person.room)) return false;
       person.hidden = true;
-      person.intent = 'hide';
       person.activity = '钻进了柜子';
       return true;
     case 'call':
@@ -147,16 +146,6 @@ function perform(host: NpcHost, state: GameState, person: Person, kind: ActionKi
 export function executeDecision(host: NpcHost, state: GameState, person: Person, endOfTurn = false): void {
   const ctx = buildContext(state, person);
   const decision = decide(ctx);
-  person.intent = decision.kind === 'escape' ? 'escape'
-    : decision.kind === 'call' ? 'call'
-      : decision.kind === 'rescue' ? 'rescue'
-        : decision.kind === 'heal' ? 'heal'
-          : decision.kind === 'hide' ? 'hide'
-            : decision.kind === 'flee' ? 'flee'
-              : decision.kind === 'barricade' ? 'barricade'
-                : decision.kind === 'totem' ? 'work'
-                  : decision.kind === 'observe' ? 'wary'
-                    : 'idle';
   if (!perform(host, state, person, decision.kind)) {
     // 崩溃的人跑不动时会缩在角落，而不是若无其事地开始日常
     if (person.fear >= 85 && decision.kind === 'flee') {

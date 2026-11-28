@@ -59,7 +59,6 @@ export function fleeAway(
   const top = best[0]?.d ?? 0;
   person.room = randomOf(best.filter((b) => b.d >= top - 1).map((b) => b.r));
   person.alert = Math.max(0, person.alert - 12);
-  person.intent = 'flee';
   person.activity = '夺路而逃';
   // 逃跑路线始终留下脚印；潜行者只是不制造额外声响。
   host.pushTrail(state, fromId, person.room, person.hp <= SURVIVOR_INJURED_HP);
@@ -83,7 +82,6 @@ export function shout(host: NpcHost, state: GameState, person: Person, base = 18
         p.lastHeardFrom = person.name;
         p.lastHeardRoom = person.room;
         p.lastHeardTurn = state.turn;
-        if (p.intent === 'idle') p.intent = 'wary';
         learned += 1;
         host.log(state, `${p.name} 听见喊声，警觉升到 ${p.alert}/100。`);
       }
@@ -96,7 +94,6 @@ export function shout(host: NpcHost, state: GameState, person: Person, base = 18
         p.lastHeardFrom = person.name;
         p.lastHeardRoom = person.room;
         p.lastHeardTurn = state.turn;
-        if (p.intent === 'idle') p.intent = 'wary';
         learned += 1;
       });
   });

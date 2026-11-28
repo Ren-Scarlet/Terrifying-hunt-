@@ -14,7 +14,7 @@ import { SURVIVOR_MAP } from '../../survivors';
 import type { GameState, Person, RoomId } from '../../types';
 import { isLocked, isObstacle, isRoomLit, npcPeople as npcs, peopleInRoom } from '../../world/roomState';
 import type { NpcHost } from './host';
-import { ambushActive, effectiveFearRadius, fearAtLeast, playerIsHidden, wantsToLeave } from './predicates';
+import { ambushActive, effectiveFearRadius, playerIsHidden, wantsToLeave } from './predicates';
 
 /** 幸存者亲眼目击的事件类型 */
 export type NpcWitnessedEvent = 'attack' | 'murder' | 'abduction';
@@ -38,7 +38,6 @@ export function sameRoomKillerReact(host: NpcHost, state: GameState, armed: bool
     if (!killerHidden && !survivorBlind) {
       person.alert = clamp(Math.max(person.alert, 70), 0, 100);
       if ((person.startleTurns ?? 0) > 0) { person.activity = '被门口的动静惊到，愣在原地'; continue; }
-      if (person.intent === 'idle' || person.intent === 'wary' || person.intent === 'call') person.intent = 'flee';
       person.activity = '被你堵在屋里，正拼命往外跑';
     } else {
       person.alert = clamp(person.alert + 6, 0, 100);
@@ -69,25 +68,16 @@ export function npcReact(host: NpcHost, state: GameState): void {
 
     // 恐惧范围：相邻房间先起疑；范围 2 的杀手会在隔壁直接引发逃跑，两格外也会察觉。
     const distanceToPlayer = roomDistance(person.room, state.playerRoom);
-    // 正在处理现场事务的人一旦进入恐惧（恐惧 60+）或发现杀手逼近，就会立刻中断逃跑。
-    if (person.intent === 'heal' && (fearAtLeast(person, 'afraid') || distanceToPlayer <= 1)) {
-      person.intent = 'flee';
-      person.alert = Math.max(person.alert, 75);
-      person.activity = '治疗被打断，察觉屠夫后立刻逃跑';
-    }
     if (fearRadius >= 2 && distanceToPlayer === 1 && person.alert < 45) {
       person.alert = Math.max(person.alert, 45);
-      person.intent = 'flee';
       person.activity = '察觉到杀手逼近，立刻逃跑';
       if (person.movesThisTurn < REACT_MOVE_CAP && host.fleeAway(state, person, true)) person.movesThisTurn += 1;
       continue;
     } else if (fearRadius >= 1 && distanceToPlayer === 1 && person.alert < 12) {
       person.alert = Math.max(person.alert, 12);
-      person.intent = 'wary';
       person.activity = '听见附近有动静，停下来观察';
     } else if (fearRadius >= 2 && distanceToPlayer === 2 && person.alert < 12) {
       person.alert = Math.max(person.alert, 12);
-      person.intent = 'wary';
       person.activity = '远处传来令人不安的动静';
     }
 
@@ -106,11 +96,9 @@ export function npcReact(host: NpcHost, state: GameState): void {
     // 后院翻篱笆是回合结束的结算，不在这中间偷偷逃出去
     if (wantsToLeave(state, person)) continue;
 
-    const fleeing = person.intent === 'flee' || person.intent === 'escape';
+    const fleeing = person.alert >= 75 || person.escapeProgress > 0;
     const busy =
-      person.intent === 'call' ||
-      person.intent === 'heal' ||
-      person.intent === 'rescue' ||
+      /电话|无线电|包扎|拖|救/.test(person.activity) ||
       ((person.archetype === 'rescuer' || person.archetype === 'hider' || person.archetype === 'caller') &&
         person.alert >= 25);
     if (!fleeing && !busy) continue;
@@ -174,7 +162,6 @@ export function npcWitnessEvent(host: NpcHost,
         host.actByArchetype(state, witness);
       } else {
         witness.goal = 'panic';
-        witness.intent = 'flee';
         witness.activity = '目睹无法理解的恐怖，拼命逃离';
         if (witness.movesThisTurn < REACT_MOVE_CAP && host.fleeAway(state, witness, true)) {
           witness.movesThisTurn += 1;
@@ -196,7 +183,6 @@ export function npcWitnessEvent(host: NpcHost,
     if (witness.room !== previousRoom) {
       witness.movesThisTurn = Math.min(REACT_MOVE_CAP, witness.movesThisTurn + 1);
     }
-    if (witness.intent === 'idle') witness.intent = 'wary';
     if (witness.activity === '在翻找抽屉' || witness.activity === '靠在窗边抽烟') {
       witness.activity = eventLabel;
     }
@@ -233,7 +219,6 @@ export function npcOnPlayerEnter(host: NpcHost, state: GameState, barricadedEntr
     // 刚被追上来的人：他已经在你面前了，这一下跑不掉
     if (person.id === host.getChasedId()) {
       person.alert = 100;
-      person.intent = 'flee';
       person.activity = '被你堵在屋里';
       host.log(state, `${person.name} 猛一回头，你已经在门口了。`);
       return;
@@ -300,7 +285,6 @@ export function npcOnPlayerEnter(host: NpcHost, state: GameState, barricadedEntr
     }
 
     // 尚未恐慌的人不会自动逃跑：明亮环境里先起疑，黑暗里可能根本没看清你。
-    person.intent = person.alert >= 12 ? 'wary' : 'idle';
     person.activity = exhausted
       ? '跑不动了，靠着墙喘气'
       : darkRoom && person.alert < 12
