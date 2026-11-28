@@ -46,6 +46,9 @@ import {
   usePower,
   wipeBlade,
 } from './game/engine';
+import { applyAchievements } from './game/achievements';
+import type { AchievementDef } from './game/achievements';
+import { renderAchievements } from './ui/render/achievements';
 import { loadSave, writeSave } from './game/save';
 import { bootCustomAccessories, customAccessoriesForPublish, importCustomAccessories, isCustomAccessory, removeCustomAccessory, upsertCustomAccessory } from './game/customContent';
 import { publishAccessoryPack, verifyGitHubToken } from './game/cloud';
@@ -113,6 +116,7 @@ session.editorDeck = [...save.deck];
 let resultApplied = false;
 /** 本局新解锁的卡牌，用于结算面板只提示真正新增的那张 */
 let lastNewCard: string | null = null;
+let lastUnlockedAchievements: AchievementDef[] = [];
 /** 信息面板当前展示的卡牌，避免同一张牌重复重绘 */
 let detailCardUid: string | null = null;
 /** 当前锁定的人物档案；卡牌悬停结束后仍恢复显示。 */
@@ -431,6 +435,8 @@ function render(): void {
     html = renderAccessoryLoadout(save, session.accessoryDraft, session.pendingRun !== null);
   } else if (view.panel === 'deck') {
     html = renderDeckEditor(session.editorDeck, save.unlockedCards, save.killer ?? '迈克尔·迈尔斯', save.sharedCards ?? []);
+  } else if (view.panel === 'achievements') {
+    html = renderAchievements(save);
   } else if (view.panel === 'shop') {
     html = renderShop(save);
   } else if (view.screen === 'menu' || !game) {
@@ -447,7 +453,7 @@ function render(): void {
     }
   } else {
     html = renderGame(game, getKiller(save.killer));
-    if (view.screen === 'result') html += renderResult(game, lastNewCard);
+    if (view.screen === 'result') html += renderResult(game, lastNewCard, lastUnlockedAchievements);
     if (rogueOffers && save.rogue) html += renderRogueReward(save.rogue, rogueOffers);
   }
   if (view.guide) html += renderGuide();
@@ -845,6 +851,9 @@ function afterAction(): void {
         darkCells += 1;
       }
       save = { ...save, wins, credits: save.credits + earned, darkCells, unlockedCards: unlocked };
+      const settled = applyAchievements(save, game);
+      save = settled.save;
+      lastUnlockedAchievements = settled.unlocked;
       writeSave(save);
     }
   }
@@ -876,6 +885,7 @@ function startGame(freeHunt = false, loadout: string[] = []): void {
   lastWanted = game.wanted;
   resultApplied = false;
   lastNewCard = null;
+  lastUnlockedAchievements = [];
   render();
 }
 
@@ -908,6 +918,7 @@ function startRogueFloor(run: RogueRun): void {
   lastWanted = game.wanted;
   resultApplied = false;
   lastNewCard = null;
+  lastUnlockedAchievements = [];
   render();
 }
 
@@ -1044,6 +1055,7 @@ function leaveToMenu(): void {
   game = null;
   selectedPersonId = null;
   lastNewCard = null;
+  lastUnlockedAchievements = [];
   session.pendingRun = null;
   showMenu();
   rollMenuMap();

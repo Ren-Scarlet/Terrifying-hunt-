@@ -101,9 +101,10 @@ import { blinkRangeOf, hatchetMax, modifierSummary, modifierValue, possessCost }
 import { exportTuning, importTuning, resetTuning, setAddonModValue } from '../src/game/tuning';
 import { renderAccessoryLoadout } from '../src/ui/render/menus';
 import { HUNTING_GROUNDS } from '../src/game/maps';
-import type { GameState, RoomId } from '../src/game/types';
+import type { GameState, RoomId, SaveData } from '../src/game/types';
 import { createSeededRandom, random, withRandomSource } from '../src/game/random';
 import { cellDistance, nearestOf, roomDistance } from '../src/game/navigation';
+import { applyAchievements, ACHIEVEMENTS } from '../src/game/achievements';
 import { advanceRogue, applyRogueFloor, rollRogueAccessories, rollRogueDeck, rollRogueOffers, startRogueRun } from '../src/game/rogue';
 import { bloodwebCostAtLevel } from '../src/game/progress';
 import { EXECUTION_METHODS, executionTextEntries, resolveExecutionText } from '../src/game/execution';
@@ -1699,6 +1700,47 @@ function caseQteExecution(): void {
 }
 
 caseQteExecution();
+
+function caseAchievements(): void {
+  const baseSave: SaveData = {
+    deck: [...STARTING_DECK],
+    unlockedCards: [],
+    wins: 0,
+    killer: '迈克尔·迈尔斯',
+    credits: 100,
+    darkCells: 0,
+    unlockedKillers: ['迈克尔·迈尔斯'],
+    executionRecords: [],
+    accessories: {},
+    accessoryLoadout: [],
+    achievementProgress: {},
+    achievementUnlocked: [],
+  };
+  const game = newGame();
+  game.result = 'win';
+  game.npcAlarmed = false;
+  game.survivorKills = 100;
+  game.executions = 20;
+  game.trapTriggerCount = 10;
+  game.executionMethodsUsed = EXECUTION_METHODS.map((method) => method.id);
+  awardBlood(game, 'contract', '测试血点', 10000, { key: 'test:achievement-blood' });
+  const settled = applyAchievements(baseSave, game);
+  const ids = settled.save.achievementUnlocked ?? [];
+  check('成就：达到条件后自动解锁',
+    ['first_game', 'hundred_kills', 'executioner_20', 'trap_10', 'blood_10000', 'no_alarm_win', 'special_6'].every((id) => ids.includes(id)),
+    ids.join(','));
+  check('成就：解锁时自动发放奖励',
+    settled.save.credits > baseSave.credits && settled.save.darkCells > 0,
+    `credits=${settled.save.credits} dark=${settled.save.darkCells}`);
+  check('成就：目录 id 唯一且图标/说明齐全',
+    new Set(ACHIEVEMENTS.map((def) => def.id)).size === ACHIEVEMENTS.length &&
+    ACHIEVEMENTS.every((def) => def.icon && def.description && def.target > 0));
+  const again = applyAchievements(settled.save, game);
+  check('成就：已解锁的成就不会重复发奖励',
+    again.unlocked.length === 0 && again.save.credits === settled.save.credits);
+}
+
+caseAchievements();
 
 /** AB：封锁房门必须同时阻止 NPC 进入和离开；脚印不应随机消失 */
 function caseNpcLocksAndPersistentTrails(): void {

@@ -124,6 +124,7 @@ export function renderMenu(save: SaveData): string {
           <button class="btn" data-action="accessories">配件装配</button>
           ${new URLSearchParams(location.search).get('admin') === '1' ? '<button class="btn ghost" data-action="workshop-open">配件工坊</button>' : ''}
           <button class="btn" data-action="bloodweb">血网升级</button>
+          <button class="btn" data-action="achievements">成就</button>
           <button class="btn" data-action="shop">卡牌商店</button>
           <button class="btn ghost" data-action="guide">玩法指引</button>
         </div>

@@ -3933,3 +3933,32 @@ button, .room-hit, .hand-row { touch-action: manipulation; }
   box-shadow: 0 0 8px rgba(255, 210, 74, .9);
 }
 .qte-panel .qte-hint { color: #b9b09a; font-size: 10px; letter-spacing: .04em; }
+/* ==========================================================================
+   成就面板
+   ========================================================================== */
+.achievements-modal { width: min(940px, 96vw); max-height: 88vh; overflow-y: auto; }
+.achievements-lead { color: #a49c8d; font-size: 12px; margin: 0 0 14px; }
+.achievement-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; }
+.achievement-card {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 10px 12px;
+  border: 1px solid #332f28;
+  background: #0b0d0e;
+  opacity: .72;
+}
+.achievement-card.unlocked { opacity: 1; border-color: #6d5a32; background: linear-gradient(100deg, #15130d, #0b0d0e); }
+.achievement-icon { width: 44px; height: 44px; flex: 0 0 44px; display: grid; place-items: center; border: 1px solid #3a352c; background: #121416; }
+.achievement-icon img { width: 32px; height: 32px; object-fit: contain; }
+.achievement-card.unlocked .achievement-icon { border-color: #8a6d33; box-shadow: 0 0 10px #b9915033; }
+.achievement-copy { min-width: 0; flex: 1; display: grid; gap: 3px; }
+.achievement-copy b { display: flex; align-items: center; gap: 6px; color: #d8cfbd; font-size: 13px; }
+.achievement-copy b em { font-style: normal; font-size: 9px; color: #8fd08a; border: 1px solid #3f6b3a; padding: 1px 4px; }
+.achievement-copy p { margin: 0; color: #8f897f; font-size: 11px; line-height: 1.6; }
+.achievement-progress { position: relative; height: 5px; margin-top: 3px; background: #1c1f21; border: 1px solid #2c3033; }
+.achievement-progress span { display: block; height: 100%; background: linear-gradient(90deg, #7c5c27, #d0a94f); }
+.achievement-progress i { position: absolute; right: 0; top: -14px; font-style: normal; font-size: 9px; color: #8f897f; }
+.achievement-reward { color: #b9a267; font-size: 10px; }
+.result-achievements { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin: 8px 0; }
+.result-achievements > small { color: var(--faint); font-size: 10px; letter-spacing: 2px; }
+.achievement-toast { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border: 1px solid #6d5a32; background: #17140f; color: #e8d6ac; font-size: 11px; }
+.achievement-toast img { width: 16px; height: 16px; object-fit: contain; }

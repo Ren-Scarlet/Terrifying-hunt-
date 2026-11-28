@@ -72,6 +72,7 @@ import { blinkRangeOf, blinkWithinRange, hatchetMax, modifierSummary } from '../
 import { isMuted, playHeartbeat, playSfx, playTrapScream } from '../audio';
 import { addonIconHtml, escape, icon, personChip, shadowFigures, perkIconHtml, TYPE_NAMES, killerFaceHtml, defaultDetailHtml, cardTextHtml } from './shared';
 import type { BloodCategory, GameState, Person, RoomId, SaveData } from '../../game/types';
+import type { AchievementDef } from '../../game/achievements';
 
 /**
  * 血点明细按五类分组渲染：实时面板与结算面板共用。
@@ -1016,8 +1017,8 @@ function personSlotStyle(roomId: RoomId, personId: string, index: number): strin
   `;
 }
 
-/** newCard：本局新解锁的卡牌 id（已解锁过的不会再重复提示）。 */
-export function renderResult(state: GameState, newCard: string | null): string {
+/** newCard：本局新解锁的卡牌 id；newAchievements：本局新解锁的成就。 */
+export function renderResult(state: GameState, newCard: string | null, newAchievements: AchievementDef[] = []): string {
   const supernatural = KILLER_MAP[state.killer]?.school === 'supernatural';
   const labels: Record<string, string> = {
     win: '猎杀结束', caught: supernatural ? '力量被封印' : '被警察抓捕', timeout: '猎场终止', failed: '猎杀失败',
@@ -1065,6 +1066,7 @@ export function renderResult(state: GameState, newCard: string | null): string {
         <div class="blood-breakdown">${bloodGroupsHtml(state, true)}</div>
         <details class="result-log"><summary>本局日志 · ${state.log.length} 条记录</summary><div class="result-log-list">${[...state.log].reverse().map((line) => `<div>${escape(line)}</div>`).join('')}</div></details>
         ${newCard ? `<p style="color:var(--gold)">新卡牌解锁：<b>${escape(CARD_MAP[newCard]?.name ?? newCard)}</b></p>` : ''}
+        ${newAchievements.length ? `<div class="result-achievements"><small>新成就</small>${newAchievements.map((achievement) => `<span class="achievement-toast"><img src="${uiIcon(achievement.icon as Parameters<typeof uiIcon>[0])}" alt="" onerror="this.style.display='none'">${escape(achievement.name)}</span>`).join('')}</div>` : ''}
         <p style="color:var(--gold)">${icon('bloodPoint', 'ui-icon tiny')} 获得血点：<b>+${earned.toLocaleString()}</b></p>
         ${darkCells ? `<p style="color:var(--gold)">${icon('darkCell', 'ui-icon tiny')} 获得暗金细胞：<b>+${darkCells}</b></p>` : ''}
         <div class="actions">

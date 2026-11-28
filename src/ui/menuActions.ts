@@ -59,6 +59,16 @@ export function createMenuActions(deps: MenuActionDeps): ActionTable {
       deps.render();
     },
 
+    achievements: () => {
+      openPanel('achievements');
+      deps.render();
+    },
+
+    'achievements-close': () => {
+      closePanel();
+      deps.render();
+    },
+
     'acc-equip': ({ target }) => {
       const id = target.dataset.id;
       if (id && !session.accessoryDraft.includes(id) && session.accessoryDraft.length < ACCESSORY_SLOTS && (save().accessories?.[id] ?? 0) > 0) {

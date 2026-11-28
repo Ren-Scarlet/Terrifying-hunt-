@@ -622,6 +622,10 @@ export interface SaveData {
   progress?: import('./progress').ProgressMap;
   /** 公共卡池：别的杀手练到 30 的倍数后共享出来的专属卡。 */
   sharedCards?: string[];
+  /** 成就进度：指标 → 累计值 */
+  achievementProgress?: Record<string, number>;
+  /** 已解锁成就 id */
+  achievementUnlocked?: string[];
   /** 上一次选择带入的配件 id（最多 2 件），作为下局的默认装配。 */
   accessoryLoadout: string[];
   /** 存档里记一下版本，方便以后迁移 */

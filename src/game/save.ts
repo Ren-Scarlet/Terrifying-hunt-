@@ -30,6 +30,8 @@ function defaultSave(): SaveData {
     rogue: null,
     progress: {},
     sharedCards: [],
+    achievementProgress: {},
+    achievementUnlocked: [],
     version: SAVE_VERSION,
   };
 }
@@ -128,6 +130,16 @@ export function loadSave(): SaveData {
       progress,
       Array.isArray(parsed.sharedCards) ? parsed.sharedCards.filter((id): id is string => typeof id === 'string' && !!CARD_MAP[id]) : [],
     );
+    const achievementProgress: Record<string, number> = {};
+    if (parsed.achievementProgress && typeof parsed.achievementProgress === 'object') {
+      Object.entries(parsed.achievementProgress).forEach(([key, value]) => {
+        const amount = toInt(value, 0);
+        if (amount > 0) achievementProgress[key] = amount;
+      });
+    }
+    const achievementUnlocked = Array.isArray(parsed.achievementUnlocked)
+      ? [...new Set(parsed.achievementUnlocked.filter((id): id is string => typeof id === 'string'))]
+      : [];
 
     return {
       deck,
@@ -145,6 +157,8 @@ export function loadSave(): SaveData {
       rogue: sanitizeRogue(parsed.rogue),
       progress,
       sharedCards,
+      achievementProgress,
+      achievementUnlocked,
       version: SAVE_VERSION,
     };
   } catch {
