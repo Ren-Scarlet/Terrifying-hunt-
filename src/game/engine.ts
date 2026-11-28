@@ -12,13 +12,13 @@ import {
   trapDamageOf,
   trapHoldTurns,
 } from './modifiers';
-import { ESCAPE_ROOMS, BASE_AP, SABOTAGE_COST, ITEM_BOX_CHARGES, POSSESS_TURNS, SURVIVOR_MAX_HP, SURVIVOR_INJURED_HP, REACT_MOVE_CAP, BLEEDOUT_TURNS } from './constants';
+import { ESCAPE_ROOMS, BASE_AP, SABOTAGE_COST, ITEM_BOX_CHARGES, POSSESS_TURNS, SURVIVOR_MAX_HP, SURVIVOR_INJURED_HP, REACT_MOVE_CAP, BLEEDOUT_TURNS, ALARM_MAX } from './constants';
 import { drawCards } from './deck';
 import { executeOps } from './effects/runtime';
 import { createGame } from './setup';
 export { drawCards } from './deck';
 export { createGame } from './setup';
-export { BASE_AP, SABOTAGE_COST, ITEM_BOX_CHARGES, POSSESS_TURNS, SURVIVOR_MAX_HP, SURVIVOR_INJURED_HP, BLEEDOUT_TURNS } from './constants';
+export { BASE_AP, SABOTAGE_COST, ITEM_BOX_CHARGES, POSSESS_TURNS, SURVIVOR_MAX_HP, SURVIVOR_INJURED_HP, BLEEDOUT_TURNS, ALARM_MAX } from './constants';
 import { ACTIVITIES, createPeople, itemUsesFor } from './npc/factory';
 import { ARCH_DESC, ARCH_LABEL, GOAL_LABEL, HEALTH_LABEL, INTENT_LABEL, ROUTINE_PROFILE, SITE_ITEM_LABEL, SURVIVOR_ITEM_LABEL } from './npc/catalog';
 export { ARCH_DESC, ARCH_LABEL, GOAL_LABEL, HEALTH_LABEL, INTENT_LABEL, SITE_ITEM_LABEL, SURVIVOR_ITEM_LABEL } from './npc/catalog';
@@ -128,6 +128,10 @@ import {
   sameRoomKillerReact as aiSameRoomKillerReact,
   type NpcWitnessedEvent,
 } from './npc/ai/reactions';
+import {
+  tryTakeSupply as aiTryTakeSupply,
+  useSurvivorItem as aiUseSurvivorItem,
+} from './npc/ai/items';
 import type { NpcHost } from './npc/ai/host';
 
 /**
@@ -193,8 +197,6 @@ import type {
 
 /** 兼容旧配置的导出；现在倒地后即可处决，救援窗口由玩家是否选择处决决定。 */
 export const DOWNED_LOCK_TURNS = 0;
-/** 暴露度上限：到 100 直接判负（实体杀手被捕，灵异鬼怪被驱散） */
-export const ALARM_MAX = 100;
 /** 1 点旧「暴露度」折算成多少暴露度：暴露度只是暴露度的 0~10 镜像 */
 const WANTED_TO_ALARM = 10;
 /** 挥刀 / 搜索各自消耗 1 点行动点：唯一的伤害来源，不能免费 */
@@ -1578,132 +1580,11 @@ function usableItemBoxes(state: GameState): SiteItem[] {
   return state.siteItems.filter((i) => i.kind === 'itemBox' && !i.broken && i.charges > 0);
 }
 
-/**
- * 幸存者不是随手乱抓：他会看场上缺什么再决定拿哪件。
- * 有人倒地 → 医疗包；电闸损坏或断电 → 工具箱；想报警 → 信号弹；
- * 想跑 → 钥匙；要挡你 → 武器；被盯上 → 烟雾弹。留两成随机，人也会慌。
- */
-function pickSupply(state: GameState, person: Person): SurvivorItem {
-  const downed = npcs(state).some((p) => p.hp <= 0);
-  const injured = npcs(state).some((p) => p.hp > 0 && p.hp <= SURVIVOR_INJURED_HP);
-  const circuitsNeedRepair = state.powerCircuits.some((circuit) => circuit.broken || circuit.enabled === false);
-  const score: Record<SurvivorItem, number> = {
-    medkit: (downed ? 5 : 0) + (injured ? 2 : 0) + (person.archetype === 'rescuer' ? 4 : 0),
-    toolbox: circuitsNeedRepair ? 4 : 0,
-    flare: (state.alarm < 45 ? 3 : 1) + (person.archetype === 'caller' ? 4 : 0),
-    weapon: (person.archetype === 'defiant' || person.archetype === 'brave' ? 5 : 0) + (state.alarm >= 45 ? 2 : 0),
-    smoke: (person.alert >= 25 ? 4 : 1) + (person.sneaky ? 2 : 0),
-    flashlight: (person.archetype === 'defiant' || person.archetype === 'kiter' ? 3 : 1) + (person.alert >= 40 ? 2 : 0),
-  };
-  const all = Object.keys(score) as SurvivorItem[];
-  const best = all.slice().sort((a, b) => score[b] - score[a])[0];
-  return random() < 0.78 ? best : randomOf(all);
-}
+/** 道具行为已搬到 npc/ai/items.ts；这里保留引擎侧入口（签名不变）。 */
+function tryTakeSupply(state: GameState, person: Person): boolean { return aiTryTakeSupply(aiHost, state, person); }
+function useSurvivorItem(state: GameState, person: Person): boolean { return aiUseSurvivorItem(aiHost, state, person); }
 
-/** 走到道具箱前翻一件东西：这是幸存者「多一个选择」的来源 */
-function tryTakeSupply(state: GameState, person: Person): boolean {
-  if (person.item) return false;
-  const box = state.siteItems.find(
-    (i) => i.kind === 'itemBox' && i.room === person.room && !i.broken && i.charges > 0,
-  );
-  if (!box) return false;
-  box.charges -= 1;
-  const item = pickSupply(state, person);
-  person.item = item;
-  person.itemUses = itemUsesFor(item);
-  if (item === 'weapon') person.armed = true;
-  person.intent = 'work';
-  person.activity = `翻出了${SURVIVOR_ITEM_LABEL[item]}`;
-  addDisturbance(state, person.room);
-  log(state, `${person.name} 在${roomName(person.room)}的道具箱里翻出了${SURVIVOR_ITEM_LABEL[item]}（这个箱子还剩 ${box.charges} 件）。`);
-  return true;
-}
 
-/**
- * 道具只在「用得上的那一刻」生效，用完即弃。
- * 医疗包 / 信号弹 / 钥匙 / 烟雾弹各开一条路；工具箱与武器是装备，留到对应场合。
- * 它们是幸存者手里的选择，不是引擎里写死的全局判定。
- */
-function useSurvivorItem(state: GameState, person: Person): boolean {
-  const item = person.item;
-  if (!item || person.itemUses <= 0) return false;
-  switch (item) {
-    case 'medkit': {
-      const hurt =
-        npcs(state).find((p) => p.hp <= 0 && roomDistance(person.room, p.room) <= 2) ??
-        npcs(state).find((p) => p.hp > 0 && p.hp <= SURVIVOR_INJURED_HP && roomDistance(person.room, p.room) <= 2);
-      if (!hurt) return false;
-      // 治疗必须跨过一个完整回合；同一回合内即使连续触发 NPC 行动，也不会提前完成。
-      person.intent = 'heal';
-      if (person.healLastTurn === undefined) {
-        person.healLastTurn = state.turn;
-        person.healTurns = 1;
-        person.activity = `正在给${hurt.name}包扎（本回合治疗中）`;
-        log(state, `${person.name} 蹲下来给${hurt.name}包扎；如果这一回合没有被你找到，伤口就会处理好。`);
-        addDisturbance(state, person.room);
-        return true;
-      }
-      if (state.turn <= person.healLastTurn) {
-        person.activity = `正在给${hurt.name}包扎（还需要一个回合）`;
-        return true;
-      }
-      person.healTurns = 0;
-      person.healLastTurn = undefined;
-      if (hurt.hp <= 0) rescuePerson(state, hurt);
-      else healPerson(state, hurt, 1);
-      consumeItem(state, person);
-      person.activity = `把${hurt.name}救了回来`;
-      log(state, `${person.name} 用医疗包救回了${hurt.name}——你留下的伤被人补回来了。`);
-      addDisturbance(state, person.room);
-      return true;
-    }
-    case 'flashlight': {
-      // 只有和玩家同屋才照得到；不在就先揣着
-      if (person.room !== state.playerRoom) return false;
-      consumeItem(state, person);
-      interruptPlayer(state, `${person.name} 拧亮手电筒，一道白光正打在你脸上。`, person.id);
-      return true;
-    }
-    case 'flare': {
-      if (state.alarm >= ALARM_MAX - 12) return false;
-      consumeItem(state, person);
-      person.intent = 'call';
-      person.activity = '打出了一发信号弹';
-      log(state, `${person.name} 打出信号弹，整栋房子的警戒往上窜了一截。`);
-      addDisturbance(state, person.room);
-      addAlarm(state, 14);
-      return true;
-    }
-    case 'smoke': {
-      if (person.alert < 18) return false;
-      consumeItem(state, person);
-      person.alert = Math.max(0, person.alert - 35);
-      if (cabinetRoomsFor(state).includes(person.room) && random() < 0.6) person.hidden = true;
-      state.trails = state.trails.filter((t) => t.room !== person.room);
-      person.activity = '丢出烟雾弹，从视线里消失了';
-      log(state, `${person.name} 丢了烟雾弹，脚印和视线一起断在这里。`);
-      return true;
-    }
-    case 'toolbox': {
-      const circuit = state.powerCircuits.find((item) =>
-        item.breakerRoom === person.room && (item.broken || item.enabled === false),
-      );
-      if (!circuit) return false;
-      circuit.broken = false;
-      circuit.enabled = true;
-      consumeItem(state, person);
-      person.intent = 'work';
-      person.activity = `用工具箱修复了${circuit.name}电闸`;
-      addDisturbance(state, person.room);
-      log(state, `${person.name} 用工具箱修复了${circuit.name}电闸，相关区域恢复供电。`);
-      return true;
-    }
-    case 'weapon':
-      // 武器会在反抗时消耗；工具箱用于修复被破坏的电闸。
-      return false;
-  }
-  return false;
-}
 
 /* ==================================================================== */
 /*  玩家行动                                                            */

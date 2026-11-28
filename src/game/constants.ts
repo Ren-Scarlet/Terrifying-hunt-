@@ -27,3 +27,6 @@ export const REACT_MOVE_CAP = 3;
 
 /** 倒地后撑不过这么多回合就会自动流血而死 */
 export const BLEEDOUT_TURNS = 4;
+
+/** 暴露度上限：到 100 直接判负（实体杀手被捕，灵异鬼怪被驱散） */
+export const ALARM_MAX = 100;
