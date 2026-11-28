@@ -113,7 +113,7 @@ import {
   tryRescue as aiTryRescue,
 } from './npc/ai/support';
 import { npcTurn as aiNpcTurn } from './npc/ai/turn';
-import { executeDecision, tickAllChase } from './npc/ai/runtime';
+import { executeDecision, tickAllChase, chaseStaminaOf as aiChaseStamina } from './npc/ai/runtime';
 import {
   npcOnPlayerEnter as aiNpcOnPlayerEnter,
   npcReact as aiNpcReact,
@@ -155,6 +155,7 @@ import {
   canUsePower as aiCanUsePower,
   powerBlockReason as aiPowerBlockReason,
   recoverBearTrap as aiRecoverBearTrap,
+  sadakoTeleport as aiSadakoTeleport,
   refillHuntressHatchets as aiRefillHuntressHatchets,
   throwHuntressHatchet as aiThrowHuntressHatchet,
   usePower as aiUsePower,
@@ -706,18 +707,12 @@ function checkScourgeShrine(state: GameState): void {
 function afterPlayerAction(state: GameState): void {
   if (state.result) return;
   checkScourgeShrine(state);
-  sameRoomKillerReact(state, state.lastPlayerRoom === state.playerRoom);
+  sameRoomKillerReact(state, !state.sadakoHidden && state.lastPlayerRoom === state.playerRoom);
   const beforeReaction = snapshotRooms(state);
   npcReact(state);
   checkScourgeShrine(state);
   resolveTrapEntries(state, beforeReaction);
   if (state.result) return;
-  if (state.nurseFatiguePending) {
-    state.nurseFatiguePending = false;
-    state.nurseFollowUp = false;
-    state.stunTurns = Math.max(state.stunTurns, 1);
-    log(state, '闪现后的疲惫袭来：下回合行动点减少 1。');
-  }
   state.revealAuraActions = Math.max(0, state.revealAuraActions - 1);
   state.trailRevealActions = Math.max(0, state.trailRevealActions - 1);
   state.stealthActions = Math.max(0, state.stealthActions - 1);
@@ -1331,6 +1326,8 @@ export function powerCooldown(state: GameState, powerId: string): number {
 }
 /** 杀手能力已搬到 actions/powers.ts；这里保留引擎侧入口（签名不变）。 */
 export function blinkPlayer(state: GameState, room: RoomId): boolean { return aiBlinkPlayer(aiHost, state, room); }
+export function sadakoTeleport(state: GameState, room: RoomId): boolean { return aiSadakoTeleport(aiHost, state, room); }
+export function chaseStamina(state: GameState, personId: string): number { return aiChaseStamina(state, personId); }
 export function throwHuntressHatchet(state: GameState, targetId: string): boolean { return aiThrowHuntressHatchet(aiHost, state, targetId); }
 export function refillHuntressHatchets(state: GameState): boolean { return aiRefillHuntressHatchets(aiHost, state); }
 export function recoverBearTrap(state: GameState): boolean { return aiRecoverBearTrap(aiHost, state); }

@@ -397,13 +397,18 @@ function killerBuffsHtml(state: GameState): string {
     chips.push({ label: '伏击就绪', hint: '本回合伏击生效：目标更难察觉你的接近。', tone: 'buff' });
   }
   if (state.nurseFollowUp) {
-    chips.push({ label: '濒死之息', hint: '护士：下一次行动后进入疲惫，下回合少 1 点行动点。', tone: 'neutral' });
+    chips.push({ label: '濒死之息', hint: '护士：闪现后的攻击窗口已开启；下一次行动若没有命中，下回合少 1 点行动点。', tone: 'neutral' });
   }
   if (state.stunTurns > 0) {
     chips.push({ label: `眩晕 · 下回合 -${state.stunTurns} AP`, hint: '被幸存者反击或障碍打断，下回合行动点减少。', tone: 'debuff' });
   }
   if (state.blindTurns > 0) {
     chips.push({ label: `致盲 · ${state.blindTurns} 回合`, hint: '被手电筒致盲：视野与判断受影响。', tone: 'debuff' });
+  }
+  if (state.killer === '贞子') {
+    chips.push(state.sadakoHidden
+      ? { label: '恐惧洪流 · 隐匿', hint: '无法被察觉，也无法攻击；再次使用能力即可现身。', tone: 'buff' }
+      : { label: '恐惧洪流 · 已现身', hint: '可以被看见，也可以攻击；再次使用能力会退回隐匿。', tone: 'neutral' });
   }
   if (state.playerSkipTurn) {
     chips.push({ label: '警察火力压制 · 本回合无法行动', hint: '被警察累计枪击三次：这一回合只能结束回合，幸存者仍会行动。', tone: 'danger' });
@@ -598,6 +603,12 @@ function personSlotStyle(roomId: RoomId, personId: string, index: number): strin
         ${state.escapeRooms.includes(room.id)
           ? `<span class="global-ping escape" title="逃生大门已开启：${escape(room.name)}">${icon('escape', 'ui-icon tiny')}</span>`
           : ''}
+        ${state.killer === '贞子' && state.tvRooms.includes(room.id)
+          ? (() => {
+              const closed = state.tvClosed.includes(room.id);
+              return `<button type="button" class="global-tv ${closed ? 'closed' : 'open'}" data-action="sadako-tv" data-room="${room.id}" ${closed ? 'disabled' : ''} title="${closed ? '电视已关闭：无法传送到这里' : '贞子可以传送到这台电视，并让房间里的人咒怨 +1'}"><b>TV</b><small>${closed ? '已关' : '可传送'}</small></button>`;
+            })()
+          : ''}
         <div class="room-head">
           <span class="room-name">${explored ? escape(room.name) : '？？？'}</span>
           ${noise ? `<span class="room-tag noise loud" title="${escape(noise.label)}">${icon('crow', 'crow-icon tiny')}${escape(noise.label)}</span>` : ''}
@@ -733,7 +744,7 @@ function personSlotStyle(roomId: RoomId, personId: string, index: number): strin
       statusBits.push(`<span class="status-badge downed">${escape(p.name)} 倒地 · 可立即处决 · 同伴仍可能救起</span>`);
     });
   if (state.nurseBlinkTargeting) statusBits.push(`<span class="status-badge blink-mode">护士闪现选点中 · 选择 ${blinkRangeOf(state)} 格内的任意位置</span>`);
-  if (state.nurseFollowUp) statusBits.push('<span class="status-badge blink-mode">濒死之息 · 现在可对同屋站立幸存者发动普通攻击；下一次行动后疲惫</span>');
+  if (state.nurseFollowUp) statusBits.push('<span class="status-badge blink-mode">濒死之息 · 现在可对同屋站立幸存者发动普通攻击；若没有命中，下回合疲惫</span>');
   if (state.huntressAiming) statusBits.push('<span class="status-badge hatchet-mode">狩猎飞斧瞄准中 · 点击地图上的直线视野目标</span>');
   const statusHtml = statusBits.length ? `<div class="status-strip">${statusBits.join('')}</div>` : '';
   const standingHere = here.filter((person) => person.hp > 0);
@@ -916,7 +927,7 @@ function personSlotStyle(roomId: RoomId, personId: string, index: number): strin
           ${state.lookingAround ? '<div class="look-prompt" role="status"><b>选择要查看的房间</b><span>地图上亮起边框的房间都与当前位置相邻。点击其中一个，消耗 1 点行动点查看。</span><button class="btn ghost mini" data-action="look-cancel">取消</button></div>' : ''}
           ${state.huntressAiming ? '<div class="look-prompt hatchet-prompt" role="status"><b>狩猎飞斧瞄准中</b><span>点击地图上可见的站立幸存者。飞斧只能命中当前房间或正前方直线房间内的目标；无法投出的原因会显示在现场反馈中。</span></div>' : ''}
           ${state.barricades.length ? `<div class="look-prompt barricade-prompt" role="status"><b>幸存者放下了木板</b><span>${state.barricades.map((room) => roomName(room)).join('、')}：地图上的橙色高亮标记就是被封住的入口。靠近该房间后点击「破坏木板 · 1 AP」即可通行。</span></div>` : ''}
-          ${state.auraTargeting ? '<div class="look-prompt aura-prompt" role="status"><b>恶灵低语 · 选择房间</b><span>点击地图任意房间，包括你当前所在的房间；也可以取消，不发动显形效果。</span><button class="btn ghost mini" data-action="aura-cancel">取消选择</button></div>' : ''}
+          ${state.auraTargeting ? '<div class="look-prompt aura-prompt" role="status"><b>恶灵低语 · 必须选择房间</b><span>点击地图任意房间（包括你当前所在的房间）。卡牌已经打出，不能取消或回退。</span></div>' : ''}
           <div class="map-viewport">
             <div class="floorplan" style="--ar:${layoutAspectNum().toFixed(4)};aspect-ratio:${layoutAspect()}">
               ${rooms}

@@ -20,6 +20,7 @@ export type ActionKind =
   | 'barricade'
   | 'call'
   | 'totem'
+  | 'tv'
   | 'rescue'
   | 'heal'
   | 'escape'
@@ -40,6 +41,7 @@ export interface DecisionContext {
   chased: boolean;
   phoneHere: boolean;
   totemHere: boolean;
+  tvHere: boolean;
   allyDownedHere: boolean;
   allyInjuredHere: boolean;
   gateOpen: boolean;
@@ -61,9 +63,9 @@ export interface Decision {
  */
 export const CAPABILITIES: Record<AlertBand, ActionKind[]> = {
   unaware: ['idle', 'move', 'rescue', 'heal'],
-  suspicious: ['idle', 'move', 'rescue', 'heal', 'observe', 'totem'],
-  alert: ['idle', 'move', 'rescue', 'heal', 'observe', 'totem', 'flee', 'lock', 'call', 'barricade', 'hide', 'escape'],
-  panicked: ['idle', 'move', 'rescue', 'heal', 'observe', 'totem', 'flee', 'lock', 'call', 'barricade', 'hide', 'escape', 'shout'],
+  suspicious: ['idle', 'move', 'rescue', 'heal', 'observe', 'totem', 'tv'],
+  alert: ['idle', 'move', 'rescue', 'heal', 'observe', 'totem', 'tv', 'flee', 'lock', 'call', 'barricade', 'hide', 'escape'],
+  panicked: ['idle', 'move', 'rescue', 'heal', 'observe', 'totem', 'tv', 'flee', 'lock', 'call', 'barricade', 'hide', 'escape', 'shout'],
 };
 
 /**
@@ -149,6 +151,9 @@ export function decide(ctx: DecisionContext, roll: () => number = () => 0.5): De
 
   // 拆图腾：怀疑以上
   if (ctx.totemHere && canDo('totem')) return { kind: 'totem', reason: 'totem' };
+
+  // 贞子的电视：怀疑以上会关掉它，并取走录像带
+  if (ctx.tvHere && canDo('tv')) return { kind: 'tv', reason: 'tv' };
 
   // 门开了就往出口走（不是慌乱也会走，但优先级低于报警）
   if (ctx.gateOpen && canDo('escape')) return { kind: 'escape', reason: 'gate_open' };

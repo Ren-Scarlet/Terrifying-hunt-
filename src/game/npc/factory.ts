@@ -43,6 +43,8 @@ function makePerson(
     armed: false,
     item: null,
     itemUses: 0,
+    curse: 0,
+    hasTape: false,
     // 有名有姓、带威胁设定的角色更老练；再随机挑一些普通人，避免人人都好抓
     sneaky: SURVIVOR_MAP[s.id]?.threat ? true : random() < 0.28,
     trackedTurns: 0,
@@ -120,6 +122,8 @@ export function createPeople(mission: Mission): Person[] {
     armed: false,
     item: null,
     itemUses: 0,
+    curse: 0,
+    hasTape: false,
     sneaky: false,
     trackedTurns: 0,
     lastSeenRoom: POLICE_START,

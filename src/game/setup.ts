@@ -245,6 +245,11 @@ export function createGame(
     survivorTotal: people.filter((person) => person.role !== 'police').length,
     itemBoxes: [],
     corpseRooms: [],
+    sadakoHidden: killerId === '贞子',
+    tvRooms: killerId === '贞子'
+      ? shuffle(ROOMS.map((room) => room.id).filter((room) => room !== ENTRY_ROOM)).slice(0, 6)
+      : [],
+    tvClosed: [],
     policeShots: 0,
     playerSkipTurn: false,
     powerCircuits: [

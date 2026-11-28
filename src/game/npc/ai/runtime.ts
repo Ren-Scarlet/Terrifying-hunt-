@@ -14,6 +14,7 @@ import { phoneWorks } from '../../world/phones';
 import { cabinetRoomsFor, isRoomLit, peopleInRoom } from '../../world/roomState';
 import { decide, type ActionKind, type DecisionContext } from './behavior';
 import { type ChaseState, afterFlee, canFlee, createChaseState, tickChase } from './chase';
+import { CHASE } from './chase';
 import { decayAlert } from './model';
 import type { NpcHost } from './host';
 import { ACTIVITIES } from '../factory';
@@ -46,6 +47,7 @@ function buildContext(state: GameState, person: Person): DecisionContext {
     chased: state.chaseTargetId === person.id,
     phoneHere: phoneWorks(state, person.room),
     totemHere: state.totems.includes(person.room),
+    tvHere: state.tvRooms.includes(person.room) && !state.tvClosed.includes(person.room),
     allyDownedHere: here.some((other) => other.id !== person.id && other.role !== 'police' && other.hp <= 0),
     allyInjuredHere: here.some((other) => other.id !== person.id && other.role !== 'police' && other.hp > 0 && other.hp <= 2),
     gateOpen: state.escapeRooms.length > 0,
@@ -126,6 +128,16 @@ function perform(host: NpcHost, state: GameState, person: Person, kind: ActionKi
       return host.tryCall(state, person);
     case 'totem':
       return removeTotem(host, state, person);
+    case 'tv': {
+      if (state.killer !== '贞子' || person.hasTape) return false;
+      const tv = state.tvRooms.find((room) => room === person.room && !state.tvClosed.includes(room));
+      if (!tv) return false;
+      state.tvClosed.push(tv);
+      person.hasTape = true;
+      person.activity = '关掉了电视，取走了录像带';
+      host.log(state, `${person.name} 关掉了${roomName(person.room)}的电视，取走了里面的录像带。`);
+      return true;
+    }
     case 'rescue':
     case 'heal':
       return host.tryRescue(state, person);
@@ -188,9 +200,9 @@ export function tickAllChase(state: GameState): void {
 
 }
 
-/** 供调试/测试查看某个幸存者还剩多少体力 */
-export function chaseStaminaOf(personId: string): number {
-  return 0;
+/** 供界面/调试查看某个幸存者还剩多少追逐体力（默认满值）。 */
+export function chaseStaminaOf(state: GameState, personId: string): number {
+  return chaseStates.get(state)?.get(personId)?.stamina ?? CHASE.maxStamina;
 }
 
 /** 距离玩家多远（供调试/UI 使用） */

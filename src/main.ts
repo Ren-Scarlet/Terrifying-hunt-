@@ -28,7 +28,6 @@ import {
   lookAround,
   lookAtRoom,
   cancelLookSelection,
-  cancelAuraSelection,
   selectAuraRoom,
   interactCabinet,
   interactTotem,
@@ -41,6 +40,7 @@ import {
   searchRoom,
   sabotageSiteItem,
   destroyItemBox,
+  sadakoTeleport,
   breakPhone,
   breakDoor,
   togglePowerCircuit,
@@ -118,6 +118,7 @@ let resultApplied = false;
 /** 本局新解锁的卡牌，用于结算面板只提示真正新增的那张 */
 let lastNewCard: string | null = null;
 let lastUnlockedAchievements: AchievementDef[] = [];
+let lastExecuteAt = 0;
 /** 信息面板当前展示的卡牌，避免同一张牌重复重绘 */
 let detailCardUid: string | null = null;
 /** 当前锁定的人物档案；卡牌悬停结束后仍恢复显示。 */
@@ -200,6 +201,7 @@ function showLatestExecutionScene(): void {
 
 function startExecutionQte(personId: string): void {
   if (!game || isQteActive()) return;
+  lastExecuteAt = Date.now();
   const reason = qteExecutionBlockReason(game, personId);
   if (reason) {
     noteToPlayer(game, reason);
@@ -1090,7 +1092,7 @@ function blockedByGameMode(action: string): boolean {
   if (game.nurseBlinkTargeting) return !['blink-select', 'power'].includes(action);
   if (game.huntressAiming) return !['hatchet-target', 'power'].includes(action);
   if (game.lookingAround) return !['look-select', 'look-cancel'].includes(action);
-  if (game.auraTargeting) return !['aura-select', 'aura-cancel'].includes(action);
+  if (game.auraTargeting) return action !== 'aura-select';
   return false;
 }
 
@@ -1157,6 +1159,7 @@ function createGameActions(): ActionTable {
     },
 
     'execute-special': ({ target }) => {
+      lastExecuteAt = Date.now();
       const game = currentGame();
       playSfx('executionSite');
       const method = target.dataset.method as ExecutionMethodId | undefined;
@@ -1305,6 +1308,12 @@ function createGameActions(): ActionTable {
       afterAction();
     },
 
+    'sadako-tv': ({ target }) => {
+      const room = target.dataset.room;
+      if (room && sadakoTeleport(currentGame(), room as RoomId)) playSfx('spark');
+      afterAction();
+    },
+
     'break-door': ({ target }) => {
       const room = target.dataset.room as RoomId | undefined;
       if (!room) return;
@@ -1355,11 +1364,6 @@ function createGameActions(): ActionTable {
       pulseAuraHeartbeat();
     },
 
-    'aura-cancel': () => {
-      cancelAuraSelection(currentGame());
-      playSfx('click');
-      render();
-    },
 
     'cabinet-interact': () => {
       interactCabinet(currentGame());
@@ -1448,6 +1452,7 @@ function createGameActions(): ActionTable {
 
   /** 普通处决与指定目标处决只差一个 data-person-id。 */
   function runExecute({ target, action }: ActionContext): void {
+    lastExecuteAt = Date.now();
     const game = currentGame();
     const personId = action === 'execute-target' ? target.dataset.personId : undefined;
     const ghosts = captureAttackGhosts();
@@ -1640,6 +1645,8 @@ app.addEventListener('click', (event) => {
   clearHeldMovement();
   const action = target.dataset.action;
   if (!action) return;
+  // 处决后 DOM 立刻重绘，双击的第二下容易落到刚出现的房间移动按钮上。
+  if (action === 'move' && Date.now() - lastExecuteAt < 420) return;
 
   // 分数处决 QTE 已删除；所有处决走普通处决 / 地点处决。
   if (handleImmersiveAction(action)) return;

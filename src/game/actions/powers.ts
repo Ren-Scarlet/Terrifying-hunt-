@@ -31,6 +31,30 @@ function huntressTargetable(host: NpcHost, state: GameState, person: Person): bo
   return host.forwardRoom(state) === person.room;
 }
 
+export function sadakoTeleport(host: NpcHost, state: GameState, room: RoomId): boolean {
+  if (state.killer !== '贞子') return false;
+  if (!state.tvRooms.includes(room) || state.tvClosed.includes(room)) {
+    host.log(state, '这台电视机已经关闭，无法传送。');
+    return false;
+  }
+  state.playerRoom = room;
+  state.tvClosed.push(room);
+  const targets = state.people.filter((person) => person.room === room && person.role !== 'police' && person.hp > 0);
+  targets.forEach((person) => {
+    person.curse = Math.min(7, (person.curse ?? 0) + 1);
+    host.log(state, `${person.name} 看见了雪花屏里的影子，咒怨 +1（${person.curse}/7）。`);
+  });
+  targets.filter((person) => (person.curse ?? 0) >= 7).forEach((person) => {
+    host.log(state, `${person.name} 的咒怨达到 7 层，录像带的诅咒应验了。`);
+    host.killPerson(state, person);
+  });
+  host.log(state, `你从${roomName(room)}的电视机里爬了出来，屏幕随即熄灭。`);
+  host.npcOnPlayerEnter(state);
+  host.afterPlayerAction(state);
+  host.checkImmediateWin(state);
+  return true;
+}
+
 export function blinkPlayer(host: NpcHost, state: GameState, room: RoomId): boolean {
   if (state.killer !== '护士' || !state.nurseBlinkTargeting) return false;
   const maxRange = blinkRangeOf(state);
@@ -116,6 +140,7 @@ export function recoverBearTrap(host: NpcHost, state: GameState): boolean {
 
 export function canUsePower(host: NpcHost, state: GameState, powerId: string): boolean {
   if (state.phase !== 'playing') return false;
+  if (state.killer === '贞子' && powerId === 'sadako_deluge') return true;
   const killer = KILLER_MAP[state.killer];
   const power = killer?.powers.find((p) => p.id === powerId);
   if (!power) return false;
@@ -143,6 +168,7 @@ export function canUsePower(host: NpcHost, state: GameState, powerId: string): b
 
 /** 能力为什么不能用，给按钮的 tooltip 用 */
 export function powerBlockReason(host: NpcHost, state: GameState, powerId: string): string {
+  if (state.killer === '贞子' && powerId === 'sadako_deluge') return '';
   const killer = KILLER_MAP[state.killer];
   const power = killer?.powers.find((p) => p.id === powerId);
   if (!power) return '';
@@ -179,6 +205,16 @@ export function powerBlockReason(host: NpcHost, state: GameState, powerId: strin
 }
 
 export function usePower(host: NpcHost, state: GameState, powerId: string): boolean {
+  if (state.killer === '贞子' && powerId === 'sadako_deluge') {
+    state.sadakoHidden = !state.sadakoHidden;
+    state.attackReady = true;
+    host.log(state, state.sadakoHidden
+      ? '你退回雪花屏里：无法被察觉，也无法攻击。再次使用恐惧洪流即可现身。'
+      : '你从屏幕里走出来：现在可以被看见，也可以挥刀。');
+    host.afterPlayerAction(state);
+    host.checkImmediateWin(state);
+    return true;
+  }
   if (powerId === 'trap_set') {
     const reason = trapPlacementBlockReason(host, state);
     if (reason) { host.log(state, reason); return false; }

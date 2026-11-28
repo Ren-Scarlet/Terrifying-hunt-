@@ -39,6 +39,7 @@ import {
   executeDownedPerson,
   executeQtePerson,
   qteExecutionBlockReason,
+  sadakoTeleport,
   destroyItemBox,
   executeBlockReason,
   carryPerson,
@@ -136,9 +137,9 @@ boardPerson.room = boardRoom;
 boardRules.clearedObstacles.push(boardRoom);
 check('幸存者：原有木板已被清除后不能再次放板', !canPlaceBarricade(boardRules, boardPerson));
 
-check('初期可选杀手包含设陷者、护士、女猎手与迈尔斯',
-  ACTIVE_KILLERS.map((killer) => killer.owner).join('|') === '设陷者|护士|女猎手|迈克尔·迈尔斯' &&
-  STARTER_KILLERS.join('|') === '设陷者|护士|女猎手|迈克尔·迈尔斯',
+check('初期可选杀手包含设陷者、护士、女猎手、迈尔斯与贞子',
+  ACTIVE_KILLERS.map((killer) => killer.owner).join('|') === '设陷者|护士|女猎手|迈克尔·迈尔斯|贞子' &&
+  STARTER_KILLERS.join('|') === '设陷者|护士|女猎手|迈克尔·迈尔斯|贞子',
   ACTIVE_KILLERS.map((killer) => killer.owner).join('、'),
 );
 check('未开放杀手资料仍保留在内部数据库，便于后续实装',
@@ -1840,6 +1841,80 @@ function caseNpcChapterOne(): void {
 
 caseNpcChapterOne();
 
+function caseSadako(): void {
+  const game = createGame(STARTING_DECK, undefined, '贞子');
+  check('贞子：开局隐匿且地图有 6 台电视',
+    game.sadakoHidden && game.tvRooms.length === 6 && game.tvClosed.length === 0,
+    `hidden=${game.sadakoHidden} tv=${game.tvRooms.length}`);
+  check('贞子：隐匿时不能攻击', attackBlockReason(game).includes('恐惧洪流'));
+  check('贞子：使用恐惧洪流不消耗行动点',
+    usePower(game, 'sadako_deluge') && !game.sadakoHidden && game.energy === game.maxEnergy);
+  const victim = game.people.find((person) => person.role !== 'police')!;
+  const tv = game.tvRooms[0];
+  victim.room = tv;
+  victim.hp = 4;
+  victim.curse = 0;
+  game.playerRoom = tv;
+  check('贞子：电视传送会关闭电视并叠加咒怨',
+    sadakoTeleport(game, tv) && game.tvClosed.includes(tv) && victim.curse === 1,
+    `closed=${game.tvClosed.includes(tv)} curse=${victim.curse}`);
+  victim.curse = 6;
+  const secondTv = game.tvRooms[1];
+  victim.room = secondTv;
+  sadakoTeleport(game, secondTv);
+  check('贞子：咒怨达到 7 层即被杀害', !game.people.some((person) => person.id === victim.id));
+
+  const aiTv = createGame(STARTING_DECK, undefined, '贞子');
+  aiTv.tvRooms = ['study'];
+  aiTv.tvClosed = [];
+  aiTv.playerRoom = 'garden';
+  const watcher = aiTv.people.find((person) => person.role !== 'police')!;
+  aiTv.people.filter((person) => person.id !== watcher.id).forEach((person) => { person.room = 'attic'; person.hidden = true; });
+  watcher.room = 'study';
+  watcher.alert = 50;
+  watcher.fear = 0;
+  endTurn(aiTv);
+  check('贞子：怀疑以上的幸存者会关电视并拿走录像带',
+    aiTv.tvClosed.includes('study') && watcher.hasTape,
+    `closed=${aiTv.tvClosed.join(',')} tape=${watcher.hasTape}`);
+  const beforeCurse = watcher.curse;
+  endTurn(aiTv);
+  check('贞子：持有录像带每回合咒怨 +1', watcher.curse > beforeCurse, `curse=${watcher.curse}`);
+}
+
+caseSadako();
+
+function caseNurseRework(): void {
+  const miss = createGame(STARTING_DECK, undefined, '护士');
+  miss.energy = 4;
+  usePower(miss, 'nurse_blink');
+  const missRoom = ROOM_MAP[miss.playerRoom].neighbors[0];
+  miss.nurseBlinkTargeting = true;
+  blinkPlayer(miss, missRoom);
+  endTurn(miss);
+  check('护士：闪现后没有命中，下回合进入疲惫',
+    miss.energy === miss.maxEnergy - 1 && !miss.nurseFatiguePending,
+    `energy=${miss.energy}/${miss.maxEnergy}`);
+
+  const hit = createGame(STARTING_DECK, undefined, '护士');
+  const hitTarget = hit.people.find((person) => person.role !== 'police')!;
+  hit.energy = 4;
+  usePower(hit, 'nurse_blink');
+  hit.nurseBlinkTargeting = true;
+  blinkPlayer(hit, ROOM_MAP[hit.playerRoom].neighbors[0]);
+  hitTarget.room = hit.playerRoom;
+  hitTarget.hp = 4;
+  hit.attackReady = true;
+  hit.energy = 4;
+  attack(hit, hitTarget.id);
+  endTurn(hit);
+  check('护士：闪现后命中，不会进入疲惫',
+    hit.energy === hit.maxEnergy && !hit.nurseFollowUp,
+    `energy=${hit.energy}/${hit.maxEnergy}`);
+}
+
+caseNurseRework();
+
 /** AB：封锁房门必须同时阻止 NPC 进入和离开；脚印不应随机消失 */
 function caseNpcLocksAndPersistentTrails(): void {
   const locked = newGame();
@@ -2681,8 +2756,9 @@ function caseHexPhonesAndAlarm(): void {
   crowGame.log = [];
   bird.sneaky = false;
   bird.armed = false;
+  bird.room = crowGame.playerRoom;
   bird.alert = 100;
-  bird.fear = 100;
+  bird.fear = 0;
   endTurn(crowGame);
   check('乌鸦：幸存者在乌鸦房间行动会发出动静',
     (crowGame.log.some((line) => line.includes('乌鸦')) || crowGame.disturbances.some((d) => d.label.includes('乌鸦')))

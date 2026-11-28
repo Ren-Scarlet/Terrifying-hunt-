@@ -118,7 +118,7 @@ export const CARDS: CardDef[] = [
     name: '牢牢紧握',
     cost: 1,
     type: 'tactic',
-    desc: '指定当前房间一名站立幸存者：其下一次行动无法逃离当前房间。',
+    desc: '指定当前房间一名站立幸存者：其下一次行动受限（无法行动），且在此期间无法闪避攻击。',
     flavor: '这次，你抓得足够牢。',
     sourceSkill: 'Iron Grasp',
     unlocked: true,

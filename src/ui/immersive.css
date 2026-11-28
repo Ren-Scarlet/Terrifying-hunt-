@@ -2597,8 +2597,8 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
 
 /* 1) 当前任务：从右上角移到左上（紧贴任务条下方），并允许滚动 */
 #app.immersive-game .task-pop{
-  right:auto!important;left:74px!important;top:96px!important;
-  width:min(384px,44vw)!important;max-height:62vh!important;overflow:auto!important;
+  right:auto!important;left:74px!important;top:232px!important;
+  width:min(384px,44vw)!important;max-height:calc(100vh - 320px)!important;overflow:auto!important;
   padding:16px 18px!important;border-radius:2px!important;
   background:linear-gradient(165deg,rgba(10,14,17,.96),rgba(5,7,9,.96))!important;
   border:1px solid rgba(150,92,66,.34)!important;
@@ -2607,7 +2607,7 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
 #app.immersive-game .task-pop h3{font-size:11px!important;letter-spacing:2.4px!important;color:#c9a86c!important;}
 #app.immersive-game .task-pop p{font-size:12px!important;line-height:1.8!important;}
 @media(max-width:900px){
-  #app.immersive-game .task-pop{left:10px!important;top:84px!important;width:min(88vw,384px)!important;}
+  #app.immersive-game .task-pop{left:10px!important;top:192px!important;width:min(88vw,384px)!important;max-height:calc(100dvh - 330px)!important;}
 }
 
 /* 2) 人物详情：加宽侧栏，正文改为单列、放大行距，头像不再挤成一条 */

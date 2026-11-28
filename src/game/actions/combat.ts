@@ -28,7 +28,7 @@ function clamp(value: number, min: number, max: number): number {
  */
 export function attackBlockReason(host: NpcHost, state: GameState, targetId?: string, costOverride = ATTACK_COST): string {
   if (state.phase !== 'playing') return '现在不能攻击';
-  if (state.attackBlockedTurn === state.turn) return '戏耍食物生效中：本回合不能攻击。';
+  if (state.killer === '贞子' && state.sadakoHidden) return '恐惧洪流：先现身，才能攻击。';  if (state.attackBlockedTurn === state.turn) return '戏耍食物生效中：本回合不能攻击。';
   // 攻击只针对站立目标；倒地者有独立的处决按钮，避免两个动作混在一起。
   if (targetId) {
     const picked = state.people.find((p) => p.id === targetId);
@@ -54,6 +54,7 @@ export function canAttack(host: NpcHost, state: GameState, targetId?: string): b
 /** 独立处决动作：倒地后立即可用，消耗 1 AP；玩家不处决时，同伴仍可在之后救援。 */
 export function executeBlockReason(host: NpcHost, state: GameState, targetId?: string): string {
   if (state.phase !== 'playing') return '现在不能处决';
+  if (state.killer === '贞子' && state.sadakoHidden) return '恐惧洪流：先现身，才能处决。';
   if (state.attackBlockedTurn === state.turn) return '戏耍食物生效中：本回合不能处决。';
   const target = targetId
     ? state.people.find((person) => person.id === targetId)
@@ -185,6 +186,8 @@ export function attack(host: NpcHost, state: GameState, targetId?: string, optio
   state.energy -= attackCost;
   if (state.killer === '护士' && state.nurseFollowUp && target.role !== 'police') {
     state.huntCounters.nurseBlinkAttacks += 1;
+    state.nurseFollowUp = false;
+    state.nurseFatiguePending = false;
     host.log(state, `护士利用闪现后的追击窗口攻击了 ${target.name}。`);
   }
   state.attackReady = false;

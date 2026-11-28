@@ -102,7 +102,7 @@ export const KILLERS: KillerProfile[] = [
       {
         id: 'nurse_blink',
         name: '斯宾塞的濒死之息',
-        desc: '选择地图上 3 格内的任意房间闪现，无视墙壁与房门（配件可延长到 4 格）。闪现后获得一次立即攻击或抓取同屋幸存者的窗口；完成下一次行动后疲惫，下回合少 1 点行动点。',
+        desc: '选择地图上 3 格内的任意房间闪现，无视墙壁与房门（配件可延长到 4 格）。闪现后必须尽快攻击命中同屋幸存者；若下一次行动没有命中，则进入疲惫，下回合少 1 点行动点。',
         cooldown: 1,
         ops: [],
       },
@@ -192,25 +192,9 @@ export const KILLERS: KillerProfile[] = [
       {
         id: 'sadako_deluge',
         name: '恐惧洪流',
-        desc: '全场所有人警觉 +12，并僵住 1 回合。',
-        cooldown: 1,
-        ops: [
-          { op: 'alert', who: 'allAny', amount: 12 },
-          { op: 'block', who: 'allAny', turns: 1 },
-          { op: 'log', text: '屏幕雪花一闪，每个房间里都多了一道湿脚印。' },
-        ],
-      },
-      {
-        id: 'sadako_tape',
-        name: '录像带',
-        desc: '全场所有人受 1 点伤害，并暴露位置 2 回合。',
-        cooldown: 3,
-        ultimate: true,
-        ops: [
-          { op: 'damage', who: 'allAny', amount: 1 },
-          { op: 'scout', all: true, turns: 2 },
-          { op: 'log', text: '七天，从这一秒开始算。' },
-        ],
+        desc: '免费切换现身与隐匿，不消耗行动点，但每次切换后幸存者仍会行动。隐匿时无法被察觉、无法攻击；现身之后才能挥刀。地图上另有 6 台电视机可传送。',
+        cooldown: 0,
+        ops: [],
       },
     ],
   },
@@ -425,7 +409,7 @@ export const KILLER_MAP: Record<string, KillerProfile> = KILLERS.reduce(
 );
 
 /** 当前正式开放的初期角色。其余资料保留在数据库中，待机制实装后再开放。 */
-export const ACTIVE_KILLER_NAMES = ['设陷者', '护士', '女猎手', '迈克尔·迈尔斯'] as const;
+export const ACTIVE_KILLER_NAMES = ['设陷者', '护士', '女猎手', '迈克尔·迈尔斯', '贞子'] as const;
 export const ACTIVE_KILLERS = ACTIVE_KILLER_NAMES.map((name) => KILLER_MAP[name]);
 /** 初始解锁名单与当前开放名单保持一致。 */
 export const STARTER_KILLERS: string[] = [...ACTIVE_KILLER_NAMES];

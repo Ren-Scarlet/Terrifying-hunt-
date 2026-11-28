@@ -8,6 +8,7 @@ import { BLEEDOUT_TURNS, REACT_MOVE_CAP, SURVIVOR_INJURED_HP } from '../../const
 import { roomName } from '../../missions';
 import { roomDistance } from '../../navigation';
 import { ROOM_MAP } from '../../rooms';
+import { nextStepToward } from '../../world/pathfinding';
 import type { GameState, Person } from '../../types';
 import { isLocked, isRoomLit, npcPeople as npcs, peopleInRoom } from '../../world/roomState';
 import { applyAlertEvent, applyFearEvent, decayFear, isSafe } from './model';
@@ -17,7 +18,7 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 export function npcTurn(host: NpcHost, state: GameState): void {
-  host.sameRoomKillerReact(state, true);
+  host.sameRoomKillerReact(state, !state.sadakoHidden);
   // 红色人影只保留到下一次 NPC 回合开始，给玩家足够时间确认陷阱命中。
   state.people.forEach((person) => { person.trapTriggered = false; });
   const before = host.snapshotRooms(state);
@@ -37,6 +38,34 @@ export function npcTurn(host: NpcHost, state: GameState): void {
       applyAlertEvent(person, 'see_corpse');
       applyFearEvent(person, 'corpse_in_room');
       host.log(state, `${person.name} 在${roomName(person.room)}看见了尸体，呼吸一下子乱了。`);
+    }
+
+    // 录像带：持有者每回合结束咒怨 +1；带着它走向最远的另一台电视归还。
+    if (person.hp > 0 && person.hasTape) {
+      person.curse = Math.min(7, (person.curse ?? 0) + 1);
+      host.log(state, `${person.name} 手里的录像带又播放了一段雪花，咒怨 +1（${person.curse}/7）。`);
+      if (person.curse >= 7) {
+        host.log(state, `${person.name} 的咒怨达到 7 层，录像带的诅咒应验了。`);
+        host.killPerson(state, person);
+        continue;
+      }
+      const targets = state.tvRooms
+        .filter((room) => !state.tvClosed.includes(room))
+        .sort((a, b) => roomDistance(person.room, b) - roomDistance(person.room, a));
+      const target = targets[0];
+      if (target && target !== person.room) {
+        const step = nextStepToward(state, person.room, target, [state.playerRoom]);
+        if (step) {
+          person.room = step;
+          person.activity = `带着录像带前往${roomName(target)}的电视`;
+          host.log(state, `${person.name} 抱着录像带，往${roomName(target)}的方向走去。`);
+          continue;
+        }
+      } else if (target === person.room) {
+        person.hasTape = false;
+        host.log(state, `${person.name} 把录像带塞回了${roomName(target)}的电视，诅咒暂时离开了他的手里。`);
+        continue;
+      }
     }
 
     // 已被发现的捕兽夹可以被幸存者拆除，避免陷阱成为永久封路工具。

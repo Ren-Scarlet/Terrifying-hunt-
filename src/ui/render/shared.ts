@@ -1,7 +1,7 @@
 import { CARDS, CARD_MAP } from '../../game/cards';
 import { ADDON_RARITY_BG, PERK_RARITY_BG, POWER_RARITY_BG, accessoryImage, cardImage, characterImage, uiIcon } from '../../game/assetMap';
 import {
-  BASE_AP, BLEEDOUT_TURNS, BLOOD, HEALTH_LABEL,
+  BASE_AP, BLEEDOUT_TURNS, BLOOD, HEALTH_LABEL, chaseStamina,
   conditionOf, effectiveCost, isPersonVisible,
   attackBlockReason, executeBlockReason,
 } from '../../game/engine';
@@ -162,6 +162,12 @@ export function personChip(person: Person, attackable = false, carryable = false
   const itemMark = person.item
     ? `<span class="chip-item" title="携带${SURVIVOR_ITEM_LABEL[person.item]}，剩余 ${person.itemUses} 次">${itemIconHtml(person.item)}${SURVIVOR_ITEM_LABEL[person.item]}</span>`
     : '';
+  const curseMark = (person.curse ?? 0) > 0
+    ? `<span class="chip-curse" title="咒怨达到 7 层时会被录像带杀死">咒怨 ${person.curse}/7</span>`
+    : '';
+  const tapeMark = person.hasTape
+    ? '<span class="chip-tape" title="持有录像带：每回合结束咒怨 +1；可以带到最远的电视归还">录像带</span>'
+    : '';
   const avatarHtml = img
     ? `<span class="person-avatar-wrap"><img class="person-avatar" src="${img}" alt="" onerror="this.style.display='none'">${person.bloodSacrifice ? `<img class="chip-sacrifice-mark" src="${uiIcon('obsession')}" alt="血祭品" title="本局血祭品">` : ''}</span>`
     : '';
@@ -217,7 +223,7 @@ export function personChip(person: Person, attackable = false, carryable = false
   return `<button type="button" class="person-chip ${cls} ${person.bloodSacrifice ? 'blood-sacrifice' : ''} ${person.trapTriggered ? 'trap-triggered' : ''} ${health === 'downed' ? 'is-downed' : ''} ${attackable ? 'can-hit' : ''} ${targetMode ? 'targeting-' + targetMode : ''}"${slotStyleAttr} data-action="${action}" data-person-id="${person.id}"${attackable ? ' data-attack="1"' : ''}
     title="${escape(person.name)} · ${HEALTH_LABEL[health]} · ${ALERT_LABEL[band]} ${person.alert}/100 · 恐惧 ${FEAR_LABEL[fearBand(person.fear)]} · 正在${escape(label)}${note}">
     ${avatarHtml}${trapHitMark}
-    ${dialogue}<span>${escape(person.name)}</span>${contractTargetMark}${highValueMark}${itemMark}${stateMark}<span class="person-status-row">${statusIcons}</span>${alertMark}${watchMark}
+    ${dialogue}<span>${escape(person.name)}</span>${contractTargetMark}${highValueMark}${itemMark}${curseMark}${tapeMark}${stateMark}<span class="person-status-row">${statusIcons}</span>${alertMark}${watchMark}
   </button>`;
 }
 
@@ -258,10 +264,13 @@ export function personDetailHtml(state: GameState, personId: string): string {
     paras.push(
       `状态：${HEALTH_LABEL[health]}（${person.hp}/4）。`,
       `警戒：${ALERT_LABEL[alertBand(person.alert)]}（${person.alert}/100）· 恐惧：${FEAR_LABEL[fearBand(person.fear)]}（${person.fear}/100）。行为：${person.activity || '暂无明显动作'}。`,
+      `追逐体力：${chaseStamina(state, person.id)}/3（体力见底后会停下来喘一回合）。`,
     );
     if (person.dialogue) paras.push(`听见他说：“${person.dialogue}”`);
     if (person.marked) paras.push('契约情报：这是本局指定目标。');
     if (person.item) paras.push(`携带道具：${SURVIVOR_ITEM_LABEL[person.item]}（剩余 ${person.itemUses} 次）。`);
+    if ((person.curse ?? 0) > 0) paras.push(`咒怨：${person.curse}/7。达到 7 层会被录像带杀死。`);
+    if (person.hasTape) paras.push('持有录像带：每回合结束咒怨 +1；他会把录像带带到最远的另一台电视归还。');
     if (person.highValue) paras.push(`高价值目标：击杀后额外获得 ${BLOOD.highValueKill} 血点。`);
     if (person.bloodSacrifice) paras.push('特殊身份：本局血祭品。');
     if (isPersonVisible(state, person)) {

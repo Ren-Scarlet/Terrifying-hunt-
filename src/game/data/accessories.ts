@@ -174,6 +174,40 @@ export const ACCESSORIES: AccessoryDef[] = [
     sourceText: '尾随血祭品时，尾随值累积速率增加40%。',
     mods: [{ key: 'stalkGain', value: 40 }, { key: 'startAlarm', value: 6 }],
   },
+
+  /* ------------------------------------------------------------------ */
+  /* 贞子 · 恐惧洪流                                                    */
+  /* ------------------------------------------------------------------ */
+  {
+    id: 'sadako_tape',
+    name: '诅咒录像带',
+    owner: '贞子',
+    rarity: 'very-rare',
+    desc: '结算血点 +20%。',
+    sourceSkill: 'Cursed Videotape',
+    sourceText: '录像带的诅咒传播得更快。',
+    mods: [{ key: 'bloodPointPct', value: 20 }],
+  },
+  {
+    id: 'sadako_well',
+    name: '古井水',
+    owner: '贞子',
+    rarity: 'rare',
+    desc: '能力冷却 -1 回合。',
+    sourceSkill: 'Well Water',
+    sourceText: '井水让怨念更快重新聚拢。',
+    mods: [{ key: 'cooldown', value: -1 }],
+  },
+  {
+    id: 'sadako_tv',
+    name: '雪花电视',
+    owner: '贞子',
+    rarity: 'uncommon',
+    desc: '结算血点 +10%，但能力冷却 +1 回合。',
+    sourceSkill: 'Static Television',
+    sourceText: '雪花屏让猎场更容易记住她的脸。',
+    mods: [{ key: 'bloodPointPct', value: 10 }, { key: 'cooldown', value: 1 }],
+  },
 ];
 
 export const ACCESSORY_MAP: Record<string, AccessoryDef> = Object.fromEntries(

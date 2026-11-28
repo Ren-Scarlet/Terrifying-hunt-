@@ -232,6 +232,10 @@ export interface Person {
   /** 手里的幸存者道具与剩余次数 */
   item: SurvivorItem | null;
   itemUses: number;
+  /** 贞子专属：咒怨层数；达到 7 即被录像带杀死 */
+  curse: number;
+  /** 是否持有从电视机里取出的录像带 */
+  hasTape: boolean;
   /** 随机高价值目标：击杀后获得大量额外血点 */
   highValue?: boolean;
   /** 老练的幸存者：有时能悄无声息地移动，仍会留下脚印，但不会惊动乌鸦 */
@@ -624,6 +628,11 @@ export interface GameState {
   playerSkipTurn: boolean;
   /** 独立区域电闸及其供电范围 */
   powerCircuits: PowerCircuit[];
+  /** 贞子：是否处于录像带隐匿状态（无法侦测、无法攻击） */
+  sadakoHidden: boolean;
+  /** 贞子的电视机房间；关闭后不能再传送 */
+  tvRooms: RoomId[];
+  tvClosed: RoomId[];
 }
 
 export interface SaveData {
