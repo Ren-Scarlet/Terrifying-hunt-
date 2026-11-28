@@ -328,6 +328,7 @@ export function renderBloodweb(
                 <span>${escape(offer.desc)}</span>
               </button>`).join('')}</div>`
           : '<p class="bloodweb-empty">花血点升一级，下面会随机出现该杀手的 3 件配件，选一件进库存。每位杀手等级独立，血点想给谁花就给谁花。</p>'}
+        <div class="bloodweb-note">价格随等级上升：1 级 500，10 级 800，20 级 1,200，30 级 1,600，50 级 2,500，75 级 3,500，99 级 5,000。</div>
         <div class="bloodweb-note">每 100 级自动转生（等级回 1、转生 +1）；每累计 30 级把该杀手一张专属卡放进公共池，其他杀手也能构筑。</div>
         <div class="actions">
           <button class="btn ghost" data-action="bloodweb-close">关闭</button>

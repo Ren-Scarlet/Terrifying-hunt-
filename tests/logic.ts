@@ -103,6 +103,7 @@ import type { GameState, RoomId } from '../src/game/types';
 import { createSeededRandom, random, withRandomSource } from '../src/game/random';
 import { cellDistance, nearestOf, roomDistance } from '../src/game/navigation';
 import { advanceRogue, applyRogueFloor, rollRogueAccessories, rollRogueDeck, rollRogueOffers, startRogueRun } from '../src/game/rogue';
+import { bloodwebCostAtLevel } from '../src/game/progress';
 import { EXECUTION_METHODS } from '../src/game/executions';
 import { awarenessLabel, awarenessStage, myersStalkGain } from '../src/game/npc/awareness';
 
@@ -1389,6 +1390,18 @@ function caseNewMechanics() {
 }
 
 caseNewMechanics();
+
+// 血点升级价格：按等级锚点线性插值
+{
+  check('血点升级：七个等级锚点价格正确',
+    [1, 10, 20, 30, 50, 75, 99].map(bloodwebCostAtLevel).join(',') === '500,800,1200,1600,2500,3500,5000');
+  check('血点升级：中间等级线性插值', bloodwebCostAtLevel(5) === 630 && bloodwebCostAtLevel(60) === 2900,
+    `lv5=${bloodwebCostAtLevel(5)} lv60=${bloodwebCostAtLevel(60)}`);
+  check('血点升级：价格随等级单调不下降',
+    Array.from({ length: 99 }, (_, i) => bloodwebCostAtLevel(i + 1))
+      .every((cost, i, all) => i === 0 || cost >= all[i - 1]));
+  check('血点升级：99 级以上按 5000 封顶', bloodwebCostAtLevel(100) === 5000);
+}
 
 function caseMergeAndMissions(): void {
   // 契约在准备开始时随机组合，五类任务都应有机会出现。

@@ -31,12 +31,33 @@ export function progressOf(map: ProgressMap | undefined, killer: string): Killer
 }
 
 /** 累计等级（跨转生）：用来算「每 30 级共享一张专属卡」。 */
-/** 升下一级要花多少血点：50 起，每级 +15。 */
-export const BLOODWEB_BASE_COST = 50;
-export const BLOODWEB_COST_STEP = 15;
+/** 血点升级价格锚点：按当前等级线性插值，99 级封顶 5000。 */
+export const LEVEL_COST_ANCHORS: ReadonlyArray<readonly [number, number]> = [
+  [1, 500],
+  [10, 800],
+  [20, 1200],
+  [30, 1600],
+  [50, 2500],
+  [75, 3500],
+  [99, 5000],
+];
+
+export function bloodwebCostAtLevel(level: number): number {
+  const clamped = Math.max(1, Math.min(99, Math.round(level)));
+  if (clamped >= 99) return 5000;
+  for (let i = 0; i < LEVEL_COST_ANCHORS.length - 1; i += 1) {
+    const [fromLevel, fromCost] = LEVEL_COST_ANCHORS[i];
+    const [toLevel, toCost] = LEVEL_COST_ANCHORS[i + 1];
+    if (clamped >= fromLevel && clamped <= toLevel) {
+      const ratio = (clamped - fromLevel) / (toLevel - fromLevel);
+      return Math.round((fromCost + ratio * (toCost - fromCost)) / 10) * 10;
+    }
+  }
+  return 5000;
+}
 
 export function bloodwebCost(progress: KillerProgress): number {
-  return BLOODWEB_BASE_COST + Math.max(0, progress.level - 1) * BLOODWEB_COST_STEP;
+  return bloodwebCostAtLevel(progress.level);
 }
 
 /** 花血点买一级（100 级自动转生）。 */
