@@ -1,0 +1,21 @@
+[application]
+config/name="暗夜杀机"
+run/main_scene="res://场景/主场景.tscn"
+config/features=PackedStringArray("4.7", "GL Compatibility")
+config/description="暗夜杀机：原生 Godot 单机策略猎杀游戏"
+
+[display]
+window/size/viewport_width=1440
+window/size/viewport_height=900
+window/size/window_width_override=1440
+window/size/window_height_override=900
+window/stretch/mode="canvas_items"
+
+[rendering]
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+textures/default_filters/use_nearest_mipmap_filter=false
+environment/defaults/default_clear_color=Color(0.035, 0.035, 0.045, 1)
+
+[autoload]
+SaveManager="*res://脚本/存档管理器.gd"
