@@ -1980,6 +1980,14 @@ function caseChaseAndGhostface(): void {
     `id=${ghostId} energy=${ghost.energy}`);
   resolveGhostfaceNightfall(ghost, ghostTarget.id, true);
   check('鬼面：QTE 成功会累积标记', ghostTarget.watchValue >= 35, `mark=${ghostTarget.watchValue}`);
+  ghostTarget.watchValue = 90;
+  ghost.nightfallActive = true;
+  resolveGhostfaceNightfall(ghost, ghostTarget.id, true);
+  ghostTarget.hp = 4;
+  ghost.attackReady = true;
+  ghost.energy = 4;
+  attack(ghost, ghostTarget.id);
+  check('鬼面：标记满后一刀直接击倒', ghostTarget.hp === 0, `hp=${ghostTarget.hp} watched=${ghostTarget.watched}`);
 
   const ghostFail = createGame(STARTING_DECK, undefined, '鬼面');
   const failTarget = ghostFail.people.find((person) => person.role !== 'police')!;

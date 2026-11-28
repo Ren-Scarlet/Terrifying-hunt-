@@ -237,7 +237,7 @@ export function attack(host: NpcHost, state: GameState, targetId?: string, optio
   // 基础挥刀 1 点：健康 4 点、受伤 2 点，所以四刀倒地（第二刀进入受伤）。
   // 配件的「挥刀伤害」只在普通挥刀上生效，不放大厄咒/附身的一击倒地。
   const softPossess = state.possessed && hasEffect(state, 'possessHit', 'possessDamage');
-  const baseDamage = noedActive
+  const baseDamage = noedActive || nightfallKill
     ? SURVIVOR_MAX_HP
     : softPossess
       ? Math.max(1, effectTotal(state, 'possessHit', 'possessDamage'))
