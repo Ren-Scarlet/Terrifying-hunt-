@@ -204,8 +204,8 @@ function startExecutionQte(personId: string): void {
   unlockAudio();
   startQte({
     label: '处决时机',
+    mode: 'random',
     length: 4,
-    durationMs: 4200,
     anchor: () => app.querySelector<HTMLElement>('.player-marker'),
     onComplete: ({ success }) => {
       const current = currentGame();

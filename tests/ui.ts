@@ -18,6 +18,7 @@ import {
   ui,
 } from '../src/ui/viewState';
 import { session } from '../src/ui/session';
+import { timingHit } from '../src/ui/qte';
 
 let pass = 0;
 let fail = 0;
@@ -95,6 +96,9 @@ check('牌组草稿支持就地追加', session.editorDeck.join(',') === 'a,b,c'
 session.pendingRun = 'free';
 check('出发模式可读写', session.pendingRun === 'free');
 session.pendingRun = null;
+
+check('QTE：timing 模式只在目标区内判定成功',
+  timingHit(0.5, 0.4, 0.6) && timingHit(0.4, 0.4, 0.6) && !timingHit(0.61, 0.4, 0.6));
 
 console.log(`\n界面状态 ${pass} 通过 / ${fail} 失败`);
 if (fail > 0) process.exitCode = 1;

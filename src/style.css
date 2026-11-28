@@ -3905,3 +3905,31 @@ button, .room-hit, .hand-row { touch-action: manipulation; }
   color: #ffe9a8;
 }
 .execution-scene-line { display: block; margin-top: 6px; color: #e0c27e; font-size: 12px; font-style: italic; }
+/* timing 模式：左右摆动的光标 + 绿色目标区 */
+.qte-panel .qte-timing {
+  position: relative;
+  width: 100%;
+  height: 26px;
+  margin: 2px 0;
+  border: 1px solid rgba(255, 255, 255, .22);
+  border-radius: 5px;
+  background: linear-gradient(90deg, #171a1c, #24282b);
+  overflow: hidden;
+}
+.qte-panel .qte-zone {
+  position: absolute;
+  top: 0; bottom: 0;
+  background: rgba(94, 205, 129, .34);
+  border-left: 1px solid rgba(140, 240, 170, .85);
+  border-right: 1px solid rgba(140, 240, 170, .85);
+  box-shadow: inset 0 0 12px rgba(94, 205, 129, .35);
+}
+.qte-panel .qte-cursor {
+  position: absolute;
+  top: -2px; bottom: -2px;
+  width: 3px;
+  transform: translateX(-50%);
+  background: #ffd24a;
+  box-shadow: 0 0 8px rgba(255, 210, 74, .9);
+}
+.qte-panel .qte-hint { color: #b9b09a; font-size: 10px; letter-spacing: .04em; }
