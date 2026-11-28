@@ -137,7 +137,6 @@ import { policePhase as aiPolicePhase } from './npc/police';
 import {
   callPhase as aiCallPhase,
   escapePhase as aiEscapePhase,
-  witnessPhase as aiWitnessPhase,
 } from './turn/phases';
 import { endTurn as aiEndTurn } from './turn/ending';
 import {
@@ -229,12 +228,10 @@ const aiHost: NpcHost = {
   getChasedId: () => chasedId,
   finish,
   finishCall,
-  witnessWanted,
   runNpcTurn: npcTurn,
   callPhase,
   escapePhase,
   policePhase,
-  witnessPhase,
   syncWanted,
   refreshVision,
   pruneTrails,
@@ -477,12 +474,6 @@ export function addAlarm(state: GameState, amount: number): void {
 }
 
 /** 布局牌对报警暴露度的削弱 */
-function witnessWanted(state: GameState, base: number): number {
-  let gain = base;
-  if (state.phoneCut) gain -= 1;
-  if (state.poltergeist) gain -= 1;
-  return Math.max(0, gain);
-}
 
 export { roomName };
 
@@ -1068,7 +1059,6 @@ export function updateNpcDialogue(state: GameState): void {
 /** 回合三阶段已搬到 turn/phases.ts；这里保留引擎侧入口。 */
 function callPhase(state: GameState): void { aiCallPhase(aiHost, state); }
 function escapePhase(state: GameState): void { aiEscapePhase(aiHost, state); }
-function witnessPhase(state: GameState): void { aiWitnessPhase(aiHost, state); }
 
 
 /* ==================================================================== */

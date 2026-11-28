@@ -84,37 +84,3 @@ export function escapePhase(host: NpcHost, state: GameState): void {
     }
   }
 }
-
-export function witnessPhase(host: NpcHost, state: GameState): void {
-  if (alarmSuppressed(state)) {
-    host.log(state, '目击者保持沉默。');
-    return;
-  }
-  const witnesses = peopleInRoom(state, state.playerRoom).filter(
-    (p) => p.role !== 'police' && p.hp > 0 && !p.hidden,
-  );
-  if (!witnesses.length) return;
-
-  // 完全没察觉的人（还没注意到你、也没在盯着门口）不会记住你的脸。
-  // 想安静地做事，就得先让屋里的人背对你。
-  const aware = witnesses.filter((p) => p.alert >= 25 || p.intent !== 'idle');
-  if (!aware.length) {
-    host.log(state, '屋里的人背对着你，什么也没看见。');
-    return;
-  }
-
-  const alarmWitness = aware.find((p) => SURVIVOR_MAP[p.id]?.threat === 'alarm');
-  const spiritualSees = aware.some((p) => SURVIVOR_MAP[p.id]?.threat === 'spiritual');
-  if (spiritualSees) host.log(state, '灵异感知者看穿了你的伪装，任何隐匿都失效。');
-
-  const witness = alarmWitness ?? aware[0];
-  const base = alarmWitness ? 3 : 2;
-  // 递增递减：已经被报过一次警，再说一遍没那么值钱了
-  const dulled = Math.max(1, base - Math.floor(state.wanted / 3));
-  const gain = host.witnessWanted(state, dulled);
-  host.addWanted(state, gain);
-  host.addAlarm(state, 4);
-  state.lastCrimeRoom = state.playerRoom;
-  host.log(state, `${witness.name} 目击了你，暴露度 +${gain}${alarmWitness ? '（报警者）' : ''}。`);
-  if (alarmWitness) host.log(state, `${witness.name} 直接报出了这间房，警察正在赶来。`);
-}

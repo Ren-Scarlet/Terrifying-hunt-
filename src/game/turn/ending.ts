@@ -71,7 +71,6 @@ export function endTurn(host: NpcHost, state: GameState): void {
   host.policePhase(state);
   if (state.result) return;
 
-  host.witnessPhase(state);
   host.checkImmediateWin(state);
   if (state.result) return;
 

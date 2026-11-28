@@ -73,15 +73,12 @@ export interface NpcHost {
   finish(state: GameState, result: 'win' | 'caught' | 'timeout' | 'failed'): void;
   /** 报警成功：暴露度大涨、警察赶来 */
   finishCall(state: GameState, person: Person, device: string): void;
-  /** 目击者对暴露度的贡献（受布局牌削弱） */
-  witnessWanted(state: GameState, base: number): number;
   /** 逐个幸存者的回合行动 */
   runNpcTurn(state: GameState): void;
   /** 回合阶段：电话兑现 / 逃生 / 警察 / 目击 */
   callPhase(state: GameState): void;
   escapePhase(state: GameState): void;
   policePhase(state: GameState): void;
-  witnessPhase(state: GameState): void;
   /** 回合收尾：警报降温、视野、痕迹、天亮压力、环境事件 */
   syncWanted(state: GameState): void;
   refreshVision(state: GameState): void;
