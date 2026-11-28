@@ -77,6 +77,21 @@ import { canMoveTo, moveBlockReason, moveCost } from './world/movement';
 import { phoneWorks, workingPhones } from './world/phones';
 export { canMoveTo, moveBlockReason, moveCost } from './world/movement';
 export { phoneWorks, workingPhones } from './world/phones';
+import {
+  BREAKER_SWITCH_COST,
+  WIPE_COST,
+  breakerBlockReason,
+  sabotageBlockReason,
+  sabotageTarget,
+  wipeBlockReason,
+} from './rules/actionRules';
+export {
+  BREAKER_SWITCH_COST,
+  WIPE_COST,
+  breakerBlockReason,
+  sabotageBlockReason,
+  wipeBlockReason,
+} from './rules/actionRules';
 import { SURVIVOR_MAP } from './survivors';
 import type {
   Archetype,
@@ -176,8 +191,6 @@ const FRENZY_GAIN = 25;
 const FRENZY_LOSS = 20;
 
 /* ---------- 本轮新增：擦刀 / 守尸 / 追击热度 / 眩晕致盲 / 鬼面夜幕 ---------- */
-/** 擦刀：原地花 1 点收回刀锋，但这一次动作幸存者也会跟着动 */
-export const WIPE_COST = 1;
 /** 每多追同一名幸存者一回合，其他人的工作效率 +25%，最多翻倍 */
 /** 同屋有倒地同伴时，各原型把人拉起来的意愿（0~1）：人人都可能救，只是有人更奋不顾身 */
 const RESCUE_EAGERNESS: Record<Archetype, number> = {
@@ -3419,14 +3432,6 @@ export function attack(state: GameState, targetId?: string, options: { costOverr
   return true;
 }
 
-/** 擦刀为什么按不下去 */
-export function wipeBlockReason(state: GameState): string {
-  if (state.phase !== 'playing') return '现在不能动手';
-  if (state.attackReady) return '刀锋还干净，不用擦';
-  if (state.energy < WIPE_COST) return `需要 ${WIPE_COST} 点行动点`;
-  return '';
-}
-
 /**
  * 擦刀：原地花 1 点行动点，把 attackReady 收回来，接着就能再砍/处决。
  * 代价是这一次动作同样算一次「玩家行动」——幸存者会趁你低头擦刀跑掉、干活、
@@ -3820,21 +3825,6 @@ function triggerEnvironmentalEvent(state: GameState): void {
   log(state, `【环境事件】${room.name}突然传来玻璃碎裂声${startled.length ? `，${startled.map((person) => person.name).join('、')}被惊动了` : '，声音在空房间里回荡'}。`);
 }
 
-export const BREAKER_SWITCH_COST = 1;
-
-/** 电闸只能在所在房间操作；每组电路独立控制对应区域供电。 */
-export function breakerBlockReason(state: GameState, circuitId?: string): string | null {
-  if (state.phase !== 'playing') return '这一局已经结束了。';
-  const circuit = state.powerCircuits.find((item) =>
-    circuitId ? item.id === circuitId : item.breakerRoom === state.playerRoom,
-  );
-  if (!circuit) return '这间屋子没有电闸。';
-  if (circuit.breakerRoom !== state.playerRoom) return '必须走到电闸所在房间才能操作。';
-  if (circuit.broken) return '电闸控制箱已经损坏，无法操作。';
-  if (state.energy < BREAKER_SWITCH_COST) return '行动点不足：操作电闸需要 1 点。';
-  return null;
-}
-
 export function togglePowerCircuit(state: GameState, circuitId?: string): boolean {
   const reason = breakerBlockReason(state, circuitId);
   if (reason) {
@@ -3856,25 +3846,6 @@ export function togglePowerCircuit(state: GameState, circuitId?: string): boolea
   afterPlayerAction(state);
   checkImmediateWin(state);
   return true;
-}
-
-/** 统一破坏入口：相邻门锁、电话线、无线电、电闸与道具箱。 */
-function sabotageTarget(state: GameState): { kind: 'door'; room: RoomId } | { kind: 'phone'; room: RoomId } | { kind: 'radio' } | { kind: 'facility' } | null {
-  const breaker = state.powerCircuits.some((c) => c.breakerRoom === state.playerRoom && !c.broken);
-  const item = state.siteItems.some((i) => i.room === state.playerRoom && !i.broken && i.charges > 0);
-  if (breaker || item) return { kind: 'facility' };
-  const lockedNeighbor = ROOM_MAP[state.playerRoom].neighbors.find((room) => isLocked(state, room));
-  if (lockedNeighbor) return { kind: 'door', room: lockedNeighbor };
-  if (phoneWorks(state, state.playerRoom)) return { kind: 'phone', room: state.playerRoom };
-  if (RADIO_ROOMS.includes(state.playerRoom) && !state.sabotage.includes('radio')) return { kind: 'radio' };
-  if (lockedNeighbor) return { kind: 'door', room: lockedNeighbor };
-  return isLocked(state, state.playerRoom) ? { kind: 'door', room: state.playerRoom } : null;
-}
-
-export function sabotageBlockReason(state: GameState): string | null {
-  if (state.phase !== 'playing') return '这一局已经结束了。';
-  if (state.energy < SABOTAGE_COST) return `行动点不足：破坏需要 ${SABOTAGE_COST} 点。`;
-  return sabotageTarget(state) ? null : '附近没有可破坏的门锁、通讯设施或现场设施。';
 }
 
 export function sabotageSiteItem(state: GameState, options: { free?: boolean; suppressAfterAction?: boolean } = {}): boolean {
