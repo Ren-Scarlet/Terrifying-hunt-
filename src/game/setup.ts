@@ -255,6 +255,9 @@ export function createGame(
       ? shuffle(ROOMS.map((room) => room.id).filter((room) => room !== ENTRY_ROOM)).slice(0, 6)
       : [],
     tvClosed: [],
+    tvClosedAt: {},
+    nurseMissesLeft: 1,
+    deepWoundNextHit: false,
     policeShots: 0,
     playerSkipTurn: false,
     powerCircuits: [

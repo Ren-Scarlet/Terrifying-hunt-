@@ -165,7 +165,9 @@ export type AccessoryEffectAction =
   | 'freePower'
   | 'returnBlink'
   | 'blinkMisses'
-  | 'possessBloodDouble';
+  | 'possessBloodDouble'
+  | 'retainStalkOnExit'
+  | 'possessDamage';
 
 export interface AccessoryEffect {
   trigger: AccessoryEffectTrigger;
@@ -677,6 +679,12 @@ export interface GameState {
   /** 贞子的电视机房间；关闭后不能再传送 */
   tvRooms: RoomId[];
   tvClosed: RoomId[];
+  /** 电视关闭的回合；2 回合后自动重新开启 */
+  tvClosedAt: Partial<Record<RoomId, number>>;
+  /** 护士闪现后还需要几次未命中才疲惫 */
+  nurseMissesLeft: number;
+  /** 配件：下一次命中附加重伤 */
+  deepWoundNextHit: boolean;
 }
 
 export interface SaveData {

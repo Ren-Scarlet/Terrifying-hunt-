@@ -9,6 +9,7 @@ import { getExecutionMethod, createExecutionScene } from '../execution';
 import { modifierValue } from '../modifiers';
 import { random } from '../random';
 import { BLOOD, awardBlood, bloodPointTotal, markBloodEvent } from '../bloodpoints';
+import { effectTotal, hasEffect } from '../accessoryEffects';
 import type { GameState, Person, RoomId } from '../types';
 import { ROOM_MAP } from '../rooms';
 import { npcPeople as npcs, peopleInRoom, isRoomLit } from '../world/roomState';
@@ -176,6 +177,14 @@ export function attack(host: NpcHost, state: GameState, targetId?: string, optio
     host.checkImmediateWin(state);
     return false;
   }
+  if (state.possessed && hasEffect(state, 'possessEnter', 'instantExecute') && target.role !== 'police' && target.hp > 0) {
+    state.energy -= attackCost;
+    host.log(state, `恶魔附身：你伸手掐住了 ${target.name} 的喉咙，直接处决。`);
+    host.killPerson(state, target);
+    host.afterPlayerAction(state);
+    host.checkImmediateWin(state);
+    return true;
+  }
   const heavy = state.possessed;
   const alone = npcs(state).every((person) =>
     person.id === target.id || person.room !== state.playerRoom || person.hp <= 0,
@@ -188,6 +197,7 @@ export function attack(host: NpcHost, state: GameState, targetId?: string, optio
     state.huntCounters.nurseBlinkAttacks += 1;
     state.nurseFollowUp = false;
     state.nurseFatiguePending = false;
+    state.nurseMissesLeft = 0;
     host.log(state, `护士利用闪现后的追击窗口攻击了 ${target.name}。`);
   }
   state.attackReady = false;
@@ -224,9 +234,14 @@ export function attack(host: NpcHost, state: GameState, targetId?: string, optio
   const controlCombo = target.role !== 'police' && target.blockedTurns > 0;
   // 基础挥刀 1 点：健康 4 点、受伤 2 点，所以四刀倒地（第二刀进入受伤）。
   // 配件的「挥刀伤害」只在普通挥刀上生效，不放大厄咒/附身的一击倒地。
-  const baseDamage = noedActive || (heavy && state.killer === '迈克尔·迈尔斯')
+  const softPossess = state.possessed && hasEffect(state, 'possessHit', 'possessDamage');
+  const baseDamage = noedActive
     ? SURVIVOR_MAX_HP
-    : Math.min(SURVIVOR_MAX_HP, 1 + modifierValue(state, 'attackDamage'));
+    : softPossess
+      ? Math.max(1, effectTotal(state, 'possessHit', 'possessDamage'))
+      : heavy && state.killer === '迈克尔·迈尔斯'
+        ? SURVIVOR_MAX_HP
+        : Math.min(SURVIVOR_MAX_HP, 1 + modifierValue(state, 'attackDamage'));
   const comboDamage = controlCombo && baseDamage < SURVIVOR_MAX_HP ? 1 : 0;
   if (noedActive && target.role !== 'police') {
     host.damagePerson(state, target, SURVIVOR_MAX_HP);
@@ -288,6 +303,24 @@ export function attack(host: NpcHost, state: GameState, targetId?: string, optio
     if (state.killer === '迈克尔·迈尔斯' && state.myersFoodMarks > 0) {
       state.myersFoodMarks -= 1;
       host.log(state, `戏耍食物印记 -1（${state.myersFoodMarks}/8）。`);
+    }
+  }
+  if (state.possessed) {
+    const restore = effectTotal(state, 'possessHit', 'restoreStalk');
+    if (restore > 0) state.stalkMeter = Math.min(100, state.stalkMeter + restore);
+  }
+  if (state.deepWoundNextHit && target.role !== 'police' && target.hp > 0) {
+    target.statusEffects ??= {};
+    target.statusEffects.deepWound = Math.max(target.statusEffects.deepWound ?? 0, 2);
+    state.deepWoundNextHit = false;
+    host.log(state, `配件效果：${target.name} 被撕开一道深伤口。`);
+  }
+  if (state.killer === '贞子' && target.role !== 'police' && state.people.some((person) => person.id === target.id)) {
+    target.curse = Math.min(7, (target.curse ?? 0) + 1);
+    host.log(state, `${target.name} 被贞子的手碰到，咒怨 +1（${target.curse}/7）。`);
+    if (target.curse >= 7) {
+      host.log(state, `${target.name} 的咒怨达到 7 层，录像带的诅咒应验了。`);
+      host.killPerson(state, target);
     }
   }
   host.afterPlayerAction(state);

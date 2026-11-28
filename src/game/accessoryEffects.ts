@@ -31,6 +31,8 @@ export const EFFECT_ACTIONS: Record<AccessoryEffectAction, string> = {
   returnBlink: '可回到闪现前位置',
   blinkMisses: '需要连续未命中次数',
   possessBloodDouble: '恶魔附身血点翻倍',
+  retainStalkOnExit: '退出附身保留尾随值',
+  possessDamage: '附身命中伤害改为值',
 };
 
 export function effectsOf(state: GameState, trigger: AccessoryEffectTrigger): AccessoryEffect[] {

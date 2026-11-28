@@ -5,7 +5,7 @@
  */
 import { KILLER_MAP } from '../killers';
 import { BLOOD, awardBlood } from '../bloodpoints';
-import { effectsOf } from '../accessoryEffects';
+import { effectsOf, effectTotal, hasEffect } from '../accessoryEffects';
 import { applyFearEvent } from '../npc/ai/model';
 import { blinkRangeOf, blinkWithinRange, hatchetDamageOf, hatchetMax, modifierValue, possessCost } from '../modifiers';
 import { roomName } from '../missions';
@@ -41,6 +41,7 @@ export function sadakoTeleport(host: NpcHost, state: GameState, room: RoomId): b
   }
   state.playerRoom = room;
   state.tvClosed.push(room);
+  state.tvClosedAt[room] = state.turn + 2;
   const targets = state.people.filter((person) => person.room === room && person.role !== 'police' && person.hp > 0);
   targets.forEach((person) => {
     person.curse = Math.min(7, (person.curse ?? 0) + 1);
@@ -65,6 +66,11 @@ export function blinkPlayer(host: NpcHost, state: GameState, room: RoomId): bool
     return false;
   }
   const from = ROOM_MAP[state.playerRoom].rect;
+  const previousRoom = state.playerRoom;
+  if (hasEffect(state, 'blink', 'returnBlink')) state.blinkReturnRoom = previousRoom;
+  const blinkMisses = effectTotal(state, 'blink', 'blinkMisses');
+  state.nurseMissesLeft = Math.max(1, blinkMisses || 1);
+  if (hasEffect(state, 'blink', 'deepWound')) state.deepWoundNextHit = true;
   const to = ROOM_MAP[room].rect;
   const dx = to.left + to.width / 2 - (from.left + from.width / 2);
   const dy = to.top + to.height / 2 - (from.top + from.height / 2);
@@ -152,7 +158,7 @@ export function recoverBearTrap(host: NpcHost, state: GameState): boolean {
 
 export function canUsePower(host: NpcHost, state: GameState, powerId: string): boolean {
   if (state.phase !== 'playing') return false;
-  if (state.killer === '贞子' && powerId === 'sadako_deluge') return true;
+  if (state.killer === '贞子' && powerId === 'sadako_deluge') return !state.sadakoHidden || state.energy >= 1;
   const killer = KILLER_MAP[state.killer];
   const power = killer?.powers.find((p) => p.id === powerId);
   if (!power) return false;
@@ -171,7 +177,7 @@ export function canUsePower(host: NpcHost, state: GameState, powerId: string): b
   }
   if (powerId === 'myers_gaze') {
     if (state.killer !== '迈克尔·迈尔斯' || state.possessed || state.energy < 1) return false;
-    if (state.stalkMeter >= 100) return true;
+    if (state.stalkMeter >= 100 + effectTotal(state, 'passive', 'maxStalk')) return true;
     return visibleMyersStalkTargets(host, state).some((person) => myersStalkGain(person.alert) > 0);
   }
   if (power.requires && !power.requires.every((c) => host.checkCond(state, c))) return false;
@@ -180,7 +186,9 @@ export function canUsePower(host: NpcHost, state: GameState, powerId: string): b
 
 /** 能力为什么不能用，给按钮的 tooltip 用 */
 export function powerBlockReason(host: NpcHost, state: GameState, powerId: string): string {
-  if (state.killer === '贞子' && powerId === 'sadako_deluge') return '';
+  if (state.killer === '贞子' && powerId === 'sadako_deluge') {
+    return state.sadakoHidden && state.energy < 1 ? '现身需要 1 点行动点' : '';
+  }
   const killer = KILLER_MAP[state.killer];
   const power = killer?.powers.find((p) => p.id === powerId);
   if (!power) return '';
@@ -203,7 +211,7 @@ export function powerBlockReason(host: NpcHost, state: GameState, powerId: strin
   if (powerId === 'myers_gaze') {
     if (state.possessed) return '恶魔附身期间不能再次尾随';
     if (state.energy < 1) return '至少需要 1 点行动点';
-    if (state.stalkMeter >= 100) return '';
+    if (state.stalkMeter >= 100 + effectTotal(state, 'passive', 'maxStalk')) return '';
     if (!visibleMyersStalkTargets(host, state).some((person) => myersStalkGain(person.alert) > 0)) return '视野内没有可继续积累尾随值的幸存者';
   }
   if (power.requires && !power.requires.every((c) => host.checkCond(state, c))) {
@@ -218,6 +226,10 @@ export function powerBlockReason(host: NpcHost, state: GameState, powerId: strin
 
 export function usePower(host: NpcHost, state: GameState, powerId: string): boolean {
   if (state.killer === '贞子' && powerId === 'sadako_deluge') {
+    if (state.sadakoHidden) {
+      if (state.energy < 1) { host.log(state, '现身需要 1 点行动点。'); return false; }
+      state.energy -= 1;
+    }
     state.sadakoHidden = !state.sadakoHidden;
     state.attackReady = true;
     host.log(state, state.sadakoHidden
@@ -246,6 +258,17 @@ export function usePower(host: NpcHost, state: GameState, powerId: string): bool
     return true;
   }
   if (powerId === 'nurse_blink') {
+    if (hasEffect(state, 'blink', 'returnBlink') && state.blinkReturnRoom && !state.nurseBlinkTargeting) {
+      const back = state.blinkReturnRoom;
+      state.blinkReturnRoom = null;
+      state.playerRoom = back;
+      state.nurseFollowUp = false;
+      state.nurseFatiguePending = false;
+      host.log(state, `你沿着残留的寒意回到${roomName(back)}，闪现的落点被抹掉了。`);
+      host.afterPlayerAction(state);
+      host.checkImmediateWin(state);
+      return true;
+    }
     if (state.nurseBlinkTargeting) {
       state.nurseBlinkTargeting = false;
       host.log(state, '已取消闪现选点。');
@@ -269,9 +292,13 @@ export function usePower(host: NpcHost, state: GameState, powerId: string): bool
   }
   if (powerId === 'myers_gaze') {
     if (!canUsePower(host, state, powerId)) { host.log(state, powerBlockReason(host, state, powerId) || '当前无法尾随。'); return false; }
-    if (state.stalkMeter >= 100) {
+    if (state.stalkMeter >= 100 + effectTotal(state, 'passive', 'maxStalk')) {
       state.energy -= 1;
       state.possessed = true;
+      state.maxEnergy += effectTotal(state, 'possessEnter', 'ap');
+      if (hasEffect(state, 'possessEnter', 'instantExecute')) {
+        host.log(state, '恶魔附身强化：你可以直接处决还站着的幸存者。');
+      }
       host.log(state, `恶魔附身：尾随值已满，迈克尔释放积攒的恶意。接下来每次行动消耗 ${possessCost(state)} 点尾随值，强化挥刀可直接击倒站立目标；结束后不会陷入虚弱。`);
       state.attackReady = true;
       host.afterPlayerAction(state);
@@ -301,7 +328,7 @@ export function usePower(host: NpcHost, state: GameState, powerId: string): bool
       totalGain += gain;
       names.push(`${person.name} +${gain}${isolated ? '（落单）' : ''}`);
     }
-    state.stalkMeter = Math.min(100, state.stalkMeter + totalGain);
+    state.stalkMeter = Math.min(100 + effectTotal(state, 'passive', 'maxStalk'), state.stalkMeter + totalGain);
     host.log(state, `你观察视野内 ${visible.length} 名幸存者：${names.join('、')}；尾随值 +${totalGain}（${state.stalkMeter}/100）。`);
     state.attackReady = true;
     host.afterPlayerAction(state);

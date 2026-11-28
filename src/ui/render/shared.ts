@@ -169,7 +169,7 @@ export function personChip(person: Person, attackable = false, carryable = false
     ? '<span class="chip-tape" title="持有录像带：每回合结束咒怨 +1；可以带到最远的电视归还">录像带</span>'
     : '';
   const avatarHtml = img
-    ? `<span class="person-avatar-wrap"><img class="person-avatar" src="${img}" alt="" onerror="this.style.display='none'">${person.bloodSacrifice ? `<img class="chip-sacrifice-mark" src="${uiIcon('obsession')}" alt="血祭品" title="本局血祭品">` : ''}</span>`
+    ? `<span class="person-avatar-wrap"><img class="person-avatar" src="${img}" alt="" onerror="this.style.display='none'">${person.bloodSacrifice ? `<img class="chip-sacrifice-mark" src="${uiIcon('obsession')}" alt="血祭品" title="本局血祭品">` : ''}${(person.curse ?? 0) >= 3 ? `<span class="curse-snow ${(person.curse ?? 0) >= 5 ? 'heavy' : ''}" style="opacity:${Math.min(0.85, 0.25 + (person.curse ?? 0) * 0.08)}" title="咒怨 ${person.curse}/7：雪花屏正在吞掉他的脸"></span>` : ''}</span>`
     : '';
   const trapHitMark = person.trapTriggered
     ? '<span class="shadow-figure trap-hit-figure" title="刚刚踩中捕兽夹并发出尖叫"></span>'

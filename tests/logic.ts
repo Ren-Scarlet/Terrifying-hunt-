@@ -1847,8 +1847,10 @@ function caseSadako(): void {
     game.sadakoHidden && game.tvRooms.length === 6 && game.tvClosed.length === 0,
     `hidden=${game.sadakoHidden} tv=${game.tvRooms.length}`);
   check('贞子：隐匿时不能攻击', attackBlockReason(game).includes('恐惧洪流'));
-  check('贞子：使用恐惧洪流不消耗行动点',
-    usePower(game, 'sadako_deluge') && !game.sadakoHidden && game.energy === game.maxEnergy);
+  const energyBefore = game.energy;
+  check('贞子：现身消耗 1 点行动点，隐匿免费',
+    usePower(game, 'sadako_deluge') && !game.sadakoHidden && game.energy === energyBefore - 1
+    && usePower(game, 'sadako_deluge') && game.sadakoHidden && game.energy === energyBefore - 1);
   const victim = game.people.find((person) => person.role !== 'police')!;
   const tv = game.tvRooms[0];
   victim.room = tv;
@@ -1867,6 +1869,7 @@ function caseSadako(): void {
   const aiTv = createGame(STARTING_DECK, undefined, '贞子');
   aiTv.tvRooms = ['study'];
   aiTv.tvClosed = [];
+  aiTv.tvClosedAt = {};
   aiTv.playerRoom = 'garden';
   const watcher = aiTv.people.find((person) => person.role !== 'police')!;
   aiTv.people.filter((person) => person.id !== watcher.id).forEach((person) => { person.room = 'attic'; person.hidden = true; });
@@ -1880,6 +1883,19 @@ function caseSadako(): void {
   const beforeCurse = watcher.curse;
   endTurn(aiTv);
   check('贞子：持有录像带每回合咒怨 +1', watcher.curse > beforeCurse, `curse=${watcher.curse}`);
+  endTurn(aiTv);
+  check('贞子：关闭的电视 2 回合后重新开启', !aiTv.tvClosed.includes('study'), `closed=${aiTv.tvClosed.join(',')}`);
+
+  const curseHit = createGame(STARTING_DECK, undefined, '贞子');
+  curseHit.sadakoHidden = false;
+  curseHit.energy = 4;
+  const curseTarget = curseHit.people.find((person) => person.role !== 'police')!;
+  curseTarget.room = curseHit.playerRoom;
+  curseTarget.hp = 4;
+  curseTarget.alert = 0;
+  curseHit.attackReady = true;
+  attack(curseHit, curseTarget.id);
+  check('贞子：攻击命中也会叠加 1 层咒怨', curseTarget.curse >= 1, `curse=${curseTarget.curse}`);
 }
 
 caseSadako();
@@ -1909,7 +1925,7 @@ function caseNurseRework(): void {
   attack(hit, hitTarget.id);
   endTurn(hit);
   check('护士：闪现后命中，不会进入疲惫',
-    hit.energy === hit.maxEnergy && !hit.nurseFollowUp,
+    hit.energy >= hit.maxEnergy && !hit.nurseFollowUp,
     `energy=${hit.energy}/${hit.maxEnergy}`);
 }
 

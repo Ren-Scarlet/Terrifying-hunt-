@@ -11,6 +11,7 @@ import { roomDistance } from '../navigation';
 import { ROOM_MAP } from '../rooms';
 import { BLOOD, awardBlood, markBloodEvent } from '../bloodpoints';
 import { applyAlertEvent, applyFearEvent } from './ai/model';
+import { effectTotal, hasEffect } from '../accessoryEffects';
 import type { GameState, Person } from '../types';
 import { npcPeople as npcs, isRoomLit } from '../world/roomState';
 import type { NpcHost } from './ai/host';
@@ -27,6 +28,9 @@ export function killPerson(host: NpcHost, state: GameState, person: Person): voi
     : host.npcWitnessEvent(state, person.room, 'murder', person.id);
   state.people = state.people.filter((p) => p.id !== person.id);
   state.pinnedPeople = state.pinnedPeople.filter((id) => id !== person.id);
+  if (state.possessed && hasEffect(state, 'kill', 'restoreStalk')) {
+    state.stalkMeter = Math.min(100 + effectTotal(state, 'passive', 'maxStalk'), state.stalkMeter + effectTotal(state, 'kill', 'restoreStalk'));
+  }
   if (!state.corpseRooms.includes(person.room)) state.corpseRooms.push(person.room);
   if (state.bitterMurmurReady && person.role !== 'police') {
     state.bitterMurmurReady = false;

@@ -20,12 +20,25 @@ export function endTurn(host: NpcHost, state: GameState): void {
     host.log(state, '你仍被枪声压得不敢抬头，这一回合只能看着他们行动。');
   }
 
+  // 被关闭的电视 2 回合后重新开启。
+  state.tvClosed = state.tvClosed.filter((room) => {
+    const reopenAt = state.tvClosedAt[room] ?? 0;
+    if (state.turn < reopenAt) return true;
+    delete state.tvClosedAt[room];
+    host.log(state, `${roomName(room)}的电视重新亮起，雪花屏又开始播放。`);
+    return false;
+  });
   const m = state.mission;
   if (state.nurseFatiguePending) {
-    state.nurseFatiguePending = false;
-    state.nurseFollowUp = false;
-    state.stunTurns = Math.max(state.stunTurns, 1);
-    host.log(state, '你没有利用闪现后的攻击窗口，护士仍因濒死之息进入疲惫：下回合行动点减少 1。');
+    if (state.nurseMissesLeft > 1) {
+      state.nurseMissesLeft -= 1;
+      host.log(state, `闪现后的攻击再次落空，还差 ${state.nurseMissesLeft} 次未命中才会进入疲惫。`);
+    } else {
+      state.nurseFatiguePending = false;
+      state.nurseFollowUp = false;
+      state.stunTurns = Math.max(state.stunTurns, 1);
+      host.log(state, '你没有利用闪现后的攻击窗口，护士仍因濒死之息进入疲惫：下回合行动点减少 1。');
+    }
   }
   host.checkImmediateWin(state);
   if (state.result) return;

@@ -133,6 +133,7 @@ function perform(host: NpcHost, state: GameState, person: Person, kind: ActionKi
       const tv = state.tvRooms.find((room) => room === person.room && !state.tvClosed.includes(room));
       if (!tv) return false;
       state.tvClosed.push(tv);
+      state.tvClosedAt[tv] = state.turn + 2;
       person.hasTape = true;
       person.activity = '关掉了电视，取走了录像带';
       host.log(state, `${person.name} 关掉了${roomName(person.room)}的电视，取走了里面的录像带。`);

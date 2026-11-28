@@ -4026,3 +4026,22 @@ button, .room-hit, .hand-row { touch-action: manipulation; }
   0%, 100% { box-shadow: 0 0 8px rgba(120, 200, 230, .35); }
   50% { box-shadow: 0 0 18px rgba(150, 220, 245, .9); }
 }
+/* 贞子咒怨：头像上的黑白电视雪花 */
+.person-avatar-wrap { position: relative; }
+.curse-snow {
+  position: absolute; inset: -1px;
+  pointer-events: none;
+  border-radius: 50%;
+  background:
+    repeating-linear-gradient(0deg, rgba(255,255,255,.28) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(90deg, rgba(0,0,0,.42) 0 2px, transparent 2px 5px);
+  mix-blend-mode: screen;
+  filter: grayscale(1) contrast(1.6);
+  animation: curseSnow 0.55s steps(3) infinite;
+}
+.curse-snow.heavy { animation-duration: .28s; filter: grayscale(1) contrast(2.2); }
+@keyframes curseSnow {
+  0% { background-position: 0 0, 0 0; opacity: .65; }
+  50% { background-position: 3px 5px, -4px 2px; opacity: .9; }
+  100% { background-position: -2px 7px, 5px -3px; opacity: .7; }
+}

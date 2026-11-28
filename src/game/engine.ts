@@ -729,9 +729,15 @@ function afterPlayerAction(state: GameState): void {
   // 恶魔附身以行动而非回合计时；每次行动消耗的尾随值由统一修正层决定。
   if (state.killer === '迈克尔·迈尔斯' && state.possessed) {
     const cost = possessCost(state);
-    state.stalkMeter = Math.max(0, state.stalkMeter - cost);
+    if (hasEffect(state, 'passive', 'noStalkDecay')) {
+      state.stalkMeter = Math.max(1, state.stalkMeter);
+    } else {
+      state.stalkMeter = Math.max(0, state.stalkMeter - cost);
+    }
     if (state.stalkMeter === 0) {
       state.possessed = false;
+      state.maxEnergy = Math.max(1, state.maxEnergy - effectTotal(state, 'possessEnter', 'ap'));
+      if (hasEffect(state, 'possessExit', 'revealAura')) state.revealAuraActions = Math.max(state.revealAuraActions, 3);
       log(state, '尾随值耗尽，恶魔附身结束。');
     } else {
       log(state, `恶魔附身消耗 ${cost} 点尾随值（剩余 ${state.stalkMeter}/100）。`);

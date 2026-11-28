@@ -5,6 +5,7 @@
  * 同一行为可以通过 key + limit 限制次数，或用 decay 让重复奖励递减，避免刷分。
  */
 import type { BloodCategory, BloodPointLine, GameState, MissionTask, PerformanceTitle } from './types';
+import { hasEffect } from './accessoryEffects';
 
 export const BLOOD_CATEGORY_LABEL: Record<BloodCategory, string> = {
   hunt: '猎杀',
@@ -79,7 +80,8 @@ export function awardBlood(
   const key = options.key ?? `${category}:${label}`;
   const count = state.bloodPointCounts[key] ?? 0;
   if (count >= (options.limit ?? Infinity)) return 0;
-  const amount = options.decay ? Math.round(value * Math.pow(0.5, count)) : value;
+  const doubled = state.possessed && hasEffect(state, 'possessHit', 'possessBloodDouble') ? 2 : 1;
+  const amount = options.decay ? Math.round(value * doubled * Math.pow(0.5, count)) : value * doubled;
   if (amount === 0) return 0;
   state.bloodPointCounts[key] = count + 1;
   state.bloodPointLines.push({ category, label, value: amount });
