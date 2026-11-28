@@ -5,6 +5,8 @@
  */
 import { KILLER_MAP } from '../killers';
 import { BLOOD, awardBlood } from '../bloodpoints';
+import { effectsOf } from '../accessoryEffects';
+import { applyFearEvent } from '../npc/ai/model';
 import { blinkRangeOf, blinkWithinRange, hatchetDamageOf, hatchetMax, modifierValue, possessCost } from '../modifiers';
 import { roomName } from '../missions';
 import { ROOMS, ROOM_MAP } from '../rooms';
@@ -82,7 +84,17 @@ export function blinkPlayer(host: NpcHost, state: GameState, room: RoomId): bool
   if (blinkCooldown > 0) state.cooldowns.nurse_blink = blinkCooldown;
   else delete state.cooldowns.nurse_blink;
   state.attackReady = true;
-  host.log(state, `护士穿过墙壁与房门，闪现到${roomName(room)}。你可以立即对同屋站立幸存者发动一次普通攻击；下一次行动后将进入疲惫。`);
+  host.log(state, `护士穿过墙壁与房门，闪现到${roomName(room)}。你可以立即对同屋站立幸存者发动一次普通攻击；下一次行动没有命中才会进入疲惫。`);
+  effectsOf(state, 'blink').forEach((effect) => {
+    if (effect.action === 'ap') state.energy += effect.value;
+    if (effect.action === 'fear') {
+      state.people.filter((person) => person.room === room && person.role !== 'police' && person.hp > 0)
+        .forEach((person) => applyFearEvent(person, 'chased', Math.max(1, Math.round(effect.value / 8))));
+    }
+    if (effect.action === 'blood') {
+      awardBlood(state, 'hunt', `配件：闪现威吓 · ${roomName(room)}`, effect.value, { key: `acc-blink:${state.turn}`, limit: 1 });
+    }
+  });
   return true;
 }
 
@@ -277,8 +289,15 @@ export function usePower(host: NpcHost, state: GameState, powerId: string): bool
         other.id !== person.id && other.hp > 0 && other.role !== 'police' && !other.hidden && other.room === person.room,
       );
       const baseGain = myersStalkGain(person.alert) + (isolated ? 5 : 0);
+      const stalkBonus = effectsOf(state, 'stalk')
+        .filter((effect) => effect.action === 'stalk')
+        .reduce((sum, effect) => sum + effect.value, 0);
+      const fearBonus = effectsOf(state, 'stalk')
+        .filter((effect) => effect.action === 'fear')
+        .reduce((sum, effect) => sum + effect.value, 0);
+      if (fearBonus > 0) applyFearEvent(person, 'chased', Math.max(1, Math.round(fearBonus / 8)));
       // 配件的「尾随获取」按百分比放大，四舍五入保证 HUD 与结算看到同一个整数。
-      const gain = Math.max(0, Math.round(baseGain * (1 + modifierValue(state, 'stalkGain') / 100)));
+      const gain = Math.max(0, Math.round(baseGain * (1 + modifierValue(state, 'stalkGain') / 100)) + stalkBonus);
       totalGain += gain;
       names.push(`${person.name} +${gain}${isolated ? '（落单）' : ''}`);
     }

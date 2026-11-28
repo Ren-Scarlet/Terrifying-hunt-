@@ -37,6 +37,7 @@ import {
   missionTaskProgress,
 } from './bloodpoints';
 import { applyAlertEvent, applyFearEvent } from './npc/ai/model';
+import { effectTotal, effectsOf, hasEffect } from './accessoryEffects';
 export {
   BLOOD,
   BLOOD_CATEGORY_LABEL,
@@ -1335,7 +1336,21 @@ export function canUsePower(state: GameState, powerId: string): boolean { return
 export function powerBlockReason(state: GameState, powerId: string): string { return aiPowerBlockReason(aiHost, state, powerId); }
 export function usePower(state: GameState, powerId: string): boolean {
   state.powerUsedThisAction = true;
-  return aiUsePower(aiHost, state, powerId);
+  const freePower = state.freePowerTurn !== state.turn
+    && (hasEffect(state, 'firstPower', 'freePower') || hasEffect(state, 'usePower', 'freePower'));
+  if (freePower) {
+    state.freePowerTurn = state.turn;
+    state.energy += 1;
+  }
+  const used = aiUsePower(aiHost, state, powerId);
+  if (!used && freePower) state.energy = Math.max(0, state.energy - 1);
+  if (used) {
+    effectsOf(state, 'usePower').forEach((effect) => {
+      if (effect.action === 'draw') drawCards(state, Math.max(0, effect.value));
+      if (effect.action === 'ap') state.energy += effect.value;
+    });
+  }
+  return used;
 }
 
 /* ==================================================================== */
@@ -1386,6 +1401,10 @@ export function drawCardAction(state: GameState): boolean {
   }
   state.energy -= DRAW_CARD_COST;
   drawForPlayer(state, 1);
+  effectsOf(state, 'draw').forEach((effect) => {
+    if (effect.action === 'ap') state.energy += effect.value;
+    if (effect.action === 'draw') drawForPlayer(state, Math.max(0, effect.value));
+  });
   log(state, `你花费 ${DRAW_CARD_COST} 点行动点主动抽了 1 张牌。`);
   afterPlayerAction(state);
   return true;

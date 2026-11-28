@@ -3,6 +3,7 @@ import { CARD_MAP } from './cards';
 import { KILLER_MAP } from './killers';
 import { ACCESSORY_MAP, sanitizeAccessoryLoadout } from './accessories';
 import { modifiersForAccessories, modifierSummary } from './modifiers';
+import { effectsForIds } from './accessoryEffects';
 import { generateMission } from './missions';
 import { createPeople } from './npc/factory';
 import { ITEM_BOX_CHARGES, ITEM_BOX_COUNT } from './items';
@@ -93,8 +94,11 @@ export function createGame(
   const accessories = sanitizeAccessoryLoadout(accessoryIds, killerId);
   // 所有配件数值先汇总成一张修正表，开局的基础值统一从这里取。
   const modifiers = modifiersForAccessories(accessories);
+  const passiveAp = effectsForIds(accessories, 'passive')
+    .filter((effect) => effect.action === 'ap')
+    .reduce((sum, effect) => sum + effect.value, 0);
   const baseFearRadius = KILLER_MAP[killerId].fearRadius ?? 1;
-  const startingEnergy = Math.max(1, BASE_AP + modifiers.ap);
+  const startingEnergy = Math.max(1, BASE_AP + modifiers.ap + passiveAp);
   const activeMission = mission ?? generateMission(killerId);
   const people = createPeople(activeMission).filter((person) => KILLER_MAP[killerId].school !== 'supernatural' || person.role !== 'police');
   const pile = shuffle(deckIds.filter((id) => CARD_MAP[id])).map<CardInstance>((defId) => ({
@@ -246,7 +250,8 @@ export function createGame(
     itemBoxes: [],
     corpseRooms: [],
     sadakoHidden: killerId === '贞子',
-    tvRooms: killerId === '贞子'
+    freePowerTurn: 0,
+    blinkReturnRoom: null,    tvRooms: killerId === '贞子'
       ? shuffle(ROOMS.map((room) => room.id).filter((room) => room !== ENTRY_ROOM)).slice(0, 6)
       : [],
     tvClosed: [],

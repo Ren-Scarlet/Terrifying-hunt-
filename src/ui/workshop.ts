@@ -2,8 +2,9 @@ import { ACCESSORIES, ACCESSORY_RARITY_LABEL, accessoryPrice } from '../game/dat
 import { ACCESSORY_MAP } from '../game/data/accessories';
 import { customAccessoryList, isCustomAccessory, isPublishedAccessory, exportCustomAccessories } from '../game/customContent';
 import { MOD_KEYS, modifierLabel } from '../game/modifiers';
+import { EFFECT_ACTIONS, EFFECT_TRIGGERS } from '../game/accessoryEffects';
 import { ACTIVE_KILLERS } from '../game/data/killers';
-import type { AccessoryDef, AccessoryMod, AccessoryRarity } from '../game/types';
+import type { AccessoryDef, AccessoryEffect, AccessoryMod, AccessoryRarity } from '../game/types';
 import { accessoryImage } from '../game/assetMap';
 import { addonIconHtml, escape } from './render/shared';
 
@@ -36,7 +37,26 @@ export function newAccessoryDraft(): AccessoryDef {
     desc: '',
     sourceSkill: '',
     mods: [{ key: 'ap', value: 1 }],
+    effects: [],
   };
+}
+
+function effectRows(def: AccessoryDef): string {
+  return (def.effects ?? [])
+    .map(
+      (effect, index) => `
+      <div class="ws-mod" data-effect-index="${index}">
+        <select data-acc-effect-trigger="${index}">
+          ${(Object.keys(EFFECT_TRIGGERS) as Array<keyof typeof EFFECT_TRIGGERS>).map((trigger) => `<option value="${trigger}" ${effect.trigger === trigger ? 'selected' : ''}>${escape(EFFECT_TRIGGERS[trigger])}</option>`).join('')}
+        </select>
+        <select data-acc-effect-action="${index}">
+          ${(Object.keys(EFFECT_ACTIONS) as Array<keyof typeof EFFECT_ACTIONS>).map((action) => `<option value="${action}" ${effect.action === action ? 'selected' : ''}>${escape(EFFECT_ACTIONS[action])}</option>`).join('')}
+        </select>
+        <input type="number" step="1" data-acc-effect-value="${index}" value="${effect.value ?? 1}" aria-label="数值">
+        <button type="button" class="btn mini ghost" data-action="workshop-effect-remove" data-index="${index}">删除</button>
+      </div>`,
+    )
+    .join('');
 }
 
 function modRows(def: AccessoryDef): string {
@@ -85,8 +105,13 @@ function editorHtml(def: AccessoryDef, isNew: boolean): string {
         </div>
       </div>
       <div class="ws-mods">
-        <div class="ws-mods-head"><b>效果数值</b><button type="button" class="btn mini" data-action="workshop-mod-add">＋ 添加效果</button></div>
+        <div class="ws-mods-head"><b>效果数值</b><button type="button" class="btn mini" data-action="workshop-mod-add">＋ 添加数值</button></div>
         ${modRows(def)}
+      </div>
+      <div class="ws-mods">
+        <div class="ws-mods-head"><b>触发效果</b><button type="button" class="btn mini" data-action="workshop-effect-add">＋ 添加效果</button></div>
+        <small class="ws-note">触发器 + 动作 + 数值；例如「使用杀手能力时 / 抽牌 +1」「闪现后 / 恐惧 +20」。</small>
+        ${effectRows(def) || '<small class="ws-note">还没有触发效果。</small>'}
       </div>
       <div class="ws-actions">
         <button type="button" class="btn primary" data-action="workshop-save">保存</button>
@@ -158,6 +183,29 @@ export function updateDraftMod(index: number, patch: { key?: AccessoryMod['key']
   if (!def || !def.mods[index]) return;
   if (patch.key) def.mods[index].key = patch.key;
   if (typeof patch.value === 'number') def.mods[index].value = patch.value;
+}
+
+export function updateDraftEffect(index: number, patch: Partial<AccessoryEffect>): void {
+  const def = workshopState.editing;
+  if (!def) return;
+  def.effects ??= [];
+  const effect = def.effects[index];
+  if (!effect) return;
+  if (patch.trigger) effect.trigger = patch.trigger;
+  if (patch.action) effect.action = patch.action;
+  if (typeof patch.value === 'number') effect.value = patch.value;
+}
+
+export function addDraftEffect(): void {
+  if (!workshopState.editing) return;
+  workshopState.editing.effects ??= [];
+  workshopState.editing.effects.push({ trigger: 'usePower', action: 'draw', value: 1 });
+}
+
+export function removeDraftEffect(index: number): void {
+  if (!workshopState.editing) return;
+  workshopState.editing.effects ??= [];
+  workshopState.editing.effects.splice(index, 1);
 }
 
 export function addDraftMod(): void {

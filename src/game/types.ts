@@ -136,6 +136,44 @@ export interface AccessoryMod {
   value: number;
 }
 
+/** 配件工坊可编辑的触发效果；引擎按 trigger + action 执行。 */
+export type AccessoryEffectTrigger =
+  | 'passive'
+  | 'usePower'
+  | 'firstPower'
+  | 'draw'
+  | 'stalk'
+  | 'blink'
+  | 'possessEnter'
+  | 'possessExit'
+  | 'possessHit'
+  | 'kill';
+
+export type AccessoryEffectAction =
+  | 'ap'
+  | 'draw'
+  | 'fear'
+  | 'stalk'
+  | 'blood'
+  | 'undetectable'
+  | 'deepWound'
+  | 'revealAura'
+  | 'restoreStalk'
+  | 'maxStalk'
+  | 'noStalkDecay'
+  | 'instantExecute'
+  | 'freePower'
+  | 'returnBlink'
+  | 'blinkMisses'
+  | 'possessBloodDouble';
+
+export interface AccessoryEffect {
+  trigger: AccessoryEffectTrigger;
+  action: AccessoryEffectAction;
+  /** 数值；开关型效果填 1 */
+  value: number;
+}
+
 /** 统一修正层的汇总表：每个键的最终加值。 */
 export type AccessoryMods = Record<AccessoryModKey, number>;
 
@@ -157,6 +195,8 @@ export interface AccessoryDef {
   sourceText?: string;
   /** 供统一修正层汇总的数值 */
   mods: AccessoryMod[];
+  /** 工坊里配置的触发效果；不填则只有 mods */
+  effects?: AccessoryEffect[];
   /** 作者自定义配件：上传图标后以 dataURL 存这里（内置配件为空） */
   iconData?: string;
   /** 已发布配件：图标文件路径（public/assets/custom/...） */
@@ -626,6 +666,10 @@ export interface GameState {
   policeShots: number;
   /** 下一回合被警察压制，无法行动 */
   playerSkipTurn: boolean;
+  /** 本回合已经触发过“第一次使用能力免费”的配件效果 */
+  freePowerTurn: number;
+  /** 闪现前的位置：带「回到原位」配件时可由护士再次按键返回 */
+  blinkReturnRoom: RoomId | null;
   /** 独立区域电闸及其供电范围 */
   powerCircuits: PowerCircuit[];
   /** 贞子：是否处于录像带隐匿状态（无法侦测、无法攻击） */

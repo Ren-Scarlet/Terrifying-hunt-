@@ -81,8 +81,8 @@ import {
 } from './ui/render';
 import { renderAdmin } from './ui/admin';
 import {
-  addDraftMod, downloadJson, duplicateAsDraft, exportCustomAccessories, renderWorkshop, removeDraftMod,
-  startEditDraft, startNewDraft, updateDraftField, updateDraftMod, workshopState,
+  addDraftMod, addDraftEffect, downloadJson, duplicateAsDraft, exportCustomAccessories, renderWorkshop, removeDraftMod, removeDraftEffect,
+  startEditDraft, startNewDraft, updateDraftField, updateDraftMod, updateDraftEffect, workshopState,
 } from './ui/workshop';
 import { initCloudAuth, loadCloudConfig } from './game/cloud';
 import { mountFloorplanScene, type SceneHandle } from './ui/scene';
@@ -1520,6 +1520,8 @@ registry.register('配件工坊', {
   'workshop-cancel': () => { workshopState.editing = null; render(); },
   'workshop-mod-add': () => { addDraftMod(); render(); },
   'workshop-mod-remove': ({ target }) => { removeDraftMod(Number(target.dataset.index) || 0); render(); },
+  'workshop-effect-add': () => { addDraftEffect(); render(); },
+  'workshop-effect-remove': ({ target }) => { removeDraftEffect(Number(target.dataset.index) || 0); render(); },
   'workshop-icon-clear': () => { if (workshopState.editing) { delete workshopState.editing.iconData; render(); } },
   'workshop-login': () => {
     const token = workshopState.token.trim();
@@ -1760,7 +1762,13 @@ document.addEventListener('input', (event) => {
   const modKey = el.getAttribute('data-acc-mod-key');
   if (modKey !== null) { updateDraftMod(Number(modKey), { key: el.value as never }); return; }
   const modValue = el.getAttribute('data-acc-mod-value');
-  if (modValue !== null) { updateDraftMod(Number(modValue), { value: Number(el.value) || 0 }); }
+  if (modValue !== null) { updateDraftMod(Number(modValue), { value: Number(el.value) || 0 }); return; }
+  const effectTrigger = el.getAttribute('data-acc-effect-trigger');
+  if (effectTrigger !== null) { updateDraftEffect(Number(effectTrigger), { trigger: el.value as never }); return; }
+  const effectAction = el.getAttribute('data-acc-effect-action');
+  if (effectAction !== null) { updateDraftEffect(Number(effectAction), { action: el.value as never }); return; }
+  const effectValue = el.getAttribute('data-acc-effect-value');
+  if (effectValue !== null) { updateDraftEffect(Number(effectValue), { value: Number(el.value) || 0 }); }
 });
 document.addEventListener('change', (event) => {
   const el = event.target as HTMLInputElement | null;
