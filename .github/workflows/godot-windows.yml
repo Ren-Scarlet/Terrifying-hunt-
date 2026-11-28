@@ -26,7 +26,8 @@ jobs:
         shell: pwsh
         run: |
           $godotExe = Join-Path $env:USERPROFILE "godot/Godot_v4.7.2-stable_win64.exe"
-          & $godotExe --headless --editor --path godot --quit
+          $validate = Start-Process -FilePath $godotExe -ArgumentList '--headless --editor --path godot --quit' -Wait -PassThru -NoNewWindow
+          if ($validate.ExitCode -ne 0) { throw "Godot project validation failed: $($validate.ExitCode)" }
 
       - name: Export Windows executable
         shell: pwsh
@@ -34,11 +35,11 @@ jobs:
           New-Item -ItemType Directory -Force -Path godot/build | Out-Null
           $godotExe = Join-Path $env:USERPROFILE "godot/Godot_v4.7.2-stable_win64.exe"
           Write-Host "Godot executable:" $godotExe
-          & $godotExe --version
           $output = Join-Path $PWD "godot/build/暗夜杀机.exe"
           Write-Host "Export target:" $output
-          & $godotExe --headless --verbose --path godot --export-release "Windows Desktop" $output
-          if ($LASTEXITCODE -ne 0) { throw "Godot export failed with exit code $LASTEXITCODE" }
+          $exportArgs = '--headless --verbose --path godot --export-release "Windows Desktop" "' + $output + '"'
+          $export = Start-Process -FilePath $godotExe -ArgumentList $exportArgs -Wait -PassThru -NoNewWindow
+          if ($export.ExitCode -ne 0) { throw "Godot export failed with exit code $($export.ExitCode)" }
           Get-ChildItem -Path . -Filter "*.exe" -Recurse | Select-Object -ExpandProperty FullName
           if (!(Test-Path $output)) { throw "Godot export did not create expected executable: $output" }
 
