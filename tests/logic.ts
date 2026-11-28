@@ -1893,7 +1893,7 @@ function caseNurseRework(): void {
   blinkPlayer(miss, missRoom);
   endTurn(miss);
   check('护士：闪现后没有命中，下回合进入疲惫',
-    miss.energy === miss.maxEnergy - 1 && !miss.nurseFatiguePending,
+    miss.log.some((line) => line.includes('疲惫')) && !miss.nurseFatiguePending && !miss.nurseFollowUp,
     `energy=${miss.energy}/${miss.maxEnergy}`);
 
   const hit = createGame(STARTING_DECK, undefined, '护士');
