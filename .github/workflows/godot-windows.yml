@@ -1,0 +1,43 @@
+name: Godot Windows 单机版
+
+on:
+  push:
+    branches: [godot-single-player-port]
+    paths:
+      - "godot/**"
+      - ".github/workflows/godot-windows.yml"
+  workflow_dispatch:
+
+jobs:
+  export-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Godot and export templates
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: 4.7.2
+          use-dotnet: false
+          include-templates: true
+
+      - name: Validate project import
+        shell: pwsh
+        run: godot --headless --editor --path godot --quit
+
+      - name: Export Windows executable
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path godot/build | Out-Null
+          godot --headless --path godot --export-release "Windows Desktop" "godot/build/暗夜杀机.exe"
+
+      - name: Upload Windows build
+        uses: actions/upload-artifact@v4
+        with:
+          name: 暗夜杀机-Godot-Windows
+          path: |
+            godot/build/暗夜杀机.exe
+            godot/build/暗夜杀机.pck
+          if-no-files-found: error
+          retention-days: 14
