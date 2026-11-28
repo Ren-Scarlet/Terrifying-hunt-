@@ -1,5 +1,5 @@
 import { CARD_MAP } from '../../game/cards';
-import { awarenessLabel, awarenessStage } from '../../game/npc/awareness';
+import { ALERT_LABEL, FEAR_LABEL, alertBand, fearBand } from '../../game/npc/ai/model';
 import { characterImage, POWER_RARITY_BG, uiIcon } from '../../game/assetMap';
 import {
   ALARM_MAX,
@@ -12,9 +12,7 @@ import {
   HAND_LIMIT,
   FRENZY_MAX,
   FRENZY_THRESHOLD,
-  GOAL_LABEL,
   HEALTH_LABEL,
-  INTENT_LABEL,
   LOOK_COST,
   SEARCH_COST,
   attackBlockReason,
@@ -316,9 +314,9 @@ function threatRowsHtml(state: GameState): string {
   const alive = state.people.filter((p) => p.role !== 'police' && p.hp > 0);
   const downed = state.people.filter((p) => p.role !== 'police' && p.hp <= 0);
   const atExit = alive.filter((p) => state.escapeRooms.includes(p.room));
-  const leaving = alive.filter((p) => p.intent === 'escape');
-  const calling = alive.filter((p) => p.intent === 'call');
-  const caring = alive.filter((p) => p.intent === 'rescue' || p.intent === 'heal');
+  const leaving = alive.filter((p) => p.escapeProgress > 0);
+  const calling = alive.filter((p) => /电话|无线电/.test(p.activity));
+  const caring = alive.filter((p) => /救|包扎|拖/.test(p.activity));
   const armed = alive.filter((p) => p.armed);
   const hiding = state.people.filter((p) => p.role !== 'police' && p.hidden);
   const rows: Array<{ name: string; count: number; hint: string; level: 'warn' | 'hot' }> = [];
@@ -330,7 +328,7 @@ function threatRowsHtml(state: GameState): string {
   const brokenCircuits = state.powerCircuits.filter((c) => c.broken).length;
   const injured = alive.filter((p) => p.hp > 0 && p.hp <= 2).length;
   const highAlert = alive.filter((p) => p.alert >= 75).length;
-  const working = alive.filter((p) => p.intent === 'work').length;
+  const working = alive.filter((p) => /图腾/.test(p.activity)).length;
   const isolated = alive.filter((p) => !state.people.some((other) =>
     other.id !== p.id && other.role !== 'police' && other.hp > 0 && !other.hidden && other.room === p.room,
   )).length;
@@ -686,17 +684,17 @@ function personSlotStyle(roomId: RoomId, personId: string, index: number): strin
       const img = characterImage(p.id);
       const vis = isPersonVisible(state, p);
       const health = conditionOf(p);
-      const stage = awarenessStage(p.alert);
-      const alertClass = ['', 'mid', 'panic', 'high'][stage];
-      const alertLabel = `<em class="alert-tag ${alertClass}">${awarenessLabel(p.alert)} ${p.alert}</em>`;
-      const intentLabel = p.intent === 'idle' ? GOAL_LABEL[p.goal] : INTENT_LABEL[p.intent];
+      const band = alertBand(p.alert);
+      const alertClass = band === 'panicked' ? 'high' : band === 'alert' ? 'panic' : band === 'suspicious' ? 'mid' : '';
+      const alertLabel = `<em class="alert-tag ${alertClass}">${ALERT_LABEL[band]} ${p.alert}</em>`;
+      const intentLabel = `${ALERT_LABEL[band]} · ${p.activity}`;
       const where = vis ? roomName(p.room) : `最后在${roomName(p.lastSeenRoom)}`;
-      return `<button class="roster-person ${p.room === state.playerRoom ? 'here' : ''} ${p.marked ? 'marked' : ''} ${p.bloodSacrifice ? 'blood-sacrifice' : ''} ${p.intent === 'escape' ? 'escaping' : ''} ${vis ? '' : 'unknown'} ${health === 'downed' ? 'downed' : ''}"
+      return `<button class="roster-person ${p.room === state.playerRoom ? 'here' : ''} ${p.marked ? 'marked' : ''} ${p.bloodSacrifice ? 'blood-sacrifice' : ''} ${p.escapeProgress > 0 ? 'escaping' : ''} ${vis ? '' : 'unknown'} ${health === 'downed' ? 'downed' : ''}"
         data-action="person" data-person-id="${p.id}"
-        title="${escape(p.name)}：${escape(ARCH_LABEL[p.archetype])}，${escape(GOAL_LABEL[p.goal])}，${escape(HEALTH_LABEL[health])}${vis ? '' : '，位置待确认'}">
+        title="${escape(p.name)}：${escape(ARCH_LABEL[p.archetype])}，${escape(ALERT_LABEL[band])}，${escape(HEALTH_LABEL[health])}${vis ? '' : '，位置待确认'}">
         ${img ? `<img src="${img}" alt="" onerror="this.style.display='none'">` : ''}
         <span><b>${escape(p.name)} ${alertLabel}</b>
-          <small class="goal-line">${escape(ARCH_LABEL[p.archetype])} · ${escape(GOAL_LABEL[p.goal])}</small>
+          <small class="goal-line">${escape(ARCH_LABEL[p.archetype])} · ${escape(FEAR_LABEL[fearBand(p.fear)])}</small>
           ${p.marked ? '<small class="contract-target-tag">★ 契约指定目标</small>' : ''}
           ${p.bloodSacrifice ? '<small class="blood-sacrifice-tag"><i aria-hidden="true"></i>血祭品</small>' : ''}
           <small>${where} · ${HEALTH_LABEL[health]} · ${escape(intentLabel)}</small>

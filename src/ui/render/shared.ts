@@ -2,7 +2,7 @@ import { CARDS, CARD_MAP } from '../../game/cards';
 import { ADDON_RARITY_BG, PERK_RARITY_BG, POWER_RARITY_BG, accessoryImage, cardImage, characterImage, uiIcon } from '../../game/assetMap';
 import {
   ARCH_LABEL, BASE_AP, BLEEDOUT_TURNS, GOAL_LABEL, HEALTH_LABEL,
-  INTENT_LABEL, SURVIVOR_ITEM_LABEL, conditionOf, effectiveCost, isPersonVisible,
+SURVIVOR_ITEM_LABEL, conditionOf, effectiveCost, isPersonVisible,
   attackBlockReason, executeBlockReason,
 } from '../../game/engine';
 import { KILLERS, type KillerProfile } from '../../game/killers';
@@ -10,7 +10,7 @@ import { roomName } from '../../game/missions';
 import { getPersonProfile, type PersonProfile } from '../../game/people';
 import { ROUTINE_PROFILE } from '../../game/npc/catalog';
 import { SURVIVOR_MAP } from '../../game/survivors';
-import { awarenessLabel, awarenessStage } from '../../game/npc/awareness';
+import { ALERT_LABEL, FEAR_LABEL, alertBand, fearBand } from '../../game/npc/ai/model';
 import type { AccessoryDef, GameState, Person, SaveData } from '../../game/types';
 
 export const escape = (s: string) =>
@@ -145,11 +145,6 @@ export function cardDetailHtml(state: GameState, cardUid: string): string {
   );
 }
 
-export function intentDot(person: Person): string {
-  if (person.intent === 'idle') return '';
-  return `<i class="intent-dot i-${person.intent}" title="${escape(INTENT_LABEL[person.intent])}"></i>`;
-}
-
 export function personChip(person: Person, attackable = false, carryable = false, targetMode?: 'hatchet', darkRoom = false, slotStyle?: string): string {
   const cls =
     person.role === 'police'
@@ -171,11 +166,12 @@ export function personChip(person: Person, attackable = false, carryable = false
     ? '<span class="shadow-figure trap-hit-figure" title="刚刚踩中捕兽夹并发出尖叫"></span>'
     : '';
   // 头顶上的警戒值：不用再翻日志判断这个人现在有多怕
-  const alertLevel = (['low', 'mid', 'panic', 'high'] as const)[awarenessStage(person.alert)];
+  const band = alertBand(person.alert);
+  const alertLevel = band === 'panicked' ? 'high' : band === 'alert' ? 'panic' : band === 'suspicious' ? 'mid' : 'low';
   const alertMark =
     person.role === 'police'
       ? ''
-      : `<span class="chip-alert ${alertLevel}" title="警戒度：${awarenessLabel(person.alert)}（${person.alert}/100）；恐惧值：${person.fear}/100。恐惧满值后再次受击会倒地"><b>警戒 ${person.alert}</b><i>恐惧 ${person.fear}</i></span>`;
+      : `<span class="chip-alert ${alertLevel}" title="警戒：${ALERT_LABEL[band]}（${person.alert}/100）；恐惧：${FEAR_LABEL[fearBand(person.fear)]}（${person.fear}/100）"><b>警戒 ${person.alert}</b><i>恐惧 ${person.fear}</i></span>`;
   const bleedLeft = Math.max(0, BLEEDOUT_TURNS - person.downedTurns);
   const stateMark =
     health === 'downed'
@@ -201,7 +197,7 @@ export function personChip(person: Person, attackable = false, carryable = false
     : person.watchValue > 0
       ? `<span class="chip-watch" title="夜幕监视值 ${person.watchValue}/100">监视 ${person.watchValue}</span>`
       : '';
-  const label = person.intent === 'idle' ? person.activity : INTENT_LABEL[person.intent];
+  const label = person.activity;
   const dialogue = person.dialogue ? `<span class="person-dialogue" aria-hidden="true">${escape(person.dialogue)}</span>` : '';
   const action = targetMode === 'hatchet'
     ? 'hatchet-target'
@@ -216,7 +212,7 @@ export function personChip(person: Person, attackable = false, carryable = false
             : '';
   const slotStyleAttr = slotStyle ? ` style="${slotStyle}"` : '';
   return `<button type="button" class="person-chip ${cls} ${person.bloodSacrifice ? 'blood-sacrifice' : ''} ${person.trapTriggered ? 'trap-triggered' : ''} ${health === 'downed' ? 'is-downed' : ''} ${attackable ? 'can-hit' : ''} ${targetMode ? 'targeting-' + targetMode : ''}"${slotStyleAttr} data-action="${action}" data-person-id="${person.id}"${attackable ? ' data-attack="1"' : ''}
-    title="${escape(person.name)} · ${HEALTH_LABEL[health]} · ${awarenessLabel(person.alert)} ${person.alert}/100 · ${escape(ARCH_LABEL[person.archetype])} · ${escape(GOAL_LABEL[person.goal])} · 正在${escape(label)}${note}">
+    title="${escape(person.name)} · ${HEALTH_LABEL[health]} · ${ALERT_LABEL[band]} ${person.alert}/100 · 恐惧 ${FEAR_LABEL[fearBand(person.fear)]} · 正在${escape(label)}${note}">
     ${avatarHtml}${trapHitMark}
     ${dialogue}<span>${escape(person.name)}</span>${contractTargetMark}${stateMark}<span class="person-status-row">${statusIcons}</span>${alertMark}${watchMark}
   </button>`;
@@ -263,8 +259,7 @@ export function personDetailHtml(state: GameState, personId: string): string {
     const health = conditionOf(person);
     paras.push(
       `状态：${HEALTH_LABEL[health]}（${person.hp}/4）。行为类型：${ARCH_LABEL[person.archetype]}。`,
-      `目的：${GOAL_LABEL[person.goal]}。当前状态：${INTENT_LABEL[person.intent]}。`,
-      `警戒值：${awarenessLabel(person.alert)}（${person.alert}/100）。恐惧值：${person.fear}/100${person.fear >= 100 ? '（精神崩溃）' : person.fear >= 70 ? '（濒临崩溃）' : ''}。行为：${person.activity || '暂无明显动作'}。`,
+      `警戒：${ALERT_LABEL[alertBand(person.alert)]}（${person.alert}/100）· 恐惧：${FEAR_LABEL[fearBand(person.fear)]}（${person.fear}/100）。行为：${person.activity || '暂无明显动作'}。`,
     );
     if (person.dialogue) paras.push(`听见他说：“${person.dialogue}”`);
     if (person.item) paras.push(`携带物品：${SURVIVOR_ITEM_LABEL[person.item]}（剩余 ${person.itemUses} 次）。`);

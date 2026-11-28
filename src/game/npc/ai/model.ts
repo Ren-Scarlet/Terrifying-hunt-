@@ -16,6 +16,21 @@ export type Mind = Pick<Person, 'alert' | 'fear'>;
 export type AlertBand = 'unaware' | 'suspicious' | 'alert' | 'panicked';
 export type FearBand = 'calm' | 'uneasy' | 'afraid' | 'broken';
 
+/** 给界面用的中文标签（新四档） */
+export const ALERT_LABEL: Record<AlertBand, string> = {
+  unaware: '未发觉',
+  suspicious: '怀疑',
+  alert: '警觉',
+  panicked: '慌乱',
+};
+
+export const FEAR_LABEL: Record<FearBand, string> = {
+  calm: '冷静',
+  uneasy: '不安',
+  afraid: '恐惧',
+  broken: '崩溃',
+};
+
 /**
  * 全部可调数值。第一章里标"待定"的部分，先按评审建议给默认值：
  *   - 升档立即，降档需要跌破"阈值 − 8"并持续 1 回合（慌乱需要 2 回合）。

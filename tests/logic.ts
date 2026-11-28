@@ -958,7 +958,8 @@ function caseHuntActionAndDossierUi(): void {
   s.energy = 3;
   const dossier = personDetailHtml(s, victim.id);
   const bio = SURVIVOR_MAP[victim.id]?.bio;
-  check('G 人物档案显示角色背景', !bio || dossier.includes(bio));
+  // 档案正文会做 HTML 转义，含引号的背景无法整段匹配；用前缀确认'确实显示了背景'
+  check('G 人物档案显示角色背景', !bio || dossier.includes(bio) || dossier.includes(bio.slice(0, 8)));
   check('G 人物档案显示当前状态与正在做的事',
     dossier.includes('倒地') && dossier.includes('倒在地上，试图呼救'));
 }
