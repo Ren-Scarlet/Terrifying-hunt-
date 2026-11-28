@@ -128,4 +128,12 @@ export interface NpcHost {
   effectiveCost(defId: string, state: GameState): number;
   /** 执行一串卡牌效果 */
   runOps(state: GameState, ops: Op[]): void;
+  /** 房间现在是否在玩家视野里 */
+  isRoomVisible(state: GameState, room: RoomId): boolean;
+  /** 这个幸存者现在是否可见 */
+  isPersonVisible(state: GameState, person: Person): boolean;
+  /** 玩家正前方一格的相邻房间 */
+  forwardRoom(state: GameState): RoomId | null;
+  /** 杀手能力剩余冷却 */
+  powerCooldown(state: GameState, powerId: string): number;
 }
