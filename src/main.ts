@@ -85,7 +85,7 @@ import {
 } from './ui/workshop';
 import { initCloudAuth, loadCloudConfig } from './game/cloud';
 import { mountFloorplanScene, type SceneHandle } from './ui/scene';
-import { playHeartbeat, playSfx, playStep, playSurvivorHit, playSurvivorDeath, setMusic, toggleMute, unlockAudio } from './ui/audio';
+import { playHeartbeat, playSfx, playStep, playSurvivorHit, playSurvivorDeath, preloadAudio, setMusic, toggleMute, unlockAudio } from './ui/audio';
 import type { SfxName } from './ui/audio';
 import { currentMenuMap, rollMenuMap } from './ui/mapArt';
 import { ActionRegistry, type ActionContext, type ActionTable } from './ui/actions';
@@ -1753,6 +1753,9 @@ document.addEventListener('change', (event) => {
 window.addEventListener('resize', () => publishBottomHudHeight());
 
 installImmersiveKeys();
+
+// 启动即预加载音效与两条背景音乐，避免第一次播放时临时请求导致“玩着玩着才有声音”。
+preloadAudio();
 
 // 离线支持：首次联网打开后，Service Worker 会把整包资源缓存到本地，之后断网也能继续玩。
 // 只在生产构建里注册（vite dev 没有 sw.js），并且失败时静默忽略。

@@ -172,6 +172,49 @@ let audioUnlocked = false;
 const missing = new Set<SfxName>();
 let lastHeartbeatAt = 0;
 
+/** 预加载用的静音 Audio 元素；只负责把浏览器缓存预热，不参与播放。 */
+const preloadedSfx: HTMLAudioElement[] = [];
+const MUSIC_ELEMENTS: Partial<Record<MusicTrack, HTMLAudioElement>> = {};
+let preloadStarted = false;
+
+function createMusicElement(track: MusicTrack): HTMLAudioElement {
+  const el = new Audio(src(MUSIC_FILES[track]));
+  el.loop = true;
+  el.preload = 'auto';
+  el.volume = MUSIC_VOLUME[track];
+  el.addEventListener('error', () => {
+    musicMissing.add(track);
+    delete MUSIC_ELEMENTS[track];
+    if (music === el) {
+      music = null;
+      if (musicTrack === track) musicTrack = null;
+    }
+  }, { once: true });
+  MUSIC_ELEMENTS[track] = el;
+  return el;
+}
+
+/**
+ * 启动时预加载所有音效与两条背景音乐。
+ * 之前每次 playSfx() 都 new Audio()，第一次播放要等网络请求，于是出现
+ * “玩着玩着声音突然有了”。预先 load() 一次后，后续播放直接命中缓存。
+ */
+export function preloadAudio(): void {
+  if (preloadStarted) return;
+  preloadStarted = true;
+  Object.entries(SFX_FILES).forEach(([name, file]) => {
+    const el = new Audio(src(file));
+    el.preload = 'auto';
+    el.addEventListener('error', () => missing.add(name as SfxName), { once: true });
+    el.load();
+    preloadedSfx.push(el);
+  });
+  (Object.keys(MUSIC_FILES) as MusicTrack[]).forEach((track) => {
+    createMusicElement(track).load();
+  });
+}
+
+
 /** 地图会频繁重绘；仅在幸存者与杀手同处一室时限频播放心跳。 */
 export function playHeartbeat(): void {
   const now = Date.now();
@@ -243,17 +286,9 @@ export function setMusic(track: MusicTrack | null): void {
     music = null;
   }
   if (!track || musicMissing.has(track)) return;
-  const el = new Audio(src(MUSIC_FILES[track]));
-  el.loop = true;
+  const el = MUSIC_ELEMENTS[track] ?? createMusicElement(track);
   el.volume = MUSIC_VOLUME[track];
-  // 加载失败（文件还没给）就记住这一轨，不再反复请求
-  el.addEventListener('error', () => {
-    musicMissing.add(track);
-    if (music === el) {
-      music = null;
-      if (musicTrack === track) musicTrack = null;
-    }
-  }, { once: true });
+  el.currentTime = 0;
   music = el;
   if (audioUnlocked && !muted) void el.play().catch(() => {});
 }
