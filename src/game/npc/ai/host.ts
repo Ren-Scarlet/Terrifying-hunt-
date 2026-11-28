@@ -68,4 +68,6 @@ export interface NpcHost {
   rememberVisible(state: GameState): void;
   /** 当前正被玩家贴上的人（贴脸时不再触发转身就跑） */
   getChasedId(): string | null;
+  /** 结束这一局（胜负结算） */
+  finish(state: GameState, result: 'win' | 'caught' | 'timeout' | 'failed'): void;
 }
