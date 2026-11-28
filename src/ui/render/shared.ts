@@ -1,7 +1,7 @@
 import { CARDS, CARD_MAP } from '../../game/cards';
 import { ADDON_RARITY_BG, PERK_RARITY_BG, POWER_RARITY_BG, accessoryImage, cardImage, characterImage, uiIcon } from '../../game/assetMap';
 import {
-  BASE_AP, BLEEDOUT_TURNS, HEALTH_LABEL,
+  BASE_AP, BLEEDOUT_TURNS, BLOOD, HEALTH_LABEL,
   conditionOf, effectiveCost, isPersonVisible,
   attackBlockReason, executeBlockReason,
 } from '../../game/engine';
@@ -145,6 +145,9 @@ export function personChip(person: Person, attackable = false, carryable = false
   const contractTargetMark = person.marked
     ? '<span class="chip-contract-target" title="本局契约指定击杀目标">★ 契约目标</span>'
     : '';
+  const highValueMark = person.highValue
+    ? '<span class="chip-high-value" title="高价值目标：击杀后额外获得大量血点">◇ 高价值</span>'
+    : '';
   const avatarHtml = img
     ? `<span class="person-avatar-wrap"><img class="person-avatar" src="${img}" alt="" onerror="this.style.display='none'">${person.bloodSacrifice ? `<img class="chip-sacrifice-mark" src="${uiIcon('obsession')}" alt="血祭品" title="本局血祭品">` : ''}</span>`
     : '';
@@ -200,7 +203,7 @@ export function personChip(person: Person, attackable = false, carryable = false
   return `<button type="button" class="person-chip ${cls} ${person.bloodSacrifice ? 'blood-sacrifice' : ''} ${person.trapTriggered ? 'trap-triggered' : ''} ${health === 'downed' ? 'is-downed' : ''} ${attackable ? 'can-hit' : ''} ${targetMode ? 'targeting-' + targetMode : ''}"${slotStyleAttr} data-action="${action}" data-person-id="${person.id}"${attackable ? ' data-attack="1"' : ''}
     title="${escape(person.name)} · ${HEALTH_LABEL[health]} · ${ALERT_LABEL[band]} ${person.alert}/100 · 恐惧 ${FEAR_LABEL[fearBand(person.fear)]} · 正在${escape(label)}${note}">
     ${avatarHtml}${trapHitMark}
-    ${dialogue}<span>${escape(person.name)}</span>${contractTargetMark}${stateMark}<span class="person-status-row">${statusIcons}</span>${alertMark}${watchMark}
+    ${dialogue}<span>${escape(person.name)}</span>${contractTargetMark}${highValueMark}${stateMark}<span class="person-status-row">${statusIcons}</span>${alertMark}${watchMark}
   </button>`;
 }
 
@@ -244,6 +247,7 @@ export function personDetailHtml(state: GameState, personId: string): string {
     );
     if (person.dialogue) paras.push(`听见他说：“${person.dialogue}”`);
     if (person.marked) paras.push('契约情报：这是本局指定目标。');
+    if (person.highValue) paras.push(`高价值目标：击杀后额外获得 ${BLOOD.highValueKill} 血点。`);
     if (person.bloodSacrifice) paras.push('特殊身份：本局血祭品。');
     if (isPersonVisible(state, person)) {
       paras.push(`位置：${roomName(person.room)}。`);

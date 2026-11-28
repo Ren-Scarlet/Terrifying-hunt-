@@ -2803,32 +2803,6 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
   max-height: none !important;
 }
 
-/* 分数处决按钮：固定在倒地目标上方，避免被小房间裁掉或被人像盖住 */
-#app.immersive-game .map-person-wrap .score-execution-btn {
-  position: absolute !important;
-  left: 50% !important;
-  top: -36px !important;
-  transform: translateX(-50%) !important;
-  z-index: 36 !important;
-  display: inline-flex !important;
-  align-items: center; justify-content: center;
-  min-width: 104px !important;
-  min-height: 28px !important;
-  padding: 4px 9px !important;
-  border: 1px solid rgba(235, 200, 96, .9) !important;
-  border-radius: 7px !important;
-  background: rgba(58, 44, 10, .96) !important;
-  color: #ffe9a8 !important;
-  font-size: 11px !important;
-  font-weight: 700 !important;
-  pointer-events: auto !important;
-  box-shadow: 0 0 12px rgba(235, 200, 96, .3) !important;
-}
-#app.immersive-game .map-person-wrap .score-execution-btn:disabled {
-  opacity: .55 !important;
-  cursor: not-allowed !important;
-}
-
 /* 头像图片必须跟随 wrap：后面有 72px 的旧规则会把它撑出房间 */
 #app.immersive-game .floorplan .room-people .person-chip .person-avatar-wrap .person-avatar {
   width: 100% !important;
@@ -3045,92 +3019,6 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
 
 
 /* ------------------------------------------------------------------ */
-/* 处决 QTE：贴在杀手头像上的四位数，不再是全屏遮罩                     */
-/* ------------------------------------------------------------------ */
-#app.immersive-game .qte-panel,
-.qte-panel {
-  position: fixed;
-  z-index: 90;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 5px;
-  padding: 8px 10px;
-  border: 1px solid rgba(235, 200, 96, .9);
-  border-radius: 10px;
-  background: rgba(10, 12, 14, .97);
-  color: #ffe9a8;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, .85), 0 0 16px rgba(235, 200, 96, .25);
-}
-.qte-panel > b {
-  font-size: 11px;
-  letter-spacing: .06em;
-  color: #ffd24a;
-}
-.qte-panel .qte-digits {
-  display: flex;
-  gap: 6px;
-}
-.qte-panel .qte-digits span {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 36px;
-  border: 1px solid rgba(255, 255, 255, .35);
-  border-radius: 5px;
-  background: rgba(20, 22, 24, .9);
-  font-size: 22px;
-  font-weight: 800;
-  line-height: 1;
-}
-.qte-panel .qte-digits span.done {
-  color: #7fd88a;
-  border-color: #4f8f5e;
-  background: rgba(24, 46, 30, .9);
-}
-.qte-panel .qte-digits span.current {
-  border-color: #ffd24a;
-  box-shadow: 0 0 10px rgba(255, 210, 74, .65);
-}
-.qte-panel .qte-timer {
-  display: block;
-  width: 100%;
-  height: 3px;
-  border-radius: 2px;
-  background: linear-gradient(90deg, #ff6a3c, #ffd24a);
-  transform-origin: left center;
-  animation-name: qteTimerDrain;
-  animation-timing-function: linear;
-  animation-fill-mode: forwards;
-}
-@keyframes qteTimerDrain {
-  from { transform: scaleX(1); }
-  to { transform: scaleX(0); }
-}
-.qte-panel .qte-pad {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 3px;
-  width: 100%;
-}
-.qte-panel .qte-pad button {
-  min-height: 26px;
-  border: 1px solid rgba(255, 255, 255, .22);
-  border-radius: 4px;
-  background: rgba(26, 30, 34, .95);
-  color: #e8e2d6;
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-}
-.qte-panel .qte-pad button:hover {
-  border-color: rgba(255, 210, 74, .8);
-  color: #ffd24a;
-}
-
-
-/* ------------------------------------------------------------------ */
 /* 地图物件：容器不挡路，但物件本身要能悬停/点击（逃生点、处决点、道具箱） */
 /* ------------------------------------------------------------------ */
 #app.immersive-game .floorplan .room-features { pointer-events: none !important; }
@@ -3330,16 +3218,6 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
 #app.immersive-game .blood-sacrifice-tag i {
   display: inline-block; width: 7px; height: 7px; border-radius: 50%;
   background: #e0362c; box-shadow: 0 0 6px rgba(224, 54, 44, .8);
-}
-
-/* 分数处决：和普通处决并排，同样红色 */
-#app.immersive-game .person-world-actions .btn.score-execution-btn {
-  position: static !important;
-  transform: none !important;
-  border-color: rgba(204, 65, 58, .9) !important;
-  background: linear-gradient(180deg, rgba(99, 25, 25, .98), rgba(39, 10, 12, .98)) !important;
-  color: #ffe0d6 !important;
-  box-shadow: 0 3px 12px rgba(0, 0, 0, .8) !important;
 }
 
 /* 动静标记：更醒目，带房间级提示 */
@@ -3746,10 +3624,6 @@ body.immersive-hunt::before, body.immersive-hunt::after { z-index: -1; }
 #app.immersive-game:not(.mobile-game-active) .floorplan .room-people .map-person-wrap .person-world-actions {
   top: auto !important;
   bottom: calc(100% + 4px) !important;
-}
-#app.immersive-game:not(.mobile-game-active) .floorplan .room-people .map-person-wrap .person-world-actions .score-execution-btn {
-  top: auto !important;
-  bottom: calc(100% + 6px) !important;
 }
 #app.immersive-game:not(.mobile-game-active) .floorplan .room-people .map-person-wrap .person-dialogue {
   bottom: calc(var(--chip) + var(--status) + 56px) !important;

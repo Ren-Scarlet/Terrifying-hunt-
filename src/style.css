@@ -1212,12 +1212,14 @@ button { font-family: inherit; cursor: pointer; }
   display: block; width: 64px; height: 1px; margin: 10px auto 0;
   background: linear-gradient(90deg, transparent, #8d3a2c, transparent);
 }
-.result-stars { font-size: 26px; color: #a8916a; letter-spacing: 12px; margin: 10px 0 6px; text-shadow: 0 0 24px rgba(179, 148, 95, .3); }
+.result-total { display: flex; align-items: baseline; justify-content: center; gap: 10px; margin: 10px 0 4px; }
+.result-total small { color: var(--faint); font-size: 10px; letter-spacing: 2px; }
+.result-total b { font-family: var(--font-num); font-size: 28px; color: var(--gold); text-shadow: 0 0 18px #b9915066; }
 .result-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 16px 0; }
 .result-grid div { padding: 10px; background: #0a0c0e; border-radius: 2px; border: 1px solid var(--line-soft); }
 .result-grid small { display: block; color: var(--faint); font-size: 9px; letter-spacing: 2px; text-transform: uppercase; }
 .result-grid b { font-size: 17px; font-family: var(--font-num); color: #d4ccbe; }
-.score-breakdown { display: grid; gap: 5px; margin-bottom: 12px; font-size: 11px; }
+.blood-breakdown { display: grid; gap: 5px; margin-bottom: 12px; font-size: 11px; }
 .score-line {
   display: flex; justify-content: space-between; gap: 12px;
   padding: 6px 10px;
@@ -1820,9 +1822,6 @@ button { font-family: inherit; cursor: pointer; }
   color: #d7a79b; border-color: #6d3025;
   background: linear-gradient(90deg, #23100d, #3a1712, #23100d);
 }
-.result-rank { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 4px 0 2px; }
-.result-rank small { font-size: 9px; letter-spacing: 2px; color: var(--faint); }
-.result-rank b { font-family: var(--font-num); font-size: 26px; color: var(--gold); text-shadow: 0 0 18px #b9915066; }
 .result-objective {
   display: flex; align-items: center; gap: 10px; text-align: left;
   margin: 12px 0 0; padding: 9px 12px;
@@ -2341,6 +2340,17 @@ button, .room-hit, .hand-row { touch-action: manipulation; }
 .person-chip.marked {
   border: 2px solid #d19a55;
   box-shadow: 0 0 0 1px #2b1c10, 0 0 13px #d19a5588, 0 2px 8px #000b;
+}
+.person-chip .chip-high-value {
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: 0 0 auto; overflow: visible; white-space: nowrap;
+  padding: 2px 5px; border-radius: 3px;
+  border: 1px solid #6fb0a8;
+  background: linear-gradient(180deg, #1d3d38, #102421);
+  color: #c9fff4; font-size: 10px; font-weight: 900;
+  letter-spacing: .2px; line-height: 1.2;
+  text-shadow: 0 1px 2px #000;
+  box-shadow: 0 0 8px #6fb0a844, inset 0 1px #c9fff433;
 }
 .roster-person.marked {
   border: 2px solid #d19a55;
@@ -2923,31 +2933,11 @@ button, .room-hit, .hand-row { touch-action: manipulation; }
 .btn.power.possessed-ready { border-color: #a43e37; color: #f0b0a6; box-shadow: inset 0 0 0 1px #a43e3744, 0 0 12px #9b332c55; }
 
 
-/* 结算中的猎杀风格评价：与契约总分分开呈现，强调玩家采用的策略。 */
-.hunt-style-card {
-  display: grid; gap: 10px; margin: 14px 0; padding: 13px 15px;
-  border: 1px solid #554b39; background: linear-gradient(110deg, #171713, #111313);
-}
-.hunt-style-heading { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 12px; }
-.hunt-style-heading > div { display: grid; gap: 3px; }
-.hunt-style-heading small { color: #b4a27f; font-size: 11px; letter-spacing: .08em; }
-.hunt-style-heading > div b { color: #e8dcc3; font-size: 14px; }
-.hunt-style-rank { min-width: 42px; text-align: center; font-size: 30px; line-height: 1; color: #d5c19b; }
-.hunt-style-rank.rank-s { color: #e8c66f; text-shadow: 0 0 12px #b98b3b66; }
-.hunt-style-rank.rank-a { color: #b9c9cf; }
-.hunt-style-rank.rank-b { color: #c6a77d; }
-.hunt-style-rank.rank-c { color: #9d9b94; }
-.hunt-style-score { color: #d8c8a7; font-size: 13px; font-weight: 700; }
-.hunt-style-breakdown { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 5px 14px; }
-.style-score-line { display: flex; justify-content: space-between; gap: 8px; color: #aaa294; font-size: 11px; }
-.style-score-line b { color: #d5c49e; font-variant-numeric: tabular-nums; }
-.hunt-style-reward { margin: 0; color: #e0c27e; font-size: 12px; }
-.hunt-style-reward.muted { color: #8d897f; }
-@media (max-width: 600px) {
-  .hunt-style-heading { grid-template-columns: 1fr auto; }
-  .hunt-style-score { grid-column: 1 / -1; }
-  .hunt-style-breakdown { grid-template-columns: 1fr; }
-}
+/* 结算中的特殊表现与血点五类明细 */
+.performance-titles { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 10px 0; }
+.performance-titles > small { color: var(--faint); font-size: 10px; letter-spacing: 2px; }
+.performance-title { display: inline-flex; align-items: center; gap: 6px; padding: 4px 9px; border: 1px solid #6b5636; background: #17140f; color: #e8d6ac; font-size: 11px; }
+.performance-title b { color: var(--gold); font-family: var(--font-num); }
 
 
 /* 地图全景优先：地图缩放设置不再制造内部滚动视口，所有房间始终完整可见。 */

@@ -1609,6 +1609,26 @@ function caseMarkedTargetIdentification(): void {
 }
 caseMarkedTargetIdentification();
 
+function caseHighValueTarget(): void {
+  const game = newGame();
+  const high = game.people.filter((person) => person.role !== 'police' && person.highValue);
+  check('高价值目标：每局恰好一名', high.length === 1, `count=${high.length}`);
+  const target = high[0];
+  if (!target) return;
+  const chip = personChip(target);
+  check('高价值目标：人物标签显示高价值徽记', chip.includes('chip-high-value') && chip.includes('高价值'));
+  check('高价值目标：人物档案说明额外奖励', personDetailHtml(game, target.id).includes('高价值目标'));
+  target.room = game.playerRoom;
+  target.hidden = false;
+  target.hp = 0;
+  target.downedTurns = 0;
+  game.energy = 4;
+  const ok = executeDownedPerson(game, target.id);
+  check('高价值目标：击杀后额外获得 1500 血点',
+    ok && game.bloodPointLines.some((line) => line.label.includes('高价值目标') && line.value === BLOOD.highValueKill));
+}
+caseHighValueTarget();
+
 /** AB：封锁房门必须同时阻止 NPC 进入和离开；脚印不应随机消失 */
 function caseNpcLocksAndPersistentTrails(): void {
   const locked = newGame();

@@ -92,6 +92,10 @@ export function createPeople(mission: Mission): Person[] {
     people.push(makePerson(s, 'civilian', nextRoom(), 4, false));
   });
 
+  // 每局随机出现一名高价值目标：击杀后获得大量额外血点。
+  const highValueTarget = people.length ? randomOf(people) : null;
+  if (highValueTarget) highValueTarget.highValue = true;
+
   // 柜子/床底机制对任何人都可能发生，不再指定固定的躲藏型。
   people.push({
     id: 'police-0',
