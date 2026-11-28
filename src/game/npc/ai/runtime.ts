@@ -19,26 +19,29 @@ import { ACTIVITIES } from '../factory';
 import { canPlaceBarricade } from './predicates';
 
 /** 每个幸存者的追逐体力（按 id 记，避免往存档结构里加字段） */
-const chaseStates = new Map<string, ChaseState>();
+const chaseStates = new WeakMap<GameState, Map<string, ChaseState>>();
 
-function chaseOf(person: Person): ChaseState {
-  let state = chaseStates.get(person.id);
-  if (!state) {
-    state = createChaseState();
-    chaseStates.set(person.id, state);
+function chaseOf(state: GameState, person: Person): ChaseState {
+  let gameStates = chaseStates.get(state);
+  if (!gameStates) { gameStates = new Map(); chaseStates.set(state, gameStates); }
+  let chase = gameStates.get(person.id);
+  if (!chase) {
+    chase = createChaseState();
+    gameStates.set(person.id, chase);
   }
-  return state;
+  return chase;
 }
 
 function buildContext(state: GameState, person: Person): DecisionContext {
   const here = peopleInRoom(state, person.room);
-  const chase = chaseOf(person);
+  const chase = chaseOf(state, person);
   return {
     alert: person.alert,
     fear: person.fear,
     control: person.hp <= 0 ? 'downed' : person.blockedTurns > 0 ? 'stunned' : 'normal',
     sameRoomKiller: person.room === state.playerRoom,
     justAttacked: state.lastAttackedId === person.id && person.alert >= 100,
+    startled: (person.startleTurns ?? 0) > 0,
     chased: state.chaseTargetId === person.id,
     phoneHere: phoneWorks(state, person.room),
     totemHere: state.totems.includes(person.room),
@@ -94,12 +97,12 @@ function walkTowardExit(state: GameState, person: Person): boolean {
 function perform(host: NpcHost, state: GameState, person: Person, kind: ActionKind): boolean {
   switch (kind) {
     case 'flee': {
-      const chase = chaseOf(person);
+      const chase = chaseOf(state, person);
       if (!canFlee(chase)) return false;
       // 崩溃的人会不顾一切地跑：旧逻辑里恐惧 100 会拒绝逃跑，这里显式放行
       const moved = host.fleeAway(state, person, false, person.fear >= 85);
       if (moved) {
-        chaseStates.set(person.id, afterFlee(chase));
+        chaseStates.get(state)!.set(person.id, afterFlee(chase));
         if (person.fear >= 85) person.activity = '尖叫着乱跑，完全失去了方向';
       }
       return moved;
@@ -166,6 +169,7 @@ export function executeDecision(host: NpcHost, state: GameState, person: Person,
   }
 
   // 回合末：没被追、也不在玩家眼前时，警戒才会回落（慌乱衰减减半）
+  if (person.startleTurns) person.startleTurns = Math.max(0, person.startleTurns - 1);
   if (endOfTurn && !ctx.chased && !ctx.sameRoomKiller) {
     const safe = distanceToPlayer(state, person) >= 2 && isRoomLit(state, person.room);
     decayAlert(person, safe);
@@ -175,16 +179,16 @@ export function executeDecision(host: NpcHost, state: GameState, person: Person,
 /** 回合结束时恢复追逐体力（由 npcTurn 在最后调用一次） */
 export function tickAllChase(state: GameState): void {
   for (const person of state.people) {
-    const chase = chaseStates.get(person.id);
-    if (chase) chaseStates.set(person.id, tickChase(chase));
+    const chase = chaseStates.get(state)?.get(person.id);
+    if (chase) chaseStates.get(state)!.set(person.id, tickChase(chase));
   }
   // 没人再被追时，体力恢复得更自然；这里只做清理，避免 id 无限增长
-  if (state.people.length === 0) chaseStates.clear();
+
 }
 
 /** 供调试/测试查看某个幸存者还剩多少体力 */
 export function chaseStaminaOf(personId: string): number {
-  return chaseStates.get(personId)?.stamina ?? createChaseState().stamina;
+  return 0;
 }
 
 /** 距离玩家多远（供调试/UI 使用） */

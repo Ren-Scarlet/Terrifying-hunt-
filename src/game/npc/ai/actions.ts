@@ -80,7 +80,6 @@ export function shout(host: NpcHost, state: GameState, person: Person, base = 18
     .forEach((p) => {
       if (p.alert < 70) {
         p.alert = clamp(p.alert + base, 0, 100);
-        p.awareness = Math.max(p.awareness, 1);
         p.lastHeardFrom = person.name;
         p.lastHeardRoom = person.room;
         p.lastHeardTurn = state.turn;
@@ -94,7 +93,6 @@ export function shout(host: NpcHost, state: GameState, person: Person, base = 18
       .filter((p) => p.role !== 'police' && p.hp > 0 && p.alert < 55)
       .forEach((p) => {
         p.alert = clamp(p.alert + Math.round(base * 0.55), 0, 100);
-        p.awareness = Math.max(p.awareness, 1);
         p.lastHeardFrom = person.name;
         p.lastHeardRoom = person.room;
         p.lastHeardTurn = state.turn;

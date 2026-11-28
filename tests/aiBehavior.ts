@@ -40,6 +40,7 @@ function ctx(over: Partial<DecisionContext> = {}): DecisionContext {
     control: 'normal',
     sameRoomKiller: false,
     justAttacked: false,
+    startled: false,
     chased: false,
     phoneHere: false,
     totemHere: false,

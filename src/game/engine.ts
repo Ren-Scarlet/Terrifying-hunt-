@@ -728,7 +728,6 @@ function checkScourgeShrine(state: GameState): void {
   if (newcomer) {
     newcomer.fear = clamp(newcomer.fear + 35, 0, 100);
     newcomer.alert = clamp(newcomer.alert + 12, 0, 100);
-    newcomer.awareness = Math.max(newcomer.awareness, 2);
     newcomer.revealedActions = Math.max(newcomer.revealedActions ?? 0, 4);
     newcomer.intent = 'wary';
     log(state, `鬼魔神龛触发：${newcomer.name}受到惊吓，恐惧 +35、警觉 +12，气场显现 3 次后续行动！`);
@@ -944,8 +943,8 @@ function survivorsActOnce(state: GameState, actorId: string): void {
   for (const p of npcs(state)) {
     if (p.hp <= 0 || p.hidden || p.blockedTurns > 0 || p.movesThisTurn >= REACT_MOVE_CAP) continue;
     const from = p.room;
-    if (p.room === state.playerRoom) { if (p.awareness >= 2 || p.alert >= 40) fleeAway(state, p); }
-    else if (p.awareness >= 2 || p.alert >= 40 || ['flee', 'escape', 'call', 'heal', 'rescue'].includes(p.intent)) actByArchetype(state, p);
+    if (p.room === state.playerRoom) { if (p.alert >= 40) fleeAway(state, p); }
+    else if (p.alert >= 40) actByArchetype(state, p);
     else if (random() < 0.35) {
       const options = ROOM_MAP[p.room].neighbors.filter((room) => room !== state.playerRoom && !isLocked(state, room));
       if (options.length) { const next = randomOf(options); p.room = next; p.activity = `趁你等待时移动到${roomName(next)}`; }
@@ -979,7 +978,6 @@ export function triggerBearTrapForPerson(state: GameState, person: Person): void
   if (trap.discovered) return;
   if (person.alert >= 40 && random() < 0.4) {
     trap.discovered = true;
-    person.awareness = Math.max(person.awareness, 2);
     person.intent = 'wary';
     person.activity = '发现地上的捕兽夹，正小心观察';
     log(state, `${person.name} 在${roomName(person.room)}发现了捕兽夹，暂时没有踩上去。`);
@@ -997,7 +995,6 @@ export function triggerBearTrapForPerson(state: GameState, person: Person): void
   const holdTurns = trapHoldTurns(state);
   person.hp = Math.max(0, person.hp - trapDamage);
   person.alert = 100;
-  person.awareness = 3;
   person.blockedTurns = holdTurns;
   person.intent = 'stunned';
   if (person.hp <= 0) {

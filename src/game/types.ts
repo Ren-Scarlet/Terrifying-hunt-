@@ -253,8 +253,6 @@ export interface Person {
   alert: number;
   /** 恐惧值 0–100：满值后崩溃；此时再次受到攻击会直接倒地。 */
   fear: number;
-  /** 已确认危险的持久认知阶段：0 未发觉、1 怀疑、2 恐慌、3 警觉；不会因即时 alert 衰减而忘记已知信息 */
-  awareness: number;
   /** 当前头顶显示的短暂对白 */
   dialogue: string;
   /** 当前行为，用于档案与人物名单 */
@@ -284,6 +282,8 @@ export interface Person {
   callTurns: number;
   /** 躲在柜子/床底：不搜出来就看不见，也吃不到大部分卡牌 */
   hidden: boolean;
+  /** 刚被惊动、还没反应过来的回合数：进门当回合只会观察 */
+  startleTurns?: number;
   /** 找到武器：反抗时能让玩家掉行动点 */
   armed: boolean;
   /** 老练的幸存者：有时能悄无声息地移动，仍会留下脚印，但不会惊动乌鸦 */

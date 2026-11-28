@@ -35,7 +35,6 @@ export function triggerEnvironmentalEvent(host: NpcHost, state: GameState): void
       const affected = npcs(state).filter((person) => person.hp > 0 && !person.hidden && roomDistance(person.room, room) <= 1);
       affected.forEach((person) => {
         person.alert = clamp(person.alert + 14, 0, 100);
-        person.awareness = Math.max(person.awareness, 1);
         if (person.alert >= 40 && person.intent === 'idle') person.intent = 'wary';
         person.activity = '被屋顶积雪坠落的巨响惊动';
       });
@@ -55,7 +54,6 @@ export function triggerEnvironmentalEvent(host: NpcHost, state: GameState): void
       const affected = npcs(state).filter((person) => person.hp > 0 && !person.hidden && roomDistance(person.room, room) <= 1);
       affected.forEach((person) => {
         person.alert = clamp(person.alert + 10, 0, 100);
-        person.awareness = Math.max(person.awareness, 1);
         if (person.intent === 'idle') person.intent = 'wary';
         person.activity = '被幼儿教室断续响起的玩具音乐吸引';
       });
@@ -68,7 +66,6 @@ export function triggerEnvironmentalEvent(host: NpcHost, state: GameState): void
       const caller = randomOf(npcs(state).filter((person) => person.hp > 0 && !person.hidden));
       if (caller) {
         caller.alert = clamp(caller.alert + 16, 0, 100);
-        caller.awareness = Math.max(caller.awareness, 1);
         caller.intent = 'wary';
         caller.activity = '听见广播里的求救杂音，正在确认来源';
       }
@@ -94,7 +91,6 @@ export function triggerEnvironmentalEvent(host: NpcHost, state: GameState): void
       const affected = npcs(state).filter((person) => person.hp > 0 && !person.hidden && roomDistance(person.room, room) <= 1);
       affected.forEach((person) => {
         person.alert = clamp(person.alert + 12, 0, 100);
-        person.awareness = Math.max(person.awareness, 1);
         if (person.intent === 'idle') person.intent = 'wary';
         person.activity = '被车库外突然响起的汽车警报惊动';
       });
@@ -109,7 +105,6 @@ export function triggerEnvironmentalEvent(host: NpcHost, state: GameState): void
     );
     affected.forEach((person) => {
       person.alert = clamp(person.alert + 12, 0, 100);
-      person.awareness = Math.max(person.awareness, 1);
       if (person.alert >= 45) person.intent = 'wary';
       person.activity = '被课间铃声惊动，正在寻找声音来源';
     });
@@ -150,7 +145,6 @@ export function triggerEnvironmentalEvent(host: NpcHost, state: GameState): void
       const person = randomOf(callers);
       person.goal = 'phone';
       person.alert = clamp(Math.max(45, person.alert + 18), 0, 100);
-      person.awareness = Math.max(person.awareness, 2);
       person.intent = 'call';
       person.activity = '被突然响起的电话吸引，正赶去求救';
       host.log(state, `【环境事件】电话突然响起。${person.name}听见铃声，正朝电话赶去——再不阻止，他可能会报警。`);
@@ -175,7 +169,6 @@ export function triggerEnvironmentalEvent(host: NpcHost, state: GameState): void
   const startled = npcs(state).filter((person) => person.hp > 0 && !person.hidden && person.room === room.id);
   startled.forEach((person) => {
     person.alert = clamp(person.alert + 12, 0, 100);
-    person.awareness = Math.max(person.awareness, 1);
     person.intent = 'wary';
     person.activity = '被玻璃碎裂声惊动，正查看四周';
   });

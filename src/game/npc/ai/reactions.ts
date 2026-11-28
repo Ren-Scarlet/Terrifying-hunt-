@@ -37,7 +37,7 @@ export function sameRoomKillerReact(host: NpcHost, state: GameState, armed: bool
     const survivorBlind = (effects.blind ?? 0) > 0 || (effects.oblivious ?? 0) > 0 || !isRoomLit(state, person.room);
     if (!killerHidden && !survivorBlind) {
       person.alert = clamp(Math.max(person.alert, 70), 0, 100);
-      person.awareness = Math.max(person.awareness, 2);
+      if ((person.startleTurns ?? 0) > 0) { person.activity = '被门口的动静惊到，愣在原地'; continue; }
       if (person.intent === 'idle' || person.intent === 'wary' || person.intent === 'call') person.intent = 'flee';
       person.activity = '被你堵在屋里，正拼命往外跑';
     } else {
@@ -62,6 +62,7 @@ export function npcReact(host: NpcHost, state: GameState): void {
     if (person.hp <= 0 || person.hidden) continue;
     if (person.lastWitnessedEventClock === state.trailClock) continue;
     if (person.blockedTurns > 0 || state.pinnedPeople.includes(person.id)) continue;
+    if ((person.startleTurns ?? 0) > 0) continue;
     const effects = person.statusEffects ?? {};
     const cannotSense = (effects.undetectable ?? 0) > 0 || (effects.oblivious ?? 0) > 0 || (effects.blind ?? 0) > 0 || !isRoomLit(state, person.room);
     if (cannotSense) continue;
@@ -73,24 +74,20 @@ export function npcReact(host: NpcHost, state: GameState): void {
       person.healTurns = 0;
       person.healLastTurn = undefined;
       person.intent = 'flee';
-      person.awareness = Math.max(person.awareness, 2);
       person.alert = Math.max(person.alert, 75);
       person.activity = '治疗被打断，察觉屠夫后立刻逃跑';
     }
     if (fearRadius >= 2 && distanceToPlayer === 1 && person.alert < 45) {
-      person.awareness = Math.max(person.awareness, 2);
       person.alert = Math.max(person.alert, 45);
       person.intent = 'flee';
       person.activity = '察觉到杀手逼近，立刻逃跑';
       if (person.movesThisTurn < REACT_MOVE_CAP && host.fleeAway(state, person, true)) person.movesThisTurn += 1;
       continue;
-    } else if (fearRadius >= 1 && distanceToPlayer === 1 && person.awareness === 0 && person.alert < 40) {
-      person.awareness = 1;
+    } else if (fearRadius >= 1 && distanceToPlayer === 1 && person.alert < 12) {
       person.alert = Math.max(person.alert, 12);
       person.intent = 'wary';
       person.activity = '听见附近有动静，停下来观察';
-    } else if (fearRadius >= 2 && distanceToPlayer === 2 && person.awareness === 0 && person.alert < 40) {
-      person.awareness = 1;
+    } else if (fearRadius >= 2 && distanceToPlayer === 2 && person.alert < 12) {
       person.alert = Math.max(person.alert, 12);
       person.intent = 'wary';
       person.activity = '远处传来令人不安的动静';
@@ -102,7 +99,7 @@ export function npcReact(host: NpcHost, state: GameState): void {
     if (sameRoom && person.id === state.lastAttackedId) continue;
     if (sameRoom) {
       if (state.ambushTurn === state.turn) continue;
-      if (person.awareness < 2) continue;
+      if (person.alert < 40) continue;
       if (person.movesThisTurn >= REACT_MOVE_CAP) continue;
       if (witnessInRoom(host, state, person)) person.movesThisTurn += 1;
       continue;
@@ -162,7 +159,6 @@ export function npcWitnessEvent(host: NpcHost,
     const fearGain = event === 'murder' ? 42 : event === 'abduction' ? 30 : 24;
     witness.alert = clamp(Math.max(witness.alert + alertFloor, alertFloor), 0, 100);
     witness.fear = clamp(witness.fear + fearGain, 0, 100);
-    witness.awareness = Math.max(witness.awareness, event === 'murder' ? 3 : 2);
     witness.lastWitnessedEventClock = state.trailClock;
     witness.dialogue = supernatural
       ? randomOf(['那不是人……快躲起来！', '别看它！快跑！', '这到底是什么东西？！'])
@@ -260,9 +256,10 @@ export function npcOnPlayerEnter(host: NpcHost, state: GameState, barricadedEntr
     // 推门会制造动静，但不代表每个人都会立刻认出杀手。
     // 只有警觉达到「警戒」(75+) 才会夺路而逃；低于阈值先观察、怀疑或继续原本的事。
     const wasAlert = person.alert;
+    if (wasAlert < 40) person.startleTurns = 1;
     const darkRoom = !isRoomLit(state, state.playerRoom);
     // 进门前已经恐慌的人会在这次照面中确认危险；低于恐慌者不因进门噪声直接升级认知。 
-    if (wasAlert >= 40) person.awareness = Math.max(person.awareness, 2);
+
 
     let gain = 30;
     if (threat === 'spiritual') gain = 65;
@@ -366,7 +363,6 @@ export function witnessInRoom(host: NpcHost, state: GameState, person: Person): 
   }
   person.alert = clamp(Math.max(person.alert + 45, 75), 0, 100);
   host.addDisturbance(state, person.room);
-  person.awareness = Math.max(person.awareness, 2);
   person.lastWitnessedEventClock = state.trailClock;
   host.shout(state, person, 18);
   const previousRoom = person.room;

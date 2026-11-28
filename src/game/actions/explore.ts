@@ -31,7 +31,6 @@ export function breakBarricade(host: NpcHost, state: GameState, room: RoomId): b
   inside.forEach((person) => {
     person.alert = Math.max(person.alert, 55);
     person.fear = clamp(person.fear + 12, 0, 100);
-    person.awareness = Math.max(person.awareness, 2);
   });
   if (inside.length) {
     host.log(state, `木板碎裂的巨响让${inside.map((person) => person.name).join('、')}立刻警觉起来，${inside.length > 1 ? '他们' : '他'}开始死死盯住门口。`);

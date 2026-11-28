@@ -3,6 +3,7 @@
  * 运行：npm run check
  */
 import { CARD_MAP, CARDS, STARTING_DECK, deckCardsForKiller } from '../src/game/data/cards';
+import { perceptionRadius } from '../src/game/world/perception';
 import { ACTIVE_KILLERS, KILLERS, STARTER_KILLERS } from '../src/game/data/killers';
 import {
   ARCH_LABEL,
@@ -333,7 +334,6 @@ function caseEnvironmentalEvents(): void {
   s.turn = 2;
   s.people.forEach((person) => {
     person.alert = 0;
-    person.awareness = 0;
     person.intent = 'idle';
     person.movesThisTurn = 3;
   });
@@ -400,9 +400,11 @@ function caseDrawAndDiscardRules(): void {
     victim.hidden = false;
     victim.blockedTurns = 0;
     victim.movesThisTurn = 3;
+    victim.item = null;
+    victim.itemUses = 0;
     const beforeRoom = victim.room;
     endTurn(flee);
-    check('回合结束：同屋幸存者即使移动次数用尽也会尝试逃跑', victim.room !== beforeRoom || !flee.people.some((p) => p.id === victim.id), `room=${victim.room}`);
+    check('回合结束：同屋幸存者即使移动次数用尽也会尝试逃跑', victim.room !== beforeRoom || !flee.people.some((p) => p.id === victim.id), `room=${victim.room} act=${victim.activity} fear=${victim.fear} move=${victim.movesThisTurn}`);
   } else {
     check('回合结束：同屋幸存者即使移动次数用尽也会尝试逃跑', false, '随机户型没有两条可走出口');
   }
@@ -412,7 +414,7 @@ function caseDrawAndDiscardRules(): void {
 function caseMyersStalkingAndFearRadius(): void {
   const s = newGame();
   const victim = player(s);
-  check('恐惧范围：普通杀手基础值默认为 1', s.fearRadius === 1);
+  check('感知半径：普通杀手基础值默认为 1', perceptionRadius(s) === 1);
   const next = openNeighbor(s.playerRoom);
   s.energy = 9;
   const beforeCost = moveCost(s, next);
@@ -427,7 +429,7 @@ function caseMyersStalkingAndFearRadius(): void {
   runOps(stealth, [{ op: 'flag', key: 'myersStalk' }]);
   stealth.energy = 9;
   movePlayer(stealth, stealthRoom);
-  check('迈尔斯：尾随者模式进入幸存者所在房间也不会被察觉', hiddenTarget.alert === 0 && hiddenTarget.awareness === 0, `alert=${hiddenTarget.alert} awareness=${hiddenTarget.awareness}`);
+  check('迈尔斯：尾随者模式进入幸存者所在房间也不会被察觉', hiddenTarget.alert === 0 && hiddenTarget.alert < 12, `alert=${hiddenTarget.alert} alert=hiddenTarget.alert`);
 
   const stalking = createGame(STARTING_DECK, undefined, '迈克尔·迈尔斯');
   const prey = player(stalking);
@@ -440,15 +442,14 @@ function caseMyersStalkingAndFearRadius(): void {
       person.hidden = true;
       person.intent = 'idle';
       person.alert = 0;
-      person.awareness = 0;
-    }
+      }
   });
   prey.room = stalking.playerRoom;
   prey.hidden = false;
   prey.intent = 'idle';
   prey.hp = 4;
   stalking.energy = 5;
-  stalking.fearRadius = 0;
+  stalking.stealthActions = 1;
   const stalkStart = stalking.stalkMeter;
   check('迈尔斯：落单目标提供基础尾随值与额外收益',
     usePower(stalking, 'myers_gaze') && stalking.stalkMeter === stalkStart + 20 && stalking.energy === 4 &&
@@ -479,7 +480,7 @@ function caseMyersStalkingAndFearRadius(): void {
   fleeingTarget.hidden = false;
   fleeingTarget.intent = 'flee';
   fleeingTarget.movesThisTurn = 2;
-  fleeingVisible.fearRadius = 0;
+  fleeingVisible.stealthActions = 1;
   fleeingVisible.energy = 2;
   check('迈尔斯：视野内正在逃跑的 NPC 仍可被观察',
     usePower(fleeingVisible, 'myers_gaze') && fleeingVisible.stalkMeter === 20 && fleeingVisible.energy === 1);
@@ -563,7 +564,6 @@ function caseMyersStalkingAndFearRadius(): void {
   disarmTarget.room = disarmRoom;
   disarmTarget.hp = 4;
   disarmTarget.alert = 100;
-  disarmTarget.awareness = 0;
   withRandomSource(() => 0.01, () => triggerBearTrapForPerson(disarmGame, disarmTarget));
   check('设陷者：警觉 NPC 能先发现陷阱而不是直接触发',
     disarmGame.bearTraps[0].armed && disarmGame.bearTraps[0].discovered &&
@@ -714,7 +714,7 @@ function caseMyersStalkingAndFearRadius(): void {
       });
     })());
   const normal = createGame(['insidious'], undefined, '设陷者');
-  check('恐惧范围：其他杀手仍保持默认 1', normal.fearRadius === 1);
+  check('感知半径：其他杀手仍保持默认 1', perceptionRadius(normal) === 1);
 }
 
 function caseNavigationUtilities(): void {
@@ -814,7 +814,6 @@ function caseUnaware(): void {
   const next = openNeighbor(s.playerRoom);
   v.room = next;
   v.alert = 0;
-  v.awareness = 0;
   v.intent = 'idle';
   movePlayer(s, next);
   check('E 低警觉者被推门后不会立刻逃跑',
@@ -828,7 +827,6 @@ function caseUnaware(): void {
   const darkNext = openNeighbor(dark.playerRoom);
   darkVictim.room = darkNext;
   darkVictim.alert = 0;
-  darkVictim.awareness = 0;
   darkVictim.intent = 'idle';
   movePlayer(dark, darkNext);
   check('E 暗处进入显著降低幸存者警觉增长',
@@ -841,7 +839,6 @@ function caseUnaware(): void {
   const suspiciousRoom = openNeighbor(prePanic.playerRoom);
   suspiciousTarget.room = suspiciousRoom;
   suspiciousTarget.alert = 30;
-  suspiciousTarget.awareness = 1;
   suspiciousTarget.intent = 'wary';
   movePlayer(prePanic, suspiciousRoom);
   check('E 进门前低于恐慌的幸存者不会被瞬时警觉推成逃跑',
@@ -855,7 +852,6 @@ function caseUnaware(): void {
   const darkWaryRoom = openNeighbor(darkPanic.playerRoom);
   darkAlreadyWary.room = darkWaryRoom;
   darkAlreadyWary.alert = 30;
-  darkAlreadyWary.awareness = 1;
   movePlayer(darkPanic, darkWaryRoom);
   check('E 暗处进入只增加极少警觉，低于恐慌者仍不逃跑',
     darkAlreadyWary.room === darkWaryRoom && darkAlreadyWary.alert <= 37 && darkAlreadyWary.intent !== 'flee',
@@ -866,7 +862,6 @@ function caseUnaware(): void {
   const panicNext = openNeighbor(panic.playerRoom);
   alarmed.room = panicNext;
   alarmed.alert = 66;
-  alarmed.awareness = 2;
   alarmed.intent = 'wary';
   panic.people.forEach((person) => { person.item = null; person.itemUses = 0; });
   movePlayer(panic, panicNext);
@@ -1233,8 +1228,8 @@ function caseWitnessFearAndUnifiedSabotage(): void {
   const attacked = attack(attackState, victim.id);
   check('目击袭击：同屋目击者不仅增加恐惧警戒，还会立刻改变行动',
     attacked && witness.fear >= 22 && witness.alert >= 55 &&
-    witness.awareness >= 2 && witness.intent !== 'idle',
-    `fear=${witness.fear} alert=${witness.alert} awareness=${witness.awareness} intent=${witness.intent}`);
+    witness.alert >= 40 && witness.intent !== 'idle',
+    `fear=${witness.fear} alert=${witness.alert} alert=witness.alert intent=${witness.intent}`);
 
   const murder = newGame();
   const murderVictim = murder.people.find((p) => p.role !== 'police' && p.hp > 0)!;
@@ -1246,7 +1241,6 @@ function caseWitnessFearAndUnifiedSabotage(): void {
   murderWitness.hp = 4;
   murderWitness.alert = 0;
   murderWitness.fear = 0;
-  murderWitness.awareness = 0;
   murderWitness.intent = 'idle';
   murderWitness.movesThisTurn = 0;
   murder.people.filter((p) => p.id !== murderVictim.id && p.id !== murderWitness.id && p.role !== 'police')
@@ -1255,9 +1249,9 @@ function caseWitnessFearAndUnifiedSabotage(): void {
   const executed = executeDownedPerson(murder, murderVictim.id);
   check('目击击杀：一击处决会被同屋 NPC 亲眼目击并触发真实反应',
     executed && !murder.people.some((p) => p.id === murderVictim.id) &&
-    murderWitness.awareness >= 3 && murderWitness.alert >= 75 &&
+    murderWitness.alert >= 75 && murderWitness.alert >= 75 &&
     murderWitness.intent !== 'idle' && murder.log.some((line) => line.includes('【NPC目击】')),
-    `awareness=${murderWitness.awareness} alert=${murderWitness.alert} intent=${murderWitness.intent}`);
+    `alert=murderWitness.alert alert=${murderWitness.alert} intent=${murderWitness.intent}`);
 
   const carryWitnessState = newGame();
   const carriedVictim = carryWitnessState.people.find((p) => p.role !== 'police' && p.hp > 0)!;
@@ -1269,7 +1263,6 @@ function caseWitnessFearAndUnifiedSabotage(): void {
   carryWitness.room = carryWitnessState.playerRoom;
   carryWitness.hidden = false;
   carryWitness.alert = 0;
-  carryWitness.awareness = 0;
   carryWitness.intent = 'idle';
   // 固定目击者原型，避免随机的二次呼喊让门口 NPC 在玩家进入前就逃离。
   carryWitness.archetype = 'hider';
@@ -1280,25 +1273,24 @@ function caseWitnessFearAndUnifiedSabotage(): void {
   doorwayWitness.room = carryDestination;
   doorwayWitness.hidden = false;
   doorwayWitness.alert = 0;
-  doorwayWitness.awareness = 0;
   doorwayWitness.intent = 'idle';
   carryWitnessState.people.filter((p) =>
     p.id !== carriedVictim.id && p.id !== carryWitness.id && p.id !== doorwayWitness.id && p.role !== 'police')
     .forEach((p) => { p.room = 'attic'; p.hidden = true; });
   carryWitnessState.energy = 12;
   const pickedUp = carryPerson(carryWitnessState, carriedVictim.id);
-  const pickupSeen = pickedUp && carryWitness.awareness >= 2 &&
+  const pickupSeen = pickedUp && carryWitness.alert >= 40 &&
     carryWitness.alert >= 50 && carryWitness.intent !== 'idle' &&
     carryWitnessState.log.some((line) => line.includes('目睹倒地者被强行带走'));
   carryWitnessState.freeMove = true;
   const carriedIntoRoom = movePlayer(carryWitnessState, carryDestination);
   check('目击搬运：抱起倒地者时，同屋 NPC 会立即识别并行动',
     pickupSeen,
-    `awareness=${carryWitness.awareness} alert=${carryWitness.alert} intent=${carryWitness.intent}`);
+    `alert=carryWitness.alert alert=${carryWitness.alert} intent=${carryWitness.intent}`);
   check('目击搬运：抱着受害者进入新房间时，新的目击者也会作出反应',
-    carriedIntoRoom && doorwayWitness.awareness >= 2 &&
+    carriedIntoRoom && doorwayWitness.alert >= 40 &&
     doorwayWitness.alert >= 78 && doorwayWitness.intent !== 'idle',
-    `awareness=${doorwayWitness.awareness} alert=${doorwayWitness.alert} intent=${doorwayWitness.intent}`);
+    `alert=doorwayWitness.alert alert=${doorwayWitness.alert} intent=${doorwayWitness.intent}`);
 
   const door = newGame();
   const poweredDoorRooms = new Set((Object.keys(ROOM_MAP) as RoomId[]).filter((room) => isRoomLit(door, room)));
@@ -1680,8 +1672,7 @@ function caseAidAndPressure(): void {
   const medic = medkitPair[1];
   const medkitRoom = openNeighbor(medkitGame.playerRoom);
   medkitDowned.room = medkitRoom; medkitDowned.hp = 0; medkitDowned.downedTurns = 0; medkitDowned.hidden = false;
-  medic.room = medkitRoom; medic.hp = 4; medic.hidden = false; medic.alert = 0; medic.awareness = 0;
-  medic.archetype = 'hider'; medic.intent = 'heal'; medic.item = 'medkit'; medic.itemUses = 2; medic.healTurns = 0;
+  medic.room = medkitRoom; medic.hp = 4; medic.hidden = false; medic.alert = 0; medic.archetype = 'hider'; medic.intent = 'heal'; medic.item = 'medkit'; medic.itemUses = 2; medic.healTurns = 0;
   withRandomSource(() => 0.99, () => { endTurn(medkitGame); endTurn(medkitGame); });
   check('AA 医疗包会在连续两回合后救起倒地同伴', medkitDowned.hp > 0 && medkitDowned.downedTurns === 0 && medic.itemUses < 2, `hp=${medkitDowned.hp} healTurns=${medic.healTurns}`);
 
@@ -1700,7 +1691,7 @@ function caseContractsPowerAndCarry(): void {
   check('AB 未发生报警时无报警目标保持完成', missionTaskProgress(contract, alarmTask) === 1);
   contract.npcAlarmed = true;
   check('AB 幸存者成功报警后无报警目标失败', missionTaskProgress(contract, alarmTask) === 0);
-  const allowedKinds = ['kill_count', 'marked_kill', 'execute', 'special_execute', 'score_execute', 'alarm_below', 'no_alarm', 'break_circuit', 'killer_stat'];
+  const allowedKinds = ['kill_count', 'marked_kill', 'execute', 'special_execute', 'score_execute', 'score_threshold', 'alarm_below', 'no_alarm', 'break_circuit', 'killer_stat'];
   const actualKinds = (contract.mission.tasks ?? []).map((task) => task.kind);
   check('AB 契约只使用新任务类型且包含可选奖励目标',
     actualKinds.every((kind) => allowedKinds.includes(kind)) && (contract.mission.tasks ?? []).some((task) => task.optional && (task.reward ?? 0) > 0),
@@ -1850,7 +1841,6 @@ function caseNpcLocksAndPersistentTrails(): void {
     trapped.hp = 4;
     trapped.hidden = false;
     trapped.alert = 78;
-    trapped.awareness = 2;
     trapped.intent = 'wary';
     breach.roomLocks[breachRoom] = 3;
     breach.nurseBlinkTargeting = true;
@@ -1902,7 +1892,6 @@ function caseNpcLocksAndPersistentTrails(): void {
     walker.alert = 100;
     walker.hp = 4;
     walker.sneaky = true;
-    walker.awareness = 2;
     walker.archetype = 'kiter';
     walker.fear = 0;
     walker.item = null;
@@ -1928,9 +1917,9 @@ caseNpcLocksAndPersistentTrails();
 function caseNpcAwarenessAndDialogue(): void {
   const daily = newGame();
   const civilians = daily.people.filter((p) => p.role !== 'police');
-  check('AC 幸存者开局处于日常认知阶段', civilians.every((p) => p.awareness === 0 && p.alert === 0));
+  check('AC 幸存者开局处于日常认知阶段', civilians.every((p) => p.alert < 12 && p.alert === 0));
   endTurn(daily);
-  check('AC 没有异常时幸存者仍处于日常认知阶段', civilians.every((p) => p.awareness === 0));
+  check('AC 没有异常时幸存者仍处于日常认知阶段', civilians.every((p) => p.alert < 12));
   check('AC 日常 NPC 会生成生活对白', civilians.every((p) => p.dialogue.length > 0));
 
   const suspicious = newGame();
@@ -1941,15 +1930,15 @@ function caseNpcAwarenessAndDialogue(): void {
   target.room = suspiciousFarRoom;
   target.movesThisTurn = 0;
   target.intent = 'idle';
-  target.awareness = 0;
   target.alert = 20;
   // 排除随机图腾房干扰：这条只测'低强度异常→起疑'
   suspicious.totems = [];
   // 也不让随机开局道具（信号弹）抢在'起疑'之前触发
   target.item = null;
+  suspicious.siteItems = [];
   target.itemUses = 0;
   endTurn(suspicious);
-  check('AC 低强度异常只让 NPC 起疑，不直接进入求生', target.awareness === 1 && target.intent === 'wary' && target.dialogue.length > 0, `awareness=${target.awareness} intent=${target.intent} alert=${target.alert} activity=${target.activity}`);
+  check('AC 低强度异常只让 NPC 起疑，不直接进入求生', target.alert > 0 && target.intent === 'wary' && target.dialogue.length > 0, `alert=target.alert intent=${target.intent} alert=${target.alert} activity=${target.activity}`);
 
   const panic = newGame();
   const witness = player(panic);
@@ -1957,10 +1946,9 @@ function caseNpcAwarenessAndDialogue(): void {
   witness.movesThisTurn = 0;
   witness.intent = 'idle';
   witness.hidden = false;
-  witness.awareness = 0;
   witness.alert = 100;
   endTurn(panic);
-  check('AC 高危信息让 NPC 进入求生并显示逃跑对白', witness.awareness === 3 && witness.dialogue.length > 0);
+  check('AC 高危信息让 NPC 进入求生并显示逃跑对白', witness.alert >= 75 && witness.dialogue.length > 0);
 }
 caseNpcAwarenessAndDialogue();
 
@@ -2068,7 +2056,7 @@ function caseNewPerkSystem(): void {
     hexHit && hex.hexHuntressUsed && hex.cardBonusScore === 50);
 
   const noed = createGame(['hex_noed'], undefined, '迈克尔·迈尔斯');
-  noed.people.forEach((person) => { person.room = 'bedroom'; person.alert = 0; person.awareness = 0; person.item = null; person.itemUses = 0; });
+  noed.people.forEach((person) => { person.room = 'bedroom'; person.alert = 0; person.item = null; person.itemUses = 0; });
   noed.hand = [{ uid: 'test-noed', defId: 'hex_noed' }];
   noed.energy = 6;
   const noedPlayed = playCard(noed, 'test-noed');
@@ -2261,13 +2249,11 @@ check('迈尔斯尾随：目标越警觉，尾随收益越低',
   [0, 12, 40, 75].map(myersStalkGain).join('|') === '15|8|3|0');
 const dialogueGuard = newGame();
 const dialoguePerson = dialogueGuard.people.find((p) => p.role !== 'police')!;
-dialoguePerson.alert = 0;
-dialoguePerson.awareness = 3;
-dialoguePerson.intent = 'flee';
+dialoguePerson.alert = 100;
 updateNpcDialogue(dialogueGuard);
 check('NPC 对白：未发觉且没有危险认知时，不会声称正在被追',
   !/追我|他就在后面|快跑|离我远点/.test(dialoguePerson.dialogue), dialoguePerson.dialogue);
-check('NPC 对白刷新：不会清除已确认的危险记忆', dialoguePerson.awareness === 3);
+check('NPC 对白刷新：不会清除已确认的危险记忆', dialoguePerson.alert >= 75);
 const pathGuard = newGame();
 const pathStart = ROOM_MAP[pathGuard.playerRoom].neighbors[0];
 check('NPC 寻路：避让列表中的玩家房间不能成为路径终点',
@@ -2684,18 +2670,25 @@ function caseHexPhonesAndAlarm(): void {
   const scared = calm.people.find((person) => person.role !== 'police')!;
   scared.room = (Object.keys(ROOM_MAP) as RoomId[]).find((room) => room !== calm.playerRoom && !ROOM_MAP[calm.playerRoom].neighbors.includes(room))!;
   scared.fear = 90;
+  scared.statusEffects = {};
+  scared.trackedTurns = 0;
   scared.alert = 10;
   scared.hp = 4;
   endTurn(calm);
-  check('恐惧：安全时会从恐慌中回落', scared.fear < 90, `fear=${scared.fear}`);
+  check('恐惧：安全时会从恐慌中回落', scared.fear < 90, `fear=${scared.fear} act=${scared.activity} alert=${scared.alert} nearby=${scared.room === calm.playerRoom || ROOM_MAP[calm.playerRoom].neighbors.includes(scared.room)} tracked=${scared.trackedTurns} cursed=${scared.statusEffects?.cursed ?? 0}`);
 
   // 乌鸦：只有「幸存者换房间」才会惊起乌鸦（屠夫进门不算）
   const crowGame = createGame(STARTING_DECK, undefined, '设陷者');
   const bird = crowGame.people.find((person) => person.role !== 'police')!;
   crowGame.crows = Object.keys(ROOM_MAP) as RoomId[];
+  crowGame.roomLocks = {};
+  crowGame.barricades = [];
   crowGame.crowAlerts = {};
   crowGame.log = [];
   bird.sneaky = false;
+  bird.item = null;
+  bird.itemUses = 0;
+  bird.armed = false;
   bird.alert = 100;
   bird.fear = 100;
   bird.intent = 'flee';
@@ -2731,7 +2724,6 @@ function caseHexPhonesAndAlarm(): void {
   const cornered = face.people.find((person) => person.role !== 'police')!;
   cornered.room = face.playerRoom;
   cornered.alert = 0;
-  cornered.awareness = 0;
   cornered.intent = 'idle';
   cornered.hp = 4;
   endTurn(face);

@@ -24,7 +24,7 @@ export function npcTurn(host: NpcHost, state: GameState): void {
     if (state.result) return;
     if (!state.people.some((p) => p.id === person.id)) continue;
     const totemIndex = state.totems.indexOf(person.room);
-    if (totemIndex >= 0 && person.hp > 0 && (person.awareness >= 1 || person.alert >= 25) && (person.id.charCodeAt(0) + state.turn) % 2 === 0) {
+    if (totemIndex >= 0 && person.hp > 0 && person.alert >= 25 && (person.id.charCodeAt(0) + state.turn) % 2 === 0) {
       state.totems.splice(totemIndex, 1);
       host.log(state, `${person.name} 在${roomName(person.room)}发现并破坏了图腾。`);
       host.log(state, `【图腾被拆】${roomName(person.room)}的图腾已被幸存者拆毁，地图上不再显示。剩余 ${state.totems.length} 座。`);
@@ -32,7 +32,7 @@ export function npcTurn(host: NpcHost, state: GameState): void {
 
     // 已被发现的捕兽夹可以被幸存者拆除，避免陷阱成为永久封路工具。
     const spottedTrap = state.bearTraps.find((trap) => trap.armed && trap.discovered && trap.room === person.room);
-    if (spottedTrap && person.hp > 0 && person.awareness >= 1) {
+    if (spottedTrap && person.hp > 0 && person.alert >= 12) {
       spottedTrap.armed = false;
       host.log(state, `${person.name} 发现并拆除了${roomName(person.room)}的捕兽夹。`);
     }
@@ -68,7 +68,6 @@ export function npcTurn(host: NpcHost, state: GameState): void {
     // 乌鸦：停在这间屋的人一动就会惊起它们
     if ((person.statusEffects.deepWound ?? 0) > 0) person.bleed = Math.max(person.bleed, 1);
     // 即时警觉值可以下降，但已经确认的危险不会被忘记。
-    person.awareness = Math.max(person.awareness, person.alert >= 75 ? 3 : person.alert >= 40 ? 2 : person.alert >= 12 ? 1 : 0);
 
     // 被抱起的人不会参与救援或移动，但仍然会继续流血倒计时。
     if (person.id === state.carryPersonId) {
@@ -98,7 +97,7 @@ export function npcTurn(host: NpcHost, state: GameState): void {
     }
 
     // 日常生活阶段不会因为房间亮着灯就逐渐怀疑异常。
-    if (isRoomLit(state, person.room) && person.awareness > 0) {
+    if (isRoomLit(state, person.room) && person.alert >= 12) {
       person.alert = clamp(person.alert + 4, 0, 100);
     }
 
@@ -145,9 +144,8 @@ export function npcTurn(host: NpcHost, state: GameState): void {
     const nearbyVictim = npcs(state).some(
       (other) => other.id !== person.id && (other.hp <= 0 || (other.hp > 0 && other.hp <= SURVIVOR_INJURED_HP)) && roomDistance(other.room, person.room) <= 1,
     );
-    if (nearbyVictim && person.awareness < 2) {
+    if (nearbyVictim && person.alert < 40) {
       person.alert = Math.max(person.alert, 45);
-      person.awareness = 2;
     }
 
     // 保命优先：救援、手里的道具、赶去救倒地的人，先于一切日常决策。

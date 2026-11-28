@@ -55,7 +55,7 @@ person.fear = 0;
 
 /* ---------------- 感知半径 ---------------- */
 
-game.fearRadius = 2;
+game.modifiers.fearRadius = 1;
 check('默认感知半径等于杀手基础值', effectiveFearRadius(game) === 2, `r=${effectiveFearRadius(game)}`);
 game.stealthActions = 1;
 check('静止隐身：感知半径压到 0', effectiveFearRadius(game) === 0);

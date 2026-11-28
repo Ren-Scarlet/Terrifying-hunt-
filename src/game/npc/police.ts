@@ -87,7 +87,6 @@ export function policePhase(host: NpcHost, state: GameState): void {
     );
     searched.forEach((person) => {
       person.alert = clamp(person.alert + 10, 0, 100);
-      person.awareness = Math.max(person.awareness, 1);
       if (person.alert >= 40 && person.intent === 'idle') person.intent = 'wary';
       person.activity = '听见警员在附近搜查';
     });
@@ -104,7 +103,6 @@ export function policePhase(host: NpcHost, state: GameState): void {
     person.hp > 0 && !person.hidden && roomDistance(person.room, state.playerRoom) <= 1,
   ).forEach((person) => {
     person.alert = clamp(person.alert + 14, 0, 100);
-    person.awareness = Math.max(person.awareness, 2);
   });
 
   host.log(state, state.emergencyActive && state.policeLock >= 3

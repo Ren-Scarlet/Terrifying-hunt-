@@ -34,6 +34,8 @@ export interface DecisionContext {
   sameRoomKiller: boolean;
   /** 这一瞬间刚被攻击 */
   justAttacked: boolean;
+  /** 刚被惊动、还没反应过来 */
+  startled: boolean;
   /** 正在被追 */
   chased: boolean;
   phoneHere: boolean;
@@ -90,6 +92,7 @@ function can(ctx: DecisionContext, band: AlertBand, fear: FearBand, kind: Action
  */
 export function decide(ctx: DecisionContext, roll: () => number = () => 0.5): Decision {
   if (ctx.control !== 'normal') return { kind: 'idle', reason: 'control' };
+  if (ctx.startled && !ctx.justAttacked) return { kind: 'observe', reason: 'startled' };
 
   const band = alertBand(ctx.alert);
   const fear = fearBand(ctx.fear);

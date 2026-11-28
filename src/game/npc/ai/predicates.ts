@@ -5,6 +5,7 @@
  * 引擎和新的 AI 共用同一份判定，避免「界面说的」和「AI 做的」两套标准。
  */
 import { roomDistance } from '../../navigation';
+import { perceptionRadius } from '../../world/perception';
 import { OBSTACLE_ROOMS } from '../../rooms';
 import type { GameState, Person, RoomId } from '../../types';
 
@@ -49,10 +50,9 @@ export function playerIsHidden(state: GameState): boolean {
   return alarmSuppressed(state) || state.stealthActions > 0;
 }
 
-/** 尾随者模式会把迈尔斯的实际恐惧范围压到 0。 */
+/** 玩家当前的被察觉半径（0 潜行 / 1 同屋 / 2 隔一格） */
 export function effectiveFearRadius(state: GameState): number {
-  if (state.stealthActions > 0) return 0;
-  return state.killer === '迈克尔·迈尔斯' && state.myersStalking ? 0 : state.fearRadius;
+  return perceptionRadius(state);
 }
 
 /** 本回合是否处于「伏击」状态：推门进去也不会惊动任何人 */
