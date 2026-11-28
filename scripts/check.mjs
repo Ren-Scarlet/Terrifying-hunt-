@@ -64,6 +64,7 @@ if (tscOk) {
     { entry: 'tests/world.ts', out: `${OUT}/world.mjs` },
     { entry: 'tests/npc.ts', out: `${OUT}/npc.mjs` },
     { entry: 'tests/aiModel.ts', out: `${OUT}/aimodel.mjs` },
+    { entry: 'tests/aiBehavior.ts', out: `${OUT}/aibehavior.mjs` },
     { entry: 'tests/logic.ts', out: `${OUT}/logic.mjs` },
     { entry: 'tests/sim.ts', out: `${OUT}/sim.mjs` },
   ];
@@ -91,6 +92,7 @@ if (tscOk) {
     step('世界查询', () => replay(run(process.execPath, [`${OUT}/world.mjs`]), 3));
     step('AI 判定', () => replay(run(process.execPath, [`${OUT}/npc.mjs`]), 3));
     step('新模型', () => replay(run(process.execPath, [`${OUT}/aimodel.mjs`]), 3));
+    step('新决策', () => replay(run(process.execPath, [`${OUT}/aibehavior.mjs`]), 3));
     step('规则回归', () => replay(run(process.execPath, [`${OUT}/logic.mjs`]), 3));
     step('整局冒烟', () => replay(run(process.execPath, [`${OUT}/sim.mjs`]), 3));
   } else {
