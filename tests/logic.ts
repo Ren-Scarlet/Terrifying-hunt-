@@ -223,8 +223,6 @@ function caseIndependentBreakerNetwork(): void {
   const s = newGame();
   const circuit = s.powerCircuits[0];
   const room = circuit.affectedRooms[0];
-  check('电力系统：现场只生成道具箱，不再生成发电机',
-    s.siteItems.length === 2 && s.siteItems.every((item) => item.kind === 'itemBox'));
   check('电闸：每组电路独立供电，不依赖发电机', isRoomLit(s, room) && !('generatorId' in circuit));
   s.playerRoom = circuit.breakerRoom;
   const before = s.energy;
@@ -358,7 +356,7 @@ function caseDrawAndDiscardRules(): void {
   const s = newGame();
   check('抽牌规则：开局仍有 5 张手牌', s.hand.length === 5, `hand=${s.hand.length}`);
   const initialDeck = s.drawPile.length;
-  s.people.forEach((p) => { p.alert = 0; p.item = null; p.itemUses = 0; });
+  s.people.forEach((p) => { p.alert = 0; });
   endTurn(s);
   check('抽牌规则：新回合只补 1 张且保留原手牌', s.hand.length === 6 && s.drawPile.length === initialDeck - 1, `hand=${s.hand.length} deck=${s.drawPile.length}`);
 
@@ -400,8 +398,6 @@ function caseDrawAndDiscardRules(): void {
     victim.hidden = false;
     victim.blockedTurns = 0;
     victim.movesThisTurn = 3;
-    victim.item = null;
-    victim.itemUses = 0;
     const beforeRoom = victim.room;
     endTurn(flee);
     check('回合结束：同屋幸存者即使移动次数用尽也会尝试逃跑', victim.room !== beforeRoom || !flee.people.some((p) => p.id === victim.id), `room=${victim.room} act=${victim.activity} fear=${victim.fear} move=${victim.movesThisTurn}`);
@@ -607,12 +603,13 @@ function caseMyersStalkingAndFearRadius(): void {
     `fear=${panicTarget.fear} room=${panicTarget.room}`);
 
   const brutalCard = createGame(STARTING_DECK, undefined, '设陷者');
-  brutalCard.siteItems = [{ id: 'test-trapper-item', kind: 'itemBox', room: brutalCard.playerRoom, broken: false, charges: 1 }];
+  const brutalCircuit = brutalCard.powerCircuits.find((circuit) => !circuit.broken)!;
+  brutalCard.playerRoom = brutalCircuit.breakerRoom;
   brutalCard.hand = [{ uid: 'test-trapper-brutal', defId: 'trapper_brutal_strength' }];
   brutalCard.energy = 0;
   const brutalPlayed = playCard(brutalCard, 'test-trapper-brutal');
   check('所向无敌：0 费免费破坏当前房间的一处设施',
-    brutalPlayed && brutalCard.siteItems[0].broken && brutalCard.energy === 0);
+    brutalPlayed && brutalCircuit.broken && brutalCard.energy === 0);
 
   const euphoriaCard = createGame(STARTING_DECK, undefined, '设陷者');
   const carriedTarget = player(euphoriaCard);
@@ -809,7 +806,7 @@ function caseDefaultWindow(): void {
 /** E：低警觉者先观察；暗处进一步压低察觉速度；高警觉者仍会逃跑。 */
 function caseUnaware(): void {
   const s = newGame();
-  s.people.forEach((person) => { person.item = null; person.itemUses = 0; person.armed = false; });
+  s.people.forEach((person) => { person.armed = false; });
   const v = s.people.find((person) => person.role !== 'police' && SURVIVOR_MAP[person.id]?.threat !== 'spiritual')!;
   const next = openNeighbor(s.playerRoom);
   v.room = next;
@@ -821,7 +818,7 @@ function caseUnaware(): void {
     `房间=${v.room}，警觉=${v.alert}，意图=${v.intent}`);
 
   const dark = newGame();
-  dark.people.forEach((person) => { person.item = null; person.itemUses = 0; person.armed = false; });
+  dark.people.forEach((person) => { person.armed = false; });
   dark.powerCircuits.forEach((circuit) => { circuit.broken = true; });
   const darkVictim = dark.people.find((person) => person.role !== 'police' && SURVIVOR_MAP[person.id]?.threat !== 'spiritual')!;
   const darkNext = openNeighbor(dark.playerRoom);
@@ -834,7 +831,7 @@ function caseUnaware(): void {
     `警觉=${darkVictim.alert}，意图=${darkVictim.intent}，状态=${darkVictim.activity}`);
 
   const prePanic = newGame();
-  prePanic.people.forEach((person) => { person.item = null; person.itemUses = 0; person.armed = false; });
+  prePanic.people.forEach((person) => { person.armed = false; });
   const suspiciousTarget = player(prePanic);
   const suspiciousRoom = openNeighbor(prePanic.playerRoom);
   suspiciousTarget.room = suspiciousRoom;
@@ -846,7 +843,7 @@ function caseUnaware(): void {
     `警觉=${suspiciousTarget.alert}，意图=${suspiciousTarget.intent}`);
 
   const darkPanic = newGame();
-  darkPanic.people.forEach((person) => { person.item = null; person.itemUses = 0; person.armed = false; });
+  darkPanic.people.forEach((person) => { person.armed = false; });
   darkPanic.powerCircuits.forEach((circuit) => { circuit.broken = true; });
   const darkAlreadyWary = darkPanic.people.find((person) => person.role !== 'police' && SURVIVOR_MAP[person.id]?.threat !== 'spiritual')!;
   const darkWaryRoom = openNeighbor(darkPanic.playerRoom);
@@ -863,7 +860,6 @@ function caseUnaware(): void {
   alarmed.room = panicNext;
   alarmed.alert = 66;
   alarmed.intent = 'wary';
-  panic.people.forEach((person) => { person.item = null; person.itemUses = 0; });
   movePlayer(panic, panicNext);
   check('E 高警觉者进入房间后仍会立即逃跑',
     alarmed.room !== panicNext && alarmed.alert >= 75,
@@ -1266,10 +1262,6 @@ function caseWitnessFearAndUnifiedSabotage(): void {
   carryWitness.intent = 'idle';
   // 固定目击者原型，避免随机的二次呼喊让门口 NPC 在玩家进入前就逃离。
   carryWitness.archetype = 'hider';
-  carryWitness.item = null;
-  carryWitness.itemUses = 0;
-  doorwayWitness.item = null;
-  doorwayWitness.itemUses = 0;
   doorwayWitness.room = carryDestination;
   doorwayWitness.hidden = false;
   doorwayWitness.alert = 0;
@@ -1297,8 +1289,7 @@ function caseWitnessFearAndUnifiedSabotage(): void {
   const doorRoom = (Object.keys(ROOM_MAP) as RoomId[]).find((room) =>
     ROOM_MAP[room].neighbors.some((next) => poweredDoorRooms.has(next)) &&
     !PHONE_ROOMS.includes(room) && !RADIO_ROOMS.includes(room) &&
-    !door.powerCircuits.some((c) => c.breakerRoom === room) &&
-    !door.siteItems.some((item) => item.room === room && !item.broken),
+    !door.powerCircuits.some((c) => c.breakerRoom === room),
   )!;
   door.playerRoom = doorRoom;
   const neighbor = ROOM_MAP[door.playerRoom].neighbors.find((room) => poweredDoorRooms.has(room))!;
@@ -1316,7 +1307,6 @@ function caseWitnessFearAndUnifiedSabotage(): void {
   phone.playerRoom = phone.phones[0];
   phone.phoneCut = false;
   phone.powerCircuits = phone.powerCircuits.filter((circuit) => circuit.breakerRoom !== phone.playerRoom);
-  phone.siteItems = phone.siteItems.filter((item) => item.room !== phone.playerRoom);
   phone.energy = 4;
   const phoneBroken = sabotageSiteItem(phone);
   check('统一破坏：电话房里可以砸坏这一部电话（只影响这间房）',
@@ -1439,65 +1429,7 @@ caseFrenzy();
 caseFrenzyMobility();
 caseSneaky();
 
-/** X：道具箱固定摆放；杀手能砸，砸完幸存者就少了这条补给路 */
-function caseSiteItems(): void {
-  const s = newGame();
-  const boxes = s.siteItems.filter((item) => item.kind === 'itemBox');
-  const rooms = s.siteItems.map((item) => item.room);
-  check(
-    'X 只生成 2 个道具箱且位置不重叠，不再生成发电机',
-    boxes.length === 2 && s.siteItems.every((item) => item.kind === 'itemBox') && new Set(rooms).size === rooms.length,
-    `箱 ${boxes.length}`,
-  );
-
-  const box = boxes[0];
-  s.playerRoom = box.room;
-  s.energy = BASE_AP;
-  const ok = sabotageSiteItem(s);
-  check(
-    'X 砸道具箱后补给清零（幸存者再拿不到）',
-    ok && box.broken && box.charges === 0,
-    `broken=${box.broken} charges=${box.charges}`,
-  );
-  check('X 破坏消耗 1 点行动点', s.energy === BASE_AP - SABOTAGE_COST, `energy=${s.energy}`);
-}
-
-/** Y：幸存者真的会从道具箱拿道具，并按局势用掉 */
-function caseSurvivorItems(): void {
-  let got = false;
-  for (let attempt = 0; attempt < 12 && !got; attempt++) {
-    const s = newGame();
-    const box = s.siteItems.find((i) => i.kind === 'itemBox')!;
-    const p = s.people.find((x) => x.role !== 'police')!;
-    p.room = box.room;
-    p.goal = 'supply';
-    p.alert = 0;
-    p.item = null;
-    s.playerRoom = 'hall';
-    endTurn(s);
-    got = s.people.some((x) => x.item !== null);
-  }
-  check('Y 幸存者会从道具箱取得道具', got);
-
-  const s2 = newGame();
-  s2.siteItems.filter((i) => i.kind === 'itemBox').forEach((b) => {
-    s2.playerRoom = b.room;
-    s2.energy = BASE_AP;
-    sabotageSiteItem(s2);
-  });
-  const p2 = s2.people.find((x) => x.role !== 'police')!;
-  p2.room = s2.siteItems[0].room;
-  p2.goal = 'supply';
-  p2.alert = 0;
-  // 开局随机带道具是新的设计：这里先清空，只验证「箱子全坏就领不到新道具」
-  s2.people.forEach((x) => { x.item = null; x.itemUses = 0; });
-  s2.playerRoom = 'hall';
-  endTurn(s2);
-  check('Y 道具箱全被破坏后，幸存者拿不到道具', !s2.people.some((x) => x.item !== null));
-
-}
-
-/** 本轮：擦刀 / 同屋目击者 / 袭警 / 道具次数 / 拉扯型 */
+/** 本轮：擦刀 / 同屋目击者 / 袭警 / 拉扯型 */
 function caseNewMechanics() {
   check('Z 行动点上限为 4', BASE_AP === 4, `BASE_AP=${BASE_AP}`);
   const sacrifice = newGame();
@@ -1520,7 +1452,7 @@ function caseNewMechanics() {
 
   // 攻击与处决是两个独立动作，倒地者不会再被攻击按钮误选。
   const e = newGame();
-  e.people.forEach((p) => { p.item = null; p.itemUses = 0; p.alert = 0; });
+  e.people.forEach((p) => { p.alert = 0; });
   const freshDown = e.people.find((p) => p.role !== 'police')!;
   freshDown.room = e.playerRoom;
   freshDown.hp = 0;
@@ -1533,7 +1465,7 @@ function caseNewMechanics() {
 
   // 擦刀：砍完刀锋收不回来，花 1 点原地擦刀就能再砍
   const b = newGame();
-  b.people.forEach((p) => { p.item = null; p.itemUses = 0; p.alert = 0; });
+  b.people.forEach((p) => { p.alert = 0; });
   const victim = b.people.find((p) => p.role !== 'police')!;
   victim.room = b.playerRoom;
   victim.hp = 4;
@@ -1545,7 +1477,7 @@ function caseNewMechanics() {
 
   // 同屋目击者：另一个人不会站着发呆
   const g = newGame();
-  g.people.forEach((p) => { p.item = null; p.itemUses = 0; p.alert = 0; });
+  g.people.forEach((p) => { p.alert = 0; });
   const pair = g.people.filter((p) => p.role !== 'police').slice(0, 2);
   pair[0].room = g.playerRoom;
   pair[1].room = g.playerRoom;
@@ -1556,7 +1488,7 @@ function caseNewMechanics() {
 
   // 倒地者不再触发守尸惩罚，玩家可以选择继续追击或处决。
   const c = newGame();
-  c.people.forEach((p) => { p.item = null; p.itemUses = 0; p.alert = 0; });
+  c.people.forEach((p) => { p.alert = 0; });
   const downed = c.people.find((p) => p.role !== 'police')!;
   downed.room = c.playerRoom;
   downed.hp = 0;
@@ -1566,24 +1498,15 @@ function caseNewMechanics() {
 
   // 袭警：现在可以砍警员，但通缉立刻暴涨
   const f = newGame();
-  f.people.forEach((p) => { p.item = null; p.itemUses = 0; p.alert = 0; });
+  f.people.forEach((p) => { p.alert = 0; });
   const cop = f.people.find((p) => p.role === 'police')!;
   cop.room = f.playerRoom;
   f.attackReady = true;
   const wanted = f.wanted;
   attack(f, cop.id);
   check('Z 可以袭警且通缉暴涨', f.policeAssaulted && f.wanted >= wanted + 6, `${wanted} → ${f.wanted}`);
-
-  // 道具有使用次数
-  const d = newGame();
-  const carrier = d.people.find((p) => p.role !== 'police')!;
-  carrier.item = 'flashlight';
-  carrier.itemUses = 2;
-  check('Z 道具有使用次数', carrier.item === 'flashlight' && carrier.itemUses === 2);
 }
 
-caseSiteItems();
-caseSurvivorItems();
 caseNewMechanics();
 
 function caseMergeAndMissions(): void {
@@ -1594,7 +1517,7 @@ function caseMergeAndMissions(): void {
 
   // 通缉与警戒合并：袭警推高的是同一条暴露度，wanted 只是它的 0~10 镜像
   const s = newGame();
-  s.people.forEach((p) => { p.item = null; p.itemUses = 0; p.alert = 0; });
+  s.people.forEach((p) => { p.alert = 0; });
   const cop = s.people.find((p) => p.role === 'police')!;
   cop.room = s.playerRoom;
   s.attackReady = true;
@@ -1632,7 +1555,7 @@ caseDrawAndDiscardRules();
 function caseAidAndPressure(): void {
   // 引擎已改用种子随机源（random.ts），改 Math.random 不再生效，必须用 withRandomSource。
   const a = newGame();
-  a.people.forEach((p) => { p.item = null; p.itemUses = 0; p.alert = 0; p.hidden = false; p.hp = 4; });
+  a.people.forEach((p) => { p.alert = 0; p.hidden = false; p.hp = 4; });
   const pair = a.people.filter((p) => p.role !== 'police').slice(0, 2);
   const away = ROOM_MAP[a.playerRoom].neighbors.find((r) => !OBSTACLE_ROOMS.includes(r))
     ?? ROOM_MAP[a.playerRoom].neighbors[0];
@@ -1647,7 +1570,7 @@ function caseAidAndPressure(): void {
   // 主动赶路：倒地的人在另一间屋，附近的人会放下手里的活往那边走
   const b = newGame();
   b.roomLocks = {};
-  b.people.forEach((p) => { p.item = null; p.itemUses = 0; p.alert = 0; p.hidden = false; p.hp = 4; });
+  b.people.forEach((p) => { p.alert = 0; p.hidden = false; p.hp = 4; });
   const folk = b.people.filter((p) => p.role !== 'police').slice(0, 2);
   const near = ROOM_MAP[b.playerRoom].neighbors.find((r) => !OBSTACLE_ROOMS.includes(r))
     ?? ROOM_MAP[b.playerRoom].neighbors[0];
@@ -1664,18 +1587,6 @@ function caseAidAndPressure(): void {
     folk[1].room === near || folk[1].intent === 'rescue' || folk[1].activity.includes('赶去'),
     `room=${folk[1].room} intent=${folk[1].intent} activity=${folk[1].activity}`,
   );
-
-  const medkitGame = newGame();
-  medkitGame.roomLocks = {};
-  const medkitPair = medkitGame.people.filter((p) => p.role !== 'police').slice(0, 2);
-  const medkitDowned = medkitPair[0];
-  const medic = medkitPair[1];
-  const medkitRoom = openNeighbor(medkitGame.playerRoom);
-  medkitDowned.room = medkitRoom; medkitDowned.hp = 0; medkitDowned.downedTurns = 0; medkitDowned.hidden = false;
-  medic.room = medkitRoom; medic.hp = 4; medic.hidden = false; medic.alert = 0; medic.archetype = 'hider'; medic.intent = 'heal'; medic.item = 'medkit'; medic.itemUses = 2; medic.healTurns = 0;
-  withRandomSource(() => 0.99, () => { endTurn(medkitGame); endTurn(medkitGame); });
-  check('AA 医疗包会在连续两回合后救起倒地同伴', medkitDowned.hp > 0 && medkitDowned.downedTurns === 0 && medic.itemUses < 2, `hp=${medkitDowned.hp} healTurns=${medic.healTurns}`);
-
 }
 
 caseAidAndPressure();
@@ -1894,8 +1805,6 @@ function caseNpcLocksAndPersistentTrails(): void {
     walker.sneaky = true;
     walker.archetype = 'kiter';
     walker.fear = 0;
-    walker.item = null;
-    walker.itemUses = 0;
     walker.movesThisTurn = 0;
     tracks.trails = [];
     tracks.energy = 9;
@@ -1933,10 +1842,6 @@ function caseNpcAwarenessAndDialogue(): void {
   target.alert = 20;
   // 排除随机图腾房干扰：这条只测'低强度异常→起疑'
   suspicious.totems = [];
-  // 也不让随机开局道具（信号弹）抢在'起疑'之前触发
-  target.item = null;
-  suspicious.siteItems = [];
-  target.itemUses = 0;
   endTurn(suspicious);
   check('AC 低强度异常只让 NPC 起疑，不直接进入求生', target.alert > 0 && target.intent === 'wary' && target.dialogue.length > 0, `alert=target.alert intent=${target.intent} alert=${target.alert} activity=${target.activity}`);
 
@@ -2056,7 +1961,7 @@ function caseNewPerkSystem(): void {
     hexHit && hex.hexHuntressUsed && hex.cardBonusScore === 50);
 
   const noed = createGame(['hex_noed'], undefined, '迈克尔·迈尔斯');
-  noed.people.forEach((person) => { person.room = 'bedroom'; person.alert = 0; person.item = null; person.itemUses = 0; });
+  noed.people.forEach((person) => { person.room = 'bedroom'; person.alert = 0; });
   noed.hand = [{ uid: 'test-noed', defId: 'hex_noed' }];
   noed.energy = 6;
   const noedPlayed = playCard(noed, 'test-noed');
@@ -2686,8 +2591,6 @@ function caseHexPhonesAndAlarm(): void {
   crowGame.crowAlerts = {};
   crowGame.log = [];
   bird.sneaky = false;
-  bird.item = null;
-  bird.itemUses = 0;
   bird.armed = false;
   bird.alert = 100;
   bird.fear = 100;

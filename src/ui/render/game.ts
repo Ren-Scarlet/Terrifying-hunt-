@@ -41,8 +41,6 @@ import {
   wipeBlockReason,
   WIPE_COST,
   SABOTAGE_COST,
-  SITE_ITEM_LABEL,
-  SURVIVOR_ITEM_LABEL,
   sabotageBlockReason,
   phoneWorks,
   breakerBlockReason,
@@ -75,7 +73,7 @@ import { isCardTuned } from '../../game/tuning';
 import { ACCESSORY_MAP, ACCESSORY_SLOTS } from '../../game/accessories';
 import { blinkRangeOf, blinkWithinRange, hatchetMax, modifierSummary } from '../../game/modifiers';
 import { isMuted, playHeartbeat, playSfx, playTrapScream } from '../audio';
-import { addonIconHtml, escape, icon, itemBadge, itemIconHtml, personChip, shadowFigures, perkIconHtml, TYPE_NAMES, killerFaceHtml, defaultDetailHtml, cardTextHtml } from './shared';
+import { addonIconHtml, escape, icon, personChip, shadowFigures, perkIconHtml, TYPE_NAMES, killerFaceHtml, defaultDetailHtml, cardTextHtml } from './shared';
 import type { GameState, Person, RoomId, ScoreLine, SaveData } from '../../game/types';
 
 /**
@@ -99,18 +97,6 @@ const discoveredSurvivorIds = new Set<string>();
 function roomFeatures(state: GameState, roomId: RoomId): string {
   const parts: string[] = [];
   const cleared = state.clearedObstacles.includes(roomId);
-  state.siteItems
-    .filter((i) => i.room === roomId)
-    .forEach((i) => {
-      const label = SITE_ITEM_LABEL[i.kind];
-      const status = i.broken ? '已被砸烂' : `还能翻 ${i.charges} 件`;
-      const down = i.broken;
-      const canBreakHere = state.playerRoom === roomId && !down && i.charges > 0 && !state.powerCircuits.some((c) => c.breakerRoom === roomId) && !sabotageBlockReason(state);
-      const feature = `<span class="room-feature site itemBox ${down ? 'broken' : ''}" title="${label}：${status}。你用不了它，但可以花 ${SABOTAGE_COST} 点行动点砸掉">${icon('itemBox', 'ui-icon tiny')}<b>道具箱</b></span>`;
-      parts.push(canBreakHere
-        ? `<button type="button" class="room-feature site itemBox" data-action="sabotage" title="${label}：${status}。点击花费 ${SABOTAGE_COST} 点行动点破坏">${icon('itemBox', 'ui-icon tiny')}<b>破坏道具箱</b></button>`
-        : feature);
-    });
   // 房间照明由 Canvas 光照系统直接表现，不再用文字或 emoji 标记灯光状态。
   const circuitAt = state.powerCircuits.find((c) => c.breakerRoom === roomId);
   if (circuitAt) {
@@ -289,7 +275,6 @@ function huntOpportunityHtml(state: GameState): string {
 }
 
 function facilityOverviewHtml(state: GameState): string {
-  const boxes = state.siteItems.filter((item) => item.kind === 'itemBox');
   const darkCircuits = state.powerCircuits.filter((circuit) => circuit.broken || circuit.enabled === false).length;
   const radioBroken = state.sabotage.includes('radio');
   const killerSupplies = state.killer === '设陷者'
@@ -300,7 +285,6 @@ function facilityOverviewHtml(state: GameState): string {
   return `<section class="facility-overview" aria-label="现场设施状态">
     <div class="facility-overview-heading"><b>现场设施</b><small>地图标记与当前状态</small></div>
     <div class="facility-overview-items">
-      <span class="facility-pill"><i>▣</i><b>道具箱</b><strong>${boxes.filter((item) => !item.broken && item.charges > 0).length}/${boxes.length}</strong></span>
       <span class="facility-pill">${icon('generator', 'ui-icon tiny')}<b>电闸</b><strong>${darkCircuits} 组断电</strong></span>
       
       <span class="facility-pill ${state.phoneCut || (state.brokenPhones ?? []).length >= (state.phones ?? []).length ? 'offline' : ''}"><b>电话线</b><strong>${state.phoneCut ? '中断' : '正常'}</strong></span>
@@ -699,7 +683,6 @@ function personSlotStyle(roomId: RoomId, personId: string, index: number): strin
           ${p.bloodSacrifice ? '<small class="blood-sacrifice-tag"><i aria-hidden="true"></i>血祭品</small>' : ''}
           <small>${where} · ${HEALTH_LABEL[health]} · ${escape(intentLabel)}</small>
           ${health === 'downed' ? `<small class="roster-bleed">倒地 · 可立即处决 · ${Math.max(0, BLEEDOUT_TURNS - p.downedTurns)} 回合后流血死亡 · 同伴仍可能救起</small>` : ''}
-          ${p.item ? `<small class="roster-item">携带 ${itemIconHtml(p.item)}${escape(SURVIVOR_ITEM_LABEL[p.item])} ×${p.itemUses}</small>` : ''}
           ${p.watchValue > 0 || p.watched ? `<small class="roster-watch">夜幕 ${p.watched ? '已锁定 · 下一刀击倒' : `监视 ${p.watchValue}/100`}</small>` : ''}</span>
       </button>`;
     })
@@ -804,7 +787,7 @@ function personSlotStyle(roomId: RoomId, personId: string, index: number): strin
   const possessed = state.possessed;
   const sabotageReason = sabotageBlockReason(state);
   const lockedDoor = ROOM_MAP[state.playerRoom].neighbors.find((room) => isLocked(state, room));
-  const sabotageHere = state.powerCircuits.some((c) => c.breakerRoom === state.playerRoom && !c.broken) || state.siteItems.some((item) => item.room === state.playerRoom && !item.broken) ? '破坏现场设施' : phoneWorks(state, state.playerRoom) ? '砸坏电话' : RADIO_ROOMS.includes(state.playerRoom) && !state.sabotage.includes('radio') ? '破坏备用无线电' : lockedDoor ? `撞开通往${roomName(lockedDoor)}的门锁` : '破坏现场设施';
+  const sabotageHere = state.powerCircuits.some((c) => c.breakerRoom === state.playerRoom && !c.broken) ? '破坏现场设施' : phoneWorks(state, state.playerRoom) ? '砸坏电话' : RADIO_ROOMS.includes(state.playerRoom) && !state.sabotage.includes('radio') ? '破坏备用无线电' : lockedDoor ? `撞开通往${roomName(lockedDoor)}的门锁` : '破坏现场设施';
   const sabotageTitle = sabotageReason ?? `${sabotageHere}。消耗 ${SABOTAGE_COST} 点行动点；强行破门会惊动屋内的人。`;
   const sabotageMeta = sabotageReason ? escape(sabotageReason) : `${SABOTAGE_COST} 点 · ${sabotageHere}`;
   // 破坏类操作已经做成房间点位上的互动标记，底部不再保留「破坏」按钮。
@@ -1030,7 +1013,7 @@ function personSlotStyle(roomId: RoomId, personId: string, index: number): strin
       <aside class="hunt-sidebar hunt-sidebar-left">
         <details class="intel-drawer">
         <div class="intel-drag-handle">
-          <div><b>现场情报</b><small>${known.length} 人已确认 · ${state.siteItems.length} 处设施 · ${state.log.length} 条记录</small></div>
+          <div><b>现场情报</b><small>${known.length} 人已确认 · ${state.log.length} 条记录</small></div>
           <button type="button" class="intel-close" data-action="toggle-intel-drawer" aria-label="关闭现场情报">×</button>
         </div>
         <div class="intel-grid">

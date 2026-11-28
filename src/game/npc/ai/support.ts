@@ -18,10 +18,7 @@ import { canCoordinateRescue, canPlaceBarricade } from './predicates';
 import { AID_RUN_RATE, RESCUE_EAGERNESS } from './tuning';
 /** 反抗型 / 英勇型的正面反击：玩家下回合少走一步 */
 export function counterAttack(host: NpcHost, state: GameState, person: Person): void {
-  // 手里有防身武器的人反手更狠：多拖一点行动点
-  const heavy = person.item === 'weapon' && person.itemUses > 0;
-  state.stunTurns += heavy ? 2 : 1;
-  if (heavy) consumeItem(host, state, person);
+  state.stunTurns += 1;
   // 被反手推开：追势断了，杀戮清零
   state.frenzy = 0;
   state.frenzyStreak = 0;
@@ -29,18 +26,7 @@ export function counterAttack(host: NpcHost, state: GameState, person: Person): 
   person.intent = 'wary';
   person.activity = '握着刀挡在门口';
   host.addAlarm(state, 4);
-  host.log(state, `${person.name} 抄起武器朝你扑过来——你被逼退了一步（下回合少 ${heavy ? 2 : 1} 点行动点）。`);
-}
-
-/** 消耗一次道具；次数用完就清空，医疗包的治疗进度也一起归零 */
-export function consumeItem(host: NpcHost, state: GameState, person: Person): void {
-  if (!person.item) return;
-  person.itemUses = Math.max(0, person.itemUses - 1);
-  if (person.itemUses <= 0) {
-    person.item = null;
-    person.healTurns = 0;
-    person.healLastTurn = undefined;
-  }
+  host.log(state, `${person.name} 抄起武器朝你扑过来——你被逼退了一步（下回合少 1 点行动点）。`);
 }
 
 export function barricadeRoom(host: NpcHost, state: GameState, person: Person): boolean {

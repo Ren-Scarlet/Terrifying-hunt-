@@ -44,11 +44,10 @@ export type SabotageTarget =
   | { kind: 'radio' }
   | { kind: 'facility' };
 
-/** 统一破坏入口：相邻门锁、电话线、无线电、电闸与道具箱。 */
+/** 统一破坏入口：相邻门锁、电话线、无线电与电闸。 */
 export function sabotageTarget(state: GameState): SabotageTarget | null {
   const breaker = state.powerCircuits.some((c) => c.breakerRoom === state.playerRoom && !c.broken);
-  const item = state.siteItems.some((i) => i.room === state.playerRoom && !i.broken && i.charges > 0);
-  if (breaker || item) return { kind: 'facility' };
+  if (breaker) return { kind: 'facility' };
   const lockedNeighbor = ROOM_MAP[state.playerRoom].neighbors.find((room) => isLocked(state, room));
   if (lockedNeighbor) return { kind: 'door', room: lockedNeighbor };
   if (phoneWorks(state, state.playerRoom)) return { kind: 'phone', room: state.playerRoom };

@@ -3,17 +3,8 @@ import { roomDistance } from '../navigation';
 import { ESCAPE_ROOMS } from '../constants';
 import { ENTRY_ROOM, OBSTACLE_ROOMS, POLICE_START, ROOMS } from '../rooms';
 import { SPECIAL_SURVIVORS, SURVIVOR_MAP, SURVIVORS } from '../survivors';
-import type { Archetype, Mission, NpcGoal, Person, PersonRole, RoomId, SurvivorItem } from '../types';
+import type { Archetype, Mission, NpcGoal, Person, PersonRole, RoomId } from '../types';
 import { ROUTINE_PROFILE } from './catalog';
-
-const STARTER_ITEM_RATE = 0.32;
-const STARTER_ITEMS: SurvivorItem[] = ['medkit', 'toolbox', 'flashlight', 'smoke', 'flare'];
-
-/** 每件道具能用几次：工具箱/手电筒/医疗包耐用品 2 次，其余一次 */
-export function itemUsesFor(item: SurvivorItem): number {
-  return item === 'toolbox' || item === 'flashlight' || item === 'medkit' ? 2 : 1;
-}
-
 
 export const ACTIVITIES = [
   '在翻找抽屉',
@@ -71,8 +62,6 @@ function makePerson(
 ): Person {
   const archetype = pickArchetype(s);
   const routine = ROUTINE_PROFILE[archetype];
-  // 三成的人开局就带着一件小东西：只有发现他之后才看得到，值得你优先盯
-  const starter: SurvivorItem | null = random() < STARTER_ITEM_RATE ? randomOf(STARTER_ITEMS) : null;
   return {
     id: s.id,
     name: s.name,
@@ -104,9 +93,6 @@ function makePerson(
     trackedTurns: 0,
     lastSeenRoom: room,
     lastSeenTurn: 0,
-    item: starter,
-    itemUses: starter ? itemUsesFor(starter) : 0,
-    healTurns: 0,
     watchValue: 0,
     watched: false,
     movesThisTurn: 0,
@@ -153,17 +139,6 @@ export function createPeople(mission: Mission): Person[] {
     people.push(makePerson(s, 'civilian', nextRoom(), 4, false));
   });
 
-  // 每局至少安排两名手电筒携带者，让照晕反制不再依赖极低概率的随机道具分配。
-  const missingFlashlightCarriers = Math.max(0, 2 - people.filter((person) => person.item === 'flashlight').length);
-  const flashlightCandidates = [
-    ...shuffle(people.filter((person) => person.item === null)),
-    ...shuffle(people.filter((person) => person.item !== null && person.item !== 'flashlight')),
-  ];
-  flashlightCandidates.slice(0, missingFlashlightCarriers).forEach((person) => {
-    person.item = 'flashlight';
-    person.itemUses = itemUsesFor('flashlight');
-  });
-
   // 至少保留一名专职躲藏者，确保柜子/床底机制每局都有机会出现。
   if (!people.some((person) => person.archetype === 'hider')) {
     const hider = randomOf(people);
@@ -198,9 +173,6 @@ export function createPeople(mission: Mission): Person[] {
     trackedTurns: 0,
     lastSeenRoom: POLICE_START,
     lastSeenTurn: 0,
-    item: null,
-    itemUses: 0,
-    healTurns: 0,
     watchValue: 0,
     watched: false,
     movesThisTurn: 0,

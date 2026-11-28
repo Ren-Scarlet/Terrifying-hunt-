@@ -12,16 +12,16 @@ import {
   trapDamageOf,
   trapHoldTurns,
 } from './modifiers';
-import { ESCAPE_ROOMS, BASE_AP, SABOTAGE_COST, ITEM_BOX_CHARGES, POSSESS_TURNS, SURVIVOR_MAX_HP, SURVIVOR_INJURED_HP, REACT_MOVE_CAP, BLEEDOUT_TURNS, ALARM_MAX, HAND_LIMIT, FRENZY_THRESHOLD, FRENZY_AP_BONUS, WATCH_GAIN, SEARCH_COST, LOOK_COST, ATTACK_COST, SCORE_EXECUTION_THRESHOLD, PANIC_HOPS_ON_HIT } from './constants';
+import { ESCAPE_ROOMS, BASE_AP, SABOTAGE_COST, POSSESS_TURNS, SURVIVOR_MAX_HP, SURVIVOR_INJURED_HP, REACT_MOVE_CAP, BLEEDOUT_TURNS, ALARM_MAX, HAND_LIMIT, FRENZY_THRESHOLD, FRENZY_AP_BONUS, WATCH_GAIN, SEARCH_COST, LOOK_COST, ATTACK_COST, SCORE_EXECUTION_THRESHOLD, PANIC_HOPS_ON_HIT } from './constants';
 import { drawCards } from './deck';
 import { executeOps } from './effects/runtime';
 import { createGame } from './setup';
 export { drawCards } from './deck';
 export { createGame } from './setup';
-export { BASE_AP, SABOTAGE_COST, ITEM_BOX_CHARGES, POSSESS_TURNS, SURVIVOR_MAX_HP, SURVIVOR_INJURED_HP, BLEEDOUT_TURNS, ALARM_MAX, HAND_LIMIT, FRENZY_THRESHOLD, FRENZY_AP_BONUS, SEARCH_COST, LOOK_COST, ATTACK_COST, SCORE_EXECUTION_THRESHOLD, PANIC_HOPS_ON_HIT } from './constants';
-import { ACTIVITIES, createPeople, itemUsesFor } from './npc/factory';
-import { ARCH_DESC, ARCH_LABEL, GOAL_LABEL, HEALTH_LABEL, INTENT_LABEL, ROUTINE_PROFILE, SITE_ITEM_LABEL, SURVIVOR_ITEM_LABEL } from './npc/catalog';
-export { ARCH_DESC, ARCH_LABEL, GOAL_LABEL, HEALTH_LABEL, INTENT_LABEL, SITE_ITEM_LABEL, SURVIVOR_ITEM_LABEL } from './npc/catalog';
+export { BASE_AP, SABOTAGE_COST, POSSESS_TURNS, SURVIVOR_MAX_HP, SURVIVOR_INJURED_HP, BLEEDOUT_TURNS, ALARM_MAX, HAND_LIMIT, FRENZY_THRESHOLD, FRENZY_AP_BONUS, SEARCH_COST, LOOK_COST, ATTACK_COST, SCORE_EXECUTION_THRESHOLD, PANIC_HOPS_ON_HIT } from './constants';
+import { ACTIVITIES, createPeople } from './npc/factory';
+import { ARCH_DESC, ARCH_LABEL, GOAL_LABEL, HEALTH_LABEL, INTENT_LABEL, ROUTINE_PROFILE } from './npc/catalog';
+export { ARCH_DESC, ARCH_LABEL, GOAL_LABEL, HEALTH_LABEL, INTENT_LABEL } from './npc/catalog';
 export { ESCAPE_ROOMS } from './constants';
 import { CARD_MAP, UNLOCK_REWARDS } from './cards';
 import type { Cond, Dest, Op, Who } from './effect';
@@ -112,7 +112,6 @@ export { canCoordinateRescue, canPlaceBarricade, fearBand, type FearBand } from 
 import { fleeAway as aiFleeAway, shout as aiShout } from './npc/ai/actions';
 import {
   barricadeRoom as aiBarricadeRoom,
-  consumeItem as aiConsumeItem,
   counterAttack as aiCounterAttack,
   finishCall as aiFinishCall,
   tryAidRun as aiTryAidRun,
@@ -128,10 +127,6 @@ import {
   sameRoomKillerReact as aiSameRoomKillerReact,
   type NpcWitnessedEvent,
 } from './npc/ai/reactions';
-import {
-  tryTakeSupply as aiTryTakeSupply,
-  useSurvivorItem as aiUseSurvivorItem,
-} from './npc/ai/items';
 import { updateNpcDialogue as aiUpdateNpcDialogue } from './npc/ai/dialogue';
 import { policePhase as aiPolicePhase } from './npc/police';
 import {
@@ -206,7 +201,6 @@ const aiHost: NpcHost = {
   barricadeRoom,
   tryCall,
   tryRescue,
-  consumeItem,
   addWanted,
   rescuePerson,
   healPerson,
@@ -214,15 +208,12 @@ const aiHost: NpcHost = {
   sameRoomKillerReact,
   damagePerson,
   killPerson,
-  useSurvivorItem,
-  tryTakeSupply,
   resolveTrapEntries,
   updateNpcDialogue,
   recordTrails,
   snapshotRooms,
   counterAttack,
   tryAidRun,
-  usableItemBoxes,
   interruptPlayer,
   rememberVisible,
   getChasedId: () => chasedId,
@@ -279,10 +270,7 @@ import type {
   RoomId,
   ScoreLine,
   Trail,
-  SiteItem,
-  SiteItemKind,
   MissionTask,
-  SurvivorItem,
 } from './types';
 
 /* ==================================================================== */
@@ -324,14 +312,6 @@ const KILL_PRESSURE = 0.15;
 const KILL_PRESSURE_MAX = 0.6;
 /** 场上有人倒地还没死时，全体效率再抬一截 */
 const DOWNED_URGENCY = 0.25;
-/** 医疗包要连续治这么多回合才生效，不能一下就把人治好 */
-const MEDKIT_TURNS = 2;
-/** 开局就带着道具的幸存者比例 */
-const STARTER_ITEM_RATE = 0.32;
-const STARTER_ITEMS: SurvivorItem[] = ['medkit', 'toolbox', 'flashlight', 'smoke', 'flare'];
-
-/* ---------- 场地物品：道具箱 ---------- */
-const ITEM_BOX_COUNT = 2;
 
 /* ==================================================================== */
 /*  小工具                                                              */
@@ -864,7 +844,6 @@ export function runOps(state: GameState, ops: Op[]): void {
     destroyCurrentObject: (current) => {
       const room = current.playerRoom;
       const hasObject = current.powerCircuits.some((circuit) => circuit.breakerRoom === room && !circuit.broken)
-        || current.siteItems.some((item) => item.room === room && !item.broken && item.charges > 0)
         || phoneWorks(current, room)
         || (RADIO_ROOMS.includes(room) && !current.sabotage.includes('radio'));
       return hasObject && sabotageSiteItem(current, { free: true, suppressAfterAction: true });
@@ -906,7 +885,6 @@ function shout(state: GameState, person: Person, base = 18): void {
 
 /** 支援类行动已搬到 npc/ai/support.ts；这里保留引擎侧入口（签名不变）。 */
 function counterAttack(state: GameState, person: Person): void { aiCounterAttack(aiHost, state, person); }
-function consumeItem(state: GameState, person: Person): void { aiConsumeItem(aiHost, state, person); }
 function barricadeRoom(state: GameState, person: Person): boolean { return aiBarricadeRoom(aiHost, state, person); }
 function tryRescue(state: GameState, person: Person): boolean { return aiTryRescue(aiHost, state, person); }
 function tryAidRun(state: GameState, person: Person): boolean { return aiTryAidRun(aiHost, state, person); }
@@ -1073,18 +1051,7 @@ function policePhase(state: GameState): void {
 /*  创建对局                                                            */
 /* ==================================================================== */
 
-/* ---------- 场地物品：幸存者的补给与抉择 ---------- */
-
-/** 还能领东西的道具箱 */
-function usableItemBoxes(state: GameState): SiteItem[] {
-  return state.siteItems.filter((i) => i.kind === 'itemBox' && !i.broken && i.charges > 0);
-}
-
-/** 道具行为已搬到 npc/ai/items.ts；这里保留引擎侧入口（签名不变）。 */
-function tryTakeSupply(state: GameState, person: Person): boolean { return aiTryTakeSupply(aiHost, state, person); }
-function useSurvivorItem(state: GameState, person: Person): boolean { return aiUseSurvivorItem(aiHost, state, person); }
-
-
+/* ---------- 场地设施 ---------- */
 
 /* ==================================================================== */
 /*  玩家行动                                                            */
@@ -1330,17 +1297,10 @@ export function sabotageSiteItem(state: GameState, options: { free?: boolean; su
     addAlarm(state, 2);
   } else {
     const circuit = state.powerCircuits.find((c) => c.breakerRoom === state.playerRoom && !c.broken);
-    const item = state.siteItems.find((i) => i.room === state.playerRoom && !i.broken && (i.kind === 'itemBox' ? i.charges > 0 : true));
-    if (!circuit && !item) return false;
-  if (target.kind === 'facility' && circuit) {
+    if (!circuit) return false;
     circuit.broken = true;
     circuit.enabled = false;
     log(state, `你砸毁了${circuit.name}控制箱！${circuit.affectedRooms.map(roomName).join('、')}立即断电，灯光熄灭。`);
-  } else if (target.kind === 'facility' && item) {
-    item.broken = true;
-    item.charges = 0;
-    log(state, `你砸烂了${roomName(item.room)}的道具箱——从今往后，没人能从这里翻到道具了。`);
-  }
   }
 
   if (target.kind === 'facility') addAlarm(state, 3);

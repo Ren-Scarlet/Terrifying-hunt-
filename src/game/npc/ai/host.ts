@@ -5,7 +5,7 @@
  * 把「记日志、加警报、留脚印、留动静、踩夹子」这几件事通过接口传进来，
  * 依赖方向就变成 engine -> ai 单向，AI 才能真正独立出去。
  */
-import type { GameState, Person, RoomId, SiteItem } from '../../types';
+import type { GameState, Person, RoomId } from '../../types';
 import type { Cond, Op, Who } from '../../effect';
 
 export interface NpcHost {
@@ -29,8 +29,6 @@ export interface NpcHost {
   tryCall(state: GameState, person: Person): boolean;
   /** 拉起同屋倒地的同伴 */
   tryRescue(state: GameState, person: Person): boolean;
-  /** 用掉手里的幸存者道具 */
-  consumeItem(state: GameState, person: Person): void;
   /** 全局报警进度（会折算成暴露度） */
   addWanted(state: GameState, amount: number): void;
   /** 拉起倒地的同伴 */
@@ -45,10 +43,6 @@ export interface NpcHost {
   damagePerson(state: GameState, person: Person, amount: number, options?: { affectFear?: boolean; forceFlee?: boolean }): void;
   /** 移除一名幸存者并结算死亡 */
   killPerson(state: GameState, person: Person): void;
-  /** 用掉手里的幸存者道具，返回是否真的用了 */
-  useSurvivorItem(state: GameState, person: Person): boolean;
-  /** 在道具箱翻一件补给 */
-  tryTakeSupply(state: GameState, person: Person): boolean;
   /** 结算这一轮移动踩到的捕兽夹 */
   resolveTrapEntries(state: GameState, before: Map<string, RoomId>): void;
   /** 刷新头顶对白 */
@@ -61,8 +55,6 @@ export interface NpcHost {
   counterAttack(state: GameState, person: Person): void;
   /** 有人倒地时主动赶过去 */
   tryAidRun(state: GameState, person: Person): boolean;
-  /** 还能领补给的道具箱 */
-  usableItemBoxes(state: GameState): SiteItem[];
   /** 玩家被打断：扣行动点、清追势，并让幸存者趁机行动 */
   interruptPlayer(state: GameState, reason: string, actorId: string): void;
   /** 记录玩家最后看到某人的位置 */

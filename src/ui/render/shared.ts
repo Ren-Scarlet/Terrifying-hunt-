@@ -2,7 +2,7 @@ import { CARDS, CARD_MAP } from '../../game/cards';
 import { ADDON_RARITY_BG, PERK_RARITY_BG, POWER_RARITY_BG, accessoryImage, cardImage, characterImage, uiIcon } from '../../game/assetMap';
 import {
   ARCH_LABEL, BASE_AP, BLEEDOUT_TURNS, GOAL_LABEL, HEALTH_LABEL,
-SURVIVOR_ITEM_LABEL, conditionOf, effectiveCost, isPersonVisible,
+  conditionOf, effectiveCost, isPersonVisible,
   attackBlockReason, executeBlockReason,
 } from '../../game/engine';
 import { KILLERS, type KillerProfile } from '../../game/killers';
@@ -28,19 +28,6 @@ export const TYPE_RARITY: Record<string, string> = { attack: 'visceral', skill: 
 
 export const icon = (name: Parameters<typeof uiIcon>[0], cls = 'ui-icon') =>
   `<img class="${cls}" src="${uiIcon(name)}" alt="" aria-hidden="true">`;
-
-/** 三件道具按你的设计各配一张图；其余道具仍用文字角标 */
-const ITEM_ICONS: Partial<Record<NonNullable<Person['item']>, Parameters<typeof uiIcon>[0]>> = {
-  medkit: 'medkit',
-  toolbox: 'toolbox',
-  flashlight: 'flashlight',
-};
-export const itemIconHtml = (item: NonNullable<Person['item']>): string => {
-  const key = ITEM_ICONS[item];
-  return key ? `<img class="item-icon" src="${uiIcon(key)}" alt="" aria-hidden="true">` : '';
-};
-export const itemBadge = (item: NonNullable<Person['item']>, uses: number): string =>
-  `<i class="chip-item" title="手里拿着${escape(SURVIVOR_ITEM_LABEL[item])} · 还能用 ${uses} 次">${itemIconHtml(item)}${escape(SURVIVOR_ITEM_LABEL[item])}×${uses}</i>`;
 
 export function detailCardHtml(
   title: string,
@@ -121,7 +108,7 @@ export function defaultDetailHtml(): string {
     `每回合 ${BASE_AP} 点行动点：走路、挥刀、出牌、搜索柜子全从这一个池子里扣。想多追几间屋就少出牌，想连砍就别乱跑。`,
     '普通攻击消耗 1 AP，卡牌与杀手能力也会影响战斗。幸存者倒地后可以立即普通处决，也可以抱起搬运到指定地点执行地点处决；猎杀评分达到 200 分后，还会解锁头顶独立的分数处决 QTE。若暂时放过，同伴可能把人救起。',
     '相邻房间通常只能看到轮廓。进入房间会暴露位置，警觉较高的幸存者可能立刻逃跑；警觉较低的幸存者会先观察或怀疑。留意当前房间的鞋印、乌鸦和其他环境线索，判断幸存者最近的行动。',
-    '屋里的道具箱会给他们发道具（医疗包 / 工具箱 / 信号弹 / 武器 / 烟雾弹），电闸控制各区域照明；你可以拉闸或砸毁控制箱，幸存者也可能用工具箱修复它。道具箱砸烂后就再也发不出东西。',
+    '屋里各区域的电闸控制照明；你可以拉闸断电，幸存者也可能去修复它。断电区域的门锁会失效。',
     '连续追踪可积累【杀戮】资源；达到阈值后会强化行动点收益。转向、攻击或失去追踪线索都会影响追击节奏。',
     '幸存者会根据性格报警、躲藏、寻找武器、救援同伴、修复断电区域或寻找补给；他们的行动会改变现场局势并制造线索。有人藏进柜子时，点「搜索」翻出来（1 点行动点）。',
   ]);
@@ -262,7 +249,6 @@ export function personDetailHtml(state: GameState, personId: string): string {
       `警戒：${ALERT_LABEL[alertBand(person.alert)]}（${person.alert}/100）· 恐惧：${FEAR_LABEL[fearBand(person.fear)]}（${person.fear}/100）。行为：${person.activity || '暂无明显动作'}。`,
     );
     if (person.dialogue) paras.push(`听见他说：“${person.dialogue}”`);
-    if (person.item) paras.push(`携带物品：${SURVIVOR_ITEM_LABEL[person.item]}（剩余 ${person.itemUses} 次）。`);
     if (person.marked) paras.push('契约情报：这是本局指定目标。');
     if (person.bloodSacrifice) paras.push('特殊身份：本局血祭品。');
     if (isPersonVisible(state, person)) {
@@ -315,7 +301,7 @@ export function personDetailHtml(state: GameState, personId: string): string {
     rarityLabel,
     paras,
     rarityKey,
-    `<div class="person-detail-lead">${personPortraitHtml(profile)}</div>${person?.item ? `<div class="person-item-detail">${itemIconHtml(person.item)}<span><b>${escape(SURVIVOR_ITEM_LABEL[person.item])}</b><small>剩余 ${person.itemUses} 次</small></span></div>` : ''}`,
+    `<div class="person-detail-lead">${personPortraitHtml(profile)}</div>`,
   )}${localAction}</div>`;
 }
 

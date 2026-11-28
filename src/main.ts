@@ -38,7 +38,6 @@ import {
   lootPayout,
   playCard,
   searchRoom,
-  sabotageSiteItem,
   breakPhone,
   breakDoor,
   togglePowerCircuit,
@@ -1409,12 +1408,6 @@ function createGameActions(): ActionTable {
       const room = target.dataset.room as RoomId | undefined;
       if (!room) return;
       if (breakDoor(currentGame(), room)) playSfx('smash');
-      afterAction();
-    },
-
-    sabotage: () => {
-      sabotageSiteItem(currentGame());
-      playSfx('sabotage');
       afterAction();
     },
 

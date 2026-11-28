@@ -148,12 +148,9 @@ export function npcTurn(host: NpcHost, state: GameState): void {
       person.alert = Math.max(person.alert, 45);
     }
 
-    // 保命优先：救援、手里的道具、赶去救倒地的人，先于一切日常决策。
+    // 保命优先：救援、赶去救倒地的人，先于一切日常决策。
     if (host.tryRescue(state, person)) continue;
-    if (host.useSurvivorItem(state, person)) continue;
     if (person.intent !== 'escape' && person.intent !== 'call' && host.tryAidRun(state, person)) continue;
-    // 低警戒、没被追时才会顺手翻补给；追着人的时候没空。
-    if (person.alert < 40 && !state.chaseTargetId && host.tryTakeSupply(state, person)) continue;
 
     // 房门被封锁时，NPC 不能离开当前房间。
     if (isLocked(state, person.room)) {

@@ -11,9 +11,6 @@ export const SURVIVOR_INJURED_HP = 2;
 export const BASE_AP = 4;
 /** 砸掉场地设施的行动点成本。 */
 export const SABOTAGE_COST = 1;
-/** 道具箱初始可领取次数。 */
-export const ITEM_BOX_CHARGES = 3;
-export const ITEM_BOX_COUNT = 2;
 
 /** 恶魔附身的持续回合数。 */
 export const POSSESS_TURNS = 3;

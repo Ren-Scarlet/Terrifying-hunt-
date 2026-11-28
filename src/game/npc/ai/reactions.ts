@@ -69,10 +69,8 @@ export function npcReact(host: NpcHost, state: GameState): void {
 
     // 恐惧范围：相邻房间先起疑；范围 2 的杀手会在隔壁直接引发逃跑，两格外也会察觉。
     const distanceToPlayer = roomDistance(person.room, state.playerRoom);
-    // 正在治疗的人一旦进入恐惧（恐惧 60+）或发现杀手逼近，就会立刻中断包扎逃跑。
+    // 正在处理现场事务的人一旦进入恐惧（恐惧 60+）或发现杀手逼近，就会立刻中断逃跑。
     if (person.intent === 'heal' && (fearAtLeast(person, 'afraid') || distanceToPlayer <= 1)) {
-      person.healTurns = 0;
-      person.healLastTurn = undefined;
       person.intent = 'flee';
       person.alert = Math.max(person.alert, 75);
       person.activity = '治疗被打断，察觉屠夫后立刻逃跑';
@@ -326,17 +324,13 @@ export function npcOnPlayerEnter(host: NpcHost, state: GameState, barricadedEntr
     state.chaseTurns = 0;
   }
 
-  // 障碍伏击 / 手电筒致盲：推门这一下会挨一下，幸存者借机行动
+  // 障碍伏击：推门这一下会挨一下，幸存者借机行动
   if (!ambush && !state.possessed) {
-    const flasher = here.find((p) => p.item === 'flashlight' && p.itemUses > 0 && p.hp > 0);
     const obstacleHere = isObstacle(state.playerRoom) && !state.clearedObstacles.includes(state.playerRoom);
     const trapper = here.find(
       (p) => p.hp > 0 && (p.archetype === 'defiant' || p.archetype === 'brave' || p.archetype === 'kiter'),
     );
-    if (flasher) {
-      host.consumeItem(state, flasher);
-      host.interruptPlayer(state, `${flasher.name} 早在门后等着，手电筒一下子照白了你的视野。`, flasher.id);
-    } else if (barricadedEntry) {
+    if (barricadedEntry) {
       host.interruptPlayer(
         state,
         `你撞上幸存者刚刚放倒的家具，沉重的杂物砸得你眼前一黑！`,
@@ -354,13 +348,8 @@ export function npcOnPlayerEnter(host: NpcHost, state: GameState, barricadedEntr
   host.recordTrails(state, before);
 }
 
-/** 同房间的目击者：另一个人不会站着发呆，会喊人、跑、甚至拿手电筒照你 */
+/** 同房间的目击者：另一个人不会站着发呆，会喊人、跑 */
 export function witnessInRoom(host: NpcHost, state: GameState, person: Person): boolean {
-  if (person.item === 'flashlight' && person.itemUses > 0 && person.alert >= 40) {
-    host.consumeItem(state, person);
-    host.interruptPlayer(state, `${person.name} 拧亮手电筒，一道白光正打在你脸上。`, person.id);
-    return true;
-  }
   person.alert = clamp(Math.max(person.alert + 45, 75), 0, 100);
   host.addDisturbance(state, person.room);
   person.lastWitnessedEventClock = state.trailClock;

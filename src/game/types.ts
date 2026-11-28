@@ -206,22 +206,6 @@ export type NpcGoal =
   /** 按个人习惯在常去地点之间活动 */
   | 'routine';
 
-/** 幸存者从道具箱里翻出来的东西：用完即弃，是他们多出来的一条选择 */
-export type SurvivorItem = 'medkit' | 'toolbox' | 'flare' | 'weapon' | 'smoke' | 'flashlight';
-
-/** 场地物品：杀手用不了，但可以砸掉 */
-export type SiteItemKind = 'itemBox';
-
-export interface SiteItem {
-  id: string;
-  kind: SiteItemKind;
-  room: RoomId;
-  /** 道具箱被砸烂后永久失效 */
-  broken: boolean;
-  /** 还能发几件道具 */
-  charges: number;
-}
-
 /** 设陷者放置的捕兽夹；触发或被幸存者拆除后会变成未武装状态。 */
 export interface BearTrap {
   id: string;
@@ -288,14 +272,6 @@ export interface Person {
   armed: boolean;
   /** 老练的幸存者：有时能悄无声息地移动，仍会留下脚印，但不会惊动乌鸦 */
   sneaky: boolean;
-  /** 从道具箱翻到的东西：用完即弃，是他这一回合多出来的一条路 */
-  item: SurvivorItem | null;
-  /** 这件道具还能用几次；归零就清空 */
-  itemUses: number;
-  /** 医疗包慢速治疗进度：攒满 MEDKIT_TURNS 才真正回血 / 拉人 */
-  healTurns: number;
-  /** 医疗包开始治疗的回合：防止在同一回合内被多次 NPC 行动瞬间治好。 */
-  healLastTurn?: number;
   /** 鬼面「夜幕」对这名幸存者的监视值 0–100 */
   watchValue: number;
   /** 监视完成：持续透视，下一刀可以直接击倒 */
@@ -673,8 +649,6 @@ export interface GameState {
   escapeRooms: RoomId[];
   /** 本局幸存者总人数（不包含警察），用于判定是否全部逃离 */
   survivorTotal: number;
-  /** 本局随机摆放的道具箱：幸存者可领取补给，杀手可以破坏 */
-  siteItems: SiteItem[];
   /** 独立区域电闸及其供电范围 */
   powerCircuits: PowerCircuit[];
 }

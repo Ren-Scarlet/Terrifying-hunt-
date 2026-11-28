@@ -6,13 +6,12 @@ import { modifiersForAccessories, modifierSummary } from './modifiers';
 import { generateMission } from './missions';
 import { createPeople } from './npc/factory';
 import {
-  BASE_AP, ESCAPE_ROOMS, ITEM_BOX_CHARGES,
-  ITEM_BOX_COUNT, SABOTAGE_COST,
+  BASE_AP, ESCAPE_ROOMS,
 } from './constants';
 import {
   ENTRY_ROOM, EXIT_ROOM, OBSTACLE_ROOMS, ROOM_MAP, ROOMS, TOTEM_ROOMS, buildLayout,
 } from './rooms';
-import type { CardInstance, GameState, Mission, SiteItem, RoomId } from './types';
+import type { CardInstance, GameState, Mission, RoomId } from './types';
 import { drawCards } from './deck';
 import { roomDistance } from './navigation';
 import { applyHuntingGround, getHuntingGround, type HuntingGroundId } from './maps';
@@ -260,7 +259,6 @@ export function createGame(
     disturbances: [],
     escapeRooms: [],
     survivorTotal: people.filter((person) => person.role !== 'police').length,
-    siteItems: [],
     powerCircuits: [
       { id: 'main-floor', name: '主楼照明', breakerRoom: 'basement', affectedRooms: ['basement', 'hall', 'kitchen', 'dining', 'study'], broken: false, enabled: true },
       { id: 'upper-floor', name: '二层照明', breakerRoom: 'workshop', affectedRooms: ['workshop', 'bedroom', 'nursery', 'guestroom', 'attic'], broken: false, enabled: true },
@@ -274,20 +272,10 @@ export function createGame(
     .slice(0, 2);
   lockedHomes.forEach((room) => { state.roomLocks[room] = state.mission.turns; });
 
-  // 场地只保留道具箱；照明由独立电闸控制，不再依赖发电机。
+  // 场地固定设施只有电闸；照明由独立电闸控制，不再依赖发电机。
   const breakerRooms = state.powerCircuits.map((circuit) => circuit.breakerRoom);
-  const sitePool = shuffle(ROOMS.map((room) => room.id).filter(
-    (id) => id !== ENTRY_ROOM && id !== EXIT_ROOM && !ESCAPE_ROOMS.includes(id) && !OBSTACLE_ROOMS.includes(id) && !breakerRooms.includes(id),
-  ));
-  const items: SiteItem[] = [];
-  for (let i = 0; i < ITEM_BOX_COUNT; i++) {
-    const room = sitePool.pop();
-    if (room) items.push({ id: `box-${i}`, kind: 'itemBox', room, broken: false, charges: ITEM_BOX_CHARGES });
-  }
-  state.siteItems = items;
   if (killerId === '设陷者') {
     const occupied = new Set([
-      ...items.map((item) => item.room),
       ...breakerRooms,
       ENTRY_ROOM,
       EXIT_ROOM,
@@ -319,8 +307,7 @@ export function createGame(
     ? `随身配件：${accessories.map((id) => ACCESSORY_MAP[id].name).join('、')}。配件买过即永久拥有，下次出发前可以重新搭配。`
     : '本局没有携带配件。想带配件的话，下次出发前在装配界面选好两件。');
   log(state, '留意每个人的恐惧值与警戒值：恐惧会使人崩溃，警戒会促使人报警或逃跑。');
-  log(state, `屋里有 ${items.length} 个道具箱；照明由各区域电闸独立控制。`);
-  // 电话放在最后抽：不改变前面布局 / NPC / 物品的随机序列，避免影响既有对局与测试。
+  // 电话放在最后抽：不改变前面布局 / NPC 的随机序列，避免影响既有对局与测试。
   state.phones = pickPhoneRooms(state);
   state.crows = pickCrowRooms(state, state.phones);
   return state;

@@ -140,32 +140,6 @@ export function attack(host: NpcHost, state: GameState, targetId?: string, optio
   const ambushStrike = ambushActive(state) && target.role !== 'police' && target.alert < 100 && alone;
   // 难逃一死：警报拉满（最终危机）之后才生效；图腾被拆光也会失效。
   const noedActive = state.hexNoedActive && state.alarm >= ALARM_MAX && state.totems.length > 0;
-  // 带手电筒的人可能从隔壁冲进来照你：这一刀落空，两个人都趁机跑掉
-  const flasher = npcs(state).find(
-    (p) =>
-      p.item === 'flashlight' &&
-      p.itemUses > 0 &&
-      p.hp > 0 &&
-      p.alert >= 40 &&
-      (p.room === state.playerRoom || ROOM_MAP[state.playerRoom].neighbors.includes(p.room)),
-  );
-  if (flasher && random() < 0.82) {
-    host.consumeItem(state, flasher);
-    if (flasher.room !== state.playerRoom) flasher.room = state.playerRoom;
-    host.interruptPlayer(
-      state,
-      `${flasher.name} 从旁边冲进来，手电筒正照着你的眼睛——这一刀落空了。`,
-      flasher.id,
-    );
-    if (target.hp > 0) {
-      host.fleeAway(state, target);
-      target.alert = 100;
-      host.log(state, `${target.name} 毫发无伤地跟着跑出了屋子。`);
-    }
-    host.afterPlayerAction(state);
-    host.checkImmediateWin(state);
-    return false;
-  }
   state.energy -= attackCost;
   if (state.killer === '护士' && state.nurseFollowUp && target.role !== 'police') {
     state.huntStats.nurseBlinkAttacks += 1;

@@ -1,18 +1,4 @@
-import type { Archetype, Health, NpcGoal, NpcIntent, RoomId, SiteItemKind, SurvivorItem } from '../types';
-
-/** 幸存者从道具箱翻出来的东西：这些都是「选择」，不是写死的全局规则 */
-export const SURVIVOR_ITEM_LABEL: Record<SurvivorItem, string> = {
-  medkit: '医疗包',
-  toolbox: '工具箱',
-  flare: '信号弹',
-  weapon: '防身武器',
-  smoke: '烟雾弹',
-  flashlight: '手电筒',
-};
-
-export const SITE_ITEM_LABEL: Record<SiteItemKind, string> = {
-  itemBox: '道具箱',
-};
+import type { Archetype, Health, NpcGoal, NpcIntent, RoomId } from '../types';
 
 export const INTENT_LABEL: Record<NpcIntent, string> = {
   idle: '做自己的事',

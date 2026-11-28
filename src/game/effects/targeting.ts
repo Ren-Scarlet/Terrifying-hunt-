@@ -99,7 +99,6 @@ export function checkCond(host: NpcHost, state: GameState, cond: Cond): boolean 
     case 'currentDestructible': {
       const room = state.playerRoom;
       return state.powerCircuits.some((circuit) => circuit.breakerRoom === room && !circuit.broken)
-        || state.siteItems.some((item) => item.room === room && !item.broken && item.charges > 0)
         || phoneWorks(state, room)
         || (RADIO_ROOMS.includes(room) && !state.sabotage.includes('radio'));
     }
