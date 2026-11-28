@@ -92,6 +92,21 @@ export {
   sabotageBlockReason,
   wipeBlockReason,
 } from './rules/actionRules';
+import {
+  ESCAPE_ALERT_MIN,
+  alarmSuppressed,
+  ambushActive,
+  canCoordinateRescue,
+  canPlaceBarricade,
+  effectiveFearRadius,
+  fearAtLeast,
+  fearBand,
+  isQuietMove,
+  playerIsHidden,
+  wantsToLeave,
+  type FearBand,
+} from './npc/ai/predicates';
+export { canCoordinateRescue, canPlaceBarricade, fearBand, type FearBand } from './npc/ai/predicates';
 import { SURVIVOR_MAP } from './survivors';
 import type {
   Archetype,
@@ -125,9 +140,6 @@ export const DOWNED_LOCK_TURNS = 0;
 export const ALARM_MAX = 100;
 /** 1 点旧「暴露度」折算成多少暴露度：暴露度只是暴露度的 0~10 镜像 */
 const WANTED_TO_ALARM = 10;
-/** 站在后院的人至少要有这么高的警觉，才会想到翻篱笆（否则只是路过） */
-const ESCAPE_ALERT_MIN = 35;
-
 /** 挥刀 / 搜索各自消耗 1 点行动点：唯一的伤害来源，不能免费 */
 export const ATTACK_COST = 1;
 export const SEARCH_COST = 1;
@@ -159,24 +171,6 @@ export const DAWN_ALERT_GAIN = 5;
 /** 最后 5 回合的收网：每回合额外警报 +2。 */
 export const DAWN_LATE_ALARM = 2;
 
-/**
- * 恐惧档位：恐惧不再只是数字，而是决定 NPC 这一回合会不会"失去理智"。
- *   0–29  冷静：维持日常，会报警、找武器、救助同伴
- *   30–59 不安：开始结伴、避开黑暗，遇袭先逃
- *   60–84 恐惧：只想离你远一点，不再尝试报警/找武器
- *   85+   崩溃：原地发抖或尖叫乱跑，彻底失去目的
- */
-const FEAR_UNEASY = 30;
-const FEAR_AFRAID = 60;
-const FEAR_BROKEN = 85;
-
-export type FearBand = 'calm' | 'uneasy' | 'afraid' | 'broken';
-export function fearBand(person: Person): FearBand {
-  if (person.fear >= FEAR_BROKEN) return 'broken';
-  if (person.fear >= FEAR_AFRAID) return 'afraid';
-  if (person.fear >= FEAR_UNEASY) return 'uneasy';
-  return 'calm';
-}
 /** 动静（乌鸦叫）也只留最近这么多次行动：短线索，不是常驻雷达 */
 const DISTURBANCE_WINDOW = 3;
 /** 杀戮值上限 / 激活阈值：满值后每回合多 2 行动点，由玩家自己决定怎么走 */
@@ -293,27 +287,8 @@ function findVictim(
   return rank(inRoom.filter((p) => canExecuteNow(p)));
 }
 
-function alarmSuppressed(state: GameState): boolean {
-  return state.noAlarmTurn || state.turn < state.alarmSilencedUntilTurn;
-}
-
-function playerIsHidden(state: GameState): boolean {
-  return alarmSuppressed(state) || state.stealthActions > 0;
-}
-
-/** 尾随者模式会把迈尔斯的实际恐惧范围压到 0。 */
-function effectiveFearRadius(state: GameState): number {
-  if (state.stealthActions > 0) return 0;
-  return state.killer === '迈克尔·迈尔斯' && state.myersStalking ? 0 : state.fearRadius;
-}
-
 /** 正在被「追击」的人：这一瞬间他已经贴到你身上，不再触发转身就跑 */
 let chasedId: string | null = null;
-
-/** 本回合是否处于「伏击」状态：推门进去也不会惊动任何人 */
-function ambushActive(state: GameState): boolean {
-  return state.ambushTurn === state.turn;
-}
 
 /**
  * 「暴露度」是唯一的失败压力条：暴露度与暴露度/逮捕已合并成一条。
@@ -512,13 +487,6 @@ function refreshVision(state: GameState): void {
  * 用「行动计数 + 人物 id」做稳定判定，同一次行动里各处埋点结果一致；
  * 下一次行动就会变——所以他不是永远安静，玩家总还有机会找到他。
  */
-function isQuietMove(state: GameState, person: Person): boolean {
-  if (!person.sneaky) return false;
-  const seed =
-    (state.trailClock * 31 + person.id.length * 17 + state.turn * 7 + person.room.length * 13) % 100;
-  return seed < 45;
-}
-
 const NOISE_LABELS = [
   '一群乌鸦扑棱着飞起',
   '木地板吱呀响了一声',
@@ -669,7 +637,7 @@ function npcReact(state: GameState): void {
     // 恐惧范围：相邻房间先起疑；范围 2 的杀手会在隔壁直接引发逃跑，两格外也会察觉。
     const distanceToPlayer = roomDistance(person.room, state.playerRoom);
     // 正在治疗的人一旦进入恐惧（恐惧 60+）或发现杀手逼近，就会立刻中断包扎逃跑。
-    if (person.intent === 'heal' && (person.fear >= FEAR_AFRAID || distanceToPlayer <= 1)) {
+    if (person.intent === 'heal' && (fearAtLeast(person, 'afraid') || distanceToPlayer <= 1)) {
       person.healTurns = 0;
       person.healLastTurn = undefined;
       person.intent = 'flee';
@@ -1371,15 +1339,6 @@ function movePersonTo(state: GameState, person: Person, room: RoomId, clearAlert
  * 结果是「被追到后院」的人反而绝对安全。只要人站在后院并且确实慌了
  * （逃跑中 / 目的就是出口 / 警觉够高），就算他要走。
  */
-function wantsToLeave(state: GameState, person: Person): boolean {
-  if (!state.escapeRooms.length || !state.escapeRooms.includes(person.room)) return false;
-  return (
-    person.intent === 'escape' ||
-    person.intent === 'flee' ||
-    person.alert >= ESCAPE_ALERT_MIN
-  );
-}
-
 /**
  * 往离玩家最远的方向跑一步
  *
@@ -1697,12 +1656,6 @@ function witnessInRoom(state: GameState, person: Person): boolean {
   return true;
 }
 
-export function canPlaceBarricade(state: GameState, person: Person): boolean {
-  return !state.possessed && OBSTACLE_ROOMS.includes(person.room) &&
-    !state.clearedObstacles.includes(person.room) &&
-    !state.barricades.includes(person.room);
-}
-
 function barricadeRoom(state: GameState, person: Person): boolean {
   if (!canPlaceBarricade(state, person)) return false;
   person.intent = 'barricade';
@@ -1737,17 +1690,6 @@ function tryRescue(state: GameState, person: Person): boolean {
     return true;
   }
   return false;
-}
-
-/**
- * 电话线路承担跨区域求救协调。
- * 线路正常时，幸存者能远程得知倒地同伴的位置；剪断后只能依靠无线电有限协调，
- * 无线电也被破坏时，就只能响应同屋或相邻房间的呼救。
- */
-export function canCoordinateRescue(state: GameState, fromRoom: RoomId, downedRoom: RoomId): boolean {
-  if (!state.phoneCut) return true;
-  const range = state.sabotage.includes('radio') ? 1 : 3;
-  return roomDistance(fromRoom, downedRoom) <= range;
 }
 
 /** 有人倒地时，幸存者会主动赶过去：救援优先于日常目标，但没人敢闯玩家守着的房间 */

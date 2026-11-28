@@ -62,6 +62,7 @@ if (tscOk) {
   const suites = [
     { entry: 'tests/ui.ts', out: `${OUT}/ui.mjs` },
     { entry: 'tests/world.ts', out: `${OUT}/world.mjs` },
+    { entry: 'tests/npc.ts', out: `${OUT}/npc.mjs` },
     { entry: 'tests/logic.ts', out: `${OUT}/logic.mjs` },
     { entry: 'tests/sim.ts', out: `${OUT}/sim.mjs` },
   ];
@@ -87,6 +88,7 @@ if (tscOk) {
   if (bundled.every(Boolean)) {
     step('界面状态', () => replay(run(process.execPath, [`${OUT}/ui.mjs`]), 3));
     step('世界查询', () => replay(run(process.execPath, [`${OUT}/world.mjs`]), 3));
+    step('AI 判定', () => replay(run(process.execPath, [`${OUT}/npc.mjs`]), 3));
     step('规则回归', () => replay(run(process.execPath, [`${OUT}/logic.mjs`]), 3));
     step('整局冒烟', () => replay(run(process.execPath, [`${OUT}/sim.mjs`]), 3));
   } else {
