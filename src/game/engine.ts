@@ -28,7 +28,6 @@ import type { Cond, Dest, Op, Who } from './effect';
 import { KILLER_MAP } from './killers';
 import { generateMission, roomName } from './missions';
 import {
-  CABINET_ROOMS,
   ENTRY_ROOM,
   EXIT_ROOM,
   OBSTACLE_ROOMS,
@@ -39,6 +38,17 @@ import {
   TOTEM_ROOMS,
   WEAPON_ROOMS,
 } from './rooms';
+import {
+  cabinetRoomsFor,
+  canStand,
+  isLocked,
+  isObstacle,
+  isRoomLit,
+  npcPeople as npcs,
+  peopleInRoom,
+  standingPeople as standing,
+} from './world/roomState';
+export { isLocked, isRoomLit, lockedRoomsOf } from './world/roomState';
 import { SURVIVOR_MAP } from './survivors';
 import type {
   Archetype,
@@ -166,13 +176,6 @@ const MEDKIT_TURNS = 2;
 const STARTER_ITEM_RATE = 0.32;
 const STARTER_ITEMS: SurvivorItem[] = ['medkit', 'toolbox', 'flashlight', 'smoke', 'flare'];
 
-/** 各场地的藏身空间；巴德姆幼儿园额外开放玩具仓库、值班室和幼儿教室。 */
-function cabinetRoomsFor(state: GameState): RoomId[] {
-  return state.mapId === 'badham'
-    ? [...CABINET_ROOMS, 'nursery', 'storage', 'guestroom']
-    : CABINET_ROOMS;
-}
-
 /* ---------- 场地物品：道具箱 ---------- */
 const ITEM_BOX_COUNT = 2;
 
@@ -218,21 +221,6 @@ export function conditionOf(person: Person): Health {
 /*  查询                                                                */
 /* ==================================================================== */
 
-/** 房间里的人（包括倒地的人，他们还在原地） */
-function peopleInRoom(state: GameState, room: RoomId, role?: PersonRole): Person[] {
-  return state.people.filter((p) => p.room === room && (!role || p.role === role));
-}
-
-/** 全部 NPC，包括倒地的 */
-function npcs(state: GameState): Person[] {
-  return state.people.filter((p) => p.role !== 'police');
-}
-
-/** 还站着、能做事的 NPC */
-function standing(state: GameState): Person[] {
-  return npcs(state).filter((p) => p.hp > 0);
-}
-
 function findVictim(
   state: GameState,
   room: RoomId,
@@ -262,23 +250,6 @@ function findVictim(
   if (standing) return standing;
   if (!allowDowned) return undefined;
   return rank(inRoom.filter((p) => canExecuteNow(p)));
-}
-
-export function isLocked(state: GameState, room: RoomId): boolean {
-  return (state.roomLocks[room] ?? 0) > 0 && isRoomLit(state, room);
-}
-
-export function lockedRoomsOf(state: GameState): RoomId[] {
-  return (Object.keys(state.roomLocks) as RoomId[]).filter((r) => (state.roomLocks[r] ?? 0) > 0);
-}
-
-function isObstacle(room: RoomId): boolean {
-  return OBSTACLE_ROOMS.includes(room);
-}
-
-function canStand(state: GameState, room: RoomId): boolean {
-  if (isObstacle(room) && !state.clearedObstacles.includes(room)) return false;
-  return true;
 }
 
 function alarmSuppressed(state: GameState): boolean {
@@ -3712,13 +3683,6 @@ export function getHuntOpportunities(state: GameState): HuntOpportunity[] {
     }
   }
   return opportunities.slice(0, 8);
-}
-
-export function isRoomLit(state: GameState, room: RoomId): boolean {
-  return state.powerCircuits.some((circuit) =>
-    !circuit.broken && circuit.enabled !== false &&
-    (circuit.flickerTurns ?? 0) <= 0 && circuit.affectedRooms.includes(room),
-  );
 }
 
 /**
