@@ -208,6 +208,36 @@ export const ACCESSORIES: AccessoryDef[] = [
     sourceText: '雪花屏让猎场更容易记住她的脸。',
     mods: [{ key: 'bloodPointPct', value: 10 }, { key: 'cooldown', value: 1 }],
   },
+  {
+    id: 'ghost_mirror',
+    name: '裂纹镜片',
+    owner: '鬼面',
+    rarity: 'very-rare',
+    desc: '结算血点 +20%。',
+    sourceSkill: 'Cracked Mirror',
+    sourceText: '夜幕中的观察更加精准。',
+    mods: [{ key: 'bloodPointPct', value: 20 }],
+  },
+  {
+    id: 'ghost_knife',
+    name: '旧猎刀',
+    owner: '鬼面',
+    rarity: 'rare',
+    desc: '能力冷却 -1 回合。',
+    sourceSkill: 'Old Hunting Knife',
+    sourceText: '猎刀让夜幕收得更快。',
+    mods: [{ key: 'cooldown', value: -1 }],
+  },
+  {
+    id: 'ghost_cloak',
+    name: '夜行披风',
+    owner: '鬼面',
+    rarity: 'uncommon',
+    desc: '结算血点 +10%。',
+    sourceSkill: 'Night Cloak',
+    sourceText: '披风让他在黑暗里更从容。',
+    mods: [{ key: 'bloodPointPct', value: 10 }],
+  },
 ];
 
 export const ACCESSORY_MAP: Record<string, AccessoryDef> = Object.fromEntries(

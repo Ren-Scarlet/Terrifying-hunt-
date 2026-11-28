@@ -136,26 +136,9 @@ export const KILLERS: KillerProfile[] = [
       {
         id: 'ghost_stalk',
         name: '夜幕',
-        desc: '拉开夜幕：接下来每回合盯住相邻房间的一名幸存者，监视值累积到 100 他就持续显形（红色小人），下一刀额外造成 1 点伤害；已受伤者会被击倒。有人闯进你所在房间会打断夜幕，且对方能多跑一步。',
-        cooldown: 1,
-        ops: [
-          { op: 'alarm', amount: -10 },
-          { op: 'flag', key: 'noAlarm' },
-          { op: 'log', text: '你退进阴影里，开始数隔壁的脚步声。' },
-        ],
-      },
-      {
-        id: 'ghost_nightfall',
-        name: '夜袭 · 收网',
-        desc: '本回合行动点 +3、目击无效、下次攻击 +2 伤害。趁监视锁定的已受伤目标还在显形时贴上去，一刀即可击倒。',
-        cooldown: 3,
-        ultimate: true,
-        ops: [
-          { op: 'steps', amount: 3 },
-          { op: 'flag', key: 'noAlarm' },
-          { op: 'bonusDamage', amount: 2 },
-          { op: 'log', text: '灯灭了，房子开始按你的节奏呼吸。' },
-        ],
+        desc: '消耗 1 点行动点进入无法侦测，并观察视野内的一名幸存者，进行一次机会条 QTE。成功时提高其标记值，黑暗中额外提高；标记满则进入危险状态。QTE 失败会解除夜幕，本回合不能再使用。',
+        cooldown: 0,
+        ops: [],
       },
     ],
   },
@@ -409,7 +392,7 @@ export const KILLER_MAP: Record<string, KillerProfile> = KILLERS.reduce(
 );
 
 /** 当前正式开放的初期角色。其余资料保留在数据库中，待机制实装后再开放。 */
-export const ACTIVE_KILLER_NAMES = ['设陷者', '护士', '女猎手', '迈克尔·迈尔斯', '贞子'] as const;
+export const ACTIVE_KILLER_NAMES = ['设陷者', '护士', '女猎手', '迈克尔·迈尔斯', '贞子', '鬼面'] as const;
 export const ACTIVE_KILLERS = ACTIVE_KILLER_NAMES.map((name) => KILLER_MAP[name]);
 /** 初始解锁名单与当前开放名单保持一致。 */
 export const STARTER_KILLERS: string[] = [...ACTIVE_KILLER_NAMES];

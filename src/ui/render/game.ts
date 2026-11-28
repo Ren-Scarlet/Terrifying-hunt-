@@ -383,7 +383,7 @@ function killerBuffsHtml(state: GameState): string {
     chips.push({ label: '厄咒 · 猎杀戾气', hint: '咒术生效中：命中幸存者后额外累积恐惧。', tone: 'buff' });
   }
   if (state.nightfallActive) {
-    chips.push({ label: '夜幕监视', hint: '鬼面夜幕：相邻房间的目标持续显形。', tone: 'buff' });
+    chips.push({ label: '夜幕 · 无法侦测', hint: '鬼面夜幕：你可以观察并标记幸存者；QTE 失败会解除。', tone: 'buff' });
   }
   if (state.possessed) {
     chips.push({ label: `恶魔附身 · ${state.possessTurns} 回合`, hint: '迈尔斯恶魔附身：挥刀直接击倒站立目标。', tone: 'buff' });
@@ -743,7 +743,7 @@ function personSlotStyle(roomId: RoomId, personId: string, index: number): strin
   if (state.blindTurns > 0)
     statusBits.push('<span class="status-badge blind">致盲 / 被击晕：动作被打断，下一回合少 1 点行动点</span>');
   if (state.nightfallActive)
-    statusBits.push('<span class="status-badge nightfall">夜幕监视中 · 相邻房间的目标正在显形</span>');
+    statusBits.push('<span class="status-badge nightfall">夜幕中 · 无法侦测，正在观察幸存者</span>');
   state.people
     .filter((p) => p.role !== 'police' && p.hp <= 0)
     .forEach((p) => {

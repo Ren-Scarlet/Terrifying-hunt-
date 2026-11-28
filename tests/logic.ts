@@ -39,6 +39,8 @@ import {
   executeDownedPerson,
   executeQtePerson,
   qteExecutionBlockReason,
+  beginGhostfaceNightfall,
+  resolveGhostfaceNightfall,
   sadakoTeleport,
   destroyItemBox,
   executeBlockReason,
@@ -109,7 +111,8 @@ import { applyAchievements, ACHIEVEMENTS } from '../src/game/achievements';
 import { advanceRogue, applyRogueFloor, rollRogueAccessories, rollRogueDeck, rollRogueOffers, startRogueRun } from '../src/game/rogue';
 import { bloodwebCostAtLevel } from '../src/game/progress';
 import { EXECUTION_METHODS, executionTextEntries, resolveExecutionText } from '../src/game/execution';
-import { awarenessLabel, awarenessStage, myersStalkGain } from '../src/game/npc/awareness';
+import { alertBand } from '../src/game/npc/ai/model';
+import { myersStalkGain } from '../src/game/npc/awareness';
 
 let pass = 0;
 let fail = 0;
@@ -137,9 +140,9 @@ boardPerson.room = boardRoom;
 boardRules.clearedObstacles.push(boardRoom);
 check('幸存者：原有木板已被清除后不能再次放板', !canPlaceBarricade(boardRules, boardPerson));
 
-check('初期可选杀手包含设陷者、护士、女猎手、迈尔斯与贞子',
-  ACTIVE_KILLERS.map((killer) => killer.owner).join('|') === '设陷者|护士|女猎手|迈克尔·迈尔斯|贞子' &&
-  STARTER_KILLERS.join('|') === '设陷者|护士|女猎手|迈克尔·迈尔斯|贞子',
+check('初期可选杀手包含设陷者、护士、女猎手、迈尔斯、贞子与鬼面',
+  ACTIVE_KILLERS.map((killer) => killer.owner).join('|') === '设陷者|护士|女猎手|迈克尔·迈尔斯|贞子|鬼面' &&
+  STARTER_KILLERS.join('|') === '设陷者|护士|女猎手|迈克尔·迈尔斯|贞子|鬼面',
   ACTIVE_KILLERS.map((killer) => killer.owner).join('、'),
 );
 check('未开放杀手资料仍保留在内部数据库，便于后续实装',
@@ -1949,6 +1952,48 @@ function caseCardKeywords(): void {
 
 caseCardKeywords();
 
+function caseChaseAndGhostface(): void {
+  const chase = newGame();
+  chase.roomLocks = {};
+  chase.barricades = [];
+  const target = chase.people.find((person) => person.role !== 'police')!;
+  const next = ROOM_MAP[chase.playerRoom].neighbors[0];
+  target.room = next;
+  target.hidden = false;
+  target.alert = 0;
+  chase.energy = 4;
+  movePlayer(chase, next);
+  check('追逐：进入幸存者房间会设置追逐目标',
+    chase.chaseTargetId === target.id,
+    `chase=${chase.chaseTargetId} targetRoom=${target.room}`);
+
+  const ghost = createGame(STARTING_DECK, undefined, '鬼面');
+  const ghostTarget = ghost.people.find((person) => person.role !== 'police')!;
+  ghostTarget.room = ghost.playerRoom;
+  ghostTarget.hidden = false;
+  ghostTarget.hp = 4;
+  ghostTarget.watchValue = 0;
+  ghost.energy = 4;
+  const ghostId = beginGhostfaceNightfall(ghost);
+  check('鬼面：夜幕消耗 1 AP 并进入无法侦测',
+    ghostId === ghostTarget.id && ghost.energy === 3 && ghost.nightfallActive,
+    `id=${ghostId} energy=${ghost.energy}`);
+  resolveGhostfaceNightfall(ghost, ghostTarget.id, true);
+  check('鬼面：QTE 成功会累积标记', ghostTarget.watchValue >= 35, `mark=${ghostTarget.watchValue}`);
+
+  const ghostFail = createGame(STARTING_DECK, undefined, '鬼面');
+  const failTarget = ghostFail.people.find((person) => person.role !== 'police')!;
+  failTarget.room = ghostFail.playerRoom;
+  failTarget.hidden = false;
+  ghostFail.energy = 4;
+  beginGhostfaceNightfall(ghostFail);
+  resolveGhostfaceNightfall(ghostFail, failTarget.id, false);
+  check('鬼面：QTE 失败解除夜幕并锁定本回合',
+    !ghostFail.nightfallActive && ghostFail.ghostfaceLockTurn === ghostFail.turn);
+}
+
+caseChaseAndGhostface();
+
 /** AB：封锁房门必须同时阻止 NPC 进入和离开；脚印不应随机消失 */
 function caseNpcLocksAndPersistentTrails(): void {
   const locked = newGame();
@@ -2366,10 +2411,9 @@ check('不规则地图：后院始终只有车库一个入口', layoutGardenFail
 check('不规则地图：每局至少出现三种房间尺寸', layoutSizeVarietyFailures === 0, `low-variety maps=${layoutSizeVarietyFailures}`);
 
 
-/* NPC 认知分档、迈尔斯尾随收益、对白真实性与寻路避让。 */
-check('幸存者认知：100 点严格分为未发觉 / 怀疑 / 恐慌 / 警觉',
-  [0, 11, 12, 39, 40, 74, 75, 100].map(awarenessLabel).join('|') === '未发觉|未发觉|怀疑|怀疑|恐慌|恐慌|警觉|警觉' &&
-  [0, 12, 40, 75].map(awarenessStage).join('|') === '0|1|2|3');
+/* NPC 警戒/恐惧、迈尔斯尾随收益、对白真实性与寻路避让。 */
+check('幸存者警戒：100 点严格分为未发觉 / 怀疑 / 警觉 / 慌乱',
+  [0, 11, 12, 39, 40, 74, 75, 100].map((value) => alertBand(value)).join('|') === 'unaware|unaware|suspicious|suspicious|alert|alert|panicked|panicked');
 check('迈尔斯尾随：目标越警觉，尾随收益越低',
   [0, 12, 40, 75].map(myersStalkGain).join('|') === '15|8|3|0');
 const dialogueGuard = newGame();

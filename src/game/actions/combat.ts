@@ -142,6 +142,8 @@ export function attack(host: NpcHost, state: GameState, targetId?: string, optio
     return false;
   }
   const target = host.findVictim(state, state.playerRoom, Infinity, false, targetId)!;
+  state.chaseTargetId = target.id;
+  state.chaseTurns = 0;
   // 警觉以上的幸存者可能侧身闪开这一刀；闪避会消耗这次攻击，但目标不会掉血。
   if (target.role !== 'police' && target.hp > 0 && target.alert >= 40 && target.blockedTurns <= 0 && !target.watched
     && !(state.alarm >= 100 && state.totems.length > 0)) {

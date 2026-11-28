@@ -49,6 +49,7 @@ export function alarmSuppressed(state: GameState): boolean {
 /** 玩家处于「不会被看见」的状态：报警被压制或静止隐身 */
 export function playerIsHidden(state: GameState): boolean {
   return state.sadakoHidden
+    || state.nightfallActive
     || (state.possessed && hasEffect(state, 'possessEnter', 'undetectable'))
     || alarmSuppressed(state)
     || state.stealthActions > 0;
@@ -56,7 +57,7 @@ export function playerIsHidden(state: GameState): boolean {
 
 /** 玩家当前的被察觉半径（0 潜行 / 1 同屋 / 2 隔一格） */
 export function effectiveFearRadius(state: GameState): number {
-  if (state.sadakoHidden || (state.possessed && hasEffect(state, 'possessEnter', 'undetectable'))) return 0;
+  if (state.sadakoHidden || state.nightfallActive || (state.possessed && hasEffect(state, 'possessEnter', 'undetectable'))) return 0;
   return perceptionRadius(state);
 }
 

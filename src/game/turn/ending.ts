@@ -43,35 +43,7 @@ export function endTurn(host: NpcHost, state: GameState): void {
   host.checkImmediateWin(state);
   if (state.result) return;
 
-  // 鬼面「夜幕」：监视相邻房间的人；有人闯进鬼面房间就中断，且他能多跑一步
-  if (state.killer === '鬼面' && state.nightfallActive) {
-    const intruder = npcs(state).find((p) => p.hp > 0 && p.room === state.playerRoom);
-    if (intruder) {
-      state.nightfallActive = false;
-      npcs(state).forEach((p) => {
-        p.watchValue = 0;
-      });
-      if (intruder.movesThisTurn < REACT_MOVE_CAP) {
-        host.fleeAway(state, intruder);
-        intruder.movesThisTurn += 1;
-      }
-      host.log(state, `${intruder.name} 一头撞进你所在的房间，夜幕被打断了——他趁乱又多跑了一步。`);
-    } else {
-      const targets = npcs(state).filter(
-        (p) => p.hp > 0 && !p.watched && ROOM_MAP[state.playerRoom].neighbors.includes(p.room),
-      );
-      const watchedTarget = targets.sort((a, b) => b.watchValue - a.watchValue)[0];
-      if (watchedTarget) {
-        watchedTarget.watchValue = Math.min(100, watchedTarget.watchValue + WATCH_GAIN);
-        host.log(state, `夜幕：你盯着${roomName(watchedTarget.room)}里的${watchedTarget.name}（监视 ${watchedTarget.watchValue}/100）。`);
-        if (watchedTarget.watchValue >= 100) {
-          watchedTarget.watched = true;
-          watchedTarget.trackedTurns = Math.max(watchedTarget.trackedTurns, 99);
-          host.log(state, `${watchedTarget.name} 的监视值满了：他持续显形，下一刀可以直接把他放倒。`);
-        }
-      }
-    }
-  }
+  // 鬼面的夜幕由 QTE 主动结算，不再在回合结束时自动累积监视值。
 
   if (state.totems.includes(state.playerRoom)) {
     state.bonusEnergyNextTurn = 1;

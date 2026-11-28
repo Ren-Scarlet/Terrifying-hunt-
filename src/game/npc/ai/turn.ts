@@ -18,7 +18,7 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 export function npcTurn(host: NpcHost, state: GameState): void {
-  host.sameRoomKillerReact(state, !state.sadakoHidden);
+  host.sameRoomKillerReact(state, !state.sadakoHidden && !state.nightfallActive);
   // 红色人影只保留到下一次 NPC 回合开始，给玩家足够时间确认陷阱命中。
   state.people.forEach((person) => { person.trapTriggered = false; });
   const before = host.snapshotRooms(state);

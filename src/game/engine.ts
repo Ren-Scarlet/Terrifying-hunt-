@@ -1,7 +1,7 @@
 import { random, randomOf, shuffle } from './random';
 import { getExecutionMethod, type ExecutionMethodId } from './execution';
 import { nearestOf, roomDistance } from './navigation';
-import { awarenessStage, myersStalkGain } from './npc/awareness';
+import { myersStalkGain } from './npc/awareness';
 import {
   blinkRangeOf,
   blinkWithinRange,
@@ -707,8 +707,15 @@ function checkScourgeShrine(state: GameState): void {
 /** 玩家每一个动作结束后的统一收尾：世界动一下，视野记一下，胜负判一下 */
 function afterPlayerAction(state: GameState): void {
   if (state.result) return;
+  if (state.chaseTargetId) {
+    const target = state.people.find((person) => person.id === state.chaseTargetId);
+    if (!target || target.hp <= 0 || target.hidden || roomDistance(state.playerRoom, target.room) > 2) {
+      state.chaseTargetId = null;
+      state.chaseTurns = 0;
+    }
+  }
   checkScourgeShrine(state);
-  sameRoomKillerReact(state, !state.sadakoHidden && state.lastPlayerRoom === state.playerRoom);
+  sameRoomKillerReact(state, !state.sadakoHidden && !state.nightfallActive && state.lastPlayerRoom === state.playerRoom);
   const beforeReaction = snapshotRooms(state);
   npcReact(state);
   checkScourgeShrine(state);
@@ -829,7 +836,16 @@ export function runOps(state: GameState, ops: Op[]): void {
     addWanted, addAlarm, resolveDest, movePersonTo, markExplored,
     onPlayerEnter: (current, chased) => {
       chasedId = chased ?? null;
-      try { npcOnPlayerEnter(current); } finally { chasedId = null; }
+      try {
+        npcOnPlayerEnter(current);
+        const seen = npcs(current).find((person) =>
+          person.hp > 0 && !person.hidden && person.room === current.playerRoom,
+        );
+        if (seen) {
+          current.chaseTargetId = seen.id;
+          current.chaseTurns = 0;
+        }
+      } finally { chasedId = null; }
     },
     scoutRoom, npcs, peopleInRoom, standing, nextStepToward,
     healPerson, rescuePerson, checkCond,
@@ -1340,8 +1356,49 @@ export function refillHuntressHatchets(state: GameState): boolean { return aiRef
 export function recoverBearTrap(state: GameState): boolean { return aiRecoverBearTrap(aiHost, state); }
 export function canUsePower(state: GameState, powerId: string): boolean { return aiCanUsePower(aiHost, state, powerId); }
 export function powerBlockReason(state: GameState, powerId: string): string { return aiPowerBlockReason(aiHost, state, powerId); }
-export function usePower(state: GameState, powerId: string): boolean {
-  state.powerUsedThisAction = true;
+/** 鬼面夜幕：消耗 1 AP、进入无法侦测，并锁定视野内一名目标。 */
+export function beginGhostfaceNightfall(state: GameState): string | null {
+  if (state.killer !== '鬼面' || state.energy < 1 || state.ghostfaceLockTurn === state.turn) return null;
+  const targets = state.people.filter((person) =>
+    person.role !== 'police' && person.hp > 0 && !person.hidden &&
+    (person.room === state.playerRoom || ROOM_MAP[state.playerRoom].neighbors.includes(person.room)),
+  );
+  const target = targets.sort((a, b) => (b.watchValue ?? 0) - (a.watchValue ?? 0))[0];
+  if (!target) return null;
+  state.energy -= 1;
+  state.nightfallActive = true;
+  log(state, `夜幕降临：你进入无法侦测，盯住了${roomName(target.room)}的${target.name}。`);
+  return target.id;
+}
+
+/** 机会条 QTE 结果：成功累积标记，失败解除夜幕并锁本回合。 */
+export function resolveGhostfaceNightfall(state: GameState, targetId: string, success: boolean): boolean {
+  if (state.killer !== '鬼面' || !state.nightfallActive) return false;
+  const target = state.people.find((person) => person.id === targetId);
+  if (!target) {
+    state.nightfallActive = false;
+    return false;
+  }
+  if (!success) {
+    state.nightfallActive = false;
+    state.ghostfaceLockTurn = state.turn;
+    log(state, '机会从指缝里溜走：夜幕解除，你失去无法侦测，本回合不能再使用夜幕。');
+    return true;
+  }
+  const dark = !isRoomLit(state, state.playerRoom);
+  const gain = 35 + (dark ? 15 : 0);
+  target.watchValue = Math.min(100, (target.watchValue ?? 0) + gain);
+  log(state, `夜幕：你记下了${target.name}的习惯（标记 ${target.watchValue}/100${dark ? '，黑暗加成' : ''}）。`);
+  if (target.watchValue >= 100) {
+    target.watched = true;
+    target.statusEffects ??= {};
+    target.statusEffects.danger = 1;
+    log(state, `${target.name} 的标记已满，进入危险状态：下一次攻击会直接将其击倒。`);
+  }
+  return true;
+}
+
+export function usePower(state: GameState, powerId: string): boolean {  state.powerUsedThisAction = true;
   const freePower = state.freePowerTurn !== state.turn
     && (hasEffect(state, 'firstPower', 'freePower') || hasEffect(state, 'usePower', 'freePower'));
   if (freePower) {

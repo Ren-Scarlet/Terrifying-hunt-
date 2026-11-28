@@ -17,6 +17,8 @@ import {
   executeDownedPerson,
   executeQtePerson,
   qteExecutionBlockReason,
+  beginGhostfaceNightfall,
+  resolveGhostfaceNightfall,
   createGame,
   discardCard,
   drawCardAction,
@@ -1187,6 +1189,26 @@ function createGameActions(): ActionTable {
     power: ({ target }) => {
       const game = currentGame();
       const powerId = target.dataset.power;
+      if (powerId === 'ghost_stalk' && game.killer === '鬼面') {
+        const targetId = beginGhostfaceNightfall(game);
+        if (!targetId) {
+          pushHuntAlert('夜幕：视野内没有可观察的目标，或本回合已经失败过。', 'warn');
+          render();
+          return;
+        }
+        startQte({
+          label: '夜幕 · 抓住机会',
+          mode: 'timing',
+          anchor: () => app.querySelector<HTMLElement>('.player-marker'),
+          onComplete: ({ success }) => {
+            const current = currentGame();
+            resolveGhostfaceNightfall(current, targetId, success);
+            afterAction();
+          },
+        });
+        render();
+        return;
+      }
       const wasPossessed = game.possessed;
       const used = powerId ? usePower(game, powerId) : false;
       if (used && powerId === 'trap_set') playSfx('trapSet');

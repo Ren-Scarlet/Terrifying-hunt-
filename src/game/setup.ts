@@ -231,6 +231,7 @@ export function createGame(
     chaseTurns: 0,
 
     nightfallActive: false,
+    ghostfaceLockTurn: -1,
     lastAttackedId: null,
     policeAssaulted: false,
     cooldowns: {},

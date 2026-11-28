@@ -637,6 +637,8 @@ export interface GameState {
   chaseTurns: number;
   /** 鬼面夜幕是否正在监视 */
   nightfallActive: boolean;
+  /** 鬼面本回合 QTE 失败后锁定夜幕的回合号 */
+  ghostfaceLockTurn: number;
   /** 上一次被玩家砍中的人：同屋目击者要反应，但他本人不重复行动 */
   lastAttackedId: string | null;
   /** 是否已经袭击过警员（袭警后警察会更紧地咬住你） */
