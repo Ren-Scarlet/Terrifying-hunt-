@@ -19,8 +19,6 @@ export interface ActionContext {
   readonly target: HTMLElement;
   /** 动作名，等于元素的 `data-action`。 */
   readonly action: string;
-  /** 分数处决 QTE 的结果；其它动作恒为 undefined。 */
-  readonly qteOutcome?: 'perfect' | 'miss';
 }
 
 export type ActionScope = 'any' | 'game';

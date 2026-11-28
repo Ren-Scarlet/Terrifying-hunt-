@@ -1,17 +1,17 @@
 /**
- * 玩家的战斗执行：挥刀、处决、分数处决，以及"为什么砍不出去"的判定。
+ * 玩家的战斗执行：挥刀、处决，以及"为什么砍不出去"的判定。
  *
  * 判定与执行放在一起，是因为两者共用同一套目标选择规则；
  * 界面只读判定，真正改世界的是下面这些执行函数。
  */
-import { ALARM_MAX, ATTACK_COST, SCORE_EXECUTION_THRESHOLD, SURVIVOR_MAX_HP } from '../constants';
+import { ALARM_MAX, ATTACK_COST, SURVIVOR_MAX_HP } from '../constants';
 import { getExecutionMethod } from '../executions';
 import { modifierValue } from '../modifiers';
 import { random } from '../random';
-import { currentScore } from '../scoring';
+import { BLOOD, awardBlood, markBloodEvent } from '../bloodpoints';
 import type { GameState, Person, RoomId } from '../types';
 import { ROOM_MAP } from '../rooms';
-import { npcPeople as npcs, peopleInRoom } from '../world/roomState';
+import { npcPeople as npcs, peopleInRoom, isRoomLit } from '../world/roomState';
 import { ambushActive } from '../npc/ai/predicates';
 import type { NpcHost } from '../npc/ai/host';
 
@@ -85,38 +85,6 @@ export function executeDownedPerson(host: NpcHost, state: GameState, targetId?: 
   return true;
 }
 
-export function scoreExecutionBlockReason(host: NpcHost, state: GameState, targetId: string): string {
-  if (currentScore(state) < SCORE_EXECUTION_THRESHOLD) return '猎杀评分尚未达到 ' + SCORE_EXECUTION_THRESHOLD + ' 分，暂时无法发动分数处决。';
-  if (state.carryPersonId === targetId) return '目标已经被抱起；请将其搬运到地点处决区域。';
-  return executeBlockReason(host, state, targetId);
-}
-
-/** 分数处决：独立于普通处决与搬运地点处决，使用单独的头顶按钮和 QTE。 */
-export function executeScoreSpecial(host: NpcHost, state: GameState, targetId: string): boolean {
-  const reason = scoreExecutionBlockReason(host, state, targetId);
-  if (reason) {
-    host.log(state, reason);
-    return false;
-  }
-  const target = state.people.find((person) => person.id === targetId);
-  if (!target) {
-    host.log(state, '分数处决失败：没有找到目标。');
-    return false;
-  }
-  state.energy -= 1;
-  state.scoreExecutions += 1;
-  state.specialExecutionBonus += 25;
-  host.addAlarm(state, host.executionWitnessed(state, target) ? 8 : 1);
-  state.executions += 1;
-  host.log(state, '分数处决：你消耗 1 AP，发动独立处决动作，额外获得 25 分。');
-  host.killPerson(state, target);
-  if (state.result) return true;
-  state.attackReady = true;
-  host.afterPlayerAction(state);
-  host.checkImmediateWin(state);
-  return true;
-}
-
 /**
  * 普通攻击：只针对站立目标，健康 → 受伤，受伤 → 倒地；倒地后使用独立处决动作。
  * 恶魔附身期间伤害翻倍，还站着的人一刀就倒。
@@ -142,8 +110,8 @@ export function attack(host: NpcHost, state: GameState, targetId?: string, optio
   const noedActive = state.hexNoedActive && state.alarm >= ALARM_MAX && state.totems.length > 0;
   state.energy -= attackCost;
   if (state.killer === '护士' && state.nurseFollowUp && target.role !== 'police') {
-    state.huntStats.nurseBlinkAttacks += 1;
-    host.log(state, `护士利用闪现后的追击窗口攻击了 ${target.name}，额外挑战进度 +1。`);
+    state.huntCounters.nurseBlinkAttacks += 1;
+    host.log(state, `护士利用闪现后的追击窗口攻击了 ${target.name}。`);
   }
   state.attackReady = false;
   state.lastAttackedId = target.id;
@@ -171,6 +139,7 @@ export function attack(host: NpcHost, state: GameState, targetId?: string, optio
     host.log(state, `夜幕锁定 ${target.name}：这一刀直接把他放倒。`);
   }
   const hpBeforeHit = target.hp;
+  const wasInteracting = /电话|无线电|电闸|修复|维修|翻找|包扎|拖|救/.test(target.activity);
   // 卡牌联动：定位、控制、伏击都能转化成真正的猎杀优势，而不是只提供一段说明文字。
   const trackingCombo = target.role !== 'police' && target.trackedTurns > 0;
   const controlCombo = target.role !== 'police' && target.blockedTurns > 0;
@@ -201,11 +170,7 @@ export function attack(host: NpcHost, state: GameState, targetId?: string, optio
   }
   if (target.role !== 'police' && target.hp < hpBeforeHit && state.hexHuntressActive && !state.hexHuntressUsed) {
     state.hexHuntressUsed = true;
-    state.cardBonusScore += 50;
-    host.log(state, '厄咒：猎杀戾气触发：这次攻击命中，额外获得 50 点猎杀评分。');
-  }
-  if (heavy && state.killer === '迈克尔·迈尔斯' && target.hp < hpBeforeHit) {
-    state.huntStats.myersBurstHits += 1;
+    host.log(state, '厄咒：猎杀戾气触发：这次攻击命中，诅咒印记开始生效。');
   }
   if (ambushStrike) {
     state.ambushTurn = 0;
@@ -214,8 +179,26 @@ export function attack(host: NpcHost, state: GameState, targetId?: string, optio
   if (target.role !== 'police' && target.hp < hpBeforeHit) {
     if (controlCombo) host.log(state, `控制连携：你趁${target.name}被限制行动时出手，额外造成 1 点伤害。`);
     if (trackingCombo) {
-      state.specialExecutionBonus += 10;
-      host.log(state, `定位连携：你沿着追踪标记精准截住${target.name}，猎杀评分 +10。`);
+      awardBlood(state, 'hunt', `追踪截击 · ${target.name}`, BLOOD.track, { key: `track:${target.id}`, limit: 3 });
+      host.log(state, `定位连携：你沿着追踪标记精准截住${target.name}。`);
+    }
+  }
+  if (target.role !== 'police' && target.hp < hpBeforeHit) {
+    awardBlood(state, 'hunt', `攻击幸存者 · ${target.name}`, BLOOD.attack, { key: `attack:${target.id}`, limit: 3 });
+    if (hpBeforeHit > 0 && target.hp <= 0) {
+      awardBlood(state, 'hunt', `击倒幸存者 · ${target.name}`, BLOOD.down, { key: `down:${target.id}`, limit: 1 });
+    }
+    if (wasInteracting) {
+      awardBlood(state, 'hunt', `打断行动 · ${target.name}`, BLOOD.interrupt, { key: `interrupt:${target.id}`, limit: 2 });
+      awardBlood(state, 'control', `阻止地图互动 · ${target.name}`, BLOOD.preventInteraction, { key: `prevent:${target.id}`, limit: 1 });
+      host.log(state, `你打断了${target.name}正在做的事。`);
+    }
+    if (!isRoomLit(state, state.playerRoom)) {
+      awardBlood(state, 'cunning', `断电区域袭击 · ${target.name}`, BLOOD.blackoutAmbush, { key: `blackout:${target.id}`, limit: 1 });
+    }
+    if (ambushStrike) {
+      awardBlood(state, 'cunning', '伏击命中', BLOOD.abilityAmbush, { key: 'attack:ambush', limit: 3 });
+      markBloodEvent(state, 'attack:ambush');
     }
   }
   if (target.role !== 'police' && target.hp < hpBeforeHit) {

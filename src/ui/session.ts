@@ -1,5 +1,5 @@
 /**
- * 大厅会话状态：牌组编辑草稿、配件装配草稿、本次出发的模式与加注开关。
+ * 大厅会话状态：牌组编辑草稿、配件装配草稿与本次出发的模式。
  *
  * 这些都不是存档（`SaveData`），只是「这次打开界面时正在编辑什么」的临时状态，
  * 之前和屏幕标志位一起堆在 main.ts 顶层。集中到这里后，菜单动作模块与渲染层
@@ -11,7 +11,6 @@ export type PendingRun = 'contract' | 'free' | null;
 let editorDeck: string[] = [];
 let accessoryDraft: string[] = [];
 let pendingRun: PendingRun = null;
-let anteArmed = false;
 
 export const session = {
   /** 牌组编辑器里的当前草稿（未保存前不写回存档）。 */
@@ -34,12 +33,5 @@ export const session = {
   },
   set pendingRun(next: PendingRun) {
     pendingRun = next;
-  },
-  /** 下一局是否加注。 */
-  get anteArmed(): boolean {
-    return anteArmed;
-  },
-  set anteArmed(next: boolean) {
-    anteArmed = next;
   },
 };

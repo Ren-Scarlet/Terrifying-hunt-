@@ -10,8 +10,7 @@ import {
   BASE_AP,
   ATTACK_COST,
   WIPE_COST,
-  SCORE_EXECUTION_THRESHOLD,
-  SCORE_RULES,
+  BLOOD,
   DAWN_PHASE_TURNS,
   DAWN_ALARM_GAIN,
   DAWN_ALERT_GAIN,
@@ -27,7 +26,7 @@ import { LEVELS_PER_PRESTIGE, bloodwebCost, totalLevel } from '../../game/progre
 import { currentMenuMap, mapArtSrc } from '../mapArt';
 import { detailCardHtml, addonIconHtml, escape, getKiller, icon, killerFaceHtml, perkIconHtml, powerIconHtml, TYPE_NAMES } from './shared';
 
-export function renderMenu(save: SaveData, ante = false): string {
+export function renderMenu(save: SaveData): string {
   const killer = getKiller(save.killer);
   const canAfford = save.darkCells >= 2;
   const map = currentMenuMap();
@@ -108,7 +107,7 @@ export function renderMenu(save: SaveData, ante = false): string {
         )}</div>
 
         <div class="menu-stats">
-          <div><small>历史最高分</small><b>${save.bestScore}</b></div>
+          <div><small>血点余额</small><b>${save.credits}</b></div>
           <div><small>完成任务数</small><b>${save.wins}</b></div>
           <div><small>当前牌组</small><b>${save.deck.length} 张</b></div>
           <div><small>已解锁卡牌</small><b>${save.unlockedCards.filter((id) => deckCardsForKiller(killer.owner).some((card) => card.id === id)).length} / ${deckCardsForKiller(killer.owner).length}</b></div>
@@ -118,7 +117,6 @@ export function renderMenu(save: SaveData, ante = false): string {
 
         <div class="actions">
           <button class="btn primary" data-action="start">准备开始 · 随机契约</button>
-          <button class="btn ${ante ? 'primary' : ''}" data-action="ante" title="多接一个高难目标：达成契约分 +60%，未达成 −50%">加注 · ${ante ? '已开启' : '关闭'}</button>
           <button class="btn" data-action="free-hunt">自由猎杀</button>
           <button class="btn" data-action="rogue-start">${save.rogue ? `肉鸽 · 继续第 ${save.rogue.depth} 层` : '肉鸽猎杀'}</button>
           ${save.rogue ? '<button class="btn ghost" data-action="rogue-abandon">放弃肉鸽进度</button>' : ''}
@@ -136,7 +134,7 @@ export function renderMenu(save: SaveData, ante = false): string {
 
 /**
  * 玩法指引：由数据生成，而不是手写文案。
- * 卡牌来自 CARDS、杀手来自 ACTIVE_KILLERS、数值来自引擎常量与 SCORE_RULES，
+ * 卡牌来自 CARDS、杀手来自 ACTIVE_KILLERS、数值来自引擎常量与血点表，
  * 所以改玩法后指南不会过期。
  */
 export function renderGuide(): string {
@@ -156,21 +154,18 @@ export function renderGuide(): string {
     return `<div class="g-row"><b>${escape(killer.owner)}</b><span>${powers}</span></div>`;
   }).join('');
 
-  const R = SCORE_RULES;
   const scoreRows: Array<[string, string]> = [
-    ['击杀 1 人', `+${R.kill}`],
-    ['处决 1 次', `+${R.execution}`],
-    ['处决方式每多 1 种', `+${R.executionVariety}`],
-    ['连杀（同回合第 2 人起）', `+${R.comboKill}`],
-    ['击杀已恐惧崩溃的目标', `+${R.terrorKill}`],
-    ['全程无人成功报警', `+${R.noAlarm}`],
-    [`结束时警报低于 ${R.lowAlarmBelow}`, `+${R.lowAlarm}`],
-    ['无目击猎杀', `+${R.quietKill}/次，上限 ${R.quietKillCap}`],
-    ['用过 3 种卡后，每多 1 种', `+${R.cardVarietyStep}，上限 ${R.cardVarietyCap}`],
-    ['胜利结算每剩余 1 回合', `+${R.efficiencyPerTurn}`],
-    ['加注达成', '契约分 +60%'],
-    ['逃走 1 人', `−${R.escapePenalty}`],
-    ['被警察抓捕 / 超时 / 失败', `−${R.caught} / −${R.timeout} / −${R.failed}`],
+    ['首次发现幸存者', `+${BLOOD.firstDiscover}`],
+    ['成功攻击 / 击倒', `+${BLOOD.attack} / +${BLOOD.down}`],
+    ['击杀一名幸存者', `+${BLOOD.kill}`],
+    ['特殊处决 / 场景处决', `+${BLOOD.specialExecution} / +${BLOOD.locationExecution}`],
+    ['未被发现时完成击杀', `+${BLOOD.stealthKill}`],
+    ['从柜子搜出 / 陷阱捕获', `+${BLOOD.cabinetFind} / +${BLOOD.trapCapture}`],
+    ['破坏电闸 / 电话 / 木门', `+${BLOOD.breaker} / +${BLOOD.phone} / +${BLOOD.breakDoor}`],
+    ['布置 / 触发捕兽夹', `+${BLOOD.placeTrap} / +${BLOOD.trapTrigger}`],
+    ['完成主要 / 额外任务', `+${BLOOD.primaryTask} / +${BLOOD.optionalTask}`],
+    ['全部主要 / 全部额外', `+${BLOOD.allPrimary} / +${BLOOD.allOptional}`],
+    ['特殊表现称号', '每个 +300'],
   ];
   const scoreTable = scoreRows.map(([label, value]) => `<div class="g-tr"><span>${label}</span><b>${value}</b></div>`).join('');
 
@@ -186,11 +181,11 @@ export function renderGuide(): string {
           <section class="g-sec">
             <h2>1 · 一局怎么走</h2>
             <ol class="g-steps">
-              <li><b>接契约</b>：点「准备开始」后随机抽取，主目标可能是指定击杀、累计击杀、处决、破坏电闸或阻止报警。</li>
+              <li><b>接契约</b>：点「准备开始」后随机抽取，主目标可能是指定击杀、累计击杀、破坏电闸，额外目标还可能有警报限制与杀手专属任务。</li>
               <li><b>潜伏接近</b>：隔壁只看得到名字、看不到人。黑暗会降低对方的察觉速度，但你也看不清。</li>
               <li><b>制造恐惧</b>：杀戮、尖叫、断电、独处都会推高幸存者的恐惧；吓崩的人会僵住或乱跑。</li>
-              <li><b>收人</b>：两刀放倒，再补一次处决。处决方式越多样，分数越高。</li>
-              <li><b>结算</b>：主目标完成后可以立刻结算，也可以继续做额外挑战——但天亮会持续推进。</li>
+              <li><b>收人</b>：两刀放倒，再补一次处决。处决方式、陷阱与潜行都会换成血点。</li>
+              <li><b>结算</b>：主目标完成后可以立刻结算，也可以继续做额外任务——但天亮会持续推进。</li>
             </ol>
           </section>
 
@@ -204,7 +199,7 @@ export function renderGuide(): string {
           <section class="g-sec">
             <h2>3 · 挥刀与处决</h2>
             <p>幸存者 ${SURVIVOR_MAX_HP} 点生命：<b>一刀受伤、两刀倒地</b>。挥刀消耗 ${ATTACK_COST} AP，砍完要擦刀（${WIPE_COST} AP）或做别的事才能再砍。</p>
-            <p>倒地后有三种处理：<b>普通处决</b>（1 AP）、<b>搬运到地点处决</b>（6 种地点，加分更多）、以及评分达到 ${SCORE_EXECUTION_THRESHOLD} 后的<b>分数处决</b>（独立按钮 + QTE）。</p>
+            <p>倒地后有两种处理：<b>普通处决</b>（1 AP）与<b>搬运到地点处决</b>（6 种地点，血点更多）。</p>
           </section>
 
           <section class="g-sec">
@@ -215,7 +210,7 @@ export function renderGuide(): string {
               <div><b>60–84 恐惧</b><span>只想跑，不再报警；被追时放板</span></div>
               <div><b>85+ 崩溃</b><span>僵住或尖叫乱跑，补刀极佳</span></div>
             </div>
-            <p>恐惧来源：目击死亡、被攻击、<b>独处</b>、<b>黑暗</b>；结伴 + 照明会回落。恐惧崩溃时补刀每次额外 +${R.terrorKill}。</p>
+            <p>恐惧来源：目击死亡、被攻击、<b>独处</b>、<b>黑暗</b>；结伴 + 照明会回落。恐惧崩溃时击杀会额外计入凶残血点。</p>
           </section>
 
           <section class="g-sec">
@@ -239,7 +234,7 @@ export function renderGuide(): string {
             <h2>8 · 经济</h2>
             <div class="g-rows">
               <div class="g-row"><b>血点</b><span>完成任务获得，用于商店解锁卡牌、解锁配件</span></div>
-              <div class="g-row"><b>暗金细胞</b><span>胜利且评分 ≥150 时 +1，用于解锁杀手</span></div>
+              <div class="g-row"><b>暗金细胞</b><span>胜利时 +1，用于解锁杀手</span></div>
             </div>
           </section>
 

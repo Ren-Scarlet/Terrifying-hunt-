@@ -12,45 +12,38 @@ import {
   trapDamageOf,
   trapHoldTurns,
 } from './modifiers';
-import { ESCAPE_ROOMS, BASE_AP, SABOTAGE_COST, POSSESS_TURNS, SURVIVOR_MAX_HP, SURVIVOR_INJURED_HP, REACT_MOVE_CAP, BLEEDOUT_TURNS, ALARM_MAX, HAND_LIMIT, FRENZY_THRESHOLD, FRENZY_AP_BONUS, WATCH_GAIN, SEARCH_COST, LOOK_COST, ATTACK_COST, SCORE_EXECUTION_THRESHOLD, PANIC_HOPS_ON_HIT } from './constants';
+import { ESCAPE_ROOMS, BASE_AP, SABOTAGE_COST, POSSESS_TURNS, SURVIVOR_MAX_HP, SURVIVOR_INJURED_HP, REACT_MOVE_CAP, BLEEDOUT_TURNS, ALARM_MAX, HAND_LIMIT, FRENZY_THRESHOLD, FRENZY_AP_BONUS, WATCH_GAIN, SEARCH_COST, LOOK_COST, ATTACK_COST, PANIC_HOPS_ON_HIT } from './constants';
 import { drawCards } from './deck';
 import { executeOps } from './effects/runtime';
 import { createGame } from './setup';
 export { drawCards } from './deck';
 export { createGame } from './setup';
-export { BASE_AP, SABOTAGE_COST, POSSESS_TURNS, SURVIVOR_MAX_HP, SURVIVOR_INJURED_HP, BLEEDOUT_TURNS, ALARM_MAX, HAND_LIMIT, FRENZY_THRESHOLD, FRENZY_AP_BONUS, SEARCH_COST, LOOK_COST, ATTACK_COST, SCORE_EXECUTION_THRESHOLD, PANIC_HOPS_ON_HIT } from './constants';
+export { BASE_AP, SABOTAGE_COST, POSSESS_TURNS, SURVIVOR_MAX_HP, SURVIVOR_INJURED_HP, BLEEDOUT_TURNS, ALARM_MAX, HAND_LIMIT, FRENZY_THRESHOLD, FRENZY_AP_BONUS, SEARCH_COST, LOOK_COST, ATTACK_COST, PANIC_HOPS_ON_HIT } from './constants';
 import { ACTIVITIES, createPeople } from './npc/factory';
 import { HEALTH_LABEL } from './npc/catalog';
 export { HEALTH_LABEL } from './npc/catalog';
 export { ESCAPE_ROOMS } from './constants';
-import { CARD_MAP, UNLOCK_REWARDS } from './cards';
+import { CARD_MAP } from './cards';
 import type { Cond, Dest, Op, Who } from './effect';
 import { KILLER_MAP } from './killers';
 import { generateMission, roomName } from './missions';
 import {
-  LOOT_EXECUTION,
-  LOOT_FAILURE_KEEP,
-  LOOT_KILL,
-  SCORE_RULES,
-  calculateHuntStyleRating,
-  currentScore,
-  getStars,
-  lootPayout,
+  BLOOD,
+  awardBlood,
+  bloodPointGroups,
+  bloodPointTotal,
+  finalizeBloodPoints,
+  markBloodEvent,
   missionTaskProgress,
-  scoreLines,
-} from './scoring';
+} from './bloodpoints';
 export {
-  LOOT_EXECUTION,
-  LOOT_FAILURE_KEEP,
-  LOOT_KILL,
-  SCORE_RULES,
-  calculateHuntStyleRating,
-  currentScore,
-  getStars,
-  lootPayout,
+  BLOOD,
+  BLOOD_CATEGORY_LABEL,
+  awardBlood,
+  bloodPointGroups,
+  bloodPointTotal,
   missionTaskProgress,
-  scoreLines,
-} from './scoring';
+} from './bloodpoints';
 import {
   ENTRY_ROOM,
   EXIT_ROOM,
@@ -152,8 +145,6 @@ import {
   canAttack as aiCanAttack,
   executeBlockReason as aiExecuteBlockReason,
   executeDownedPerson as aiExecuteDownedPerson,
-  executeScoreSpecial as aiExecuteScoreSpecial,
-  scoreExecutionBlockReason as aiScoreExecutionBlockReason,
 } from './actions/combat';
 import { cancelAuraSelection as aiCancelAuraSelection, playCard as aiPlayCard, selectAuraRoom as aiSelectAuraRoom } from './actions/cards';
 import {
@@ -264,7 +255,6 @@ import type {
   PersonRole,
   ResultKind,
   RoomId,
-  ScoreLine,
   Trail,
   MissionTask,
 } from './types';
@@ -465,7 +455,7 @@ export function breakPhone(state: GameState): boolean {
   state.energy -= 1;
   state.brokenPhones ??= [];
   state.brokenPhones.push(state.playerRoom);
-  state.huntStats.environmentActions += 1;
+  awardBlood(state, 'control', `破坏电话 · ${roomName(state.playerRoom)}`, BLOOD.phone, { key: `phone:${state.playerRoom}`, limit: 1 });
   log(state, `你砸烂了${roomName(state.playerRoom)}的电话，这间屋子暂时没法报警了。`);
   addAlarm(state, 2);
   state.attackReady = true;
@@ -756,6 +746,13 @@ function afterPlayerAction(state: GameState): void {
   state.lastPlayerRoom = state.playerRoom;
   pruneTrails(state);
   pruneDisturbances(state);
+  // 首次发现：只在真正看见这个人时奖励一次。
+  state.people.forEach((person) => {
+    if (person.role === 'police' || person.hp <= 0) return;
+    if (!isPersonVisible(state, person)) return;
+    awardBlood(state, 'hunt', `首次发现 · ${person.name}`, BLOOD.firstDiscover, { key: `discover:${person.id}`, limit: 1 });
+  });
+  state.powerUsedThisAction = false;
 }
 
 /* ==================================================================== */
@@ -842,7 +839,9 @@ export function runOps(state: GameState, ops: Op[]): void {
       return hasObject && sabotageSiteItem(current, { free: true, suppressAfterAction: true });
     },
   });
-  if (!phoneWasCut && state.phoneCut) state.huntStats.environmentActions += 1;
+  if (!phoneWasCut && state.phoneCut) {
+    awardBlood(state, 'control', '切断电话线', BLOOD.phone, { key: 'phone:cut', limit: 1 });
+  }
 }
 
 function movePersonTo(state: GameState, person: Person, room: RoomId, clearAlert = false): void {
@@ -955,8 +954,10 @@ export function triggerBearTrapForPerson(state: GameState, person: Person): void
   trap.triggeredBy = person.id;
   trap.triggeredTurn = state.turn;
   state.lastTrapTriggerId = person.id;
-  state.huntStats.trapTriggers += 1;
   state.trapTriggerCount += 1;
+  awardBlood(state, 'cunning', `陷阱捕获 · ${person.name}`, BLOOD.trapCapture, { key: `trap:${trap.id}`, limit: 1 });
+  awardBlood(state, 'control', `幸存者触发陷阱 · ${person.name}`, BLOOD.trapTrigger, { key: `trap-control:${trap.id}`, limit: 1 });
+  markBloodEvent(state, 'trap:trigger');
   person.trapTriggered = true;
   person.revealedActions = Math.max(person.revealedActions ?? 0, 2);
   const trapDamage = trapDamageOf(state);
@@ -1067,6 +1068,7 @@ function updateFrenzy(state: GameState, from: RoomId, to: RoomId): void {
     const before = state.frenzy;
     state.frenzyStreak += 1;
     state.frenzy = clamp(state.frenzy + FRENZY_GAIN, 0, FRENZY_MAX);
+    awardBlood(state, 'hunt', '成功追踪', BLOOD.track, { key: 'track', limit: 3 });
     // 刚跨过阈值：立刻补 2 点行动点，之后每回合也多 2 点。
     // 绝不替玩家走第二步——走哪、走几格都由他自己点，不再像瞬移。
     if (before < FRENZY_THRESHOLD && state.frenzy >= FRENZY_THRESHOLD) {
@@ -1116,8 +1118,6 @@ export function attackBlockReason(state: GameState, targetId?: string, costOverr
 export function canAttack(state: GameState, targetId?: string): boolean { return aiCanAttack(aiHost, state, targetId); }
 export function executeBlockReason(state: GameState, targetId?: string): string { return aiExecuteBlockReason(aiHost, state, targetId); }
 export function executeDownedPerson(state: GameState, targetId?: string): boolean { return aiExecuteDownedPerson(aiHost, state, targetId); }
-export function scoreExecutionBlockReason(state: GameState, targetId: string): string { return aiScoreExecutionBlockReason(aiHost, state, targetId); }
-export function executeScoreSpecial(state: GameState, targetId: string): boolean { return aiExecuteScoreSpecial(aiHost, state, targetId); }
 export function attack(state: GameState, targetId?: string, options: { costOverride?: number; bleedOnHit?: boolean; bleedTurns?: number; hitStatus?: 'blind' | 'undetectable' | 'danger' | 'deepWound' | 'oblivious' | 'incurable' | 'cursed'; hitStatusTurns?: number } = {}): boolean { return aiAttack(aiHost, state, targetId, options); }
 
 /**
@@ -1231,8 +1231,8 @@ export function togglePowerCircuit(state: GameState, circuitId?: string): boolea
   );
   if (!circuit) return false;
   state.energy -= BREAKER_SWITCH_COST;
-  state.huntStats.environmentActions += 1;
   circuit.enabled = circuit.enabled === false;
+  awardBlood(state, 'control', `操作电闸 · ${circuit.name}`, BLOOD.breaker, { key: `breaker:${circuit.id}`, limit: 1 });
   addAlarm(state, 1);
   log(state, circuit.enabled
     ? `你合上了${circuit.name}电闸，供电恢复。`
@@ -1254,9 +1254,9 @@ export function sabotageSiteItem(state: GameState, options: { free?: boolean; su
   const target = sabotageTarget(state);
   if (!target) return false;
   if (!options.free) state.energy -= SABOTAGE_COST;
-  state.huntStats.environmentActions += 1;
   if (target.kind === 'door') {
     state.roomLocks[target.room] = 0;
+    awardBlood(state, 'control', `撞开门锁 · ${roomName(target.room)}`, BLOOD.breakDoor, { key: `door:${target.room}`, limit: 1 });
     log(state, `你用蛮力撞开通往${roomName(target.room)}的门锁！屋内的人被巨响惊动。`);
     npcs(state).filter((p) => p.room === target.room && p.hp > 0).forEach((p) => {
       p.alert = clamp(p.alert + 24, 0, 100);
@@ -1266,6 +1266,7 @@ export function sabotageSiteItem(state: GameState, options: { free?: boolean; su
   } else if (target.kind === 'phone') {
     state.brokenPhones ??= [];
     state.brokenPhones.push(target.room);
+    awardBlood(state, 'control', `破坏电话 · ${roomName(target.room)}`, BLOOD.phone, { key: `phone:${target.room}`, limit: 1 });
     log(state, `你砸烂了${roomName(target.room)}的电话，这间屋子暂时没法报警了。`);
     addAlarm(state, 2);
   } else if (target.kind === 'radio') {
@@ -1277,6 +1278,7 @@ export function sabotageSiteItem(state: GameState, options: { free?: boolean; su
     if (!circuit) return false;
     circuit.broken = true;
     circuit.enabled = false;
+    awardBlood(state, 'control', `破坏电闸 · ${circuit.name}`, BLOOD.breaker, { key: `breaker:${circuit.id}`, limit: 1 });
     log(state, `你砸毁了${circuit.name}控制箱！${circuit.affectedRooms.map(roomName).join('、')}立即断电，灯光熄灭。`);
   }
 
@@ -1301,7 +1303,10 @@ export function collectTrapCache(state: GameState): boolean { return aiCollectTr
 export function recoverBearTrap(state: GameState): boolean { return aiRecoverBearTrap(aiHost, state); }
 export function canUsePower(state: GameState, powerId: string): boolean { return aiCanUsePower(aiHost, state, powerId); }
 export function powerBlockReason(state: GameState, powerId: string): string { return aiPowerBlockReason(aiHost, state, powerId); }
-export function usePower(state: GameState, powerId: string): boolean { return aiUsePower(aiHost, state, powerId); }
+export function usePower(state: GameState, powerId: string): boolean {
+  state.powerUsedThisAction = true;
+  return aiUsePower(aiHost, state, powerId);
+}
 
 /* ==================================================================== */
 /*  胜负                                                                */
@@ -1312,7 +1317,7 @@ function checkImmediateWin(state: GameState): void {
   const required = (state.mission.tasks ?? []).filter((task) => !task.optional);
   if (required.length > 0 && required.every((task) => missionTaskProgress(state, task) >= task.target) && !state.missionPrimaryCompleted) {
     state.missionPrimaryCompleted = true;
-    log(state, '主目标已完成！你可以立即结算，也可以继续猎杀，完成额外挑战赚取更多奖励。');
+    log(state, '主目标已完成！你可以立即结算，也可以继续猎杀，争取额外任务与行为血点。');
   }
 }
 
@@ -1320,19 +1325,13 @@ function finish(state: GameState, result: ResultKind): void {
   if (state.result) return;
   state.result = result;
   state.phase = 'gameover';
-  const style = calculateHuntStyleRating(state, result);
-  state.huntStyleScore = style.score;
-  state.huntStyleRank = style.rank;
-  state.huntStyleBonus = style.bonus;
-  state.huntStyleBreakdown = style.breakdown;
-
-  if (result === 'win') {
-    state.rewardCards = state.mission.mode === 'free' ? [] : [UNLOCK_REWARDS[state.mission.kind]].filter(Boolean);
+  finalizeBloodPoints(state);
+  const gearPct = modifierValue(state, 'bloodPointPct');
+  if (gearPct > 0) {
+    const subtotal = bloodPointTotal(state);
+    awardBlood(state, 'hunt', `配件加成 · 血点 +${gearPct}%`, Math.round(subtotal * gearPct / 100), { key: 'gear:blood-points' });
   }
-
-  const lines = scoreLines(state, result);
-  state.scoreBreakdown = lines;
-  state.score = Math.max(0, Math.round(lines.reduce((sum, line) => sum + line.value, 0)));
+  state.rewardCards = [];
 }
 
 /** 从牌库抽牌；牌库耗尽时正常洗回弃牌堆。 */

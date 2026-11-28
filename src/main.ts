@@ -15,7 +15,6 @@ import {
   throwHuntressHatchet,
   executeCarriedPerson,
   executeDownedPerson,
-  executeScoreSpecial,
   createGame,
   discardCard,
   drawCardAction,
@@ -35,7 +34,7 @@ import {
   movePlayer,
   moveBlockReason,
   noteToPlayer,
-  lootPayout,
+  bloodPointTotal,
   playCard,
   searchRoom,
   breakPhone,
@@ -48,7 +47,7 @@ import { loadSave, writeSave } from './game/save';
 import { bootCustomAccessories, customAccessoriesForPublish, importCustomAccessories, isCustomAccessory, removeCustomAccessory, upsertCustomAccessory } from './game/customContent';
 import { publishAccessoryPack, verifyGitHubToken } from './game/cloud';
 import { ACCESSORY_MAP } from './game/data/accessories';
-import { generateFreeHunt, generateMission, withAnte } from './game/missions';
+import { generateFreeHunt, generateMission } from './game/missions';
 import { applyTuning } from './game/tuning';
 import { advanceRogue, applyRogueFloor, rollRogueOffers, startRogueRun } from './game/rogue';
 import { addLevel, bloodwebCost, progressOf, rollBloodweb, syncSharedCards } from './game/progress';
@@ -141,7 +140,6 @@ let pendingMapWalk = false;
 
 const app = document.getElementById('app')!;
 
-type ExecutionQteOutcome = 'perfect' | 'miss';
 type ExecutionStyle = { motion: string; title: string; line: string; action: string };
 const EXECUTION_STYLES: Record<string, ExecutionStyle> = {
   '设陷者': { motion: 'trapper', title: '捕兽夹的猎物', line: '挣扎只会让金属咬得更紧。', action: '设陷者俯身压住猎物，冷酷地结束挣扎' },
@@ -160,146 +158,6 @@ const EXECUTION_STYLES: Record<string, ExecutionStyle> = {
 };
 let pendingExecutionScene: { roomId: RoomId; title: string; description: string; style: string; success: boolean; x?: number; y?: number } | null = null;
 
-function applyExecutionQteOutcome(outcome: ExecutionQteOutcome, style: ExecutionStyle): void {
-  if (!game) return;
-  const nearby = (person: GameState['people'][number]): boolean =>
-    person.room === game!.playerRoom || ROOM_MAP[game!.playerRoom].neighbors.includes(person.room);
-  const affected = game.people.filter((person) => person.role !== 'police' && person.hp > 0 && !person.hidden && (outcome === 'perfect' || nearby(person)));
-  if (outcome === 'perfect') {
-    game.specialExecutionBonus += 25;
-    if (game.result) {
-      const existing = game.scoreBreakdown.find((line) => line.label === '完美处决 QTE 奖励');
-      if (existing) existing.value += 25;
-      else game.scoreBreakdown.push({ label: '完美处决 QTE 奖励', value: 25 });
-      game.score = Math.max(0, Math.round(game.scoreBreakdown.reduce((sum, line) => sum + line.value, 0)));
-    }
-    affected.forEach((person) => {
-      person.fear = Math.min(100, person.fear + 22);
-      person.alert = Math.min(100, person.alert + 8);
-    });
-    game.log.unshift(`【完美处决】${style.title}：额外获得 25 分；猎场中 ${affected.length} 名幸存者感受到更强烈的恐惧。`);
-  } else {
-    affected.forEach((person) => {
-      person.fear = Math.min(100, person.fear + 12);
-      person.alert = Math.min(100, person.alert + 5);
-    });
-    game.log.unshift(`【处决失误】动作仍然完成，但现场动静惊动了附近幸存者（${affected.length} 人），没有获得额外分数。`);
-  }
-}
-
-/**
- * 分数处决的结算：QTE 结果只影响加分，动作本身照常完成；
- * QTE 失败时按普通处决处理（不加分）。
- */
-function runScoreExecution(personId: string | undefined, outcome: 'perfect' | 'miss'): void {
-  const game = currentGame();
-  if (!personId) return;
-  const spot = personRoomPercent(personId);
-  const ghosts = captureAttackGhosts();
-  const executed = executeScoreSpecial(game, personId);
-  if (executed) {
-    pendingMapAttackTarget = personId;
-    pendingMapAttackGhost = ghosts.get(personId) ?? null;
-    const style = executionStyleOf(game);
-    const perfect = outcome === 'perfect';
-    applyExecutionQteOutcome(perfect ? 'perfect' : 'miss', style);
-    pendingExecutionScene = {
-      roomId: game.playerRoom,
-      title: style.title + ' · 分数处决' + (perfect ? ' · 完美 QTE' : ''),
-      description: style.action + '。' + style.line + (perfect ? ' 分数处决完成，QTE 完美，额外获得 25 分。' : ' 分数处决仍然完成，但 QTE 失败，按普通处决处理，没有额外分数。'),
-      style: style.motion,
-      success: true,
-      ...(spot ?? {}),
-    };
-    playSfx('execute');
-    playSfx(SURVIVOR_MAP[personId]?.gender === 'female' ? 'voiceFScream' : 'voiceMScream', 0.96);
-    window.setTimeout(() => playSfx('wipe'), 260);
-    lastLogHead = game.log[0] ?? '';
-  }
-  afterAction();
-}
-
-/**
- * 处决 QTE：不再弹全屏遮罩，而是把四位随机数字显示在杀手头像上。
- * 状态放在 qte 里，渲染时挂到 .player-marker，键盘/触屏数字键按顺序输入。
- * 以后要加别的 QTE（比如飞斧的时机条），沿用同一套「挂在头像上的即时交互」结构即可。
- */
-type QteState = {
-  digits: string[];
-  index: number;
-  deadline: number;
-  timer: number;
-  personId: string;
-};
-
-let qte: QteState | null = null;
-
-function startExecutionQte(personId: string): void {
-  if (qte || !game) return;
-  unlockAudio();
-  const digits = Array.from({ length: 4 }, () => String(Math.floor(Math.random() * 10)));
-  const timer = window.setTimeout(() => finishQte(false), 4200);
-  qte = { digits, index: 0, deadline: performance.now() + 4200, timer, personId };
-  render();
-}
-
-function qteInput(digit: string): void {
-  const current = qte;
-  if (!current) return;
-  if (digit !== current.digits[current.index]) {
-    finishQte(false);
-    return;
-  }
-  current.index += 1;
-  if (current.index >= current.digits.length) {
-    finishQte(true);
-    return;
-  }
-  syncQteUi();
-}
-
-function finishQte(success: boolean): void {
-  const current = qte;
-  if (!current) return;
-  qte = null;
-  window.clearTimeout(current.timer);
-  syncQteUi();
-  runScoreExecution(current.personId, success ? 'perfect' : 'miss');
-}
-
-/** 把 QTE 面板挂到杀手头像上（跟着地图一起移动）。 */
-function syncQteUi(): void {
-  document.querySelector('.qte-panel')?.remove();
-  const current = qte;
-  if (!current) return;
-  const marker = app.querySelector<HTMLElement>('.player-marker');
-  if (!marker) return;
-  const remaining = Math.max(0, current.deadline - performance.now());
-  const panel = document.createElement('div');
-  panel.className = 'qte-panel';
-  panel.setAttribute('role', 'dialog');
-  panel.setAttribute('aria-label', '处决快速反应挑战');
-  panel.innerHTML = `
-    <b>处决时机</b>
-    <div class="qte-digits">${current.digits.map((digit, index) => `<span class="${index < current.index ? 'done' : index === current.index ? 'current' : ''}">${digit}</span>`).join('')}</div>
-    <i class="qte-timer" style="animation-duration:${remaining}ms"></i>
-  `;
-  panel.addEventListener('click', (event) => {
-    const key = (event.target as HTMLElement).closest<HTMLElement>('[data-qte-digit]');
-    if (key?.dataset.qteDigit) {
-      event.stopPropagation();
-      qteInput(key.dataset.qteDigit);
-    }
-  });
-  // 固定定位到杀手头像下方：头像在手机上会被缩放，用 rect 定位更稳。
-  const rect = marker.getBoundingClientRect();
-  const width = Math.min(260, window.innerWidth - 24);
-  panel.style.width = `${width}px`;
-  panel.style.left = `${Math.min(window.innerWidth - width - 8, Math.max(8, rect.left + rect.width / 2 - width / 2))}px`;
-  panel.style.top = `${Math.min(window.innerHeight - 180, rect.bottom + 8)}px`;
-  document.body.appendChild(panel);
-}
-
 function showPendingExecutionScene(): void {
   if (!pendingExecutionScene) return;
   const event = pendingExecutionScene;
@@ -308,7 +166,7 @@ function showPendingExecutionScene(): void {
   if (!room) return;
   room.querySelector('.execution-scene-overlay')?.remove();
   const overlay = document.createElement('div');
-  overlay.className = 'execution-scene-overlay execution-style-' + event.style + (event.success ? ' execution-qte-success' : ' execution-qte-miss');
+  overlay.className = 'execution-scene-overlay execution-style-' + event.style;
   // 血光跟着目标头像的位置走，而不是永远在房间正中（作者反馈动画和头像对不上）
   overlay.style.setProperty('--exec-x', `${(event.x ?? 50).toFixed(1)}%`);
   overlay.style.setProperty('--exec-y', `${(event.y ?? 54).toFixed(1)}%`);
@@ -549,7 +407,7 @@ function render(): void {
   } else if (view.panel === 'shop') {
     html = renderShop(save);
   } else if (view.screen === 'menu' || !game) {
-    html = renderMenu(save, session.anteArmed);
+    html = renderMenu(save);
     if (bloodwebOpen) {
       const killer = bloodwebKiller ?? save.killer ?? '迈克尔·迈尔斯';
       html += renderBloodweb(
@@ -611,7 +469,6 @@ function render(): void {
   }
   syncScene();
   if (immersiveActive) syncImmersiveCamera(app);
-  syncQteUi();
   syncHuntAlerts();
 }
 
@@ -951,23 +808,15 @@ function afterAction(): void {
     showResult();
     if (!resultApplied) {
       resultApplied = true;
-      const newBest = Math.max(save.bestScore, game.score);
+      const earned = bloodPointTotal(game);
       const unlocked = [...save.unlockedCards];
       let wins = save.wins;
-      let credits = save.credits;
       let darkCells = save.darkCells;
       if (game.result === 'win') {
         wins += 1;
-        credits += lootPayout(game) + game.huntStyleBonus;
-        if (game.score >= 150) darkCells += 1;
-        game.rewardCards.forEach((id) => {
-          if (CARD_MAP[id] && !unlocked.includes(id)) {
-            unlocked.push(id);
-            lastNewCard = lastNewCard ?? id;
-          }
-        });
+        darkCells += 1;
       }
-      save = { ...save, bestScore: newBest, wins, credits, darkCells, unlockedCards: unlocked };
+      save = { ...save, wins, credits: save.credits + earned, darkCells, unlockedCards: unlocked };
       writeSave(save);
     }
   }
@@ -984,17 +833,13 @@ function startGame(freeHunt = false, loadout: string[] = []): void {
   lastAuraActions = 0;
   lastPalletDropCount = 0;
   lastCrowAlertCount = 0;
-  if (qte) {
-    window.clearTimeout(qte.timer);
-    qte = null;
-  }
   selectedPersonId = null;
   // 三段串起来，避免同时响糊成一团：装配完成 → 进入地图 → 游戏开始
   playSfx('ready');
   window.setTimeout(() => playSfx('enterMap'), 190);
   window.setTimeout(() => playSfx('start'), 430);
   const killer = save.killer ?? '迈克尔·迈尔斯';
-  const mission = freeHunt ? generateFreeHunt() : (session.anteArmed ? withAnte(generateMission(killer)) : generateMission(killer));
+  const mission = freeHunt ? generateFreeHunt() : generateMission(killer);
   game = createGame(save.deck, mission, killer, currentMenuMap().id, loadout);
   showGame();
   lastKills = game.kills;
@@ -1016,10 +861,6 @@ function startRogueFloor(run: RogueRun): void {
   lastAuraActions = 0;
   lastPalletDropCount = 0;
   lastCrowAlertCount = 0;
-  if (qte) {
-    window.clearTimeout(qte.timer);
-    qte = null;
-  }
   selectedPersonId = null;
   rogueOffers = null;
   save = { ...save, rogue: run };
@@ -1239,12 +1080,6 @@ function createGameActions(): ActionTable {
 
     execute: (ctx) => runExecute(ctx),
     'execute-target': (ctx) => runExecute(ctx),
-
-    'execute-score-special': ({ target }) => {
-      const personId = target.dataset.personId;
-      if (!personId || qte) return;
-      startExecutionQte(personId);
-    },
 
     'drop-carried': () => {
       const game = currentGame();
@@ -1750,8 +1585,7 @@ app.addEventListener('click', (event) => {
   const action = target.dataset.action;
   if (!action) return;
 
-  // 分数处决：先在按钮上挂 QTE；QTE 结束后再次点击同一个按钮，这次才真正结算。
-  const qteOutcome = target.dataset.qteOutcome as ExecutionQteOutcome | undefined;
+  // 分数处决 QTE 已删除；所有处决走普通处决 / 地点处决。
   if (handleImmersiveAction(action)) return;
 
   // 浏览器要求先有用户交互才允许出声
@@ -1775,7 +1609,7 @@ app.addEventListener('click', (event) => {
     if (blockedByGameMode(action)) return;
   }
 
-  spec.run({ target, action, qteOutcome });
+  spec.run({ target, action });
 });
 
 /* 平衡调整：任何输入/下拉变化都直接写回运行中的数据（写回逻辑见 adminActions） */
@@ -1826,12 +1660,6 @@ app.addEventListener('focusout', (event) => {
 
 
 window.addEventListener('keydown', (event) => {
-  if (qte && /^\d$/.test(event.key)) {
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    qteInput(event.key);
-    return;
-  }
   if (!game || !inGame() || event.altKey || event.ctrlKey || event.metaKey) return;
   const target = event.target as HTMLElement | null;
   if (target && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))) return;

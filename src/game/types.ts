@@ -109,7 +109,7 @@ export type AccessoryModKey =
   /** 开局警报值（负数=更安静） */
   | 'startAlarm'
   /** 撤离时战利品百分比（正负都允许） */
-  | 'lootPct'
+  | 'bloodPointPct'
   /** 专属能力冷却回合（负数=更快） */
   | 'cooldown'
   /** 开局捕兽夹数量 */
@@ -218,6 +218,8 @@ export interface Person {
   startleTurns?: number;
   /** 找到武器：反抗时能让玩家掉行动点 */
   armed: boolean;
+  /** 随机高价值目标：击杀后获得大量额外血点 */
+  highValue?: boolean;
   /** 老练的幸存者：有时能悄无声息地移动，仍会留下脚印，但不会惊动乌鸦 */
   sneaky: boolean;
   /** 鬼面「夜幕」对这名幸存者的监视值 0–100 */
@@ -272,9 +274,7 @@ export interface Disturbance {
   label: string;
 }
 
-export type MissionKind = 'assassinate' | 'bodyCount' | 'execution' | 'sabotage' | 'silent' | 'scoreExecution';
-
-export type MissionTaskKind = 'kill_count' | 'kill_count_before_turn' | 'marked_kill' | 'execute' | 'special_execute' | 'score_execute' | 'score_threshold' | 'no_alarm' | 'break_circuit' | 'alarm_below' | 'killer_stat';
+export type MissionTaskKind = 'kill_count' | 'marked_kill' | 'break_circuit' | 'alarm_below' | 'killer_stat';
 export type MissionTaskMetric = 'myers_stalk' | 'trap_triggers' | 'nurse_blink_attacks' | 'hatchet_hits';
 
 export interface MissionTask {
@@ -284,34 +284,26 @@ export interface MissionTask {
   target: number;
   /** optional 仅提供额外奖励，不阻止核心任务通关。 */
   optional?: boolean;
-  /** 限时击杀目标的最晚回合；仅 kill_count_before_turn 使用。 */
-  deadlineTurn?: number;
+  /** 警报限制任务的上限值。 */
   limit?: number;
   metric?: MissionTaskMetric;
-  reward?: number;
 }
 
 export interface Mission {
   id: string;
   /** contract = 契约模式；free = 玩家自主选择猎物与结束时机。 */
   mode?: 'contract' | 'free';
-  kind: MissionKind;
   title: string;
   desc: string;
   turns: number;
-  reward: number;
-  targetCount?: number;
-  /** 本局必须完成的组合契约目标 */
+  /** 本局随机组合的主要任务与额外奖励任务 */
   tasks?: MissionTask[];
-  /** 允许逃走的 NPC 上限已删除：改成「每逃一人扣分，人全跑光才判负」 */
   /** 一句话主目标：任务条上永远看得见 */
   objective?: string;
   /** 达成条件：写清楚「做到什么就算成功」 */
   successText?: string;
   /** 失败条件：写清楚「没做到什么就失败」 */
   failText?: string;
-  /** 加注：开局面多接一个高难目标，达成契约分 +60%，未达成 −50%。 */
-  ante?: boolean;
 }
 
 /** 每回合重置，用于结算杀手被动的一次性效果 */
@@ -322,30 +314,29 @@ export interface KillerRuntime {
   witnessUsed: boolean;
 }
 
-/** 结算面板上的一行明细 */
-export interface ScoreLine {
+/** 本局杀手专属能力的命中统计，用于契约与血点。 */
+export interface HuntCounters {
+  hatchetHits: number;
+  nurseBlinkAttacks: number;
+}
+
+/** 血点五类：猎杀 / 凶残 / 阴险 / 控场 / 契约 */
+export type BloodCategory = 'hunt' | 'brutal' | 'cunning' | 'control' | 'contract';
+
+/** 结算面板上的一行血点明细 */
+export interface BloodPointLine {
+  category: BloodCategory;
   label: string;
   value: number;
-  /** 分数归类的维度：契约 / 猎杀 / 潜行 / 效率 / 风格 / 失分。缺省按「其他」显示。 */
-  category?: string;
 }
 
-/** 本局计划与专属能力使用记录，用于猎杀风格评价。 */
-export interface HuntStyleStats {
-  environmentActions: number;
-  trapTriggers: number;
-  hatchetHits: number;
-  nurseBlinks: number;
-  nurseBlinkAttacks: number;
-  myersBurstHits: number;
-  quietKills: number;
-  /** 击杀时目标已处于「恐惧崩溃」状态的次数。 */
-  terrorKills: number;
-  /** 同一回合内连续放倒的额外击杀次数（第 2 人起）。 */
-  comboKills: number;
+/** 本局获得的特殊表现称号 */
+export interface PerformanceTitle {
+  id: string;
+  label: string;
+  points: number;
+  category: BloodCategory;
 }
-
-export type HuntStyleRank = 'S' | 'A' | 'B' | 'C';
 
 export type GamePhase = 'menu' | 'setup' | 'playing' | 'gameover';
 
@@ -408,8 +399,6 @@ export interface GameState {
   scourgeShrineRoom: RoomId | null;
   /** 放置神龛时已在房间内的人 */
   scourgeShrineOccupants: string[];
-  /** 通用卡牌额外得分 */
-  cardBonusScore: number;
   /** 这一次挥刀是否已经收回来：砍完必须再做一件事才能砍第二刀 */
   attackReady: boolean;
   /** 玩家已经做了几次行动：痕迹按这个计数衰减，而不是按回合 */
@@ -437,16 +426,11 @@ export interface GameState {
   missionPrimaryCompleted: boolean;
   myersStalkedIds: string[];
   watchedRoom: RoomId | null;
-  /** 已在期限内完成的任务 ID，兼容旧任务结构。 */
-  completedMissionTasks: string[];
   log: string[];
   kills: number;
   killsThisTurn: number;
   executions: number;
-  /** 达到猎杀评分门槛后，通过头顶独立按钮完成的分数处决次数。 */
-  scoreExecutions: number;
   survivorKills: number;
-  specialExecutionBonus: number;
   /** 本局使用过的特殊处决方式；用于结算与永久图鉴记录。 */
   executionMethodsUsed: string[];
   /** 本局打出过的卡牌 id（可重复）；用于结算的「构筑多样性」加分。 */
@@ -471,17 +455,16 @@ export interface GameState {
   alarmSilencedUntilTurn: number;
   lastCrimeRoom: RoomId | null;
   result: ResultKind | null;
-  score: number;
-  /** 本局累积的战利品（血点）。撤离/胜利才能完整带出，失败只保留一部分。 */
-  loot: number;
-  /** 结算面板的加分/扣分明细，由 finish() 生成 */
-  scoreBreakdown: ScoreLine[];
-  /** 猎杀风格评价独立于契约总分；高评价会带来额外血点。 */
-  huntStats: HuntStyleStats;
-  huntStyleScore: number;
-  huntStyleRank: HuntStyleRank;
-  huntStyleBonus: number;
-  huntStyleBreakdown: ScoreLine[];
+  /** 本局累积的血点明细；结算按五类汇总。 */
+  bloodPointLines: BloodPointLine[];
+  /** 防刷分计数：行为 key → 已奖励次数 */
+  bloodPointCounts: Record<string, number>;
+  /** 本局获得的特殊表现称号 */
+  performanceTitles: PerformanceTitle[];
+  /** 本局杀手专属能力命中统计 */
+  huntCounters: HuntCounters;
+  /** 本回合是否用过杀手专属能力；用于「专属攻击完成击杀」奖励。 */
+  powerUsedThisAction: boolean;
   rewardCards: string[];
 
   phoneCut: boolean;
@@ -603,7 +586,6 @@ export interface GameState {
 export interface SaveData {
   deck: string[];
   unlockedCards: string[];
-  bestScore: number;
   wins: number;
   killer?: string;
   /** 血点：商店货币，完成任务获得 */

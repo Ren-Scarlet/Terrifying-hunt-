@@ -17,7 +17,7 @@ import type { AccessoryModKey, AccessoryMods, GameState, RoomId } from './types'
  */
 
 export const MOD_KEYS: AccessoryModKey[] = [
-  'ap', 'attackDamage', 'fearRadius', 'fearOnHit', 'startAlarm', 'lootPct', 'cooldown',
+  'ap', 'attackDamage', 'fearRadius', 'fearOnHit', 'startAlarm', 'bloodPointPct', 'cooldown',
   'trapCount', 'trapDamage', 'trapHold', 'hatchetCount', 'hatchetDamage', 'blinkRange',
   'stalkGain', 'possessCost', 'startStealth',
 ];
@@ -110,7 +110,7 @@ const MOD_LABEL: Record<AccessoryModKey, string> = {
   fearRadius: '恐惧范围',
   fearOnHit: '命中恐惧',
   startAlarm: '开局警报',
-  lootPct: '战利品',
+  bloodPointPct: '血点',
   cooldown: '能力冷却',
   trapCount: '捕兽夹',
   trapDamage: '夹伤',
@@ -123,7 +123,7 @@ const MOD_LABEL: Record<AccessoryModKey, string> = {
   startStealth: '开局无法侦测',
 };
 
-const PERCENT_KEYS = new Set<AccessoryModKey>(['lootPct', 'stalkGain']);
+const PERCENT_KEYS = new Set<AccessoryModKey>(['bloodPointPct', 'stalkGain']);
 
 /** 修正键的中文短名，后台与 HUD 的文案都从这里取。 */
 export function modifierLabel(key: AccessoryModKey): string {

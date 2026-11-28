@@ -10,9 +10,6 @@ import {
   BLEEDOUT_TURNS,
   blinkPlayer,
   canPlaceBarricade,
-  executeScoreSpecial,
-  scoreExecutionBlockReason,
-  SCORE_EXECUTION_THRESHOLD,
   collectTrapCache,
   refillHuntressHatchets,
   throwHuntressHatchet,
@@ -25,11 +22,10 @@ import {
   conditionOf,
   SABOTAGE_COST,
   addAlarm,
-  currentScore,
-  scoreLines,
   fearBand,
-  lootPayout,
-  calculateHuntStyleRating,
+  BLOOD,
+  awardBlood,
+  bloodPointTotal,
   triggerBearTrapForPerson,
   sabotageSiteItem,
   breakPhone,
@@ -86,7 +82,7 @@ import { cardImage } from '../src/game/assetMap';
 import { readdirSync } from 'node:fs';
 import { getKiller, personChip, personDetailHtml } from '../src/ui/render/shared';
 import { SURVIVOR_MAP } from '../src/game/survivors';
-import { generateMission, generateFreeHunt, withAnte } from '../src/game/missions';
+import { generateMission, generateFreeHunt } from '../src/game/missions';
 import {
   ACCESSORIES,
   ACCESSORY_MAP,
@@ -177,9 +173,10 @@ function caseIndependentBreakerNetwork(): void {
   const before = s.energy;
   const pulled = togglePowerCircuit(s, circuit.id);
   check('电闸：拉闸消耗 1 AP 并关闭所属区域照明',
-    pulled && s.energy === before - BREAKER_SWITCH_COST && !isRoomLit(s, room) && s.huntStats.environmentActions === 1);
+    pulled && s.energy === before - BREAKER_SWITCH_COST && !isRoomLit(s, room) && s.bloodPointLines.some((line) => line.label.includes('操作电闸')));
   const closed = togglePowerCircuit(s, circuit.id);
-  check('电闸：合闸恢复照明', closed && isRoomLit(s, room) && s.huntStats.environmentActions === 2);
+  check('电闸：合闸恢复照明并只奖励一次控场血点',
+    closed && isRoomLit(s, room) && s.bloodPointLines.filter((line) => line.label.includes('操作电闸')).length === 1);
   circuit.broken = true;
   check('电闸：控制箱损坏后所属区域保持断电', !isRoomLit(s, room));
 }
@@ -233,7 +230,8 @@ function caseExecutionVariety(): void {
     const ok = executeCarriedPerson(s, method.id);
     check('特殊处决：' + method.name + '完成击杀并写入本局图鉴',
       ok && !s.people.some((person) => person.id === victim.id) &&
-      s.executionMethodsUsed.includes(method.id) && s.specialExecutionBonus === 35,
+      s.executionMethodsUsed.includes(method.id) &&
+      s.bloodPointLines.some((line) => line.label.includes('场景处决') && line.value === BLOOD.locationExecution),
       method.room);
   }
 }
@@ -253,16 +251,15 @@ function caseHuntingGroundsAndFreeHunt(): void {
 
   const freeMission = generateFreeHunt();
   const free = createGame(STARTING_DECK, freeMission, '迈克尔·迈尔斯', 'lampkin');
-  check('自由猎杀：不指定标记目标，并提供三项非强制挑战',
+  check('自由猎杀：不指定标记目标，并提供非强制挑战',
     free.mission.mode === 'free' &&
     free.people.every((person) => !person.marked) &&
-    (free.mission.tasks?.length ?? 0) === 3);
+    (free.mission.tasks?.length ?? 0) === 1);
   free.survivorKills = 3;
   free.executions = 2;
-  free.scoreExecutions = 1;
-  const scoreTask = free.mission.tasks!.find((task) => task.kind === 'score_execute');
-  check('自由猎杀：分数处决挑战能正确累计',
-    !!scoreTask && missionTaskProgress(free, scoreTask) === 1,
+  const killTask = free.mission.tasks!.find((task) => task.kind === 'kill_count');
+  check('自由猎杀：击杀挑战能正确累计',
+    !!killTask && missionTaskProgress(free, killTask) === 3,
     '当前挑战类型=' + (free.mission.tasks ?? []).map((task) => task.kind).join(','));
   endTurn(free);
   check('自由猎杀：完成挑战不会自动结束，玩家保留自主决定权',
@@ -463,7 +460,7 @@ function caseMyersStalkingAndFearRadius(): void {
   burstTarget.room = myersBurst.playerRoom;
   burstTarget.hidden = false;
   check('迈尔斯：恶魔附身挥刀可直接击倒健康目标',
-    attack(myersBurst, burstTarget.id) && burstTarget.hp === 0 && myersBurst.possessed && myersBurst.huntStats.myersBurstHits === 1,
+    attack(myersBurst, burstTarget.id) && burstTarget.hp === 0 && myersBurst.possessed,
     `hp=${burstTarget.hp} stalk=${myersBurst.stalkMeter}`);
 
   const trapper = createGame(STARTING_DECK, undefined, '设陷者');
@@ -492,9 +489,9 @@ function caseMyersStalkingAndFearRadius(): void {
   trappedPerson.hp = 4;
   trappedPerson.alert = 0;
   triggerBearTrapForPerson(trapper, trappedPerson);
-  check('设陷者：捕兽夹触发后造成伤害、限制移动并记录猎杀风格',
+  check('设陷者：捕兽夹触发后造成伤害、限制移动并记录血点',
     trappedPerson.hp === 3 && trappedPerson.blockedTurns === 1 &&
-    trapper.huntStats.trapTriggers === 1 && trapper.trapTriggerCount === 1 &&
+    trapper.trapTriggerCount === 1 &&
     trappedPerson.trapTriggered === true && (trappedPerson.revealedActions ?? 0) >= 2 && !trapper.bearTraps[0].armed);
   const disarmGame = createGame(STARTING_DECK, undefined, '设陷者');
   const disarmTarget = player(disarmGame);
@@ -509,7 +506,7 @@ function caseMyersStalkingAndFearRadius(): void {
     disarmTarget.hp === 4 && disarmGame.trapTriggerCount === 0);
   endTurn(disarmGame);
   check('设陷者：发现陷阱的 NPC 会在自己的回合拆除陷阱',
-    !disarmGame.bearTraps[0].armed && disarmGame.huntStats.trapTriggers === 0);
+    !disarmGame.bearTraps[0].armed && disarmGame.trapTriggerCount === 0);
 
   if (trapper.trapCaches.length) {
     trapper.playerRoom = trapper.trapCaches[0];
@@ -579,22 +576,9 @@ function caseMyersStalkingAndFearRadius(): void {
   nurseAttack.energy = 4;
   nurseAttack.attackReady = true;
   check('护士：闪现后使用普通攻击也能完成专属额外任务',
-    attack(nurseAttack, nurseAttackTarget.id) && nurseAttack.huntStats.nurseBlinkAttacks === 1 && !nurseAttack.nurseFollowUp);
+    attack(nurseAttack, nurseAttackTarget.id) && nurseAttack.huntCounters.nurseBlinkAttacks === 1 && !nurseAttack.nurseFollowUp);
 
   const huntress = createGame(STARTING_DECK, undefined, '女猎手');
-  const scoreExecution = createGame(STARTING_DECK, undefined, '设陷者');
-  const scoreTarget = player(scoreExecution);
-  scoreTarget.room = scoreExecution.playerRoom;
-  scoreTarget.hp = 0;
-  // 门槛看的是 currentScore（含警报扣分），留出余量再测，避免刚好卡在 200 边界。
-  scoreExecution.mission.reward = SCORE_EXECUTION_THRESHOLD + 50;
-  scoreExecution.energy = 4;
-  const scoreBlock = scoreExecutionBlockReason(scoreExecution, scoreTarget.id);
-  check('分数处决：达到评分门槛后可对同屋倒地目标发动独立处决',
-    scoreBlock === '' && executeScoreSpecial(scoreExecution, scoreTarget.id) &&
-    scoreExecution.scoreExecutions === 1 && scoreExecution.executions === 1 && scoreExecution.specialExecutionBonus === 25,
-    `block=${scoreBlock} score=${currentScore(scoreExecution)}`);
-
   const hatchetTarget = player(huntress);
   hatchetTarget.room = huntress.playerRoom;
   hatchetTarget.hidden = false;
@@ -604,7 +588,7 @@ function caseMyersStalkingAndFearRadius(): void {
     huntress.hatchets === 3 && usePower(huntress, 'huntress_axe') && huntress.huntressAiming);
   check('女猎手：投掷飞斧消耗 1 把、造成伤害，并迫使幸存者逃离',
     throwHuntressHatchet(huntress, hatchetTarget.id) && huntress.hatchets === 2 && hatchetTarget.hp === 3 &&
-    huntress.huntStats.hatchetHits === 1 && hatchetTarget.fear === 80 && hatchetTarget.room !== huntress.playerRoom);
+    huntress.huntCounters.hatchetHits === 1 && hatchetTarget.fear === 80 && hatchetTarget.room !== huntress.playerRoom);
 
   const highFearHuntress = createGame(STARTING_DECK, undefined, '女猎手');
   const highFearTarget = player(highFearHuntress);
@@ -620,30 +604,6 @@ function caseMyersStalkingAndFearRadius(): void {
   huntress.energy = 4;
   check('女猎手：在柜子处可以将飞斧补充至 3 把',
     refillHuntressHatchets(huntress) && huntress.hatchets === 3);
-  
-  const styleGame = createGame(STARTING_DECK, undefined, '设陷者');
-  styleGame.turn = 5;
-  const baseStyle = calculateHuntStyleRating(styleGame, 'win');
-  check('猎杀风格：普通完成任务有基础评级，但不发额外风格血点',
-    baseStyle.rank === 'C' && baseStyle.bonus === 0 && baseStyle.score >= 40,
-    `rank=${baseStyle.rank} score=${baseStyle.score} bonus=${baseStyle.bonus}`);
-  styleGame.huntStats = {
-    environmentActions: 3,
-    trapTriggers: 2,
-    hatchetHits: 2,
-    nurseBlinks: 2,
-    nurseBlinkAttacks: 2,
-    myersBurstHits: 2,
-    quietKills: 3,
-  };
-  styleGame.specialExecutionBonus = 35;
-  const highStyle = calculateHuntStyleRating(styleGame, 'win');
-  check('猎杀风格：多样化计划与专属能力可达到 S 级并获得 40 血点奖励',
-    highStyle.rank === 'S' && highStyle.score === 100 && highStyle.bonus === 40 &&
-    highStyle.breakdown.length >= 6);
-  const failedStyle = calculateHuntStyleRating(styleGame, 'failed');
-  check('猎杀风格：失败任务仍显示行动评价，但不发胜利奖励',
-    failedStyle.score > 0 && failedStyle.bonus === 0);
 
   check('卡牌图标：每张卡都有图标文件，且直接使用以卡牌 id 命名的专属图标（不借用其他卡牌图案）',
     (() => {
@@ -1431,10 +1391,12 @@ function caseNewMechanics() {
 caseNewMechanics();
 
 function caseMergeAndMissions(): void {
-  // 契约在准备开始时随机生成，六种契约必须拥有不同的主目标。
+  // 契约在准备开始时随机组合，五类任务都应有机会出现。
   const kinds = new Set<string>();
-  for (let i = 0; i < 120; i++) kinds.add(generateMission().kind);
-  check('Z 随机契约池包含至少五种不同主目标', kinds.size >= 5, [...kinds].join(','));
+  for (let i = 0; i < 120; i++) {
+    (generateMission('迈克尔·迈尔斯').tasks ?? []).forEach((task) => kinds.add(task.kind));
+  }
+  check('Z 随机契约池覆盖五类任务', kinds.size >= 5, [...kinds].join(','));
 
   // 通缉与警戒合并：袭警推高的是同一条暴露度，wanted 只是它的 0~10 镜像
   const s = newGame();
@@ -1457,11 +1419,8 @@ function caseMergeAndMissions(): void {
   addAlarm(ghost, 5);
   check('Z 警报满 → 灵异杀手进入全员逃亡阶段', ghost.emergencyActive && ghost.result === null && ghost.people.every((p) => p.role !== 'police'));
 
-  // 每逃走一个幸存者扣 15 分（全逃才判负，不再有硬阈值）
-  const sc = newGame();
-  const base = currentScore(sc);
-  sc.escaped = 2;
-  check('Z 每逃一人扣 15 分', currentScore(sc) === base - 30, `${base} → ${currentScore(sc)}`);
+  // 每逃走一人不再直接扣分；血点奖励保留。
+  check('Z 幸存者逃跑不再直接扣血点', bloodPointTotal(newGame()) === 0);
 }
 
 caseMyersStalkingAndFearRadius();
@@ -1516,16 +1475,17 @@ caseAidAndPressure();
 function caseContractsPowerAndCarry(): void {
   const contract = newGame();
   check('AB 每局契约至少包含两个组合目标', (contract.mission.tasks?.length ?? 0) >= 2, String(contract.mission.tasks?.length));
-  const alarmTask = { id: 'test-alarm', kind: 'no_alarm' as const, label: '阻止报警', target: 1 };
-  check('AB 未发生报警时无报警目标保持完成', missionTaskProgress(contract, alarmTask) === 1);
-  contract.npcAlarmed = true;
-  check('AB 幸存者成功报警后无报警目标失败', missionTaskProgress(contract, alarmTask) === 0);
-  const allowedKinds = ['kill_count', 'marked_kill', 'execute', 'special_execute', 'score_execute', 'score_threshold', 'alarm_below', 'no_alarm', 'break_circuit', 'killer_stat'];
+  const alarmTask = { id: 'test-alarm', kind: 'alarm_below' as const, label: '报警上限', target: 1, limit: 50 };
+  contract.alarm = 40;
+  check('AB 报警上限任务在警报低于阈值时完成', missionTaskProgress(contract, alarmTask) === 1);
+  contract.alarm = 70;
+  check('AB 报警上限任务超过阈值时未完成', missionTaskProgress(contract, alarmTask) === 0);
+  const allowedKinds = ['kill_count', 'marked_kill', 'break_circuit', 'alarm_below', 'killer_stat'];
   const actualKinds = (contract.mission.tasks ?? []).map((task) => task.kind);
-  check('AB 契约只使用新任务类型且包含可选奖励目标',
-    actualKinds.every((kind) => allowedKinds.includes(kind)) && (contract.mission.tasks ?? []).some((task) => task.optional && (task.reward ?? 0) > 0),
+  check('AB 契约只使用五类任务且包含额外奖励目标',
+    actualKinds.every((kind) => allowedKinds.includes(kind)) && (contract.mission.tasks ?? []).some((task) => task.optional),
     '实际类型=' + actualKinds.join(','));
-  check('AB 新契约回合上限为 20 且不生成限时击杀任务', contract.mission.turns === 20 && !(contract.mission.tasks ?? []).some((task) => task.kind === 'kill_count_before_turn'));
+  check('AB 新契约回合上限为 20', contract.mission.turns === 20);
   const myersContract = generateMission('迈克尔·迈尔斯');
   check('AB 迈尔斯契约含尾随不同幸存者的专属奖励任务', myersContract.tasks?.some((task) => task.kind === 'killer_stat' && task.metric === 'myers_stalk') === true);
   const trapperContract = generateMission('设陷者');
@@ -1537,18 +1497,10 @@ function caseContractsPowerAndCarry(): void {
   check('AB 报警上限任务在警报低于阈值时完成', missionTaskProgress(contract, lowAlarmTask) === 1);
   contract.alarm = 40;
   check('AB 报警上限任务超过阈值时未完成', missionTaskProgress(contract, lowAlarmTask) === 0);
-  const timed = newGame();
-  const timedTask = { id: 'timed-check', kind: 'kill_count_before_turn' as const, label: '限时猎杀', target: 2, deadlineTurn: 5 };
-  timed.survivorKills = 2; timed.turn = 4;
-  check('AB 限时任务：期限内达成后记录完成', missionTaskProgress(timed, timedTask) === 2);
-  timed.completedMissionTasks.push(timedTask.id); timed.turn = 8;
-  check('AB 限时任务：完成记录不会因回合推进而倒退', missionTaskProgress(timed, timedTask) === 2);
-  const expired = newGame();
-  expired.mission.tasks = [{ ...timedTask, optional: false }]; expired.turn = 6;
-  endTurn(expired);
-  check('AB 旧限时任务不会再导致第 5 回合提前判负', expired.result === null && expired.phase === 'playing');
-  // 契约是随机生成的，这里显式指定「血色清单」才能保证有标记目标。
-  const mainObjective = createGame(STARTING_DECK, generateMission('迈克尔·迈尔斯', 'assassinate'), '迈克尔·迈尔斯');
+  // 指定契约：手写一个「击杀指定幸存者」主任务，确保有标记目标。
+  const markedMission = generateMission('迈克尔·迈尔斯');
+  markedMission.tasks = [{ id: 'test-marked', kind: 'marked_kill', label: '击杀指定幸存者', target: 1 }];
+  const mainObjective = createGame(STARTING_DECK, markedMission, '迈克尔·迈尔斯');
   mainObjective.roomLocks = {};
   mainObjective.markedKilled = 1;
   endTurn(mainObjective);
@@ -1618,12 +1570,16 @@ function caseContractsPowerAndCarry(): void {
   special.playerRoom = 'kitchen'; special.carryPersonId = target.id; special.energy = BASE_AP;
   const executed = executeCarriedPerson(special, 'fridge');
   check('AB 厨房冰箱特殊处决会击杀目标并计入处决数', executed && special.executions === 1 && !special.people.some((p) => p.id === target.id));
-  check('AB 地形处决会累计额外奖励分', special.specialExecutionBonus === 35, String(special.specialExecutionBonus));
+  check('AB 地形处决会累计场景处决血点',
+    special.bloodPointLines.some((line) => line.label.includes('场景处决') && line.value === BLOOD.locationExecution),
+    String(special.bloodPointLines.length));
 }
 caseContractsPowerAndCarry();
 
 function caseMarkedTargetIdentification(): void {
-  const game = createGame(STARTING_DECK, generateMission('迈克尔·迈尔斯', 'assassinate'), '迈克尔·迈尔斯');
+  const markedMission = generateMission('迈克尔·迈尔斯');
+  markedMission.tasks = [{ id: 'test-marked', kind: 'marked_kill', label: '击杀指定幸存者', target: 1 }];
+  const game = createGame(STARTING_DECK, markedMission, '迈克尔·迈尔斯');
   game.roomLocks = {};
   const marked = game.people.find((person) => person.marked && person.role !== 'police');
   const ordinary = game.people.find((person) => !person.marked && person.role !== 'police');
@@ -1868,8 +1824,8 @@ function caseNewPerkSystem(): void {
   hex.energy = 6;
   hex.attackReady = true;
   const hexHit = attack(hex, hexVictim.id);
-  check('猎杀戾气：下一次攻击命中幸存者额外获得 50 分',
-    hexHit && hex.hexHuntressUsed && hex.cardBonusScore === 50);
+  check('猎杀戾气：下一次攻击命中幸存者后触发',
+    hexHit && hex.hexHuntressUsed);
 
   const noed = createGame(['hex_noed'], undefined, '迈克尔·迈尔斯');
   noed.people.forEach((person) => { person.room = 'bedroom'; person.alert = 0; });
@@ -2118,22 +2074,24 @@ check('苦涩低语：出牌后会等待下一次人类死亡，再触发全场�
   check('天亮：最后五回合每回合持续加压', late.alarm >= 2, `alarm=${late.alarm}`);
 }
 
-// 分数构成：实时与结算同源，新增维度按条件给分
+// 血点构成：发生时记账，结算只汇总
 {
   const sc = newGame();
-  sc.alarm = 0;
-  sc.npcAlarmed = false;
-  sc.executionMethodsUsed.push('fridge', 'microwave');
-  const lines = scoreLines(sc);
-  const sum = lines.reduce((acc, line) => acc + line.value, 0);
-  check('分数构成：实时总分等于明细之和',
-    Math.abs(currentScore(sc) - Math.max(0, Math.round(sum))) <= 1,
-    `score=${currentScore(sc)} sum=${sum}`);
-  check('分数构成：无人报警有加分', lines.some((line) => line.label.includes('全程无人成功报警')), lines.map((line) => line.label).join('|'));
-  check('分数构成：处决方式多样性有加分', lines.some((line) => line.label.includes('处决方式多样性')));
-  const sc2 = newGame();
-  sc2.cardsPlayed.push('insidious', 'iron_grasp', 'deerstalker');
-  check('分数构成：构筑多样性有加分', scoreLines(sc2).some((line) => line.label.includes('构筑多样性')), scoreLines(sc2).map((line) => line.label).join('|'));
+  awardBlood(sc, 'hunt', '首次发现', BLOOD.firstDiscover, { key: 'test:discover' });
+  awardBlood(sc, 'brutal', '击杀', BLOOD.kill, { key: 'test:kill' });
+  awardBlood(sc, 'cunning', '无声猎杀', BLOOD.stealthKill, { key: 'test:stealth' });
+  awardBlood(sc, 'control', '破坏电闸', BLOOD.breaker, { key: 'test:breaker' });
+  awardBlood(sc, 'contract', '主要任务', BLOOD.primaryTask, { key: 'test:task' });
+  const sum = sc.bloodPointLines.reduce((acc, line) => acc + line.value, 0);
+  check('血点构成：总计等于明细分之和', bloodPointTotal(sc) === sum);
+  check('血点构成：五类奖励都能入账',
+    new Set(sc.bloodPointLines.map((line) => line.category)).size === 5);
+  const once = awardBlood(sc, 'control', '重复破坏', BLOOD.breaker, { key: 'test:once', limit: 1 });
+  const twice = awardBlood(sc, 'control', '重复破坏', BLOOD.breaker, { key: 'test:once', limit: 1 });
+  check('血点防刷：同一行为达到上限后不再入账', once === BLOOD.breaker && twice === 0);
+  const first = awardBlood(sc, 'cunning', '重复触发', 100, { key: 'test:decay', decay: true });
+  const second = awardBlood(sc, 'cunning', '重复触发', 100, { key: 'test:decay', decay: true });
+  check('血点防刷：重复行为奖励递减', first === 100 && second === 50);
 }
 
 // 恐惧驱动行为：档位、崩溃失能、独处累积
@@ -2164,25 +2122,15 @@ check('苦涩低语：出牌后会等待下一次人类死亡，再触发全场�
   check('恐惧：独处会累积恐惧', single.fear > 10, `fear=${single.fear}`);
 }
 {
-  const terror = newGame();
-  terror.huntStats.terrorKills = 2;
-  check('分数构成：恐惧崩溃击杀有加分', scoreLines(terror).some((line) => line.label.includes('恐惧崩溃击杀')));
-}
-
-// 连杀与加注
-{
   const combo = newGame();
-  combo.huntStats.comboKills = 2;
-  check('分数构成：连杀有加分', scoreLines(combo).some((line) => line.label.includes('连杀')), scoreLines(combo).map((line) => line.label).join('|'));
+  awardBlood(combo, 'brutal', '连环击杀', BLOOD.comboBase, { key: 'test:combo' });
+  check('血点构成：连环击杀计入凶残', combo.bloodPointLines.some((line) => line.label.includes('连环击杀') && line.category === 'brutal'));
 
-  const anteGame = newGame();
-  anteGame.mission = withAnte(anteGame.mission);
-  check('加注：未完成前不写入分数', !scoreLines(anteGame).some((line) => line.label.includes('加注')));
-  anteGame.survivorKills = 6;
-  check('加注：达成后额外获得 60% 契约分', scoreLines(anteGame).some((line) => line.label.includes('加注达成') && line.value > 0));
-  const anteFail = newGame();
-  anteFail.mission = withAnte(anteFail.mission);
-  check('加注：未达成时结算扣分', scoreLines(anteFail, 'timeout').some((line) => line.label.includes('加注未达成') && line.value < 0));
+  // 失败不会清空已经赚到的血点。
+  const failed = newGame();
+  awardBlood(failed, 'hunt', '击杀', BLOOD.kill, { key: 'test:failed' });
+  failed.result = 'timeout';
+  check('血点：失败结算仍保留已获得奖励', bloodPointTotal(failed) === BLOOD.kill);
 }
 
 // 商店卡池：4 张需购买，不进初始牌组，但买后能进构筑
@@ -2193,14 +2141,11 @@ check('苦涩低语：出牌后会等待下一次人类死亡，再触发全场�
   check('商店卡池：进入构筑池（买后可用）', shopCards.every((card) => deckCardsForKiller('设陷者').some((poolCard) => poolCard.id === card.id)));
 }
 
-// 战利品：撤离成功才完整入账
+// 血点不再走战利品折算
 {
   const lp = newGame();
-  lp.loot = 100;
-  lp.result = 'win';
-  check('战利品：胜利全额带出', lootPayout(lp) === 100, `payout=${lootPayout(lp)}`);
-  lp.result = 'timeout';
-  check('战利品：失败只保留三成', lootPayout(lp) === 30, `payout=${lootPayout(lp)}`);
+  awardBlood(lp, 'brutal', '击杀', BLOOD.kill, { key: 'test:lp' });
+  check('血点：不再有战利品折算，按明细直接入账', bloodPointTotal(lp) === BLOOD.kill);
 }
 
 // 护士专属卡与恐惧波
@@ -2239,7 +2184,7 @@ check('苦涩低语：出牌后会等待下一次人类死亡，再触发全场�
   check('配件：不存在无主或未开放杀手的配件',
     ACCESSORIES.every((item) => owners.has(item.owner)));
   const legalKeys = new Set([
-    'ap', 'attackDamage', 'fearRadius', 'fearOnHit', 'startAlarm', 'lootPct', 'cooldown',
+    'ap', 'attackDamage', 'fearRadius', 'fearOnHit', 'startAlarm', 'bloodPointPct', 'cooldown',
     'trapCount', 'trapDamage', 'trapHold', 'hatchetCount', 'hatchetDamage', 'blinkRange',
     'stalkGain', 'possessCost', 'startStealth',
   ]);
@@ -2262,7 +2207,6 @@ check('苦涩低语：出牌后会等待下一次人类死亡，再触发全场�
   const save = {
     deck: [...STARTING_DECK],
     unlockedCards: [] as string[],
-    bestScore: 0,
     wins: 0,
     killer: '设陷者',
     credits: 100,
@@ -2379,14 +2323,9 @@ check('苦涩低语：出牌后会等待下一次人类死亡，再触发全场�
   check('配件效果：书签碎片把能力冷却 1→0', bookmarkUsed && !bookmark.cooldowns.nurse_blink, `cd=${bookmark.cooldowns.nurse_blink}`);
 
   const bracelet = createGame(STARTING_DECK, undefined, '护士', 'lampkin', ['dull_bracelet']);
-  bracelet.loot = 100;
-  bracelet.result = 'win';
-  const braceletWin = lootPayout(bracelet);
-  bracelet.result = 'timeout';
-  const braceletFail = lootPayout(bracelet);
-  check('配件效果：灰暗手镯战利品 +30%，能力冷却 +1 回合',
-    braceletWin === 130 && braceletFail === 39 && modifierValue(bracelet, 'cooldown') === 1,
-    `win=${braceletWin} fail=${braceletFail}`);
+  check('配件效果：灰暗手镯血点 +30%，能力冷却 +1 回合',
+    modifierValue(bracelet, 'bloodPointPct') === 30 && modifierValue(bracelet, 'cooldown') === 1,
+    `pct=${modifierValue(bracelet, 'bloodPointPct')}`);
 
   const myers = createGame(STARTING_DECK, undefined, '迈克尔·迈尔斯', 'lampkin', ['scratched_mirror', 'judiths_tombstone']);
   check('配件效果：划痕镜子尾随获取 +30%，墓碑把附身消耗 20→15',

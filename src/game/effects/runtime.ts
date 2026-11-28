@@ -346,7 +346,7 @@ export function executeOps(state: GameState, ops: Op[], runtime: EffectRuntime):
           case 'hexHuntress':
             state.hexHuntressActive = true;
             state.hexHuntressUsed = false;
-            log(state, '猎杀戾气已启用：下一次击杀人类时获得额外猎杀评分。');
+            log(state, '猎杀戾气已启用：下一次击杀人类时获得额外血点。');
             break;
           case 'hexNoed':
             state.hexNoedActive = true;

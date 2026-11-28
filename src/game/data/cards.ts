@@ -52,7 +52,7 @@ export const CARDS: CardDef[] = [
     name: '厄咒：猎杀戾气',
     cost: 1,
     type: 'setup',
-    desc: '启用猎杀戾气：下一次攻击命中幸存者时，额外获得 50 点猎杀评分。',
+    desc: '启用猎杀戾气：下一次攻击命中幸存者时，额外获得血点奖励。',
     flavor: '第一滴血，唤醒了诅咒。',
     sourceSkill: 'Hex: Thrill of the Hunt',
     unlocked: true,

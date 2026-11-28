@@ -1,5 +1,6 @@
 import { CARD_MAP, deckCardsForKiller } from './cards';
 import { accessoriesForKiller } from './accessories';
+import { awardBlood } from './bloodpoints';
 import { random, shuffle } from './random';
 import { KILLER_MAP } from './killers';
 import type { GameState } from './types';
@@ -42,7 +43,7 @@ export const ROGUE_BUFFS: RogueBuffDef[] = [
   { id: 'alarm_up', name: '风声鹤唳', desc: '开局警报 +20', apply: (s) => { s.alarm = Math.min(100, s.alarm + 20); } },
   { id: 'alarm_down', name: '悄无声息', desc: '开局警报 -15', apply: (s) => { s.alarm = Math.max(0, s.alarm - 15); } },
   { id: 'short_contract', name: '时限收紧', desc: '契约回合 -3', apply: (s) => { s.mission.turns = Math.max(8, s.mission.turns - 3); } },
-  { id: 'loot', name: '搜刮者', desc: '开局战利品 +3', apply: (s) => { s.loot += 3; } },
+  { id: 'loot', name: '搜刮者', desc: '开局获得 150 血点', apply: (s) => { awardBlood(s, 'hunt', '肉鸽 · 搜刮者', 150, { key: 'rogue:loot', limit: 1 }); } },
   { id: 'frenzy', name: '杀戮本能', desc: '开局杀戮值 50', apply: (s) => { s.frenzy = Math.max(s.frenzy, 50); } },
   { id: 'fear', name: '恐惧弥漫', desc: '幸存者开局恐惧 +20', apply: (s) => { s.people.forEach((p) => { if (p.role !== 'police' && p.hp > 0) p.fear = Math.min(100, p.fear + 20); }); } },
 ];

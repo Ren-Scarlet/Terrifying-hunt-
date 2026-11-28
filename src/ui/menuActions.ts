@@ -48,11 +48,6 @@ export function createMenuActions(deps: MenuActionDeps): ActionTable {
   };
 
   return {
-    ante: () => {
-      session.anteArmed = !session.anteArmed;
-      deps.render();
-    },
-
     start: beginRun,
     again: beginRun,
     'free-hunt': beginRun,

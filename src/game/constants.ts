@@ -46,8 +46,7 @@ export const LOOK_COST = 1;
 /** 挥刀消耗的行动点：唯一的伤害来源，不能免费 */
 export const ATTACK_COST = 1;
 
-/** 分数处决的解锁门槛；达到后，倒地幸存者头顶出现独立 QTE 按钮。 */
-export const SCORE_EXECUTION_THRESHOLD = 200;
+/** 特殊处决不再依赖评分门槛。 */
 
 /** 被砍伤后当场夺路而逃的步数：一刀下去，他会连着跑两间屋 */
 export const PANIC_HOPS_ON_HIT = 2;

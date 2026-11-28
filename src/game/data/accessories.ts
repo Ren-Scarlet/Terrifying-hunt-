@@ -94,7 +94,7 @@ export const ACCESSORIES: AccessoryDef[] = [
     desc: '撤离战利品 +30%，但所有能力冷却 +1 回合。',
     sourceSkill: 'Dull Bracelet',
     sourceText: '闪现最大距离减少20%；精准闪现得分事件增加100%血点。',
-    mods: [{ key: 'lootPct', value: 30 }, { key: 'cooldown', value: 1 }],
+    mods: [{ key: 'bloodPointPct', value: 30 }, { key: 'cooldown', value: 1 }],
   },
   {
     id: 'torn_bookmark',

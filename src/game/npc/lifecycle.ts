@@ -9,9 +9,9 @@ import { getExecutionMethod, type ExecutionMethodId } from '../executions';
 import { modifierValue } from '../modifiers';
 import { roomDistance } from '../navigation';
 import { ROOM_MAP } from '../rooms';
-import { LOOT_EXECUTION, LOOT_KILL } from '../scoring';
+import { BLOOD, awardBlood, markBloodEvent } from '../bloodpoints';
 import type { GameState, Person } from '../types';
-import { npcPeople as npcs } from '../world/roomState';
+import { npcPeople as npcs, isRoomLit } from '../world/roomState';
 import type { NpcHost } from './ai/host';
 import { fearBand } from './ai/predicates';
 
@@ -20,7 +20,6 @@ function clamp(value: number, min: number, max: number): number {
 }
 export function killPerson(host: NpcHost, state: GameState, person: Person): void {
   if (state.carryPersonId === person.id) state.carryPersonId = null;
-  if (person.role !== 'police' && fearBand(person) === 'broken') state.huntStats.terrorKills += 1;
   if (!state.people.some((p) => p.id === person.id)) return;
   const directWitnesses = person.role === 'police'
     ? 0
@@ -37,9 +36,8 @@ export function killPerson(host: NpcHost, state: GameState, person: Person): voi
   }
   state.kills += 1;
   if (person.role !== 'police') state.survivorKills += 1;
-  if (person.role !== 'police') state.loot += LOOT_KILL;
   // 同一回合的第二个及之后的击杀算「连杀」，鼓励用控制/范围效果制造连锁。
-  if (person.role !== 'police' && state.killsThisTurn >= 1) state.huntStats.comboKills += 1;
+  const comboIndex = person.role !== 'police' ? state.killsThisTurn : 0;
   state.killsThisTurn += 1;
   if (person.marked) state.markedKilled += 1;
   state.lastCrimeRoom = state.playerRoom;
@@ -52,8 +50,34 @@ export function killPerson(host: NpcHost, state: GameState, person: Person): voi
   if (directWitnesses > 0 || seenBy.length) {
     host.addWanted(state, person.role === 'target' ? 2 : 1);
   } else {
-    state.huntStats.quietKills += 1;
     host.log(state, '屋里没有人看见这一幕。');
+  }
+  if (person.role !== 'police') {
+    awardBlood(state, 'brutal', `击杀 ${person.name}`, BLOOD.kill, { key: `kill:${person.id}`, limit: 1 });
+    if (directWitnesses === 0 && seenBy.length === 0) {
+      awardBlood(state, 'cunning', `无声猎杀 · ${person.name}`, BLOOD.stealthKill, { key: `kill:stealth:${person.id}`, limit: 1 });
+      markBloodEvent(state, 'kill:stealth');
+    }
+    if (comboIndex >= 1) {
+      const comboValue = Math.min(BLOOD.comboMax, BLOOD.comboBase + (comboIndex - 1) * BLOOD.comboStep);
+      awardBlood(state, 'brutal', `连环击杀 · 第 ${comboIndex + 1} 人`, comboValue, { key: `kill:combo:${person.id}`, limit: 1 });
+      markBloodEvent(state, 'kill:combo');
+    }
+    if (person.highValue) {
+      awardBlood(state, 'brutal', `高价值目标 · ${person.name}`, BLOOD.highValueKill, { key: `kill:high-value:${person.id}`, limit: 1 });
+    }
+    if (state.alarm >= 90) markBloodEvent(state, 'kill:high-alarm');
+    if (state.powerUsedThisAction) {
+      awardBlood(state, 'brutal', `专属能力击杀 · ${person.name}`, BLOOD.signatureKill, { key: `kill:signature:${person.id}`, limit: 1 });
+    }
+    if (person.escapeProgress > 0 || (state.emergencyActive && state.escapeRooms.includes(person.room))) {
+      awardBlood(state, 'control', `阻止逃离 · ${person.name}`, BLOOD.preventInteraction, { key: `escape:${person.id}`, limit: 1 });
+      markBloodEvent(state, 'escape:prevented');
+    }
+    if (!isRoomLit(state, person.room)) {
+      awardBlood(state, 'cunning', `黑暗中击杀 · ${person.name}`, BLOOD.environmentKill, { key: `kill:dark:${person.id}`, limit: 1 });
+      markBloodEvent(state, 'kill:dark');
+    }
   }
   host.log(
     state,
@@ -153,6 +177,7 @@ export function carryPerson(host: NpcHost, state: GameState, personId: string): 
   state.carryPersonId = person.id;
   state.carryDistance = 0;
   person.activity = '被杀手抱起搬运';
+  awardBlood(state, 'hunt', `抓住幸存者 · ${person.name}`, BLOOD.capture, { key: `carry:${person.id}`, limit: 1 });
   host.log(state, `你抱起了倒地的${person.name}。搬运途中不会自行挣脱。`);
   host.npcWitnessEvent(state, person.room, 'abduction', person.id);
   host.afterPlayerAction(state);
@@ -190,10 +215,12 @@ export function executeCarriedPerson(host: NpcHost, state: GameState, methodId: 
   state.carryPersonId = null;
   state.carryDistance = 0;
   state.executions += 1;
-  host.log(state, `特殊处决【${method.name}】：${method.flavor(name)}（额外奖励 +35 分）。`);
+  host.log(state, `特殊处决【${method.name}】：${method.flavor(name)}。`);
   host.addAlarm(state, executionWitnessed(state, person) ? 6 : 2);
+  awardBlood(state, 'brutal', `特殊处决 · ${method.name}`, BLOOD.specialExecution, { key: `execution:special:${person.id}`, limit: 1 });
+  awardBlood(state, 'brutal', `场景处决 · ${method.name}`, BLOOD.locationExecution, { key: `execution:location:${person.id}`, limit: 1 });
+  markBloodEvent(state, 'execution:location');
   killPerson(host, state, person);
-  state.specialExecutionBonus += 35;
   if (!state.executionMethodsUsed.includes(method.id)) state.executionMethodsUsed.push(method.id);
   state.attackReady = true;
   host.addAlarm(state, 8);
@@ -228,7 +255,7 @@ export function executePerson(host: NpcHost, state: GameState, person: Person): 
   const witnessed = executionWitnessed(state, person);
   host.addAlarm(state, witnessed ? 8 : 1);
   state.executions += 1;
-  if (person.role !== 'police') state.loot += LOOT_EXECUTION;
+  awardBlood(state, 'brutal', `处决 · ${person.name}`, BLOOD.specialExecution, { key: `execution:${person.id}`, limit: 1 });
   host.log(state, witnessed ? `你处决了 ${person.name}，屋里的人看见了这一幕。` : `你悄悄处决了 ${person.name}，没有惊动别人。`);
   killPerson(host, state, person);
 }

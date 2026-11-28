@@ -2,33 +2,28 @@ import { CARDS, CARD_MAP, deckCardsForKiller } from './cards';
 import { ACCESSORY_MAP, accessoriesForKiller } from './accessories';
 import { KILLER_MAP, STARTER_KILLERS } from './killers';
 import { random, shuffle } from './random';
-import type { GameState } from './types';
 
 /**
  * 血网升级（角色等级）
  *
- *  - 每位杀手独立升级；一局结束按得分/击杀给经验。
- *  - 每 100 经验升 1 级；每级给 1 次「血网」三选一（配件 +1 库存 / 解锁卡牌 / 血点）。
+ *  - 每位杀手独立升级；升级直接消耗血点。
+ *  - 每级给 1 次「血网」三选一（配件 +1 库存 / 解锁卡牌 / 血点）。
  *  - 每 100 级「转生」一次：等级回到 1，转生数 +1，继续无限升级。
  *  - 累计等级每 30 级，把该杀手的一张专属卡放进公共池（others 也能构筑）。
  */
 
-export const XP_PER_LEVEL = 100;
 export const LEVELS_PER_PRESTIGE = 100;
 export const SHARE_EVERY = 30;
 
 export interface KillerProgress {
   level: number;
-  xp: number;
   prestige: number;
-  /** 还没领的血网三选一次数 */
-  pending: number;
 }
 
 export type ProgressMap = Partial<Record<string, KillerProgress>>;
 
 export function emptyProgress(): KillerProgress {
-  return { level: 1, xp: 0, prestige: 0, pending: 0 };
+  return { level: 1, prestige: 0 };
 }
 
 export function progressOf(map: ProgressMap | undefined, killer: string): KillerProgress {
@@ -57,30 +52,6 @@ export function addLevel(progress: KillerProgress): KillerProgress {
 
 export function totalLevel(progress: KillerProgress): number {
   return progress.prestige * LEVELS_PER_PRESTIGE + progress.level;
-}
-
-/** 一局结束能拿多少经验。输了也有一点，避免卡住。 */
-export function xpForGame(state: GameState): number {
-  const win = state.result === 'win';
-  return Math.max(10, Math.round(state.score / 5) + state.kills * 12 + (win ? 60 : 20));
-}
-
-/** 加经验并结算升级/转生；返回新的进度与升了几级。 */
-export function gainXp(progress: KillerProgress, xp: number): { progress: KillerProgress; levels: number } {
-  let { level, xp: pool, prestige, pending } = progress;
-  pool += Math.max(0, Math.round(xp));
-  let levels = 0;
-  while (pool >= XP_PER_LEVEL) {
-    pool -= XP_PER_LEVEL;
-    level += 1;
-    levels += 1;
-    pending += 1;
-    if (level > LEVELS_PER_PRESTIGE) {
-      level = 1;
-      prestige += 1;
-    }
-  }
-  return { progress: { level, xp: pool, prestige, pending }, levels };
 }
 
 export type BloodwebOffer =

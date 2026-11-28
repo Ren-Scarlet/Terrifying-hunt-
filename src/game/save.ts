@@ -19,7 +19,6 @@ function defaultSave(): SaveData {
   return {
     deck: [...STARTING_DECK],
     unlockedCards: [...STARTER_CARDS],
-    bestScore: 0,
     wins: 0,
     killer: '迈克尔·迈尔斯',
     credits: 60,
@@ -121,9 +120,7 @@ export function loadSave(): SaveData {
       progress[killer] = raw && typeof raw === 'object'
         ? {
             level: Math.min(100, Math.max(1, toInt((raw as { level?: number }).level, 1) || 1)),
-            xp: Math.min(99, toInt((raw as { xp?: number }).xp, 0)),
             prestige: toInt((raw as { prestige?: number }).prestige, 0),
-            pending: Math.min(30, toInt((raw as { pending?: number }).pending, 0)),
           }
         : emptyProgress();
     }
@@ -135,7 +132,6 @@ export function loadSave(): SaveData {
     return {
       deck,
       unlockedCards,
-      bestScore: toInt(parsed.bestScore, 0),
       wins: toInt(parsed.wins, 0),
       killer,
       credits: toInt(parsed.credits, defaultSave().credits),

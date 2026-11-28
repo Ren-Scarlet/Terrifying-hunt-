@@ -5,6 +5,7 @@
  * 结算交给 afterPlayerAction。这样界面、AI、回合结算看到的是同一套判定。
  */
 import { LOOK_COST, SEARCH_COST, SURVIVOR_INJURED_HP } from '../constants';
+import { BLOOD, awardBlood } from '../bloodpoints';
 import { drawCards } from '../deck';
 import { roomName } from '../missions';
 import type { GameState, Person, RoomId } from '../types';
@@ -34,6 +35,7 @@ export function breakBarricade(host: NpcHost, state: GameState, room: RoomId): b
   if (inside.length) {
     host.log(state, `木板碎裂的巨响让${inside.map((person) => person.name).join('、')}立刻警觉起来，${inside.length > 1 ? '他们' : '他'}开始死死盯住门口。`);
   }
+  awardBlood(state, 'control', `破坏木板 · ${roomName(room)}`, BLOOD.barricade, { key: `barricade:${room}`, limit: 1 });
   state.attackReady = true;
   host.afterPlayerAction(state);
   host.checkImmediateWin(state);
@@ -62,6 +64,7 @@ export function breakDoor(host: NpcHost, state: GameState, room: RoomId): boolea
     person.fear = clamp(person.fear + 12, 0, 100);
   });
   host.addAlarm(state, 5);
+  awardBlood(state, 'control', `破坏木门 · ${roomName(room)}`, BLOOD.breakDoor, { key: `door:${room}`, limit: 1 });
   state.attackReady = true;
   host.afterPlayerAction(state);
   host.checkImmediateWin(state);
@@ -244,6 +247,7 @@ export function interactTotem(host: NpcHost, state: GameState, reward: 'draw' | 
     state.energy += 1;
     host.log(state, `你汲取图腾的力量，立即获得 1 点行动点。`);
   }
+  awardBlood(state, 'control', `利用图腾 · ${roomName(room)}`, BLOOD.totem, { key: `totem:${room}`, limit: 1 });
   state.attackReady = true;
   host.afterPlayerAction(state);
   host.checkImmediateWin(state);
@@ -265,6 +269,8 @@ export function searchRoom(host: NpcHost, state: GameState): boolean {
   found.forEach((p) => {
     p.hidden = false;
     p.alert = clamp(p.alert + 35, 0, 100);
+    awardBlood(state, 'cunning', `柜中搜出 · ${p.name}`, BLOOD.cabinetFind, { key: `search:${p.id}`, limit: 1 });
+    awardBlood(state, 'hunt', `捕获躲藏者 · ${p.name}`, BLOOD.hiddenCapture, { key: `capture-hidden:${p.id}`, limit: 1 });
     host.log(state, `${p.name} 被你从藏身处拖了出来。`);
   });
   if (!found.length) {

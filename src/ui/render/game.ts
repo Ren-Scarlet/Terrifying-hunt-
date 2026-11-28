@@ -21,11 +21,9 @@ import {
   moveBlockReason,
   canUsePower,
   conditionOf,
-  currentScore,
-  scoreLines,
-  lootPayout,
+  bloodPointGroups,
+  bloodPointTotal,
   effectiveCost,
-  getStars,
   isLocked,
   isPersonVisible,
   isRoomExplored,
@@ -45,8 +43,6 @@ import {
   breakerBlockReason,
   BREAKER_SWITCH_COST,
   missionTaskProgress,
-  scoreExecutionBlockReason,
-  SCORE_EXECUTION_THRESHOLD,
   isRoomLit,
 } from '../../game/engine';
 import { executionMethodsAtRoom } from '../../game/executions';
@@ -73,20 +69,17 @@ import { ACCESSORY_MAP, ACCESSORY_SLOTS } from '../../game/accessories';
 import { blinkRangeOf, blinkWithinRange, hatchetMax, modifierSummary } from '../../game/modifiers';
 import { isMuted, playHeartbeat, playSfx, playTrapScream } from '../audio';
 import { addonIconHtml, escape, icon, personChip, shadowFigures, perkIconHtml, TYPE_NAMES, killerFaceHtml, defaultDetailHtml, cardTextHtml } from './shared';
-import type { GameState, Person, RoomId, ScoreLine, SaveData } from '../../game/types';
+import type { BloodCategory, GameState, Person, RoomId, SaveData } from '../../game/types';
 
 /**
- * 分数明细按维度分组渲染：实时面板与结算面板共用。
- * 分组顺序固定，玩家能直观看出「这一局的分数来自哪几类」。
+ * 血点明细按五类分组渲染：实时面板与结算面板共用。
  */
-const SCORE_GROUPS = ['契约', '猎杀', '潜行', '效率', '风格', '失分', '其他'];
-function scoreGroupsHtml(lines: ScoreLine[]): string {
-  return SCORE_GROUPS.map((category) => {
-    const rows = lines.filter((line) => (line.category ?? '其他') === category);
-    if (!rows.length) return '';
-    const sum = rows.reduce((acc, line) => acc + line.value, 0);
-    const body = rows.map((line) => `<div class="score-line ${line.value < 0 ? 'minus' : ''}"><span>${escape(line.label)}</span><b>${line.value >= 0 ? '+' : ''}${line.value}</b></div>`).join('');
-    return `<section class="score-group"><h4>${category}<b>${sum >= 0 ? '+' : ''}${sum}</b></h4>${body}</section>`;
+function bloodGroupsHtml(state: GameState, onlyEarned = false): string {
+  const groups = bloodPointGroups(state);
+  return groups.map((group) => {
+    if (onlyEarned && group.value === 0) return '';
+    const body = group.lines.map((line) => `<div class="score-line"><span>${escape(line.label)}</span><b>+${line.value}</b></div>`).join('');
+    return `<section class="score-group"><h4>${group.label}<b>+${group.value}</b></h4>${body || '<div class="score-line muted"><span>本局尚未获得</span><b>0</b></div>'}</section>`;
   }).join('');
 }
 
@@ -210,7 +203,7 @@ function doorMarkersHtml(state: GameState): string {
 
 /** 把最近发生的关键行动投射到地图上；完整记录仍保留在情报抽屉。 */
 function mapEventFeedHtml(state: GameState): string {
-  const important = /没能再起来|停止了呼吸|处决了|特殊处决|分数处决|砸毁了|砸烂了|你砸了|立即断电|电话线被剪断|封锁了|放下木板|踩中捕兽夹|报警成功|成功逃离|逃出了房子|翻出了后院|已抵达逃生点|地图出现两个逃生点|逃生点开启|大门开启|警报升高！猎场出现逃生点|被警察逮捕|被同伴救起|【环境事件】|雷雨|电话突然响起|玻璃碎裂声|灯光突然闪烁|飞斧未投出|行动点不足|未解锁|未满足|不可用|被阻|无法|不能|需要|未能|没有|尚未|不在|失败/;
+  const important = /没能再起来|停止了呼吸|处决了|特殊处决|砸毁了|砸烂了|你砸了|立即断电|电话线被剪断|封锁了|放下木板|踩中捕兽夹|报警成功|成功逃离|逃出了房子|翻出了后院|已抵达逃生点|地图出现两个逃生点|逃生点开启|大门开启|警报升高！猎场出现逃生点|被警察逮捕|被同伴救起|【环境事件】|雷雨|电话突然响起|玻璃碎裂声|灯光突然闪烁|飞斧未投出|行动点不足|未解锁|未满足|不可用|被阻|无法|不能|需要|未能|没有|尚未|不在|失败/;
   const recent = state.log.filter((line) => {
     const match = line.match(/^\[第 (\d+) 回合\]/);
     const turn = match ? Number(match[1]) : state.turn;
@@ -455,14 +448,13 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
   const objectiveDone = tasks.filter((task) => !task.optional).length > 0 && tasks.filter((task) => !task.optional).every((task) => missionTaskProgress(state, task) >= task.target);
   const progress = tasks.map((task) => {
     const value = missionTaskProgress(state, task);
-    const failed = task.kind === 'no_alarm' && state.npcAlarmed;
     const done = value >= task.target;
     const targetNames = task.kind === 'marked_kill'
       ? `<small class="mission-target-names">${markedTargetNames.length ? `指定目标：${markedTargetNames.map(escape).join('、')}` : `已击杀指定目标 ${state.markedKilled} 人`}</small>`
       : '';
-    const progressText = task.kind === 'alarm_below' ? `警报 ${state.alarm} / ≤${task.limit ?? 35}` : task.kind === 'no_alarm' ? (failed ? '已报警' : '保持中') : `${Math.min(value, task.target)}/${task.target}`;
-    const rewardText = task.optional && (task.reward ?? 0) > 0 ? `<small class="mission-task-reward">+ ${task.reward} 分</small>` : '';
-    return `<span class="mission-task ${done ? 'done' : failed ? 'failed' : ''} ${task.optional ? 'optional' : 'required'}"><b>${done ? '✓' : failed ? '✕' : '○'}</b> ${escape(task.label)} <em>${progressText}</em>${rewardText}${targetNames}</span>`;
+    const progressText = task.kind === 'alarm_below' ? `警报 ${state.alarm} / ≤${task.limit ?? 50}` : `${Math.min(value, task.target)}/${task.target}`;
+    const rewardText = task.optional ? '<small class="mission-task-reward">+300 血点</small>' : '';
+    return `<span class="mission-task ${done ? 'done' : ''} ${task.optional ? 'optional' : 'required'}"><b>${done ? '✓' : '○'}</b> ${escape(task.label)} <em>${progressText}</em>${rewardText}${targetNames}</span>`;
   }).join('');
 
 /**
@@ -604,9 +596,8 @@ function personSlotStyle(roomId: RoomId, personId: string, index: number): strin
                <div class="room-features">${roomFeatures(state, room.id)}</div>`}
         <div class="room-people ${adjacent && people.length ? 'adjacent-survivors' : ''}">
           ${lockedHidden ? '' : people.map((p) => p.hp <= 0 && p.room === state.playerRoom && !state.carryPersonId
-            ? `<div class="map-person-wrap ${currentScore(state) >= SCORE_EXECUTION_THRESHOLD ? 'score-unlocked' : ''}" style="${personSlotStyle(room.id, p.id, people.indexOf(p))}">${personChip(p, false, false, undefined, !isRoomLit(state, p.room))}
+            ? `<div class="map-person-wrap" style="${personSlotStyle(room.id, p.id, people.indexOf(p))}">${personChip(p, false, false, undefined, !isRoomLit(state, p.room))}
                 <div class="person-world-actions">
-                  ${currentScore(state) >= SCORE_EXECUTION_THRESHOLD ? `<button class="btn score-execution-btn" data-action="execute-score-special" data-person-id="${p.id}" ${scoreExecutionBlockReason(state, p.id) ? 'disabled' : ''} title="分数处决：猎杀评分达到 ${SCORE_EXECUTION_THRESHOLD} 分后解锁，消耗 1 AP 并触发 QTE">分数处决 · QTE</button>` : ''}
                   <button class="btn" data-action="carry" data-person-id="${p.id}" ${state.energy < 1 ? 'disabled' : ''} title="抱起倒地幸存者：消耗 1 AP；抱起后可搬运到指定地点执行地点处决">抱起</button>
                   <button class="btn execute" data-action="execute-target" data-person-id="${p.id}" ${executeBlockReason(state, p.id) ? 'disabled' : ''} title="普通处决：消耗 1 AP，立即击杀倒地目标">普通处决</button>
                 </div>
@@ -748,7 +739,7 @@ function personSlotStyle(roomId: RoomId, personId: string, index: number): strin
     if (carriedPerson) guidanceDetail += ` 当前搬运目标：${carriedPerson.name}。`;
   } else if (downedHereNow) {
     guidanceTitle = '猎物已经倒地';
-    guidanceDetail = '普通处决可以立即完成；也可以抱起目标，搬运到指定地点执行地点处决。当前猎杀评分 ' + currentScore(state) + ' / ' + SCORE_EXECUTION_THRESHOLD + '；达到门槛后，倒地目标头顶会出现独立的「分数处决」QTE 按钮。若拖延，同伴可能赶来救援。';
+    guidanceDetail = '普通处决可以立即完成；也可以抱起目标，搬运到指定地点执行地点处决，血点更高。若拖延，同伴可能赶来救援。';
   } else if (markedAlive) {
     const targetVisible = isPersonVisible(state, markedAlive);
     guidanceRoom = targetVisible ? markedAlive.room : markedAlive.lastSeenRoom;
@@ -868,7 +859,7 @@ function personSlotStyle(roomId: RoomId, personId: string, index: number): strin
     </div>
     <div class="objective" data-action="toggle-task-drawer" role="button" tabindex="0">
       <i class="dot"></i>
-      <div><b>${escape(m.title)}</b><span>${escape(ground.name)} · ${state.people.filter((p) => p.role !== 'police' && p.hp > 0).length} 名幸存者仍存活 · 奖励 ${m.reward}</span></div>
+      <div><b>${escape(m.title)}</b><span>${escape(ground.name)} · ${state.people.filter((p) => p.role !== 'police' && p.hp > 0).length} 名幸存者仍存活 · 主要任务 ${(m.tasks ?? []).filter((task) => !task.optional).length} 项</span></div>
     </div>
     <div class="right-tools">
       <button class="tool task-tool" data-action="toggle-task-drawer" aria-label="任务列表" title="打开任务列表（T）"><span>☷</span><em>任务列表 · T</em></button>
@@ -922,25 +913,19 @@ function personSlotStyle(roomId: RoomId, personId: string, index: number): strin
               <div class="stat"><b>${state.kills}</b><small>击杀</small></div>
               <div class="stat survivor-count"><b>${state.people.filter((p) => p.role !== 'police' && p.hp > 0).length}/${state.survivorTotal}</b><small>存活</small></div>
               
-              <div class="stat score"><b>${currentScore(state)}</b><small>预计得分</small></div>
-              <div class="stat loot-stat"><b>${state.loot}</b><small>战利品</small></div>
+              <div class="stat score"><b>${bloodPointTotal(state)}</b><small>本局血点</small></div>
             </div>
             <details class="score-details">
-              <summary>得分构成 · 怎么加分</summary>
-              ${scoreGroupsHtml(scoreLines(state))}
+              <summary>血点构成 · 五类奖励</summary>
+              ${bloodGroupsHtml(state, true)}
               <section class="score-group score-guide">
-                <h4>还能怎么加分</h4>
-                <div class="score-line"><span>全程无人成功报警</span><b>+25</b></div>
-                <div class="score-line"><span>结束时警报低于 30</span><b>+15</b></div>
-                <div class="score-line"><span>每多一种处决方式</span><b>+10</b></div>
-                <div class="score-line"><span>用满 3 种卡后，每多一种（上限 15）</span><b>+3</b></div>
-                <div class="score-line"><span>每击杀 1 人</span><b>+14</b></div>
-                <div class="score-line"><span>每处决 1 次</span><b>+10</b></div>
-                <div class="score-line"><span>胜利结算：每剩余 1 回合</span><b>+5</b></div>
-                <div class="score-line"><span>击杀已恐惧崩溃的目标</span><b>+8</b></div>
-                <div class="score-line"><span>同一回合连杀（第 2 人起）</span><b>+12</b></div>
-                <div class="score-line"><span>加注达成</span><b>契约分 +60%</b></div>
-                <div class="score-line"><span>每逃走 1 人</span><b>-15</b></div>
+                <h4>怎么拿血点</h4>
+                <div class="score-line"><span>发现 / 追踪 / 攻击 / 击倒</span><b>+100 / +50 / +200 / +350</b></div>
+                <div class="score-line"><span>击杀 / 处决 / 场景处决</span><b>+800 / +300 / +500</b></div>
+                <div class="score-line"><span>无声击杀 / 柜中搜出 / 陷阱捕获</span><b>+500 / +300 / +400</b></div>
+                <div class="score-line"><span>破坏电闸 / 电话 / 木门</span><b>+200 / +100 / +100</b></div>
+                <div class="score-line"><span>完成主要 / 额外任务</span><b>+500 / +300</b></div>
+                <div class="score-line"><span>全部主要 / 全部额外</span><b>+1500 / +1000</b></div>
               </section>
             </details>
           </div>
@@ -1047,16 +1032,14 @@ export function renderResult(state: GameState, newCard: string | null): string {
       : state.result === 'timeout'
         ? (supernatural ? '天光刺破雾幕，恶灵失去依附之所，猎杀被迫终止。' : '天亮了，警队封锁整条街。你不得不放弃这场猎杀。')
         : (supernatural ? '猎场的诅咒反噬了你，黑暗不再听从召唤。' : `${killerEnding[state.killer] ?? '猎场重新归于寂静。'}这一次，你没能完成猎杀。`);
-  const stars = getStars(state.score);
   const win = state.result === 'win';
-  const rank = win ? (state.score >= 260 ? 'S' : state.score >= 190 ? 'A' : 'B') : '—';
-  const baseEarned = win ? Math.max(10, Math.round(state.score / 5)) : 0;
-  const earned = baseEarned + state.huntStyleBonus;
-  const darkCells = win && state.score >= 150 ? 1 : 0;
-  const styleBreakdown = state.huntStyleBreakdown
-    .map((line) => `<div class="style-score-line"><span>${escape(line.label)}</span><b>+${line.value}</b></div>`)
+  const earned = bloodPointTotal(state);
+  const darkCells = win ? 1 : 0;
+  const primary = (state.mission.tasks ?? []).filter((task) => !task.optional);
+  const primaryDone = primary.filter((task) => missionTaskProgress(state, task) >= task.target).length;
+  const titleRows = state.performanceTitles
+    .map((title) => `<span class="performance-title" title="+${title.points} 血点">${escape(title.label)}<b>+${title.points}</b></span>`)
     .join('');
-  const breakdown = scoreGroupsHtml(state.scoreBreakdown);
   return `
     <div class="overlay">
       <div class="modal result-modal ${win ? 'is-win' : 'is-lose'}">
@@ -1065,32 +1048,21 @@ export function renderResult(state: GameState, newCard: string | null): string {
         <h1>${labels[state.result ?? 'failed']}</h1>
         ${state.resultReason ? `<p class="result-reason">${escape(state.resultReason)}</p>` : ''}
         <p class="result-epilogue">${escape(ending)}</p>
-        <div class="result-rank"><small>本局评级</small><b>${rank}</b></div>
-        <div class="result-stars">${'★'.repeat(stars)}${'☆'.repeat(3 - stars)}</div>
+        <div class="result-total"><small>本局狩猎结算</small><b>${earned.toLocaleString()} 血点</b></div>
         <div class="result-objective ${win ? 'done' : ''}">
           <span class="result-check">${win ? '✓' : '✕'}</span>
-          <div><small>${win ? '目标已达成' : '目标未完成'}</small><b>${escape(state.mission.objective ?? state.mission.title)}</b></div>
+          <div><small>${win ? '目标已达成' : '目标未完成'}</small><b>${escape(state.mission.objective ?? state.mission.title)} · 主要任务 ${primaryDone}/${primary.length}</b></div>
         </div>
         <div class="result-grid">
-          <div><small>最终评分</small><b>${state.score}</b></div>
-          <div><small>战利品</small><b>${state.loot} → ${lootPayout(state)}</b></div>
           <div><small>击杀人数</small><b>${state.kills}</b></div>
           <div><small>逃走人数</small><b>${state.escaped}</b></div>
           <div><small>最终警报值</small><b>${state.alarm}/${ALARM_MAX}</b></div>
         </div>
-        <section class="hunt-style-card">
-          <div class="hunt-style-heading">
-            <div><small>猎杀风格评价</small><b>计划、隐蔽与能力运用</b></div>
-            <strong class="hunt-style-rank rank-${state.huntStyleRank.toLowerCase()}">${state.huntStyleRank}</strong>
-            <span class="hunt-style-score">${state.huntStyleScore}/100</span>
-          </div>
-          <div class="hunt-style-breakdown">${styleBreakdown}</div>
-          ${state.huntStyleBonus ? `<p class="hunt-style-reward">风格奖励 · 额外血点 +${state.huntStyleBonus}</p>` : '<p class="hunt-style-reward muted">本局未获得额外风格血点；尝试利用目标习惯、环境或杀手专属能力提升评级。</p>'}
-        </section>
-        <div class="score-breakdown">${breakdown}</div>
+        ${titleRows ? `<div class="performance-titles"><small>特殊表现</small>${titleRows}</div>` : ''}
+        <div class="blood-breakdown">${bloodGroupsHtml(state, true)}</div>
         <details class="result-log"><summary>本局日志 · ${state.log.length} 条记录</summary><div class="result-log-list">${[...state.log].reverse().map((line) => `<div>${escape(line)}</div>`).join('')}</div></details>
         ${newCard ? `<p style="color:var(--gold)">新卡牌解锁：<b>${escape(CARD_MAP[newCard]?.name ?? newCard)}</b></p>` : ''}
-        ${earned ? `<p style="color:var(--gold)">${icon('bloodPoint', 'ui-icon tiny')} 获得血点：<b>+${earned}</b>${state.huntStyleBonus ? `（含风格奖励 +${state.huntStyleBonus}）` : ''}</p>` : ''}
+        <p style="color:var(--gold)">${icon('bloodPoint', 'ui-icon tiny')} 获得血点：<b>+${earned.toLocaleString()}</b></p>
         ${darkCells ? `<p style="color:var(--gold)">${icon('darkCell', 'ui-icon tiny')} 获得暗金细胞：<b>+${darkCells}</b></p>` : ''}
         <div class="actions">
           <button class="btn primary" data-action="again">再来一局</button>

@@ -4,6 +4,7 @@
  * 能力数值全部来自 modifiers.ts；这里只负责判定能不能用、以及用出去发生什么。
  */
 import { KILLER_MAP } from '../killers';
+import { BLOOD, awardBlood } from '../bloodpoints';
 import { blinkRangeOf, blinkWithinRange, hatchetDamageOf, hatchetMax, modifierValue, possessCost } from '../modifiers';
 import { roomName } from '../missions';
 import { ROOMS, ROOM_MAP } from '../rooms';
@@ -56,7 +57,6 @@ export function blinkPlayer(host: NpcHost, state: GameState, room: RoomId): bool
   const blinkCooldown = Math.max(0, 1 + modifierValue(state, 'cooldown'));
   if (blinkCooldown > 0) state.cooldowns.nurse_blink = blinkCooldown;
   else delete state.cooldowns.nurse_blink;
-  state.huntStats.nurseBlinks += 1;
   state.attackReady = true;
   host.log(state, `护士穿过墙壁与房门，闪现到${roomName(room)}。你可以立即对同屋站立幸存者发动一次普通攻击；下一次行动后将进入疲惫。`);
   return true;
@@ -75,7 +75,7 @@ export function throwHuntressHatchet(host: NpcHost, state: GameState, targetId: 
   }
   state.energy -= 1;
   state.hatchets -= 1;
-  state.huntStats.hatchetHits += 1;
+  state.huntCounters.hatchetHits += 1;
   state.huntressAiming = false;
   host.log(state, `女猎手掷出狩猎飞斧，命中${target.name}（剩余飞斧 ${state.hatchets}/${hatchetMax(state)}）。`);
   // 飞斧不影响恐惧值，也不因恐惧满值放大伤害；命中后仍会触发逃跑反应。
@@ -204,6 +204,7 @@ export function usePower(host: NpcHost, state: GameState, powerId: string): bool
       discovered: false,
     });
     host.log(state, `你在${roomName(state.playerRoom)}布设了一只捕兽夹。现在可以在任何房间连续布设，不再受地点和间距限制。`);
+    awardBlood(state, 'control', `布置捕兽夹 · ${roomName(state.playerRoom)}`, BLOOD.placeTrap, { key: 'trap:place', limit: 4 });
     state.attackReady = true;
     host.afterPlayerAction(state);
     host.checkImmediateWin(state);

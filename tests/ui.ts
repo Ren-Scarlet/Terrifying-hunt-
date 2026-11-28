@@ -96,9 +96,5 @@ session.pendingRun = 'free';
 check('出发模式可读写', session.pendingRun === 'free');
 session.pendingRun = null;
 
-session.anteArmed = true;
-check('加注开关可读写', session.anteArmed === true);
-session.anteArmed = false;
-
 console.log(`\n界面状态 ${pass} 通过 / ${fail} 失败`);
 if (fail > 0) process.exitCode = 1;
