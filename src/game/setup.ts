@@ -171,6 +171,8 @@ export function createGame(
     bloodPointCounts: {},
     performanceTitles: [],
     huntCounters: { hatchetHits: 0, nurseBlinkAttacks: 0 },
+    executionScene: null,
+    executionSceneSeq: 0,
     powerUsedThisAction: false,
     rewardCards: [],
     phoneCut: false,

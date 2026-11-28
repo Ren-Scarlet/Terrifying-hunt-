@@ -43,9 +43,11 @@ import {
   breakerBlockReason,
   BREAKER_SWITCH_COST,
   missionTaskProgress,
+  qteExecutionBlockReason,
+  QTE_EXECUTION_THRESHOLD,
   isRoomLit,
 } from '../../game/engine';
-import { executionMethodsAtRoom } from '../../game/executions';
+import { executionMethodsAtRoom } from '../../game/execution';
 import { SURVIVOR_MAP } from '../../game/survivors';
 import { getHuntingGround } from '../../game/maps';
 import { KILLERS, KILLER_MAP, type KillerProfile } from '../../game/killers';
@@ -598,6 +600,7 @@ function personSlotStyle(roomId: RoomId, personId: string, index: number): strin
           ${lockedHidden ? '' : people.map((p) => p.hp <= 0 && p.room === state.playerRoom && !state.carryPersonId
             ? `<div class="map-person-wrap" style="${personSlotStyle(room.id, p.id, people.indexOf(p))}">${personChip(p, false, false, undefined, !isRoomLit(state, p.room))}
                 <div class="person-world-actions">
+                  ${bloodPointTotal(state) >= QTE_EXECUTION_THRESHOLD ? `<button class="btn qte-execution-btn" data-action="execute-qte" data-person-id="${p.id}" ${qteExecutionBlockReason(state, p.id) ? 'disabled' : ''} title="QTE 处决：血点达到 ${QTE_EXECUTION_THRESHOLD} 后解锁，消耗 1 AP 并进入快速反应挑战；完美输入额外获得 300 血点">QTE 处决</button>` : ''}
                   <button class="btn" data-action="carry" data-person-id="${p.id}" ${state.energy < 1 ? 'disabled' : ''} title="抱起倒地幸存者：消耗 1 AP；抱起后可搬运到指定地点执行地点处决">抱起</button>
                   <button class="btn execute" data-action="execute-target" data-person-id="${p.id}" ${executeBlockReason(state, p.id) ? 'disabled' : ''} title="普通处决：消耗 1 AP，立即击杀倒地目标">普通处决</button>
                 </div>

@@ -1,7 +1,7 @@
 import { drawCards } from '../deck';
 import { POSSESS_TURNS, SURVIVOR_MAX_HP } from '../constants';
 import { roomDistance } from '../navigation';
-import { EXECUTION_METHODS } from '../executions';
+import { EXECUTION_METHODS } from '../execution';
 import { roomName } from '../missions';
 import { ROOM_MAP, ROOMS, TOTEM_ROOMS } from '../rooms';
 import type { Cond, Dest, Op, Who } from '../effect';

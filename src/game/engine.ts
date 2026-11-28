@@ -1,5 +1,5 @@
 import { random, randomOf, shuffle } from './random';
-import { getExecutionMethod, type ExecutionMethodId } from './executions';
+import { getExecutionMethod, type ExecutionMethodId } from './execution';
 import { nearestOf, roomDistance } from './navigation';
 import { awarenessStage, myersStalkGain } from './npc/awareness';
 import {
@@ -12,13 +12,13 @@ import {
   trapDamageOf,
   trapHoldTurns,
 } from './modifiers';
-import { ESCAPE_ROOMS, BASE_AP, SABOTAGE_COST, POSSESS_TURNS, SURVIVOR_MAX_HP, SURVIVOR_INJURED_HP, REACT_MOVE_CAP, BLEEDOUT_TURNS, ALARM_MAX, HAND_LIMIT, FRENZY_THRESHOLD, FRENZY_AP_BONUS, WATCH_GAIN, SEARCH_COST, LOOK_COST, ATTACK_COST, PANIC_HOPS_ON_HIT } from './constants';
+import { ESCAPE_ROOMS, BASE_AP, SABOTAGE_COST, POSSESS_TURNS, SURVIVOR_MAX_HP, SURVIVOR_INJURED_HP, REACT_MOVE_CAP, BLEEDOUT_TURNS, ALARM_MAX, HAND_LIMIT, FRENZY_THRESHOLD, FRENZY_AP_BONUS, WATCH_GAIN, SEARCH_COST, LOOK_COST, ATTACK_COST, PANIC_HOPS_ON_HIT, QTE_EXECUTION_THRESHOLD, QTE_PERFECT_BONUS } from './constants';
 import { drawCards } from './deck';
 import { executeOps } from './effects/runtime';
 import { createGame } from './setup';
 export { drawCards } from './deck';
 export { createGame } from './setup';
-export { BASE_AP, SABOTAGE_COST, POSSESS_TURNS, SURVIVOR_MAX_HP, SURVIVOR_INJURED_HP, BLEEDOUT_TURNS, ALARM_MAX, HAND_LIMIT, FRENZY_THRESHOLD, FRENZY_AP_BONUS, SEARCH_COST, LOOK_COST, ATTACK_COST, PANIC_HOPS_ON_HIT } from './constants';
+export { BASE_AP, SABOTAGE_COST, POSSESS_TURNS, SURVIVOR_MAX_HP, SURVIVOR_INJURED_HP, BLEEDOUT_TURNS, ALARM_MAX, HAND_LIMIT, FRENZY_THRESHOLD, FRENZY_AP_BONUS, SEARCH_COST, LOOK_COST, ATTACK_COST, PANIC_HOPS_ON_HIT, QTE_EXECUTION_THRESHOLD, QTE_PERFECT_BONUS } from './constants';
 import { ACTIVITIES, createPeople } from './npc/factory';
 import { HEALTH_LABEL } from './npc/catalog';
 export { HEALTH_LABEL } from './npc/catalog';
@@ -145,6 +145,8 @@ import {
   canAttack as aiCanAttack,
   executeBlockReason as aiExecuteBlockReason,
   executeDownedPerson as aiExecuteDownedPerson,
+  executeQtePerson as aiExecuteQtePerson,
+  qteExecutionBlockReason as aiQteExecutionBlockReason,
 } from './actions/combat';
 import { cancelAuraSelection as aiCancelAuraSelection, playCard as aiPlayCard, selectAuraRoom as aiSelectAuraRoom } from './actions/cards';
 import {
@@ -1118,6 +1120,8 @@ export function attackBlockReason(state: GameState, targetId?: string, costOverr
 export function canAttack(state: GameState, targetId?: string): boolean { return aiCanAttack(aiHost, state, targetId); }
 export function executeBlockReason(state: GameState, targetId?: string): string { return aiExecuteBlockReason(aiHost, state, targetId); }
 export function executeDownedPerson(state: GameState, targetId?: string): boolean { return aiExecuteDownedPerson(aiHost, state, targetId); }
+export function qteExecutionBlockReason(state: GameState, targetId?: string): string { return aiQteExecutionBlockReason(aiHost, state, targetId); }
+export function executeQtePerson(state: GameState, targetId: string, success: boolean): boolean { return aiExecuteQtePerson(aiHost, state, targetId, success); }
 export function attack(state: GameState, targetId?: string, options: { costOverride?: number; bleedOnHit?: boolean; bleedTurns?: number; hitStatus?: 'blind' | 'undetectable' | 'danger' | 'deepWound' | 'oblivious' | 'incurable' | 'cursed'; hitStatusTurns?: number } = {}): boolean { return aiAttack(aiHost, state, targetId, options); }
 
 /**

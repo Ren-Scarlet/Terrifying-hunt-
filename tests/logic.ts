@@ -38,6 +38,8 @@ import {
   BREAKER_SWITCH_COST,
   attack,
   executeDownedPerson,
+  executeQtePerson,
+  qteExecutionBlockReason,
   executeBlockReason,
   carryPerson,
   canCoordinateRescue,
@@ -104,7 +106,7 @@ import { createSeededRandom, random, withRandomSource } from '../src/game/random
 import { cellDistance, nearestOf, roomDistance } from '../src/game/navigation';
 import { advanceRogue, applyRogueFloor, rollRogueAccessories, rollRogueDeck, rollRogueOffers, startRogueRun } from '../src/game/rogue';
 import { bloodwebCostAtLevel } from '../src/game/progress';
-import { EXECUTION_METHODS } from '../src/game/executions';
+import { EXECUTION_METHODS, executionTextEntries, resolveExecutionText } from '../src/game/execution';
 import { awarenessLabel, awarenessStage, myersStalkGain } from '../src/game/npc/awareness';
 
 let pass = 0;
@@ -1628,6 +1630,75 @@ function caseHighValueTarget(): void {
     ok && game.bloodPointLines.some((line) => line.label.includes('高价值目标') && line.value === BLOOD.highValueKill));
 }
 caseHighValueTarget();
+
+function caseExecutionTexts(): void {
+  const entries = executionTextEntries();
+  check('处决文本：数据已加载且 id 唯一',
+    entries.length >= 20 && new Set(entries.map((entry) => entry.id)).size === entries.length,
+    `count=${entries.length}`);
+  const methodIds = new Set(EXECUTION_METHODS.map((method) => method.id));
+  const roomIds = new Set(Object.keys(ROOM_MAP));
+  check('处决文本：site 只使用处决点或房间 id',
+    entries.every((entry) => !entry.site || methodIds.has(entry.site) || roomIds.has(entry.site)),
+    entries.filter((entry) => entry.site && !methodIds.has(entry.site) && !roomIds.has(entry.site)).map((entry) => `${entry.id}:${entry.site}`).join(','));
+  const killerNames = new Set(KILLERS.map((killer) => killer.owner));
+  check('处决文本：killer 只使用已开放杀手名',
+    entries.every((entry) => !entry.killer || killerNames.has(entry.killer)),
+    entries.filter((entry) => entry.killer && !killerNames.has(entry.killer)).map((entry) => `${entry.id}:${entry.killer}`).join(','));
+  const victim = '梅格·托马斯';
+  const normal = resolveExecutionText({ kind: 'normal', killer: '迈克尔·迈尔斯', victimId: 'meg_thomas', victimName: victim, room: 'hall' });
+  check('处决文本：普通处决读取杀手专属标题与台词',
+    normal.title === '恶魔附身' && normal.line === '嘘……别动。' && normal.description.includes('迈尔斯'));
+  const special = resolveExecutionText({ kind: 'special', killer: '迈克尔·迈尔斯', victimId: 'meg_thomas', victimName: victim, siteId: 'fridge', siteName: '冰柜封存', room: 'kitchen' });
+  check('处决文本：地点处决优先使用地形描述，并替换受害者名',
+    special.description.includes(victim) && special.description.includes('冰柜') && special.title === '恶魔附身',
+    `title=${special.title} desc=${special.description.slice(0, 20)}`);
+  const qteText = resolveExecutionText({ kind: 'qte', killer: '迈克尔·迈尔斯', victimId: 'meg_thomas', victimName: victim, room: 'hall', success: true });
+  check('处决文本：QTE 使用独立文本而不是普通处决',
+    qteText.title !== normal.title && qteText.description.includes(victim),
+    `title=${qteText.title}`);
+}
+
+caseExecutionTexts();
+
+function caseQteExecution(): void {
+  const locked = newGame();
+  const lockedTarget = locked.people.find((person) => person.role !== 'police')!;
+  lockedTarget.room = locked.playerRoom;
+  lockedTarget.hp = 0;
+  check('QTE 处决：血点不足时不可用',
+    qteExecutionBlockReason(locked, lockedTarget.id).includes('血点') &&
+    !executeQtePerson(locked, lockedTarget.id, true));
+
+  const perfect = newGame();
+  awardBlood(perfect, 'contract', '测试血点', 2000, { key: 'test:qte-unlock' });
+  const perfectTarget = perfect.people.find((person) => person.role !== 'police')!;
+  perfectTarget.room = perfect.playerRoom;
+  perfectTarget.hp = 0;
+  perfect.energy = 4;
+  const perfectOk = executeQtePerson(perfect, perfectTarget.id, true);
+  check('QTE 处决：达到门槛后可完美处决并获得额外血点',
+    perfectOk && !perfect.people.some((person) => person.id === perfectTarget.id) &&
+    perfect.executionScene?.kind === 'qte' &&
+    perfect.executionScene?.title === '完美处决' &&
+    perfect.bloodPointLines.some((line) => line.label.includes('完美 QTE') && line.value === 300),
+    `scene=${perfect.executionScene?.kind} title=${perfect.executionScene?.title}`);
+
+  const miss = newGame();
+  awardBlood(miss, 'contract', '测试血点', 2000, { key: 'test:qte-unlock' });
+  const missTarget = miss.people.find((person) => person.role !== 'police')!;
+  missTarget.room = miss.playerRoom;
+  missTarget.hp = 0;
+  miss.energy = 4;
+  const missOk = executeQtePerson(miss, missTarget.id, false);
+  check('QTE 处决：失误仍完成处决，但没有额外奖励',
+    missOk && !miss.people.some((person) => person.id === missTarget.id) &&
+    miss.executionScene?.title === '仓促处决' &&
+    !miss.bloodPointLines.some((line) => line.label.includes('完美 QTE')),
+    `title=${miss.executionScene?.title}`);
+}
+
+caseQteExecution();
 
 /** AB：封锁房门必须同时阻止 NPC 进入和离开；脚印不应随机消失 */
 function caseNpcLocksAndPersistentTrails(): void {

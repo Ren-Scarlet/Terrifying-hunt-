@@ -5,7 +5,7 @@
  * 否则击杀数、目击、暴露度、连杀统计会各算各的。
  */
 import { PANIC_HOPS_ON_HIT, SURVIVOR_INJURED_HP, SURVIVOR_MAX_HP } from '../constants';
-import { getExecutionMethod, type ExecutionMethodId } from '../executions';
+import { getExecutionMethod, createExecutionScene, type ExecutionMethodId } from '../execution';
 import { modifierValue } from '../modifiers';
 import { roomDistance } from '../navigation';
 import { ROOM_MAP } from '../rooms';
@@ -215,7 +215,8 @@ export function executeCarriedPerson(host: NpcHost, state: GameState, methodId: 
   state.carryPersonId = null;
   state.carryDistance = 0;
   state.executions += 1;
-  host.log(state, `特殊处决【${method.name}】：${method.flavor(name)}。`);
+  const scene = createExecutionScene(state, { kind: 'special', victim: person, siteId: method.id, siteName: method.name });
+  host.log(state, `特殊处决【${method.name}】：${scene.description}`);
   host.addAlarm(state, executionWitnessed(state, person) ? 6 : 2);
   awardBlood(state, 'brutal', `特殊处决 · ${method.name}`, BLOOD.specialExecution, { key: `execution:special:${person.id}`, limit: 1 });
   awardBlood(state, 'brutal', `场景处决 · ${method.name}`, BLOOD.locationExecution, { key: `execution:location:${person.id}`, limit: 1 });
@@ -255,6 +256,7 @@ export function executePerson(host: NpcHost, state: GameState, person: Person): 
   const witnessed = executionWitnessed(state, person);
   host.addAlarm(state, witnessed ? 8 : 1);
   state.executions += 1;
+  createExecutionScene(state, { kind: 'normal', victim: person });
   awardBlood(state, 'brutal', `处决 · ${person.name}`, BLOOD.specialExecution, { key: `execution:${person.id}`, limit: 1 });
   host.log(state, witnessed ? `你处决了 ${person.name}，屋里的人看见了这一幕。` : `你悄悄处决了 ${person.name}，没有惊动别人。`);
   killPerson(host, state, person);

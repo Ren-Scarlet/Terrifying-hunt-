@@ -4,11 +4,11 @@
  * 判定与执行放在一起，是因为两者共用同一套目标选择规则；
  * 界面只读判定，真正改世界的是下面这些执行函数。
  */
-import { ALARM_MAX, ATTACK_COST, SURVIVOR_MAX_HP } from '../constants';
-import { getExecutionMethod } from '../executions';
+import { ALARM_MAX, ATTACK_COST, QTE_EXECUTION_THRESHOLD, QTE_PERFECT_BONUS, SURVIVOR_MAX_HP } from '../constants';
+import { getExecutionMethod, createExecutionScene } from '../execution';
 import { modifierValue } from '../modifiers';
 import { random } from '../random';
-import { BLOOD, awardBlood, markBloodEvent } from '../bloodpoints';
+import { BLOOD, awardBlood, bloodPointTotal, markBloodEvent } from '../bloodpoints';
 import type { GameState, Person, RoomId } from '../types';
 import { ROOM_MAP } from '../rooms';
 import { npcPeople as npcs, peopleInRoom, isRoomLit } from '../world/roomState';
@@ -79,6 +79,45 @@ export function executeDownedPerson(host: NpcHost, state: GameState, targetId?: 
   if (state.carryPersonId === target.id) state.carryPersonId = null;
   host.executePerson(state, target);
   if (state.result) return true;
+  state.attackReady = true;
+  host.afterPlayerAction(state);
+  host.checkImmediateWin(state);
+  return true;
+}
+
+/**
+ * QTE 处决：本局血点达到门槛后才解锁；结算仍走普通处决，完美输入额外奖励血点。
+ * 文本与普通 / 地点处决共用 execution 模块，只是 kind = qte。
+ */
+export function qteExecutionBlockReason(host: NpcHost, state: GameState, targetId?: string): string {
+  if (state.phase !== 'playing') return '现在不能处决';
+  if (bloodPointTotal(state) < QTE_EXECUTION_THRESHOLD) {
+    return `本局血点尚未达到 ${QTE_EXECUTION_THRESHOLD}，暂时无法发动 QTE 处决。`;
+  }
+  if (state.carryPersonId === targetId) return '目标已经被抱起；请先放下或直接搬运到地点处决。';
+  return executeBlockReason(host, state, targetId);
+}
+
+export function executeQtePerson(host: NpcHost, state: GameState, targetId: string, success: boolean): boolean {
+  const reason = qteExecutionBlockReason(host, state, targetId);
+  if (reason) {
+    host.log(state, reason);
+    return false;
+  }
+  const target = state.people.find((person) => person.id === targetId);
+  if (!target) return false;
+  state.energy -= 1;
+  host.executePerson(state, target);
+  if (!state.people.some((person) => person.id === target.id)) {
+    createExecutionScene(state, { kind: 'qte', victim: target, success });
+    if (success) {
+      awardBlood(state, 'brutal', `完美 QTE 处决 · ${target.name}`, QTE_PERFECT_BONUS, { key: `execution:qte:${target.id}`, limit: 1 });
+      markBloodEvent(state, 'execution:qte');
+    }
+    host.log(state, success
+      ? `QTE 处决：节奏完美，额外获得 ${QTE_PERFECT_BONUS} 血点。`
+      : 'QTE 处决：节奏偏了一拍，处决仍然完成，但没有额外奖励。');
+  }
   state.attackReady = true;
   host.afterPlayerAction(state);
   host.checkImmediateWin(state);

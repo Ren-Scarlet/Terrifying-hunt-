@@ -2,6 +2,7 @@ import './style.css';
 import './ui/immersive.css';
 import './ui/mobile-shell.css';
 import { applyMobileGameLayout } from './ui/mobile-layout';
+import { cancelQte, handleQteInput, isQteActive, startQte, syncQtePanel } from './ui/qte';
 import { handleImmersiveAction, installImmersiveKeys, openIntelDrawer, syncImmersiveCamera } from './ui/immersive';
 import { CARD_MAP, deckCardsForKiller, STARTING_DECK } from './game/cards';
 import {
@@ -15,6 +16,8 @@ import {
   throwHuntressHatchet,
   executeCarriedPerson,
   executeDownedPerson,
+  executeQtePerson,
+  qteExecutionBlockReason,
   createGame,
   discardCard,
   drawCardAction,
@@ -55,8 +58,7 @@ import type { BloodwebOffer } from './game/progress';
 import type { RogueOffer, RogueRun } from './game/rogue';
 import { CABINET_ROOMS, ROOM_MAP } from './game/rooms';
 import { SURVIVOR_MAP } from './game/survivors';
-import { getExecutionMethod } from './game/executions';
-import type { ExecutionMethodId } from './game/executions';
+import type { ExecutionMethodId } from './game/execution';
 import type { GameState, RoomId, SaveData } from './game/types';
 import {
   cardDetailHtml,
@@ -137,39 +139,24 @@ let pendingMapAttackGhost: AttackGhost | null = null;
 let heldMoveKey: string | null = null;
 let heldMoveTimer = 0;
 let pendingMapWalk = false;
+let lastShownExecutionSeq = 0;
 
 const app = document.getElementById('app')!;
 
-type ExecutionStyle = { motion: string; title: string; line: string; action: string };
-const EXECUTION_STYLES: Record<string, ExecutionStyle> = {
-  '设陷者': { motion: 'trapper', title: '捕兽夹的猎物', line: '挣扎只会让金属咬得更紧。', action: '设陷者俯身压住猎物，冷酷地结束挣扎' },
-  '幽灵': { motion: 'wraith', title: '丧钟之后', line: '钟声停了。你也该安静了。', action: '幽灵在雾中现身，刀锋一闪又消失' },
-  '护士': { motion: 'nurse', title: '濒死之息', line: '嘘……我听见你最后一次呼吸了。', action: '护士骤然闪现，动作迅速而冰冷' },
-  '女猎手': { motion: 'huntress', title: '林中狩猎', line: '睡吧，小兔子。', action: '女猎手举起沉重的斧头，猛然落下' },
-  '鬼面': { motion: 'ghostface', title: '最后一张照片', line: '看着我。最后一次。', action: '鬼面贴近猎物，面具在暗处一闪' },
-  '迈克尔·迈尔斯': { motion: 'myers', title: '恶魔附身', line: '嘘……别动。', action: '迈尔斯将猎物提离地面，举起菜刀，寒光落下' },
-  '贞子': { motion: 'sadako', title: '怨灵现身', line: '你看见了不该看的东西。', action: '画面骤然失真，湿冷的黑影从地面逼近' },
-  '梦魇': { motion: 'freddy', title: '梦魇降临', line: '醒来？你已经没有机会了。', action: '梦魇从阴影中伸出利爪，画面被黑暗吞没' },
-  '食人魔': { motion: 'cannibal', title: '电锯轰鸣', line: '别怕，很快就结束了。', action: '电锯声骤然逼近，沉重身影猛扑而来' },
-  '处刑者': { motion: 'executioner', title: '最终裁决', line: '罪行已被裁决。', action: '处刑者拖动巨刃，沉重地挥下' },
-  '魔王': { motion: 'demon', title: '深渊献祭', line: '黑暗会记住你的名字。', action: '巨大的黑影压下，猩红光芒吞没画面' },
-  '医生': { motion: 'doctor', title: '电刑实验', line: '放松，实验还没结束。', action: '医生启动电流，刺眼白光骤然闪烁' },
-  '门徒': { motion: 'pig', title: '游戏结束', line: '游戏结束了。', action: '门徒压低身形，面具后的刀锋突然逼近' },
-};
-let pendingExecutionScene: { roomId: RoomId; title: string; description: string; style: string; success: boolean; x?: number; y?: number } | null = null;
-
-function showPendingExecutionScene(): void {
-  if (!pendingExecutionScene) return;
-  const event = pendingExecutionScene;
-  pendingExecutionScene = null;
-  const room = app.querySelector<HTMLElement>('.room[data-room="' + event.roomId + '"]');
+function showLatestExecutionScene(): void {
+  if (!game || !game.executionScene) return;
+  const event = game.executionScene;
+  if (event.seq <= lastShownExecutionSeq) return;
+  lastShownExecutionSeq = event.seq;
+  const room = app.querySelector<HTMLElement>('.room[data-room="' + event.room + '"]');
   if (!room) return;
+  const spot = event.victimId ? personRoomPercent(event.victimId) : null;
   room.querySelector('.execution-scene-overlay')?.remove();
   const overlay = document.createElement('div');
-  overlay.className = 'execution-scene-overlay execution-style-' + event.style;
+  overlay.className = 'execution-scene-overlay execution-style-' + event.motion;
   // 血光跟着目标头像的位置走，而不是永远在房间正中（作者反馈动画和头像对不上）
-  overlay.style.setProperty('--exec-x', `${(event.x ?? 50).toFixed(1)}%`);
-  overlay.style.setProperty('--exec-y', `${(event.y ?? 54).toFixed(1)}%`);
+  overlay.style.setProperty('--exec-x', `${(spot?.x ?? 50).toFixed(1)}%`);
+  overlay.style.setProperty('--exec-y', `${(spot?.y ?? 54).toFixed(1)}%`);
   overlay.setAttribute('aria-hidden', 'true');
   const flash = document.createElement('div');
   flash.className = 'execution-scene-flash';
@@ -180,6 +167,12 @@ function showPendingExecutionScene(): void {
   const description = document.createElement('p');
   description.textContent = event.description;
   bubble.append(heading, description);
+  if (event.line) {
+    const line = document.createElement('span');
+    line.className = 'execution-scene-line';
+    line.textContent = event.line;
+    bubble.append(line);
+  }
   // 2026-11-28：删掉原来的“倒下人影”占位（CSS 画的口袋形状，像一颗导弹），
   // 只保留血光闪白 + 文案，避免角色脚下突然冒出一个图标。
   overlay.append(flash);
@@ -192,8 +185,42 @@ function showPendingExecutionScene(): void {
     bubble.classList.add('execution-scene-caption');
     app.appendChild(bubble);
   }
-  window.setTimeout(() => overlay.remove(), 4200);
-  window.setTimeout(() => bubble.remove(), 4200);
+  window.setTimeout(() => overlay.remove(), 4600);
+  window.setTimeout(() => bubble.remove(), 4600);
+}
+
+/* ------------------------------------------------------------------ */
+/* QTE：通过通用输入系统接入处决；其他玩法也可以直接调用 startQte()     */
+/* ------------------------------------------------------------------ */
+
+function startExecutionQte(personId: string): void {
+  if (!game || isQteActive()) return;
+  const reason = qteExecutionBlockReason(game, personId);
+  if (reason) {
+    noteToPlayer(game, reason);
+    render();
+    return;
+  }
+  unlockAudio();
+  startQte({
+    label: '处决时机',
+    length: 4,
+    durationMs: 4200,
+    anchor: () => app.querySelector<HTMLElement>('.player-marker'),
+    onComplete: ({ success }) => {
+      const current = currentGame();
+      const executed = executeQtePerson(current, personId, success);
+      if (executed) {
+        pendingMapAttackTarget = personId;
+        if (success) playSfx('execute');
+        playSfx(SURVIVOR_MAP[personId]?.gender === 'female' ? 'voiceFScream' : 'voiceMScream', 0.96);
+        window.setTimeout(() => playSfx('wipe'), 260);
+        lastLogHead = current.log[0] ?? '';
+      }
+      afterAction();
+    },
+  });
+  render();
 }
 
 
@@ -425,7 +452,8 @@ function render(): void {
   }
   if (view.guide) html += renderGuide();
   renderMarkupPreservingMap(html);
-  showPendingExecutionScene();
+  showLatestExecutionScene();
+  syncQtePanel();
   if (pendingMapWalk) {
     pendingMapWalk = false;
     app.classList.remove('map-walk');
@@ -833,6 +861,8 @@ function startGame(freeHunt = false, loadout: string[] = []): void {
   lastAuraActions = 0;
   lastPalletDropCount = 0;
   lastCrowAlertCount = 0;
+  lastShownExecutionSeq = 0;
+  cancelQte();
   selectedPersonId = null;
   // 三段串起来，避免同时响糊成一团：装配完成 → 进入地图 → 游戏开始
   playSfx('ready');
@@ -861,6 +891,8 @@ function startRogueFloor(run: RogueRun): void {
   lastAuraActions = 0;
   lastPalletDropCount = 0;
   lastCrowAlertCount = 0;
+  lastShownExecutionSeq = 0;
+  cancelQte();
   selectedPersonId = null;
   rogueOffers = null;
   save = { ...save, rogue: run };
@@ -1024,6 +1056,7 @@ function leaveToMenu(): void {
  */
 function blockedByGameMode(action: string): boolean {
   if (!game) return true;
+  if (isQteActive()) return true;
   // 超过手牌上限时，必须先逐张选择弃牌；禁止用结束回合或其他动作绕过。
   if (game.hand.length > 6) return action !== 'discard';
   if (game.nurseBlinkTargeting) return !['blink-select', 'power'].includes(action);
@@ -1033,10 +1066,7 @@ function blockedByGameMode(action: string): boolean {
   return false;
 }
 
-/** 当前杀手的处决演出文案。 */
-function executionStyleOf(state: GameState): ExecutionStyle {
-  return EXECUTION_STYLES[state.killer] ?? EXECUTION_STYLES['设陷者'];
-}
+/** 当前杀手的处决演出文案由 execution 模块解析，界面不再单独维护。 */
 
 function createGameActions(): ActionTable {
   const handlers: Record<string, (ctx: ActionContext) => void> = {
@@ -1080,6 +1110,10 @@ function createGameActions(): ActionTable {
 
     execute: (ctx) => runExecute(ctx),
     'execute-target': (ctx) => runExecute(ctx),
+    'execute-qte': ({ target }) => {
+      const personId = target.dataset.personId;
+      if (personId) startExecutionQte(personId);
+    },
 
     'drop-carried': () => {
       const game = currentGame();
@@ -1098,22 +1132,9 @@ function createGameActions(): ActionTable {
       const game = currentGame();
       playSfx('executionSite');
       const method = target.dataset.method as ExecutionMethodId | undefined;
-      const methodInfo = method ? getExecutionMethod(method) : undefined;
       const carriedId = game.carryPersonId;
       const carried = carriedId ? game.people.find((person) => person.id === carriedId) : undefined;
-      const carriedSpot = carriedId ? personRoomPercent(carriedId) : null;
       if (method && executeCarriedPerson(game, method)) {
-        const style = executionStyleOf(game);
-        if (methodInfo && carried) {
-          pendingExecutionScene = {
-            roomId: game.playerRoom,
-            title: style.title + ' · 地点处决 · ' + methodInfo.name,
-            description: style.action + '。' + methodInfo.flavor(carried.name) + ' ' + style.line,
-            style: style.motion,
-            success: true,
-            ...(carriedSpot ?? {}),
-          };
-        }
         playSfx('execute');
         if (carried) playSfx(SURVIVOR_MAP[carried.id]?.gender === 'female' ? 'voiceFScream' : 'voiceMScream', 0.96);
         window.setTimeout(() => playSfx('wipe'), 260);
@@ -1386,22 +1407,12 @@ function createGameActions(): ActionTable {
     const personId = action === 'execute-target' ? target.dataset.personId : undefined;
     const ghosts = captureAttackGhosts();
     const downedId = personId ?? game.people.find((person) => person.role !== 'police' && person.hp <= 0 && person.room === game.playerRoom)?.id;
-    const downedSpot = downedId ? personRoomPercent(downedId) : null;
     const executed = executeDownedPerson(game, personId);
     if (executed) {
       if (downedId) {
         pendingMapAttackTarget = downedId;
         pendingMapAttackGhost = ghosts.get(downedId) ?? null;
       }
-      const style = executionStyleOf(game);
-      pendingExecutionScene = {
-        roomId: game.playerRoom,
-        title: style.title + ' · 普通处决',
-        description: style.action + '。' + style.line,
-        style: style.motion,
-        success: true,
-        ...(downedSpot ?? {}),
-      };
       playSfx('execute');
       if (downedId) playSfx(SURVIVOR_MAP[downedId]?.gender === 'female' ? 'voiceFScream' : 'voiceMScream', 0.96);
       window.setTimeout(() => playSfx('wipe'), 260);
@@ -1660,6 +1671,11 @@ app.addEventListener('focusout', (event) => {
 
 
 window.addEventListener('keydown', (event) => {
+  if (handleQteInput(event.key)) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    return;
+  }
   if (!game || !inGame() || event.altKey || event.ctrlKey || event.metaKey) return;
   const target = event.target as HTMLElement | null;
   if (target && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))) return;

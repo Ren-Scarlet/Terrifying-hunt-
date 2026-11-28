@@ -338,6 +338,22 @@ export interface PerformanceTitle {
   category: BloodCategory;
 }
 
+export type ExecutionKind = 'normal' | 'special' | 'qte';
+
+/** 一次处决的演出文本；由 execution 模块统一生成，界面只负责显示。 */
+export interface ExecutionScene {
+  seq: number;
+  kind: ExecutionKind;
+  title: string;
+  line: string;
+  description: string;
+  motion: string;
+  room: RoomId;
+  victimId?: string;
+  siteId?: string;
+  success: boolean;
+}
+
 export type GamePhase = 'menu' | 'setup' | 'playing' | 'gameover';
 
 export type ResultKind = 'win' | 'caught' | 'timeout' | 'failed';
@@ -463,6 +479,9 @@ export interface GameState {
   performanceTitles: PerformanceTitle[];
   /** 本局杀手专属能力命中统计 */
   huntCounters: HuntCounters;
+  /** 最近一次处决的演出文本与序号 */
+  executionScene: ExecutionScene | null;
+  executionSceneSeq: number;
   /** 本回合是否用过杀手专属能力；用于「专属攻击完成击杀」奖励。 */
   powerUsedThisAction: boolean;
   rewardCards: string[];

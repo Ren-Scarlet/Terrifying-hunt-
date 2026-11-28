@@ -56,6 +56,7 @@ function replay(result, tailLines = 4) {
 }
 
 const tscOk = step('typecheck (src)', () => replay(run(process.execPath, ['node_modules/typescript/bin/tsc', '--noEmit']), 20));
+step('处决文本', () => replay(run(process.execPath, ['scripts/execution-texts.mjs', 'verify']), 2));
 
 if (tscOk) {
   console.log('打包测试…');

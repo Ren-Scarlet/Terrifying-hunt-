@@ -48,5 +48,9 @@ export const ATTACK_COST = 1;
 
 /** 特殊处决不再依赖评分门槛。 */
 
+/** QTE 处决解锁门槛（本局血点）与完美奖励。 */
+export const QTE_EXECUTION_THRESHOLD = 2000;
+export const QTE_PERFECT_BONUS = 300;
+
 /** 被砍伤后当场夺路而逃的步数：一刀下去，他会连着跑两间屋 */
 export const PANIC_HOPS_ON_HIT = 2;
