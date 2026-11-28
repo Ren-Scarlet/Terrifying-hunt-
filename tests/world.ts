@@ -142,6 +142,8 @@ check('门口有木板：不能直接走', (moveBlockReason(moveGame, nextRoom) 
   `reason=${moveBlockReason(moveGame, nextRoom)}`);
 moveGame.barricades = [];
 
+// 电子锁只在房间有电时生效：先确保这间房确实由某条电路供电，否则测的就不是锁。
+moveGame.powerCircuits[0].affectedRooms = [nextRoom];
 moveGame.roomLocks = { [nextRoom]: 3 };
 check('门被锁住：不能走', (moveBlockReason(moveGame, nextRoom) ?? '').includes('门被锁住了'),
   `reason=${moveBlockReason(moveGame, nextRoom)}`);
