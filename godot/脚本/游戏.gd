@@ -132,7 +132,8 @@ func _render() -> void:
 	action_box.add_child(_button("攻击 · 1 AP", _attack))
 	action_box.add_child(_button("搜索 · 1 AP", _search))
 	action_box.add_child(_button("普通处决 · 1 AP", _execute))
-	action_box.add_child(_button("自由猎杀重开", _restart))
+	action_box.add_child(_button("下一份随机契约", _restart_contract))
+	action_box.add_child(_button("自由猎杀", _restart))
 	for child in hand_box.get_children(): child.queue_free()
 	for card in game.hand:
 		hand_box.add_child(_button(str(card.name) + "\n" + str(card.cost) + " AP", _play_card.bind(card.id)))
@@ -175,6 +176,12 @@ func _settle_run() -> void:
 	SaveManager.settle_run(game.score, game.kills, game.executions)
 	message = "本局已结算，获得 %d 血点。" % maxi(10, game.score)
 	game._add_log("[color=#d9b36c]本局结算完成，血点已保存。[/color]")
+	_render()
+
+func _restart_contract() -> void:
+	game.start_run(false)
+	SaveManager.was_settled = false
+	selected_room = game.player_room
 	_render()
 
 func _restart() -> void:
