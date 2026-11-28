@@ -3973,3 +3973,31 @@ button, .room-hit, .hand-row { touch-action: manipulation; }
 .person-chip .chip-item .item-icon { width: 12px; height: 12px; object-fit: contain; }
 .person-item-detail .item-icon { width: 22px; height: 22px; object-fit: contain; }
 .room-feature.item-box.broken { opacity: .5; filter: grayscale(1); }
+/* 全局提示：乌鸦与逃生点即使房间未探索也在地图上显示 */
+.global-ping {
+  position: absolute;
+  z-index: 30;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  display: grid; place-items: center;
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  pointer-events: none;
+}
+.global-ping img { width: 22px; height: 22px; object-fit: contain; }
+.global-ping.crow {
+  background: radial-gradient(circle, rgba(255, 54, 42, .55), rgba(255, 54, 42, .08) 70%);
+  border: 1px solid rgba(255, 90, 70, .85);
+  box-shadow: 0 0 18px rgba(255, 40, 30, .8);
+  animation: globalPingPulse 1.4s ease-in-out infinite;
+}
+.global-ping.escape {
+  background: radial-gradient(circle, rgba(255, 214, 108, .45), rgba(255, 214, 108, .06) 70%);
+  border: 1px solid rgba(255, 214, 108, .9);
+  box-shadow: 0 0 20px rgba(255, 214, 108, .7);
+  animation: globalPingPulse 1.8s ease-in-out infinite;
+}
+@keyframes globalPingPulse {
+  0%, 100% { opacity: .6; transform: translate(-50%, -50%) scale(.92); }
+  50% { opacity: 1; transform: translate(-50%, -50%) scale(1.08); }
+}

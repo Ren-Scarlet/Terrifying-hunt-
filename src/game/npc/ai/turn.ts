@@ -10,14 +10,14 @@ import { roomDistance } from '../../navigation';
 import { ROOM_MAP } from '../../rooms';
 import type { GameState, Person } from '../../types';
 import { isLocked, isRoomLit, npcPeople as npcs, peopleInRoom } from '../../world/roomState';
-import { applyAlertEvent, applyFearEvent } from './model';
+import { applyAlertEvent, applyFearEvent, decayFear, isSafe } from './model';
 import type { NpcHost } from './host';
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 export function npcTurn(host: NpcHost, state: GameState): void {
-  host.sameRoomKillerReact(state, state.lastPlayerRoom === state.playerRoom);
+  host.sameRoomKillerReact(state, true);
   // 红色人影只保留到下一次 NPC 回合开始，给玩家足够时间确认陷阱命中。
   state.people.forEach((person) => { person.trapTriggered = false; });
   const before = host.snapshotRooms(state);
@@ -58,20 +58,16 @@ export function npcTurn(host: NpcHost, state: GameState): void {
         person.alert = clamp(person.alert + 5, 0, 100);
       }
     }
-    // 恐惧：被追着的人越怕越慌；脱离接触、没人追的人会冷静下来。
+    // 恐惧只由事件驱动：黑暗会持续施压；安全时按事件表恢复。独处不再凭空加恐惧。
     if (person.hp > 0 && person.role !== 'police') {
-      const companions = peopleInRoom(state, person.room).filter((other) => other.id !== person.id && other.role !== 'police' && other.hp > 0).length;
       const lit = isRoomLit(state, person.room);
-      if (companions === 0) person.fear = clamp(person.fear + 8, 0, 100);
-      if (!lit) person.fear = clamp(person.fear + 6, 0, 100);
-      if (companions > 0 && lit) person.fear = clamp(person.fear - 8, 0, 100);
-      // 安全时从恐慌里缓过来：离杀手远、没人追、警戒也不高的人不会永久满恐惧。
-      const nearby = person.room === state.playerRoom || ROOM_MAP[state.playerRoom].neighbors.includes(person.room);
-      const safe = !nearby && person.alert < 70 && person.trackedTurns <= 0 && person.blockedTurns <= 0 && !state.possessed;
-      if (safe && (person.statusEffects.cursed ?? 0) === 0) {
-        if (person.fear >= 85) person.fear = clamp(person.fear - 18, 0, 100);
-        else if (person.fear >= 60) person.fear = clamp(person.fear - 10, 0, 100);
-      }
+      if (!lit) applyFearEvent(person, 'darkness');
+      const safe = isSafe({
+        distance: roomDistance(person.room, state.playerRoom),
+        chased: state.chaseTargetId === person.id,
+        lit,
+      });
+      if (safe) decayFear(person, true);
     }
 
     // 乌鸦：停在这间屋的人一动就会惊起它们
@@ -105,9 +101,6 @@ export function npcTurn(host: NpcHost, state: GameState): void {
     }
 
     // 日常生活阶段不会因为房间亮着灯就逐渐怀疑异常。
-    if (isRoomLit(state, person.room) && person.alert >= 12) {
-      person.alert = clamp(person.alert + 4, 0, 100);
-    }
 
     // 流血
     if (person.bleed > 0) {

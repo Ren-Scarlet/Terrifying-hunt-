@@ -113,14 +113,15 @@ export function decide(ctx: DecisionContext, roll: () => number = () => 0.5): De
     return { kind: 'idle', reason: 'out_of_stamina' };
   }
 
-  // 玩家贴脸：能跑就跑，跑不了才防御
+  // 玩家贴脸：不管警戒到没到档，先跑；跑不动才找掩体/放板。
   if (ctx.sameRoomKiller) {
-    if (canDo('flee') && canFlee(ctx.chase)) {
-      return { kind: 'flee', reason: 'killer_same_room' };
+    if (fear === 'broken' && roll() < BROKEN_FREEZE_CHANCE) {
+      return { kind: 'idle', reason: 'broken_freeze' };
     }
+    if (canFlee(ctx.chase)) return { kind: 'flee', reason: 'killer_same_room' };
     if (ctx.canHideHere && canDo('hide')) return { kind: 'hide', reason: 'killer_same_room' };
     if (ctx.canBarricadeHere && canDo('barricade')) return { kind: 'barricade', reason: 'killer_same_room' };
-    return { kind: 'idle', reason: 'cornered' };
+    return { kind: 'flee', reason: 'cornered' };
   }
 
   // 救援/治疗：任何警戒档都会做，救人优先于自己的事

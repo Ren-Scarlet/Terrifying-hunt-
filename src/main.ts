@@ -54,7 +54,7 @@ import { loadSave, writeSave } from './game/save';
 import { bootCustomAccessories, customAccessoriesForPublish, importCustomAccessories, isCustomAccessory, removeCustomAccessory, upsertCustomAccessory } from './game/customContent';
 import { publishAccessoryPack, verifyGitHubToken } from './game/cloud';
 import { ACCESSORY_MAP } from './game/data/accessories';
-import { generateFreeHunt, generateMission } from './game/missions';
+import { generateFreeHunt, generateMission, roomName } from './game/missions';
 import { applyTuning } from './game/tuning';
 import { advanceRogue, applyRogueFloor, rollRogueOffers, startRogueRun } from './game/rogue';
 import { addLevel, bloodwebCost, progressOf, rollBloodweb, syncSharedCards } from './game/progress';
@@ -593,6 +593,9 @@ function syncHuntAlerts(): void {
   }
   if (top !== lastLogTop && /攻击被躲开了/.test(top)) {
     pushHuntAlert('攻击被躲开了', 'warn');
+  }
+  if (top !== lastLogTop && /乌鸦.*振翅/.test(top)) {
+    pushHuntAlert(top, 'warn');
   }
   lastLogTop = top;
   const turnsLeft = Math.max(0, game.mission.turns - game.turn + 1);
@@ -1270,8 +1273,16 @@ function createGameActions(): ActionTable {
 
     'toggle-breaker': ({ target }) => {
       const game = currentGame();
-      togglePowerCircuit(game, target.dataset.circuitId);
-      playSfx('breaker');
+      const circuit = game.powerCircuits.find((item) => item.id === target.dataset.circuitId);
+      if (togglePowerCircuit(game, target.dataset.circuitId) && circuit) {
+        pushHuntAlert(
+          circuit.enabled
+            ? `${circuit.name}：供电恢复 · ${circuit.affectedRooms.map(roomName).join('、')}`
+            : `${circuit.name}：已断电 · ${circuit.affectedRooms.map(roomName).join('、')}陷入黑暗`,
+          circuit.enabled ? 'info' : 'warn',
+        );
+        playSfx('breaker');
+      }
       afterAction();
     },
 
@@ -1281,7 +1292,11 @@ function createGameActions(): ActionTable {
     },
 
     sabotage: () => {
-      if (sabotageSiteItem(currentGame())) playSfx('sabotage');
+      if (sabotageSiteItem(currentGame())) {
+        const game = currentGame();
+        pushHuntAlert(game.log[0] ?? '设施已被破坏', 'warn');
+        playSfx('sabotage');
+      }
       afterAction();
     },
 

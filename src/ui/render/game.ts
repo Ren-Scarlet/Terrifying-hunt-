@@ -98,7 +98,7 @@ function roomFeatures(state: GameState, roomId: RoomId): string {
     const breakerTitle = `${escape(circuitAt.name)}：${status}，影响 ${circuitAt.affectedRooms.map(roomName).join('、')}`;
     const breakerBlocked = breakerBlockReason(state, circuitAt.id) ? 'disabled' : '';
     parts.push(state.playerRoom === roomId
-      ? `<button type="button" class="room-feature breaker ${circuitAt.broken || circuitAt.enabled === false ? 'broken' : ''}" data-action="toggle-breaker" data-circuit-id="${circuitAt.id}" ${breakerBlocked} title="${breakerTitle}。点击切换电闸（${BREAKER_SWITCH_COST} AP）">${icon('generator', 'ui-icon tiny')}<b>切换电闸</b></button>`
+      ? `<button type="button" class="room-feature breaker ${circuitAt.broken || circuitAt.enabled === false ? 'broken' : ''}" data-action="toggle-breaker" data-circuit-id="${circuitAt.id}" ${breakerBlocked} title="${breakerTitle}。点击${circuitAt.enabled === false ? '合闸恢复供电' : '拉闸切断供电'}（${BREAKER_SWITCH_COST} AP）">${icon('generator', 'ui-icon tiny')}<b>${circuitAt.enabled === false ? '合闸' : '拉闸'}</b></button>`
       : `<span class="room-feature breaker ${circuitAt.broken || circuitAt.enabled === false ? 'broken' : ''}" title="${breakerTitle}">${icon('generator', 'ui-icon tiny')}<b>电闸</b></span>`);
   }
   state.itemBoxes.filter((box) => box.room === roomId).forEach((box) => {
@@ -592,6 +592,12 @@ function personSlotStyle(roomId: RoomId, personId: string, index: number): strin
             : !state.lookingAround && !state.huntressAiming && adjacent && !barricaded
               ? `<button type="button" class="room-hit ${reachable ? '' : 'blocked'}" data-action="move" data-room="${room.id}" aria-label="${escape(moveHint)}" title="${escape(moveHint)}"></button>`
               : ''}
+        ${(state.crowTriggered ?? []).includes(room.id)
+          ? `<span class="global-ping crow" title="乌鸦被惊起：${escape(room.name)}有人行动">${icon('crow', 'crow-icon tiny')}</span>`
+          : ''}
+        ${state.escapeRooms.includes(room.id)
+          ? `<span class="global-ping escape" title="逃生大门已开启：${escape(room.name)}">${icon('escape', 'ui-icon tiny')}</span>`
+          : ''}
         <div class="room-head">
           <span class="room-name">${explored ? escape(room.name) : '？？？'}</span>
           ${noise ? `<span class="room-tag noise loud" title="${escape(noise.label)}">${icon('crow', 'crow-icon tiny')}${escape(noise.label)}</span>` : ''}

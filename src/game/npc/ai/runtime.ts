@@ -160,6 +160,11 @@ export function executeDecision(host: NpcHost, state: GameState, person: Person,
       person.activity = '缩在墙角，止不住地发抖';
       return;
     }
+    // 被堵在同一间屋、体力又见底时，仍然强行夺门而出；不能站着挨刀。
+    if (ctx.sameRoomKiller && decision.kind === 'flee' && host.fleeAway(state, person, false, true)) {
+      person.activity = '夺门而出';
+      return;
+    }
     if (!perform(host, state, person, 'move')) {
       person.activity = '无处可去，只能待在原地';
     }

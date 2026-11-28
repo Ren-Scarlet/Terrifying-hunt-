@@ -25,7 +25,7 @@ export const SURVIVOR_ITEM_USES: Record<SurvivorItem, number> = {
   medkit: 2,
 };
 
-export const ITEM_BOX_CHARGES = 3;
+export const ITEM_BOX_CHARGES = 1;
 export const ITEM_BOX_COUNT = 2;
 
 export const SURVIVOR_ITEMS: SurvivorItem[] = ['repair', 'flashlight', 'medkit'];

@@ -77,10 +77,12 @@ function killerTask(killer: string): MissionTask | null {
 
 function buildPrimaryTasks(): MissionTask[] {
   const roll = random();
-  if (roll < 0.4) return [markedTask()];
-  if (roll < 0.7) return [killTask()];
-  if (roll < 0.85) return [breakerTask(), killTask()];
-  return [killTask(), alarmTask(pick([40, 50, 60]))];
+  if (roll < 0.28) return [markedTask()];
+  if (roll < 0.5) return [killTask()];
+  if (roll < 0.66) return [breakerTask()];
+  if (roll < 0.79) return [killTask(), alarmTask(pick([40, 50, 60]))];
+  if (roll < 0.9) return [markedTask(), alarmTask(pick([35, 50]))];
+  return [breakerTask(), killTask()];
 }
 
 function buildOptionalTasks(killer: string, primary: MissionTask[]): MissionTask[] {
@@ -106,9 +108,19 @@ function contractTitle(primary: MissionTask[]): string {
 }
 
 /** 契约只在玩家点击「准备开始」时随机生成；不会先展示任务供玩家针对性改牌。 */
+let lastContractSignature = '';
+
 export function generateMission(killer = '迈克尔·迈尔斯'): Mission {
-  const primary = buildPrimaryTasks();
-  const optional = buildOptionalTasks(killer, primary);
+  let primary = buildPrimaryTasks();
+  let optional = buildOptionalTasks(killer, primary);
+  let signature = primary.map((task) => `${task.kind}:${task.target}`).join('|');
+  // 连续两局至少换一种主要任务组合；随机池很小时也不至于完全重复。
+  for (let attempt = 0; attempt < 6 && signature === lastContractSignature; attempt += 1) {
+    primary = buildPrimaryTasks();
+    optional = buildOptionalTasks(killer, primary);
+    signature = primary.map((task) => `${task.kind}:${task.target}`).join('|');
+  }
+  lastContractSignature = signature;
   const tasks = [...primary, ...optional];
   const objective = primary.map((task) => task.label).join(' ＋ ');
   return {

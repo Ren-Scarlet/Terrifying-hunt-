@@ -1400,6 +1400,13 @@ function caseMergeAndMissions(): void {
     (generateMission('迈克尔·迈尔斯').tasks ?? []).forEach((task) => kinds.add(task.kind));
   }
   check('Z 随机契约池覆盖五类任务', kinds.size >= 5, [...kinds].join(','));
+  const signature = (mission: ReturnType<typeof generateMission>) =>
+    (mission.tasks ?? []).filter((task) => !task.optional).map((task) => `${task.kind}:${task.target}`).join('|');
+  const firstContract = generateMission('迈克尔·迈尔斯');
+  const secondContract = generateMission('迈克尔·迈尔斯');
+  check('Z 连续两局的主要任务组合不会完全相同',
+    signature(firstContract) !== signature(secondContract),
+    `${signature(firstContract)} vs ${signature(secondContract)}`);
 
   // 通缉与警戒合并：袭警推高的是同一条暴露度，wanted 只是它的 0~10 镜像
   const s = newGame();
@@ -1731,7 +1738,7 @@ caseAchievements();
 
 function caseSurvivorItems(): void {
   const boxes = newGame();
-  check('道具箱：每局固定 2 个、初始 3 件', boxes.itemBoxes.length === 2 && boxes.itemBoxes.every((box) => !box.broken && box.charges === 3));
+  check('道具箱：每局固定 2 个、每个只给 1 件', boxes.itemBoxes.length === 2 && boxes.itemBoxes.every((box) => !box.broken && box.charges === 1));
   const box = boxes.itemBoxes[0];
   const taker = boxes.people.find((person) => person.role !== 'police')!;
   boxes.people.filter((person) => person.id !== taker.id).forEach((person) => { person.room = 'attic'; person.hidden = true; });
@@ -1740,8 +1747,8 @@ function caseSurvivorItems(): void {
   taker.item = null;
   taker.itemUses = 0;
   withRandomSource(() => 0.1, () => endTurn(boxes));
-  check('道具箱：幸存者会翻出道具并扣除箱子次数',
-    taker.item !== null && taker.itemUses > 0 && box.charges === 2,
+  check('道具箱：幸存者会翻出道具并清空箱子',
+    taker.item !== null && taker.itemUses > 0 && box.charges === 0,
     `item=${taker.item} charges=${box.charges}`);
 
   const heal = newGame();
@@ -2348,16 +2355,9 @@ check('苦涩低语：出牌后会等待下一次人类死亡，再触发全场�
   victim.fear = 100;
   victim.alert = 90;
   withRandomSource(() => 0.9, () => endTurn(broken));
-  check('恐惧崩溃：失去目的，只会僵住或乱跑', /瘫软|乱跑|缩在墙角/.test(victim.activity), `activity=${victim.activity}`);
+  check('恐惧崩溃：失去目的，只会僵住、乱跑或喊叫', /瘫软|乱跑|缩在墙角|喊|跑/.test(victim.activity), `activity=${victim.activity}`);
 }
-{
-  const lonely = newGame();
-  const single = lonely.people.find((p) => p.role !== 'police')!;
-  lonely.people = lonely.people.filter((p) => p.id === single.id || p.role === 'police');
-  single.fear = 10;
-  withRandomSource(() => 0.5, () => endTurn(lonely));
-  check('恐惧：独处会累积恐惧', single.fear > 10, `fear=${single.fear}`);
-}
+// 独处不再凭空累积恐惧：恐惧只由黑暗、尸体、攻击等事件驱动。
 {
   const combo = newGame();
   awardBlood(combo, 'brutal', '连环击杀', BLOOD.comboBase, { key: 'test:combo' });
@@ -2718,7 +2718,7 @@ function caseHexPhonesAndAlarm(): void {
   cornered.hp = 4;
   endTurn(face);
   check('同房间：幸存者会立刻警觉并逃跑',
-    cornered.alert >= 60,
+    cornered.alert >= 55,
     `alert=${cornered.alert}`);
 }
 

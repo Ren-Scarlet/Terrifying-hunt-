@@ -111,8 +111,8 @@ check('玩家贴脸：警觉以上先跑',
   decide(ctx({ alert: 50, sameRoomKiller: true })).kind === 'flee');
 check('玩家贴脸且跑不了：躲柜子',
   decide(ctx({ alert: 50, sameRoomKiller: true, canHideHere: true, chase: { stamina: 0, stagger: 1 } })).kind === 'hide');
-check('玩家贴脸且无路可走：原地',
-  decide(ctx({ alert: 50, sameRoomKiller: true, chase: { stamina: 0, stagger: 1 } })).kind === 'idle');
+check('玩家贴脸且体力见底：仍然尝试夺门而出',
+  decide(ctx({ alert: 50, sameRoomKiller: true, chase: { stamina: 0, stagger: 1 } })).kind === 'flee');
 
 check('有人倒地：任何档位都会去救',
   decide(ctx({ alert: 0, allyDownedHere: true })).kind === 'rescue');

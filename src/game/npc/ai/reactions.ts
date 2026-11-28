@@ -14,6 +14,7 @@ import { SURVIVOR_MAP } from '../../survivors';
 import type { GameState, Person, RoomId } from '../../types';
 import { isLocked, isObstacle, isRoomLit, npcPeople as npcs, peopleInRoom } from '../../world/roomState';
 import type { NpcHost } from './host';
+import { applyAlertEvent } from './model';
 import { ambushActive, effectiveFearRadius, playerIsHidden, wantsToLeave } from './predicates';
 
 /** 幸存者亲眼目击的事件类型 */
@@ -66,19 +67,11 @@ export function npcReact(host: NpcHost, state: GameState): void {
     const cannotSense = (effects.undetectable ?? 0) > 0 || (effects.oblivious ?? 0) > 0 || (effects.blind ?? 0) > 0 || !isRoomLit(state, person.room);
     if (cannotSense) continue;
 
-    // 恐惧范围：相邻房间先起疑；范围 2 的杀手会在隔壁直接引发逃跑，两格外也会察觉。
+    // 相邻房间只把玩家的动静当作“小幅声响”，不应凭空看见玩家或直接进入逃跑。
     const distanceToPlayer = roomDistance(person.room, state.playerRoom);
-    if (fearRadius >= 2 && distanceToPlayer === 1 && person.alert < 45) {
-      person.alert = Math.max(person.alert, 45);
-      person.activity = '察觉到杀手逼近，立刻逃跑';
-      if (person.movesThisTurn < REACT_MOVE_CAP && host.fleeAway(state, person, true)) person.movesThisTurn += 1;
-      continue;
-    } else if (fearRadius >= 1 && distanceToPlayer === 1 && person.alert < 12) {
-      person.alert = Math.max(person.alert, 12);
+    if (distanceToPlayer === 1 && person.alert < 12) {
+      applyAlertEvent(person, 'noise_adjacent');
       person.activity = '听见附近有动静，停下来观察';
-    } else if (fearRadius >= 2 && distanceToPlayer === 2 && person.alert < 12) {
-      person.alert = Math.max(person.alert, 12);
-      person.activity = '远处传来令人不安的动静';
     }
 
     // 同房间的目击者也要有动作：刚被砍的那个人本回合已经反应过，不重复。
