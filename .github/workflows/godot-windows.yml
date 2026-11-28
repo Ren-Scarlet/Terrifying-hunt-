@@ -30,7 +30,7 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path godot/build | Out-Null
-          godot --headless --path godot --export-release "Windows Desktop" "godot/build/暗夜杀机.exe"
+          godot --headless --path godot --export-release "Windows Desktop" "build/暗夜杀机.exe"
 
       - name: Upload Windows build
         uses: actions/upload-artifact@v4
@@ -38,6 +38,5 @@ jobs:
           name: 暗夜杀机-Godot-Windows
           path: |
             godot/build/暗夜杀机.exe
-            godot/build/暗夜杀机.pck
           if-no-files-found: error
           retention-days: 14
