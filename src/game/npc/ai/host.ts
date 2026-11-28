@@ -62,4 +62,10 @@ export interface NpcHost {
   tryAidRun(state: GameState, person: Person): boolean;
   /** 还能领补给的道具箱 */
   usableItemBoxes(state: GameState): SiteItem[];
+  /** 玩家被打断：扣行动点、清追势，并让幸存者趁机行动 */
+  interruptPlayer(state: GameState, reason: string, actorId: string): void;
+  /** 记录玩家最后看到某人的位置 */
+  rememberVisible(state: GameState): void;
+  /** 当前正被玩家贴上的人（贴脸时不再触发转身就跑） */
+  getChasedId(): string | null;
 }
