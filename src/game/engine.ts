@@ -12,13 +12,13 @@ import {
   trapDamageOf,
   trapHoldTurns,
 } from './modifiers';
-import { ESCAPE_ROOMS, BASE_AP, SABOTAGE_COST, ITEM_BOX_CHARGES, POSSESS_TURNS, SURVIVOR_MAX_HP, SURVIVOR_INJURED_HP, REACT_MOVE_CAP, BLEEDOUT_TURNS, ALARM_MAX } from './constants';
+import { ESCAPE_ROOMS, BASE_AP, SABOTAGE_COST, ITEM_BOX_CHARGES, POSSESS_TURNS, SURVIVOR_MAX_HP, SURVIVOR_INJURED_HP, REACT_MOVE_CAP, BLEEDOUT_TURNS, ALARM_MAX, HAND_LIMIT, FRENZY_THRESHOLD, FRENZY_AP_BONUS, WATCH_GAIN } from './constants';
 import { drawCards } from './deck';
 import { executeOps } from './effects/runtime';
 import { createGame } from './setup';
 export { drawCards } from './deck';
 export { createGame } from './setup';
-export { BASE_AP, SABOTAGE_COST, ITEM_BOX_CHARGES, POSSESS_TURNS, SURVIVOR_MAX_HP, SURVIVOR_INJURED_HP, BLEEDOUT_TURNS, ALARM_MAX } from './constants';
+export { BASE_AP, SABOTAGE_COST, ITEM_BOX_CHARGES, POSSESS_TURNS, SURVIVOR_MAX_HP, SURVIVOR_INJURED_HP, BLEEDOUT_TURNS, ALARM_MAX, HAND_LIMIT, FRENZY_THRESHOLD, FRENZY_AP_BONUS } from './constants';
 import { ACTIVITIES, createPeople, itemUsesFor } from './npc/factory';
 import { ARCH_DESC, ARCH_LABEL, GOAL_LABEL, HEALTH_LABEL, INTENT_LABEL, ROUTINE_PROFILE, SITE_ITEM_LABEL, SURVIVOR_ITEM_LABEL } from './npc/catalog';
 export { ARCH_DESC, ARCH_LABEL, GOAL_LABEL, HEALTH_LABEL, INTENT_LABEL, SITE_ITEM_LABEL, SURVIVOR_ITEM_LABEL } from './npc/catalog';
@@ -139,6 +139,7 @@ import {
   escapePhase as aiEscapePhase,
   witnessPhase as aiWitnessPhase,
 } from './turn/phases';
+import { endTurn as aiEndTurn } from './turn/ending';
 import type { NpcHost } from './npc/ai/host';
 
 /**
@@ -179,6 +180,20 @@ const aiHost: NpcHost = {
   finish,
   finishCall,
   witnessWanted,
+  runNpcTurn: npcTurn,
+  callPhase,
+  escapePhase,
+  policePhase,
+  witnessPhase,
+  syncWanted,
+  refreshVision,
+  pruneTrails,
+  pruneDisturbances,
+  dawnPhase,
+  applyDawnPressure,
+  triggerEnvironmentalEvent,
+  drawForPlayer,
+  checkImmediateWin,
 };
 import { SURVIVOR_MAP } from './survivors';
 import type {
@@ -215,8 +230,6 @@ export const SEARCH_COST = 1;
 export const LOOK_COST = 1;
 /** 主动抽牌消耗的行动点；每次抽 1 张。 */
 export const DRAW_CARD_COST = 1;
-/** 手牌上限；超过时必须由玩家选择弃牌。 */
-export const HAND_LIMIT = 6;
 /** 被砍伤后当场夺路而逃的步数：一刀下去，他会连着跑两间屋 */
 const PANIC_HOPS_ON_HIT = 2;
 /** 痕迹留几回合（含留下的那回合） */
@@ -238,9 +251,6 @@ export const DAWN_LATE_ALARM = 2;
 const DISTURBANCE_WINDOW = 3;
 /** 杀戮值上限 / 激活阈值：满值后每回合多 2 行动点，由玩家自己决定怎么走 */
 export const FRENZY_MAX = 100;
-export const FRENZY_THRESHOLD = 50;
-/** 满值给的额外行动点：不替玩家走第二步，只把「能多走」交到他手里 */
-export const FRENZY_AP_BONUS = 2;
 /** 分数处决的解锁门槛；达到后，倒地幸存者头顶出现独立 QTE 按钮。 */
 export const SCORE_EXECUTION_THRESHOLD = 200;
 /** 每跟对一段脚印涨多少，跟丢一次掉多少 */
@@ -253,8 +263,6 @@ const KILL_PRESSURE = 0.15;
 const KILL_PRESSURE_MAX = 0.6;
 /** 场上有人倒地还没死时，全体效率再抬一截 */
 const DOWNED_URGENCY = 0.25;
-/** 鬼面夜幕每回合累积的监视值 */
-const WATCH_GAIN = 34;
 /** 医疗包要连续治这么多回合才生效，不能一下就把人治好 */
 const MEDKIT_TURNS = 2;
 /** 开局就带着道具的幸存者比例 */
@@ -2775,147 +2783,9 @@ export function discardCard(state: GameState, cardUid: string): boolean {
   return true;
 }
 
+/** 回合总循环已搬到 turn/ending.ts；这里保留引擎侧入口。 */
 export function endTurn(state: GameState): void {
-  if (state.phase !== 'playing') return;
-
-  const m = state.mission;
-  if (state.nurseFatiguePending) {
-    state.nurseFatiguePending = false;
-    state.nurseFollowUp = false;
-    state.stunTurns = Math.max(state.stunTurns, 1);
-    log(state, '你没有利用闪现后的攻击窗口，护士仍因濒死之息进入疲惫：下回合行动点减少 1。');
-  }
-  checkImmediateWin(state);
-  if (state.result) return;
-
-  // 鬼面「夜幕」：监视相邻房间的人；有人闯进鬼面房间就中断，且他能多跑一步
-  if (state.killer === '鬼面' && state.nightfallActive) {
-    const intruder = npcs(state).find((p) => p.hp > 0 && p.room === state.playerRoom);
-    if (intruder) {
-      state.nightfallActive = false;
-      npcs(state).forEach((p) => {
-        p.watchValue = 0;
-      });
-      if (intruder.movesThisTurn < REACT_MOVE_CAP) {
-        fleeAway(state, intruder);
-        intruder.movesThisTurn += 1;
-      }
-      log(state, `${intruder.name} 一头撞进你所在的房间，夜幕被打断了——他趁乱又多跑了一步。`);
-    } else {
-      const targets = npcs(state).filter(
-        (p) => p.hp > 0 && !p.watched && ROOM_MAP[state.playerRoom].neighbors.includes(p.room),
-      );
-      const watchedTarget = targets.sort((a, b) => b.watchValue - a.watchValue)[0];
-      if (watchedTarget) {
-        watchedTarget.watchValue = Math.min(100, watchedTarget.watchValue + WATCH_GAIN);
-        log(state, `夜幕：你盯着${roomName(watchedTarget.room)}里的${watchedTarget.name}（监视 ${watchedTarget.watchValue}/100）。`);
-        if (watchedTarget.watchValue >= 100) {
-          watchedTarget.watched = true;
-          watchedTarget.trackedTurns = Math.max(watchedTarget.trackedTurns, 99);
-          log(state, `${watchedTarget.name} 的监视值满了：他持续显形，下一刀可以直接把他放倒。`);
-        }
-      }
-    }
-  }
-
-  if (state.totems.includes(state.playerRoom)) {
-    state.bonusEnergyNextTurn = 1;
-    log(state, '图腾余响：下一回合额外获得 1 点行动点。');
-  }
-
-  npcTurn(state);
-  if (state.result) return;
-  callPhase(state);
-  if (state.result) return;
-
-  escapePhase(state);
-  if (state.result) return;
-
-  policePhase(state);
-  if (state.result) return;
-
-  witnessPhase(state);
-  checkImmediateWin(state);
-  if (state.result) return;
-
-  // 警报值可随猎场平静而下降；最终危机开始后不会撤销。
-  if (!state.emergencyActive) state.alarm = Math.max(0, state.alarm - 6);
-  syncWanted(state);
-  if (!state.emergencyActive && state.heatTurn !== state.turn) {
-    // 这一回合没有新的动静（没人报警、没人看见你、也没动手），注意力就散一点。
-    // 这是「潜行 / 潜伏」玩法能成立的前提。
-    state.alarm = Math.max(0, state.alarm - 4);
-    syncWanted(state);
-    log(state, `这一夜没人再提起你，暴露度降到 ${state.alarm}。`);
-  }
-
-  /* ---------- 回合收尾 ---------- */
-  refreshVision(state);
-  pruneTrails(state);
-  pruneDisturbances(state);
-  state.decoyRoom = null;
-  state.freeMove = false;
-  state.discount = 0;
-  state.bonusDamage = 0;
-  // 迈尔斯的附身按行动消耗尾随值；其他来源仍兼容旧回合计时。
-  if (state.possessed && state.killer !== '迈克尔·迈尔斯') {
-    state.possessTurns = Math.max(0, state.possessTurns - 1);
-    if (state.possessTurns === 0) {
-      state.possessed = false;
-      log(state, '恶魔附身消退，刀锋恢复了原本的重量。');
-    }
-  }
-  state.myersMovedThisTurn = false;
-  state.noAlarmTurn = false;
-  state.killsThisTurn = 0;
-  state.revealedThisTurn = false;
-  state.roomLocks = Object.fromEntries(
-    Object.entries(state.roomLocks)
-      .map(([k, v]) => [k, (v ?? 0) - 1])
-      .filter(([, v]) => (v as number) > 0),
-  ) as Partial<Record<RoomId, number>>;
-  state.exitBlockedTurns = Math.max(0, state.exitBlockedTurns - 1);
-  // 临时闪断只持续一个完整回合，不会把电闸永久标记为已破坏。
-  state.powerCircuits.forEach((circuit) => {
-    if ((circuit.flickerTurns ?? 0) > 0) circuit.flickerTurns = Math.max(0, (circuit.flickerTurns ?? 0) - 1);
-  });
-  state.cooldowns = Object.fromEntries(
-    Object.entries(state.cooldowns)
-      .map(([k, v]) => [k, v - 1])
-      .filter(([, v]) => (v as number) > 0),
-  );
-  state.pinnedPeople = [];
-
-  if (state.turn >= m.turns) {
-    if (state.missionPrimaryCompleted) { state.resultReason = '主目标已经完成，猎场时间耗尽，本局按已完成契约结算。'; finish(state, 'win'); }
-    else { state.resultReason = KILLER_MAP[state.killer]?.school === 'supernatural' ? '天光刺破猎场，恶灵失去依附之所，猎杀被迫终止。' : '天亮了，警队封锁整条街，猎杀被迫终止。'; finish(state, 'timeout'); }
-    return;
-  }
-
-  // 手牌保留；每个新回合只补 1 张，不再整手弃掉重抽。
-  const dawnBefore = dawnPhase(state);
-  state.turn += 1;
-  applyDawnPressure(state, dawnBefore);
-  triggerEnvironmentalEvent(state);
-  // 杀戮满值 = 移动力提升：每回合多 2 点行动点，但绝不替玩家走第二步
-  const frenzyBonus = state.frenzy >= FRENZY_THRESHOLD ? FRENZY_AP_BONUS : 0;
-  state.energy = Math.max(
-    1,
-    state.maxEnergy + state.bonusEnergyNextTurn + frenzyBonus - state.stunTurns,
-  );
-  state.bonusEnergyNextTurn = 0;
-  state.stunTurns = 0;
-  state.blindTurns = 0;
-  // 新回合：刀已经收回来，所有人的腿也歇过来了
-  state.attackReady = true;
-  state.people.forEach((p) => {
-    p.movesThisTurn = 0;
-  });
-  drawForPlayer(state, 1);
-  if (state.hand.length > HAND_LIMIT) {
-    log(state, `当前手牌 ${state.hand.length} 张，超过上限 ${HAND_LIMIT}，请先选择弃牌。`);
-  }
-  log(state, `新回合开始，行动点恢复${frenzyBonus ? `（杀戮 +${frenzyBonus}）` : ''}。`);
+  aiEndTurn(aiHost, state);
 }
 
 export function finishContract(state: GameState): boolean {

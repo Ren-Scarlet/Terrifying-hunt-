@@ -30,3 +30,14 @@ export const BLEEDOUT_TURNS = 4;
 
 /** 暴露度上限：到 100 直接判负（实体杀手被捕，灵异鬼怪被驱散） */
 export const ALARM_MAX = 100;
+
+/** 手牌上限；超过时必须由玩家选择弃牌。 */
+export const HAND_LIMIT = 6;
+
+/** 杀戮值激活阈值：满值后每回合多 2 行动点，由玩家自己决定怎么走 */
+export const FRENZY_THRESHOLD = 50;
+/** 满值给的额外行动点：不替玩家走第二步，只把「能多走」交到他手里 */
+export const FRENZY_AP_BONUS = 2;
+
+/** 鬼面「夜幕」每回合累积的监视值 */
+export const WATCH_GAIN = 34;
