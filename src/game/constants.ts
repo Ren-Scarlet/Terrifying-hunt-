@@ -51,3 +51,6 @@ export const ATTACK_COST = 1;
 
 /** 分数处决的解锁门槛；达到后，倒地幸存者头顶出现独立 QTE 按钮。 */
 export const SCORE_EXECUTION_THRESHOLD = 200;
+
+/** 被砍伤后当场夺路而逃的步数：一刀下去，他会连着跑两间屋 */
+export const PANIC_HOPS_ON_HIT = 2;

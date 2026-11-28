@@ -12,13 +12,13 @@ import {
   trapDamageOf,
   trapHoldTurns,
 } from './modifiers';
-import { ESCAPE_ROOMS, BASE_AP, SABOTAGE_COST, ITEM_BOX_CHARGES, POSSESS_TURNS, SURVIVOR_MAX_HP, SURVIVOR_INJURED_HP, REACT_MOVE_CAP, BLEEDOUT_TURNS, ALARM_MAX, HAND_LIMIT, FRENZY_THRESHOLD, FRENZY_AP_BONUS, WATCH_GAIN, SEARCH_COST, LOOK_COST, ATTACK_COST, SCORE_EXECUTION_THRESHOLD } from './constants';
+import { ESCAPE_ROOMS, BASE_AP, SABOTAGE_COST, ITEM_BOX_CHARGES, POSSESS_TURNS, SURVIVOR_MAX_HP, SURVIVOR_INJURED_HP, REACT_MOVE_CAP, BLEEDOUT_TURNS, ALARM_MAX, HAND_LIMIT, FRENZY_THRESHOLD, FRENZY_AP_BONUS, WATCH_GAIN, SEARCH_COST, LOOK_COST, ATTACK_COST, SCORE_EXECUTION_THRESHOLD, PANIC_HOPS_ON_HIT } from './constants';
 import { drawCards } from './deck';
 import { executeOps } from './effects/runtime';
 import { createGame } from './setup';
 export { drawCards } from './deck';
 export { createGame } from './setup';
-export { BASE_AP, SABOTAGE_COST, ITEM_BOX_CHARGES, POSSESS_TURNS, SURVIVOR_MAX_HP, SURVIVOR_INJURED_HP, BLEEDOUT_TURNS, ALARM_MAX, HAND_LIMIT, FRENZY_THRESHOLD, FRENZY_AP_BONUS, SEARCH_COST, LOOK_COST, ATTACK_COST, SCORE_EXECUTION_THRESHOLD } from './constants';
+export { BASE_AP, SABOTAGE_COST, ITEM_BOX_CHARGES, POSSESS_TURNS, SURVIVOR_MAX_HP, SURVIVOR_INJURED_HP, BLEEDOUT_TURNS, ALARM_MAX, HAND_LIMIT, FRENZY_THRESHOLD, FRENZY_AP_BONUS, SEARCH_COST, LOOK_COST, ATTACK_COST, SCORE_EXECUTION_THRESHOLD, PANIC_HOPS_ON_HIT } from './constants';
 import { ACTIVITIES, createPeople, itemUsesFor } from './npc/factory';
 import { ARCH_DESC, ARCH_LABEL, GOAL_LABEL, HEALTH_LABEL, INTENT_LABEL, ROUTINE_PROFILE, SITE_ITEM_LABEL, SURVIVOR_ITEM_LABEL } from './npc/catalog';
 export { ARCH_DESC, ARCH_LABEL, GOAL_LABEL, HEALTH_LABEL, INTENT_LABEL, SITE_ITEM_LABEL, SURVIVOR_ITEM_LABEL } from './npc/catalog';
@@ -174,6 +174,18 @@ import {
   usePower as aiUsePower,
 } from './actions/powers';
 import { triggerEnvironmentalEvent as aiTriggerEnvironmentalEvent } from './world/environment';
+import {
+  canExecuteNow,
+  executionWitnessed,
+  carryPerson as aiCarryPerson,
+  damagePerson as aiDamagePerson,
+  dropCarriedPerson as aiDropCarriedPerson,
+  executeCarriedPerson as aiExecuteCarriedPerson,
+  executePerson as aiExecutePerson,
+  healPerson as aiHealPerson,
+  killPerson as aiKillPerson,
+  rescuePerson as aiRescuePerson,
+} from './npc/lifecycle';
 
 export function cancelAuraSelection(state: GameState): boolean { return aiCancelAuraSelection(aiHost, state); }
 export function selectAuraRoom(state: GameState, room: RoomId): boolean { return aiSelectAuraRoom(aiHost, state, room); }
@@ -284,8 +296,6 @@ export const DOWNED_LOCK_TURNS = 0;
 const WANTED_TO_ALARM = 10;
 /** 主动抽牌消耗的行动点；每次抽 1 张。 */
 export const DRAW_CARD_COST = 1;
-/** 被砍伤后当场夺路而逃的步数：一刀下去，他会连着跑两间屋 */
-const PANIC_HOPS_ON_HIT = 2;
 /** 痕迹留几回合（含留下的那回合） */
 export const TRAIL_TURNS = 3;
 /**
@@ -825,243 +835,15 @@ function resolveDest(state: GameState, dest: Dest): RoomId {
 /** 幸存者亲眼目击的事件类型由 AI 层定义 */
 
 
-function killPerson(state: GameState, person: Person): void {
-  if (state.carryPersonId === person.id) state.carryPersonId = null;
-  if (person.role !== 'police' && fearBand(person) === 'broken') state.huntStats.terrorKills += 1;
-  if (!state.people.some((p) => p.id === person.id)) return;
-  const directWitnesses = person.role === 'police'
-    ? 0
-    : npcWitnessEvent(state, person.room, 'murder', person.id);
-  state.people = state.people.filter((p) => p.id !== person.id);
-  state.pinnedPeople = state.pinnedPeople.filter((id) => id !== person.id);
-  if (state.bitterMurmurReady && person.role !== 'police') {
-    state.bitterMurmurReady = false;
-    const remaining = state.people.filter((p) => p.role !== 'police' && p.hp > 0 && !p.hidden);
-    remaining.forEach((other) => { other.revealedActions = Math.max(other.revealedActions ?? 0, 4); });
-    log(state, remaining.length
-      ? `苦涩低语：${person.name}倒下的回声传遍猎场，另外 ${remaining.length} 名人类的气场显现。`
-      : '苦涩低语：最后的回声沉入空屋。');
-  }
-  state.kills += 1;
-  if (person.role !== 'police') state.survivorKills += 1;
-  if (person.role !== 'police') state.loot += LOOT_KILL;
-  // 同一回合的第二个及之后的击杀算「连杀」，鼓励用控制/范围效果制造连锁。
-  if (person.role !== 'police' && state.killsThisTurn >= 1) state.huntStats.comboKills += 1;
-  state.killsThisTurn += 1;
-  if (person.marked) state.markedKilled += 1;
-  state.lastCrimeRoom = state.playerRoom;
-
-  // 只有被看见的击杀才会推高暴露度。悄悄做掉的、屋子里没人的，
-  // 外面只知道「又少了一个人」——那是暴露度该管的事，不是暴露度。
-  const seenBy = npcs(state).filter(
-    (p) => p.room === person.room && p.hp > 0 && !p.hidden && (p.alert >= 25 || p.intent !== 'idle'),
-  );
-  if (directWitnesses > 0 || seenBy.length) {
-    addWanted(state, person.role === 'target' ? 2 : 1);
-  } else {
-    state.huntStats.quietKills += 1;
-    log(state, '屋里没有人看见这一幕。');
-  }
-  log(
-    state,
-    `你杀死了${person.marked ? '标记目标' : person.role === 'police' ? '警察' : '平民'} ${person.name}。`,
-  );
-
-  // 尸体迟早会被发现：整栋房子的警觉跟着抬起来，恐慌会传染。
-  let stirred = 0;
-  npcs(state).forEach((other) => {
-    // 尸体不会让整栋房子瞬间获知消息；只有同屋或相邻房间的人先察觉。
-    const discoveryRadius = state.mapId === 'lampkin' ? 2 : 1;
-    if (other.hp > 0 && !other.hidden && roomDistance(other.room, person.room) <= discoveryRadius) {
-      const nearby = other.room === person.room;
-      other.fear = clamp(other.fear + (nearby ? 38 : 18), 0, 100);
-      other.alert = clamp(other.alert + (nearby ? 20 : 10), 0, 100);
-      stirred += 1;
-    }
-  });
-  // 没人闻到血腥味就不该抬警报：空屋里悄悄处决只留极少痕迹。
-  if (stirred > 0) {
-    addAlarm(state, 6);
-    log(state, '血腥味顺着地板缝散开，房子里的人开始不安地走动。');
-  }
-}
-
-/** 受到伤害：只能推进一档，倒地的人再挨一下才会死 */
-function damagePerson(state: GameState, person: Person, amount: number, options: { affectFear?: boolean; forceFlee?: boolean } = {}): void {
-  const { affectFear = true, forceFlee = false } = options;
-  if (!state.people.some((p) => p.id === person.id)) return;
-  let dmg = Math.max(0, amount + state.bonusDamage);
-  state.bonusDamage = 0;
-  if (dmg <= 0) return;
-  if ((person.statusEffects?.danger ?? 0) > 0 && person.hp > 0) {
-    person.statusEffects!.danger = 0;
-    person.hp = 0;
-    person.downedTurns = 0;
-    person.intent = 'stunned';
-    person.activity = '受到攻击，危险状态触发并立即倒地';
-    person.alert = 100;
-    log(state, `${person.name} 处于危险状态，受到攻击后立即倒地！`);
-    addAlarm(state, 4);
-    npcWitnessEvent(state, person.room, 'attack', person.id);
-    return;
-  }
-  // 见血就清醒：杀戮值一脚踩空
-  state.frenzy = 0;
-
-  const before = person.hp;
-  if (affectFear) {
-    // 配件「命中恐惧」在这里统一加；基础值仍然只有一套。
-    person.fear = clamp(person.fear + Math.max(28, dmg * 24) + modifierValue(state, 'fearOnHit'), 0, 100);
-    if (person.fear >= 100) dmg = Math.max(dmg, before);
-  }
-  person.hidden = false;
-  person.blockedTurns = 0;
-
-  if (before <= 0) {
-    // 对倒地目标造成伤害即为补刀；普通攻击按钮本身不会选择倒地者。
-    state.executions += 1;
-    killPerson(state, person);
-    return;
-  }
-
-  person.hp = Math.max(0, before - dmg);
-
-  if (person.hp <= 0) {
-    person.hp = 0;
-    person.downedTurns = 0;
-    person.intent = 'stunned';
-    person.activity = '倒在地上，动不了';
-    person.alert = 100;
-    log(state, `${person.name} 被打倒在地上。现在可以直接处决；如果暂时放过，同伴仍可能赶来救援。`);
-    addAlarm(state, 4);
-    npcWitnessEvent(state, person.room, 'attack', person.id);
-    return;
-  }
-
-  // 受到伤害后会惊慌逃跑；累计达到 2 点时，状态才正式变为受伤。
-  person.alert = 100;
-  person.intent = 'flee';
-  person.activity = person.hp <= SURVIVOR_INJURED_HP ? '捂着伤口逃窜' : '受到攻击，惊慌逃窜';
-  person.goal = 'exit';
-  if (before > SURVIVOR_INJURED_HP && person.hp <= SURVIVOR_INJURED_HP) log(state, `${person.name} 受伤了（${person.hp}/${SURVIVOR_MAX_HP}），丢下手里的东西就跑。`);
-  else log(state, `${person.name} 受到 ${dmg} 点伤害（剩余 ${person.hp}/${SURVIVOR_MAX_HP}）。`);
-  // 同屋目击者必须形成真实行为反应；邻近房间只通过喊声获得转述信息。
-  npcWitnessEvent(state, person.room, 'attack', person.id);
-  addAlarm(state, 3);
-  // 一刀下去他会连着跑两间屋，地板上留下一道血痕：
-  // 「砍一刀、他挪一格、我跟上去」那种没有张力的追逐到此为止。
-  for (let i = 0; i < PANIC_HOPS_ON_HIT; i++) {
-    if (!fleeAway(state, person, false, forceFlee)) break;
-    person.movesThisTurn += 1;
-  }
-}
-
-export function carryPerson(state: GameState, personId: string): boolean {
-  if (state.phase !== 'playing' || state.carryPersonId || state.energy < 1) return false;
-  const person = state.people.find((p) => p.id === personId);
-  if (!person || person.role === 'police' || person.hp > 0 || person.room !== state.playerRoom) return false;
-  state.energy -= 1;
-  state.carryPersonId = person.id;
-  state.carryDistance = 0;
-  person.activity = '被杀手抱起搬运';
-  log(state, `你抱起了倒地的${person.name}。搬运途中不会自行挣脱。`);
-  npcWitnessEvent(state, person.room, 'abduction', person.id);
-  afterPlayerAction(state);
-  return true;
-}
-
-
-export function dropCarriedPerson(state: GameState): boolean {
-  if (state.phase !== 'playing' || !state.carryPersonId || state.energy < 1) return false;
-  const person = state.people.find((candidate) => candidate.id === state.carryPersonId);
-  if (!person || person.hp > 0) return false;
-  state.energy -= 1;
-  state.carryPersonId = null;
-  state.carryDistance = 0;
-  person.activity = '被杀手放下';
-  log(state, `你放下了${person.name}。`);
-  afterPlayerAction(state);
-  return true;
-}
-export function executeCarriedPerson(state: GameState, methodId: ExecutionMethodId): boolean {
-  if (!state.carryPersonId || state.phase !== 'playing' || state.attackBlockedTurn === state.turn) return false;
-  const person = state.people.find((p) => p.id === state.carryPersonId);
-  if (!person || person.room !== state.playerRoom || !canExecuteNow(person)) {
-    log(state, '怀里的人尚不能处决，或已经不在现场。');
-    return false;
-  }
-  const method = getExecutionMethod(methodId);
-  if (!method || method.room !== state.playerRoom) {
-    log(state, '这里没有可用的特殊处决场地。');
-    return false;
-  }
-  if (state.energy < 1) { log(state, '行动点不足，无法完成特殊处决。'); return false; }
-  state.energy -= 1;
-  const name = person.name;
-  state.carryPersonId = null;
-  state.carryDistance = 0;
-  state.executions += 1;
-  log(state, `特殊处决【${method.name}】：${method.flavor(name)}（额外奖励 +35 分）。`);
-  addAlarm(state, executionWitnessed(state, person) ? 6 : 2);
-  killPerson(state, person);
-  state.specialExecutionBonus += 35;
-  if (!state.executionMethodsUsed.includes(method.id)) state.executionMethodsUsed.push(method.id);
-  state.attackReady = true;
-  addAlarm(state, 8);
-  afterPlayerAction(state);
-  checkImmediateWin(state);
-  return true;
-}
-
-function canExecuteNow(person: Person): boolean {
-  return person.hp <= 0;
-}
-
-
-/**
- * 处决是否被目击：同屋还活着的幸存者，或相邻房间里听得见动静的人。
- * 没人的屋子里悄悄处决，不应该把警报拉满。
- */
-function executionWitnessed(state: GameState, victim: Person): boolean {
-  return npcs(state).some((person) =>
-    person.id !== victim.id
-    && person.hp > 0
-    && !person.hidden
-    && (person.room === state.playerRoom || ROOM_MAP[state.playerRoom].neighbors.includes(person.room)),
-  );
-}
-
-function executePerson(state: GameState, person: Person): void {
-  if (person.hp > 0) {
-    log(state, `${person.name} 还站着，处决需要先把他打倒。`);
-    return;
-  }
-  const witnessed = executionWitnessed(state, person);
-  addAlarm(state, witnessed ? 8 : 1);
-  state.executions += 1;
-  if (person.role !== 'police') state.loot += LOOT_EXECUTION;
-  log(state, witnessed ? `你处决了 ${person.name}，屋里的人看见了这一幕。` : `你悄悄处决了 ${person.name}，没有惊动别人。`);
-  killPerson(state, person);
-}
-
-function rescuePerson(state: GameState, person: Person): void {
-  if (person.hp > 0) return;
-  person.hp = SURVIVOR_INJURED_HP;
-  person.downedTurns = 0;
-  person.intent = 'flee';
-  person.activity = '被人从地上拖了起来';
-  addAlarm(state, 2);
-  log(state, `${person.name} 被同伴救起，重新站着（受伤）。`);
-}
-
-function healPerson(state: GameState, person: Person, amount = 1): void {
-  if (person.hp <= 0) return;
-  const before = person.hp;
-  const maxHp = (person.statusEffects?.incurable ?? 0) > 0 ? SURVIVOR_INJURED_HP : SURVIVOR_MAX_HP;
-  person.hp = Math.min(maxHp, person.hp + amount);
-  if (person.hp > before && amount >= 2 && person.statusEffects?.deepWound) person.statusEffects.deepWound = 0;
-  if (person.hp > before) log(state, `${person.name} 的伤口被处理过（${person.hp}/${SURVIVOR_MAX_HP}）。`);
-}
+/** 生死线已搬到 npc/lifecycle.ts；这里保留引擎侧入口（签名不变）。 */
+function killPerson(state: GameState, person: Person): void { aiKillPerson(aiHost, state, person); }
+function damagePerson(state: GameState, person: Person, amount: number, options: { affectFear?: boolean; forceFlee?: boolean } = {}): void { aiDamagePerson(aiHost, state, person, amount, options); }
+export function carryPerson(state: GameState, personId: string): boolean { return aiCarryPerson(aiHost, state, personId); }
+export function dropCarriedPerson(state: GameState): boolean { return aiDropCarriedPerson(aiHost, state); }
+export function executeCarriedPerson(state: GameState, methodId: ExecutionMethodId): boolean { return aiExecuteCarriedPerson(aiHost, state, methodId); }
+function executePerson(state: GameState, person: Person): void { aiExecutePerson(aiHost, state, person); }
+function rescuePerson(state: GameState, person: Person): void { aiRescuePerson(aiHost, state, person); }
+function healPerson(state: GameState, person: Person, amount = 1): void { aiHealPerson(aiHost, state, person, amount); }
 
 /* ==================================================================== */
 /*  目标选择                                                            */
