@@ -394,7 +394,6 @@ function validateCondition(value: unknown, baseline: unknown): boolean {
       if (typeof v !== 'string' || v.length > 100) return false;
       if (key === 'key' && baseline.c === 'flag' && !FLAG_VALUES.has(v)) return false;
       if (key === 'v' && baseline.c === 'hasThreat' && !['alarm', 'lead', 'team', 'spiritual'].includes(v)) return false;
-      if (key === 'a' && baseline.c === 'hasArchetype' && !['alert', 'defiant', 'caller', 'rescuer', 'hider', 'brave'].includes(v)) return false;
     }
   }
   return true;
@@ -448,7 +447,7 @@ function validateDynamicCondition(value: unknown): boolean {
     downedHere: ['c'], injuredHere: ['c'], targetAway: ['c'], energy: ['c', 'gte'],
     wanted: ['c', 'gte', 'lte'], alarm: ['c', 'gte', 'lte'], stalk: ['c', 'gte'],
     possession: ['c'], visibleSurvivor: ['c'], survivorNearby: ['c'], carryingPerson: ['c'], currentDestructible: ['c'], flag: ['c', 'key'], room: ['c', 'is'],
-    markedAlive: ['c'], escaped: ['c', 'gte'], hasThreat: ['c', 'v'], hasArchetype: ['c', 'a'],
+    markedAlive: ['c'], escaped: ['c', 'gte'], hasThreat: ['c', 'v'],
   };
   const keys = allowed[value.c];
   if (!keys || Object.keys(value).some((key) => !keys.includes(key))) return false;

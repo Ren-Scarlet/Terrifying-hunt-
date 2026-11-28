@@ -6,7 +6,6 @@ import { CARD_MAP, CARDS, STARTING_DECK, deckCardsForKiller } from '../src/game/
 import { perceptionRadius } from '../src/game/world/perception';
 import { ACTIVE_KILLERS, KILLERS, STARTER_KILLERS } from '../src/game/data/killers';
 import {
-  ARCH_LABEL,
   BASE_AP,
   BLEEDOUT_TURNS,
   blinkPlayer,
@@ -52,8 +51,6 @@ import {
   waitAction,
   isRoomLit,
   recoverBearTrap,
-  getHuntOpportunities,
-  recordRoutineObservation,
   missionTaskProgress,
   attackBlockReason,
   canAttack,
@@ -112,7 +109,6 @@ import { cellDistance, nearestOf, roomDistance } from '../src/game/navigation';
 import { advanceRogue, applyRogueFloor, rollRogueAccessories, rollRogueDeck, rollRogueOffers, startRogueRun } from '../src/game/rogue';
 import { EXECUTION_METHODS } from '../src/game/executions';
 import { awarenessLabel, awarenessStage, myersStalkGain } from '../src/game/npc/awareness';
-import { ROUTINE_PROFILE } from '../src/game/npc/catalog';
 
 let pass = 0;
 let fail = 0;
@@ -170,53 +166,6 @@ function newGame(): GameState {
   // 大多数规则测试不应被随机开局锁门干扰；锁门机制另有独立测试。
   state.roomLocks = {};
   return state;
-}
-function caseRoutineHuntOpportunities(): void {
-  const s = newGame();
-  const person = s.people.find((item) => item.role !== 'police');
-  if (!person) {
-    check('日常习惯：对局至少有一名幸存者可观察', false);
-    return;
-  }
-  person.goal = 'routine';
-  person.room = s.playerRoom;
-  person.routineIndex = 0;
-  person.routineSightings = 0;
-  person.routineObserved = false;
-  person.routineLastObservedTurn = -1;
-  check('日常习惯：七种行为类型均有独立路线',
-    Object.keys(ROUTINE_PROFILE).length === 7 &&
-    Object.values(ROUTINE_PROFILE).every((routine) => routine.rooms.length >= 3));
-  const first = recordRoutineObservation(s, person.room);
-  const repeatedSameTurn = recordRoutineObservation(s, person.room);
-  check('日常习惯：同一回合重复查看不会刷观察次数',
-    first === 0 && repeatedSameTurn === 0 && person.routineSightings === 1 && !person.routineObserved);
-  s.turn += 1;
-  const second = recordRoutineObservation(s, person.room);
-  check('日常习惯：跨回合观察两次后确认路线',
-    second === 1 && person.routineObserved === true && person.routineSightings === 2 && s.huntStats.routineInsights === 1);
-  const otherRoom: RoomId = person.room === 'garage' ? 'attic' : 'garage';
-  s.people.filter((item) => item.id !== person.id).forEach((item) => { item.room = otherRoom; });
-  person.alert = 0;
-  person.hp = 4;
-  person.hidden = false;
-  person.activity = ROUTINE_PROFILE[person.archetype].activity;
-  const circuit = s.powerCircuits.find((item) => item.affectedRooms.includes(person.room));
-  if (circuit) circuit.enabled = false;
-  const opportunities = getHuntOpportunities(s);
-  check('猎杀机会：独处目标会显示落单窗口',
-    opportunities.some((item) => item.targetId === person.id && item.id.startsWith('isolated-')));
-  if (circuit) {
-    check('猎杀机会：断电房间会显示暗处接近窗口',
-      opportunities.some((item) => item.targetId === person.id && item.id.startsWith('dark-')));
-  }
-  check('猎杀机会：已确认习惯且正在按习惯停留时显示机会',
-    opportunities.some((item) => item.targetId === person.id && item.id.startsWith('routine-')));
-  const dossier = personDetailHtml(s, person.id);
-  check('人物档案：确认路线后显示习惯名称与常去房间',
-    dossier.includes(ROUTINE_PROFILE[person.archetype].label) &&
-    dossier.includes('常去路线') &&
-    dossier.includes('data-action="close-person-detail"'));
 }
 
 function caseIndependentBreakerNetwork(): void {
@@ -323,7 +272,6 @@ function caseHuntingGroundsAndFreeHunt(): void {
 }
 caseHuntingGroundsAndFreeHunt();
 
-caseRoutineHuntOpportunities();
 caseIndependentBreakerNetwork();
 casePhoneLineCoordination();
 
@@ -680,7 +628,6 @@ function caseMyersStalkingAndFearRadius(): void {
     baseStyle.rank === 'C' && baseStyle.bonus === 0 && baseStyle.score >= 40,
     `rank=${baseStyle.rank} score=${baseStyle.score} bonus=${baseStyle.bonus}`);
   styleGame.huntStats = {
-    routineInsights: 3,
     environmentActions: 3,
     trapTriggers: 2,
     hatchetHits: 2,
@@ -897,7 +844,6 @@ function caseFinisher(): void {
   downed.hidden = false;
   rescuer.room = rescueRoom;
   rescuer.hp = 4;
-  rescuer.archetype = 'rescuer';
   rescuer.hidden = false;
   rescuer.blockedTurns = 0;
   rescue.energy = 0;
@@ -1241,8 +1187,6 @@ function caseWitnessFearAndUnifiedSabotage(): void {
   carryWitness.room = carryWitnessState.playerRoom;
   carryWitness.hidden = false;
   carryWitness.alert = 0;
-  // 固定目击者原型，避免随机的二次呼喊让门口 NPC 在玩家进入前就逃离。
-  carryWitness.archetype = 'hider';
   doorwayWitness.room = carryDestination;
   doorwayWitness.hidden = false;
   doorwayWitness.alert = 0;
@@ -1418,7 +1362,6 @@ function caseNewMechanics() {
     runOps(sacrifice, [{ op: 'alert', who: 'bloodSacrifice', amount: 7 }]);
     check('Z DSL 可以单独选择血祭品', sacrifices[0].alert === beforeAlert + 7);
   }
-  check('Z 拉扯型幸存者已注册', ARCH_LABEL.kiter === '拉扯型');
   check('Z 倒地者有 4 回合流血倒计时，处决不再等待', BLEEDOUT_TURNS === 4);
   const health = newGame();
   const healthy = health.people.find((p) => p.role !== 'police')!;
@@ -1541,7 +1484,6 @@ function caseAidAndPressure(): void {
   pair[0].hp = 0;
   pair[0].downedTurns = 0;
   pair[1].room = away;
-  pair[1].archetype = 'alert';
   withRandomSource(() => 0.01, () => endTurn(a));
   check('AA 非救援型也会拉起同屋倒地同伴', pair[0].hp === 2, `hp=${pair[0].hp} down=${pair[0].downedTurns}`);
 
@@ -1557,7 +1499,6 @@ function caseAidAndPressure(): void {
   folk[0].hp = 0;
   folk[0].downedTurns = 0;
   folk[1].room = far;
-  folk[1].archetype = 'alert';
   withRandomSource(() => 0.01, () => endTurn(b));
   check(
     'AA 幸存者会主动朝倒地同伴赶过去',
@@ -1776,7 +1717,6 @@ function caseNpcLocksAndPersistentTrails(): void {
     walker.alert = 100;
     walker.hp = 4;
     walker.sneaky = true;
-    walker.archetype = 'kiter';
     walker.fear = 0;
     walker.movesThisTurn = 0;
     tracks.trails = [];

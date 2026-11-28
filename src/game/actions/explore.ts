@@ -7,7 +7,6 @@
 import { LOOK_COST, SEARCH_COST, SURVIVOR_INJURED_HP } from '../constants';
 import { drawCards } from '../deck';
 import { roomName } from '../missions';
-import { ROUTINE_PROFILE } from '../npc/catalog';
 import type { GameState, Person, RoomId } from '../types';
 import type { NpcHost } from '../npc/ai/host';
 import { ROOM_MAP } from '../rooms';
@@ -203,28 +202,7 @@ export function cancelLookSelection(host: NpcHost, state: GameState): boolean {
   return true;
 }
 
-/** 玩家每回合最多记录一次同一目标的习惯；连续两次观察才会确认完整路线。 */
-export function recordRoutineObservation(host: NpcHost, state: GameState, room: RoomId): number {
-  const observed = npcs(state).filter((person) =>
-    person.room === room && person.hp > 0 && !person.hidden && person.goal === 'routine',
-  );
-  let discovered = 0;
-  for (const person of observed) {
-    if (person.routineLastObservedTurn === state.turn) continue;
-    person.routineLastObservedTurn = state.turn;
-    person.routineSightings = (person.routineSightings ?? 0) + 1;
-    if (person.routineSightings >= 2 && !person.routineObserved) {
-      person.routineObserved = true;
-      discovered += 1;
-      host.log(state, `你已经看出${person.name}的日常规律：${ROUTINE_PROFILE[person.archetype].label}。`);
-    } else if (!person.routineObserved) {
-      host.log(state, `你记下了${person.name}在${roomName(room)}的行动习惯；再观察一次就能确认他的常去路线。`);
-    }
-  }
-  if (discovered > 0) state.huntStats.routineInsights += discovered;
-  return discovered;
-}
-
+/** 查看相邻房间：消耗 1 点行动点，获得短暂视野。 */
 export function lookAtRoom(host: NpcHost, state: GameState, room: RoomId): boolean {
   if (state.phase !== 'playing' || !state.lookingAround) return false;
   if (!ROOM_MAP[state.playerRoom].neighbors.includes(room)) {
@@ -239,7 +217,6 @@ export function lookAtRoom(host: NpcHost, state: GameState, room: RoomId): boole
   state.energy -= LOOK_COST;
   state.lookingAround = false;
   host.scoutRoom(state, room, 1);
-  recordRoutineObservation(host, state, room);
   host.log(state, `你屏住呼吸查看了「${roomName(room)}」（消耗 ${LOOK_COST} 点行动点）。`);
   state.attackReady = true;
   host.afterPlayerAction(state);

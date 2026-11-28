@@ -36,7 +36,7 @@ export interface NpcHost {
   /** 治疗受伤的同伴 */
   healPerson(state: GameState, person: Person, amount?: number): void;
   /** 主决策：这一回合按本能做什么 */
-  actByArchetype(state: GameState, person: Person): void;
+  actOnInstinct(state: GameState, person: Person): void;
   /** 同屋看到玩家时的即时反应（只改状态，不移动） */
   sameRoomKillerReact(state: GameState, armed: boolean): void;
   /** 造成伤害（会触发恐惧、逃跑与死亡结算） */

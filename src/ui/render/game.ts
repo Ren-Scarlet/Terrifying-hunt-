@@ -3,7 +3,6 @@ import { ALERT_LABEL, FEAR_LABEL, alertBand, fearBand } from '../../game/npc/ai/
 import { characterImage, POWER_RARITY_BG, uiIcon } from '../../game/assetMap';
 import {
   ALARM_MAX,
-  ARCH_LABEL,
   ATTACK_COST,
   BASE_AP,
   BLEEDOUT_TURNS,
@@ -675,10 +674,10 @@ function personSlotStyle(roomId: RoomId, personId: string, index: number): strin
       const where = vis ? roomName(p.room) : `最后在${roomName(p.lastSeenRoom)}`;
       return `<button class="roster-person ${p.room === state.playerRoom ? 'here' : ''} ${p.marked ? 'marked' : ''} ${p.bloodSacrifice ? 'blood-sacrifice' : ''} ${p.escapeProgress > 0 ? 'escaping' : ''} ${vis ? '' : 'unknown'} ${health === 'downed' ? 'downed' : ''}"
         data-action="person" data-person-id="${p.id}"
-        title="${escape(p.name)}：${escape(ARCH_LABEL[p.archetype])}，${escape(ALERT_LABEL[band])}，${escape(HEALTH_LABEL[health])}${vis ? '' : '，位置待确认'}">
+        title="${escape(p.name)}：${escape(ALERT_LABEL[band])}，${escape(HEALTH_LABEL[health])}${vis ? '' : '，位置待确认'}">
         ${img ? `<img src="${img}" alt="" onerror="this.style.display='none'">` : ''}
         <span><b>${escape(p.name)} ${alertLabel}</b>
-          <small class="goal-line">${escape(ARCH_LABEL[p.archetype])} · ${escape(FEAR_LABEL[fearBand(p.fear)])}</small>
+          <small class="fear-line">${escape(FEAR_LABEL[fearBand(p.fear)])}</small>
           ${p.marked ? '<small class="contract-target-tag">★ 契约指定目标</small>' : ''}
           ${p.bloodSacrifice ? '<small class="blood-sacrifice-tag"><i aria-hidden="true"></i>血祭品</small>' : ''}
           <small>${where} · ${HEALTH_LABEL[health]} · ${escape(intentLabel)}</small>

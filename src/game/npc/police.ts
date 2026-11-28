@@ -40,10 +40,9 @@ export function policeNextStep(host: NpcHost, state: GameState, police: Person):
     ...ESCAPE_ROOMS,
   ])];
   if (!destination && patrolPoints.length) {
-    let index = (police.routineIndex ?? 0) % patrolPoints.length;
+    let index = state.turn % patrolPoints.length;
     if (police.room === patrolPoints[index]) {
       index = (index + 1) % patrolPoints.length;
-      police.routineIndex = index;
     }
     destination = patrolPoints[index];
   }

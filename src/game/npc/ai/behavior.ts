@@ -156,5 +156,5 @@ export function decide(ctx: DecisionContext, roll: () => number = () => 0.5): De
   // 慌乱：边跑边喊（传播信息）
   if (band === 'panicked') return { kind: 'shout', reason: 'panicked' };
 
-  return { kind: 'move', reason: 'routine' };
+  return { kind: 'move', reason: 'daily' };
 }

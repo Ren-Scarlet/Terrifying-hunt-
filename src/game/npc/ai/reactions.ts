@@ -97,15 +97,12 @@ export function npcReact(host: NpcHost, state: GameState): void {
     if (wantsToLeave(state, person)) continue;
 
     const fleeing = person.alert >= 75 || person.escapeProgress > 0;
-    const busy =
-      /电话|无线电|包扎|拖|救/.test(person.activity) ||
-      ((person.archetype === 'rescuer' || person.archetype === 'hider' || person.archetype === 'caller') &&
-        person.alert >= 25);
+    const busy = /电话|无线电|包扎|拖|救/.test(person.activity);
     if (!fleeing && !busy) continue;
 
     person.movesThisTurn += 1;
     if (fleeing) host.fleeAway(state, person, true);
-    else host.actByArchetype(state, person);
+    else host.actOnInstinct(state, person);
   }
   host.recordTrails(state, before);
   host.rememberVisible(state);
@@ -156,28 +153,13 @@ export function npcWitnessEvent(host: NpcHost,
 
     const previousRoom = witness.room;
     if (supernatural) {
-      // 面对超自然威胁，普通人优先躲藏或逃命，不会像目击普通凶杀那样统一报警。
-      if (witness.archetype === 'hider') {
-        witness.goal = 'hide';
-        host.actByArchetype(state, witness);
-      } else {
-        witness.goal = 'panic';
-        witness.activity = '目睹无法理解的恐怖，拼命逃离';
-        if (witness.movesThisTurn < REACT_MOVE_CAP && host.fleeAway(state, witness, true)) {
-          witness.movesThisTurn += 1;
-        }
+      // 面对超自然威胁，普通人优先逃命，不会像目击普通凶杀那样统一报警。
+      witness.activity = '目睹无法理解的恐怖，拼命逃离';
+      if (witness.movesThisTurn < REACT_MOVE_CAP && host.fleeAway(state, witness, true)) {
+        witness.movesThisTurn += 1;
       }
     } else {
-      switch (witness.archetype) {
-        case 'alert': witness.goal = 'exit'; break;
-        case 'caller': witness.goal = 'phone'; break;
-        case 'rescuer': witness.goal = 'help'; break;
-        case 'hider': witness.goal = 'hide'; break;
-        case 'defiant': witness.goal = 'weapon'; break;
-        case 'brave': witness.goal = 'gather'; break;
-        case 'kiter': witness.goal = 'panic'; break;
-      }
-      host.actByArchetype(state, witness);
+      host.actOnInstinct(state, witness);
     }
 
     if (witness.room !== previousRoom) {
@@ -262,7 +244,7 @@ export function npcOnPlayerEnter(host: NpcHost, state: GameState, barricadedEntr
 
     // 看见你就等于确认「杀手在这间屋里」——不会站着等你出牌。
     // 想在他们转身之前动手，就得靠伏击；想在他们跑掉之后补刀，就得靠追击。
-    if (person.archetype === 'defiant' && person.armed && person.room === state.playerRoom) {
+    if (person.armed && person.alert >= 40 && person.room === state.playerRoom) {
       host.counterAttack(state, person);
       return;
     }
@@ -312,7 +294,7 @@ export function npcOnPlayerEnter(host: NpcHost, state: GameState, barricadedEntr
   if (!ambush && !state.possessed) {
     const obstacleHere = isObstacle(state.playerRoom) && !state.clearedObstacles.includes(state.playerRoom);
     const trapper = here.find(
-      (p) => p.hp > 0 && (p.archetype === 'defiant' || p.archetype === 'brave' || p.archetype === 'kiter'),
+      (p) => p.hp > 0 && p.alert >= 40,
     );
     if (barricadedEntry) {
       host.interruptPlayer(
@@ -339,7 +321,7 @@ export function witnessInRoom(host: NpcHost, state: GameState, person: Person): 
   person.lastWitnessedEventClock = state.trailClock;
   host.shout(state, person, 18);
   const previousRoom = person.room;
-  host.actByArchetype(state, person);
+  host.actOnInstinct(state, person);
   if (person.room !== previousRoom) {
     person.movesThisTurn = Math.min(REACT_MOVE_CAP, person.movesThisTurn + 1);
   }

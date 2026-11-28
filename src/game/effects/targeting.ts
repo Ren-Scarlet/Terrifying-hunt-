@@ -118,8 +118,6 @@ export function checkCond(host: NpcHost, state: GameState, cond: Cond): boolean 
       return state.escaped >= cond.gte;
     case 'hasThreat':
       return peopleInRoom(state, state.playerRoom).some((p) => SURVIVOR_MAP[p.id]?.threat === cond.v);
-    case 'hasArchetype':
-      return peopleInRoom(state, state.playerRoom).some((p) => p.archetype === cond.a && p.hp > 0);
     case 'victimHere': {
       const v = host.findVictim(state, state.playerRoom, cond.maxHp ?? Infinity);
       return !!v;

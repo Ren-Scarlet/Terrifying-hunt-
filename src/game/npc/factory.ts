@@ -3,8 +3,7 @@ import { roomDistance } from '../navigation';
 import { ESCAPE_ROOMS } from '../constants';
 import { ENTRY_ROOM, OBSTACLE_ROOMS, POLICE_START, ROOMS } from '../rooms';
 import { SPECIAL_SURVIVORS, SURVIVOR_MAP, SURVIVORS } from '../survivors';
-import type { Archetype, Mission, NpcGoal, Person, PersonRole, RoomId } from '../types';
-import { ROUTINE_PROFILE } from './catalog';
+import type { Mission, Person, PersonRole, RoomId } from '../types';
 
 export const ACTIVITIES = [
   '在翻找抽屉',
@@ -16,43 +15,6 @@ export const ACTIVITIES = [
   '低声哼着歌',
 ];
 
-const ARCHETYPES: Archetype[] = ['alert', 'defiant', 'caller', 'rescuer', 'hider', 'brave', 'kiter'];
-
-/** 按角色设定挑行为类型：有威胁设定的角色往对应的类型靠 */
-function pickArchetype(survivor: (typeof SURVIVORS)[number]): Archetype {
-  switch (survivor.threat) {
-    case 'alarm':
-      return 'caller';
-    case 'lead':
-      return 'alert';
-    case 'brave':
-      return 'brave';
-    case 'spiritual':
-      return random() < 0.5 ? 'hider' : 'defiant';
-    default:
-      return randomOf(ARCHETYPES);
-  }
-}
-
-function goalForArchetype(archetype: Archetype): NpcGoal {
-  switch (archetype) {
-    case 'caller':
-      return 'phone';
-    case 'alert':
-      return 'exit';
-    case 'rescuer':
-      return 'help';
-    case 'brave':
-      return 'weapon';
-    case 'hider':
-      return 'hide';
-    case 'defiant':
-      return random() < 0.5 ? 'weapon' : 'panic';
-    case 'kiter':
-      return random() < 0.5 ? 'supply' : 'panic';
-  }
-}
-
 function makePerson(
   s: (typeof SURVIVORS)[number],
   role: PersonRole,
@@ -60,8 +22,6 @@ function makePerson(
   hp: number,
   marked: boolean,
 ): Person {
-  const archetype = pickArchetype(s);
-  const routine = ROUTINE_PROFILE[archetype];
   return {
     id: s.id,
     name: s.name,
@@ -70,16 +30,10 @@ function makePerson(
     hp,
     marked,
     bloodSacrifice: false,
-    archetype,
     alert: 0,
     fear: 0,
     dialogue: randomOf(['今晚吃什么？', '这里还挺安静的。', '等会儿要不要看电影？', '我有点饿了。', '忙完就去休息吧。']),
     activity: randomOf(ACTIVITIES),
-    goal: goalForArchetype(archetype),
-    routineIndex: Math.floor(random() * routine.rooms.length),
-    routineSightings: 0,
-    routineObserved: false,
-    routineLastObservedTurn: -1,
     blockedTurns: 0,
     bleed: 0,
     downedTurns: 0,
@@ -138,14 +92,7 @@ export function createPeople(mission: Mission): Person[] {
     people.push(makePerson(s, 'civilian', nextRoom(), 4, false));
   });
 
-  // 至少保留一名专职躲藏者，确保柜子/床底机制每局都有机会出现。
-  if (!people.some((person) => person.archetype === 'hider')) {
-    const hider = randomOf(people);
-    hider.archetype = 'hider';
-    hider.goal = 'hide';
-    hider.routineIndex = Math.floor(random() * ROUTINE_PROFILE.hider.rooms.length);
-  }
-
+  // 柜子/床底机制对任何人都可能发生，不再指定固定的躲藏型。
   people.push({
     id: 'police-0',
     name: '巡逻警员',
@@ -154,12 +101,10 @@ export function createPeople(mission: Mission): Person[] {
     hp: 4,
     marked: false,
     bloodSacrifice: false,
-    archetype: 'alert',
     alert: 0,
     fear: 0,
     dialogue: '',
     activity: '在辖区巡逻',
-    goal: 'phone',
     blockedTurns: 0,
     bleed: 0,
     downedTurns: 0,

@@ -1,14 +1,13 @@
 import { CARDS, CARD_MAP } from '../../game/cards';
 import { ADDON_RARITY_BG, PERK_RARITY_BG, POWER_RARITY_BG, accessoryImage, cardImage, characterImage, uiIcon } from '../../game/assetMap';
 import {
-  ARCH_LABEL, BASE_AP, BLEEDOUT_TURNS, GOAL_LABEL, HEALTH_LABEL,
+  BASE_AP, BLEEDOUT_TURNS, HEALTH_LABEL,
   conditionOf, effectiveCost, isPersonVisible,
   attackBlockReason, executeBlockReason,
 } from '../../game/engine';
 import { KILLERS, type KillerProfile } from '../../game/killers';
 import { roomName } from '../../game/missions';
 import { getPersonProfile, type PersonProfile } from '../../game/people';
-import { ROUTINE_PROFILE } from '../../game/npc/catalog';
 import { SURVIVOR_MAP } from '../../game/survivors';
 import { ALERT_LABEL, FEAR_LABEL, alertBand, fearBand } from '../../game/npc/ai/model';
 import type { AccessoryDef, GameState, Person, SaveData } from '../../game/types';
@@ -110,7 +109,7 @@ export function defaultDetailHtml(): string {
     '相邻房间通常只能看到轮廓。进入房间会暴露位置，警觉较高的幸存者可能立刻逃跑；警觉较低的幸存者会先观察或怀疑。留意当前房间的鞋印、乌鸦和其他环境线索，判断幸存者最近的行动。',
     '屋里各区域的电闸控制照明；你可以拉闸断电，幸存者也可能去修复它。断电区域的门锁会失效。',
     '连续追踪可积累【杀戮】资源；达到阈值后会强化行动点收益。转向、攻击或失去追踪线索都会影响追击节奏。',
-    '幸存者会根据性格报警、躲藏、寻找武器、救援同伴、修复断电区域或寻找补给；他们的行动会改变现场局势并制造线索。有人藏进柜子时，点「搜索」翻出来（1 点行动点）。',
+    '幸存者会按当前的警戒与恐惧行动：报警、躲藏、逃跑、救援同伴或修复断电区域；他们的行动会改变现场局势并制造线索。有人藏进柜子时，点「搜索」翻出来（1 点行动点）。',
   ]);
 }
 
@@ -235,17 +234,12 @@ export function personDetailHtml(state: GameState, personId: string): string {
   const rarityKey = profile.role === 'police' ? 'rare' : profile.role === 'target' ? 'visceral' : 'common';
   const rarityLabel = person?.marked ? '标记目标' : roleName;
   const threat = SURVIVOR_MAP[personId]?.threat;
-  const routine = person ? ROUTINE_PROFILE[person.archetype] : null;
-  const habit = person?.goal === 'routine' && routine
-    ? person.routineObserved
-      ? `${routine.label}已确认；常去路线：${routine.rooms.map(roomName).join(' → ')}。`
-      : `${routine.hint}（重复观察两次可确认完整路线。）`
-    : profile.habit;
+  const habit = profile.habit;
   const paras = [...profile.bio, `习惯：${habit}`, `秘密：${profile.secret}`];
   if (person) {
     const health = conditionOf(person);
     paras.push(
-      `状态：${HEALTH_LABEL[health]}（${person.hp}/4）。行为类型：${ARCH_LABEL[person.archetype]}。`,
+      `状态：${HEALTH_LABEL[health]}（${person.hp}/4）。`,
       `警戒：${ALERT_LABEL[alertBand(person.alert)]}（${person.alert}/100）· 恐惧：${FEAR_LABEL[fearBand(person.fear)]}（${person.fear}/100）。行为：${person.activity || '暂无明显动作'}。`,
     );
     if (person.dialogue) paras.push(`听见他说：“${person.dialogue}”`);

@@ -10,11 +10,10 @@
 import { modifierValue } from './modifiers';
 import type { GameState, MissionTask, ResultKind, ScoreLine } from './types';
 
-/** 主动策略行为的结算分：鼓励观察习惯、利用环境与精准使用杀手能力。 */
+/** 主动策略行为的结算分：鼓励利用环境与精准使用杀手能力。 */
 function huntActionScore(state: GameState): number {
   const stats = state.huntStats;
   return Math.min(60,
-    stats.routineInsights * 5 +
     stats.environmentActions * 3 +
     stats.trapTriggers * 10 +
     stats.hatchetHits * 6 +
@@ -86,12 +85,11 @@ export function calculateHuntStyleRating(state: GameState, result: ResultKind): 
   breakdown: ScoreLine[];
 } {
   const stats = state.huntStats;
-  const planning = Math.min(30, stats.routineInsights * 8 + stats.environmentActions * 5 + stats.trapTriggers * 8 + stats.nurseBlinks * 2);
+  const planning = Math.min(30, stats.environmentActions * 5 + stats.trapTriggers * 8 + stats.nurseBlinks * 2);
   const precision = Math.min(25, stats.hatchetHits * 6 + stats.nurseBlinkAttacks * 8 + stats.myersBurstHits * 8 + (state.specialExecutionBonus > 0 ? 8 : 0));
   const stealth = Math.min(20, (state.npcAlarmed ? 0 : 10) + Math.max(0, 10 - Math.floor(state.alarm / 10)));
   const efficiency = result === 'win' ? Math.min(15, Math.max(0, state.mission.turns - state.turn) * 2) : 0;
   const styleTypes = [
-    stats.routineInsights > 0,
     stats.environmentActions > 0,
     stats.trapTriggers > 0,
     stats.hatchetHits > 0,

@@ -175,7 +175,6 @@ export function createGame(
     loot: 0,
     scoreBreakdown: [],
     huntStats: {
-      routineInsights: 0,
       environmentActions: 0,
       trapTriggers: 0,
       hatchetHits: 0,
@@ -286,15 +285,6 @@ export function createGame(
   }
 
 
-  state.people
-    .filter((p) => p.role !== 'police')
-    .forEach((p) => {
-      const roll = random();
-      if (roll < 0.22) p.goal = 'supply';
-      else if (roll < 0.42) p.goal = 'routine';
-      else if (roll < 0.62) p.goal = 'hide';
-      else if (roll < 0.82) p.goal = 'help';
-    });
   drawCards(state, 5);
   log(state, `猎场：${ground.name} · ${ground.ruleName}：${ground.ruleDescription}`);
   log(state, `契约已接取：${activeMission.title}`);

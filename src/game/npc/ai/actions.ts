@@ -41,7 +41,7 @@ export function fleeAway(
   // 后院是出口：只有本来就打算离开、或者已经吓破胆的人才会往外跑。
   // 否则「被追」等于「自动逃生」，玩家把人逼到院子里反而在帮对手。
   const mayExit =
-    person.goal === 'exit' || person.goal === 'panic' || person.alert >= 75 || person.hp <= SURVIVOR_INJURED_HP || state.emergencyActive;
+    person.alert >= 75 || person.hp <= SURVIVOR_INJURED_HP || state.emergencyActive || person.escapeProgress > 0;
   const options = ROOM_MAP[person.room].neighbors.filter(
     (r) =>
       r !== state.playerRoom &&

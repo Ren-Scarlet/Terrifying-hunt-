@@ -15,7 +15,7 @@ import { peopleInRoom, npcPeople as npcs } from '../../world/roomState';
 import { phoneWorks } from '../../world/phones';
 import type { NpcHost } from './host';
 import { canCoordinateRescue, canPlaceBarricade } from './predicates';
-import { AID_RUN_RATE, RESCUE_EAGERNESS } from './tuning';
+import { AID_RUN_RATE, RESCUE_RATE } from './tuning';
 /** 反抗型 / 英勇型的正面反击：玩家下回合少走一步 */
 export function counterAttack(host: NpcHost, state: GameState, person: Person): void {
   state.stunTurns += 1;
@@ -42,7 +42,7 @@ export function barricadeRoom(host: NpcHost, state: GameState, person: Person): 
 export function tryRescue(host: NpcHost, state: GameState, person: Person): boolean {
   if (person.room === state.playerRoom) return false;
   if (person.blockedTurns > 0) return false;
-  if (random() > RESCUE_EAGERNESS[person.archetype]) return false;
+  if (random() > RESCUE_RATE) return false;
   const allies = peopleInRoom(state, person.room).filter(
     (p) => p.id !== person.id && p.role !== 'police',
   );
@@ -64,7 +64,7 @@ export function tryRescue(host: NpcHost, state: GameState, person: Person): bool
 /** 有人倒地时，幸存者会主动赶过去：救援优先于日常目标，但没人敢闯玩家守着的房间 */
 export function tryAidRun(host: NpcHost, state: GameState, person: Person): boolean {
   if (person.hidden || person.blockedTurns > 0) return false;
-  if (random() > RESCUE_EAGERNESS[person.archetype] * AID_RUN_RATE) return false;
+  if (random() > RESCUE_RATE * AID_RUN_RATE) return false;
   const downed = npcs(state)
     .filter((p) => p.hp <= 0 && p.room !== state.playerRoom && canCoordinateRescue(state, person.room, p.room))
     .sort((a, b) => roomDistance(person.room, a.room) - roomDistance(person.room, b.room))[0];

@@ -1547,13 +1547,13 @@ button { font-family: inherit; cursor: pointer; }
 
 .btn.end-turn { margin-left: auto; }
 
-/* 名单里显示目的 */
-.roster-person .goal-line {
+/* 名单里显示恐惧档位 */
+.roster-person .fear-line {
   display: block;
   font-size: 9.5px; color: #b09a76; letter-spacing: .3px;
 }
 .roster-person.escaping { border-color: #6d3025; background: #150d0b; }
-.roster-person.escaping .goal-line { color: #d99a86; }
+.roster-person.escaping .fear-line { color: #d99a86; }
 
 /* 房间状态 */
 .room.locked { box-shadow: inset 0 0 0 1px rgba(110, 139, 163, .28); }

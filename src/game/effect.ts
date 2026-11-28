@@ -158,8 +158,7 @@ export type Cond =
   | { c: 'room'; is: RoomId }
   | { c: 'markedAlive' }
   | { c: 'escaped'; gte: number }
-  | { c: 'hasThreat'; v: 'alarm' | 'lead' | 'brave' | 'spiritual' }
-  | { c: 'hasArchetype'; a: 'alert' | 'defiant' | 'caller' | 'rescuer' | 'hider' | 'brave' };
+  | { c: 'hasThreat'; v: 'alarm' | 'lead' | 'brave' | 'spiritual' };
 
 /* ------------------------------------------------------------------ */
 /* 指令                                                                */

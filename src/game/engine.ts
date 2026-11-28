@@ -20,8 +20,8 @@ export { drawCards } from './deck';
 export { createGame } from './setup';
 export { BASE_AP, SABOTAGE_COST, POSSESS_TURNS, SURVIVOR_MAX_HP, SURVIVOR_INJURED_HP, BLEEDOUT_TURNS, ALARM_MAX, HAND_LIMIT, FRENZY_THRESHOLD, FRENZY_AP_BONUS, SEARCH_COST, LOOK_COST, ATTACK_COST, SCORE_EXECUTION_THRESHOLD, PANIC_HOPS_ON_HIT } from './constants';
 import { ACTIVITIES, createPeople } from './npc/factory';
-import { ARCH_DESC, ARCH_LABEL, GOAL_LABEL, HEALTH_LABEL, ROUTINE_PROFILE } from './npc/catalog';
-export { ARCH_DESC, ARCH_LABEL, GOAL_LABEL, HEALTH_LABEL } from './npc/catalog';
+import { HEALTH_LABEL } from './npc/catalog';
+export { HEALTH_LABEL } from './npc/catalog';
 export { ESCAPE_ROOMS } from './constants';
 import { CARD_MAP, UNLOCK_REWARDS } from './cards';
 import type { Cond, Dest, Op, Who } from './effect';
@@ -143,7 +143,6 @@ import {
   lookAround as aiLookAround,
   lookAtRoom as aiLookAtRoom,
   movePlayer as aiMovePlayer,
-  recordRoutineObservation as aiRecordRoutineObservation,
   searchRoom as aiSearchRoom,
   waitAction as aiWaitAction,
 } from './actions/explore';
@@ -204,7 +203,7 @@ const aiHost: NpcHost = {
   addWanted,
   rescuePerson,
   healPerson,
-  actByArchetype,
+  actOnInstinct,
   sameRoomKillerReact,
   damagePerson,
   killPerson,
@@ -257,12 +256,10 @@ const aiHost: NpcHost = {
 };
 import { SURVIVOR_MAP } from './survivors';
 import type {
-  Archetype,
   CardInstance,
   GameState,
   Health,
   Mission,
-  NpcGoal,
   Person,
   PersonRole,
   ResultKind,
@@ -410,7 +407,6 @@ function activateEmergency(state: GameState): void {
   for (const person of npcs(state)) {
     if (person.hp <= 0) continue;
     person.alert = Math.max(person.alert, 85);
-    person.goal = 'exit';
     person.escapeProgress = 0;
     person.activity = '警报全面爆发，正在逃离猎场';
   }
@@ -918,7 +914,7 @@ function survivorsActOnce(state: GameState, actorId: string): void {
     if (p.hp <= 0 || p.hidden || p.blockedTurns > 0 || p.movesThisTurn >= REACT_MOVE_CAP) continue;
     const from = p.room;
     if (p.room === state.playerRoom) { if (p.alert >= 40) fleeAway(state, p); }
-    else if (p.alert >= 40) actByArchetype(state, p);
+    else if (p.alert >= 40) actOnInstinct(state, p);
     else if (random() < 0.35) {
       const options = ROOM_MAP[p.room].neighbors.filter((room) => room !== state.playerRoom && !isLocked(state, room));
       if (options.length) { const next = randomOf(options); p.room = next; p.activity = `趁你等待时移动到${roomName(next)}`; }
@@ -936,9 +932,8 @@ function survivorsActOnce(state: GameState, actorId: string): void {
 
 
 
-/** 按行为类型行动一步 */
-/** 决策入口：新 AI（npc/ai/runtime.ts）。旧的性格决策已经删除。 */
-function actByArchetype(state: GameState, person: Person): void {
+/** 决策入口：新 AI（npc/ai/runtime.ts）。 */
+function actOnInstinct(state: GameState, person: Person): void {
   executeDecision(aiHost, state, person);
 }
 
@@ -1013,7 +1008,7 @@ function crowAlertFor(state: GameState, person: Person): void {
   log(state, `${roomName(person.room)}方向传来一阵乌鸦扑棱棱的振翅声——有人在那里动了。`);
 }
 
-/** 回合循环还在 npc/ai/turn.ts；决策已经换成新 AI（actByArchetype 下面的入口）。 */
+/** 回合循环还在 npc/ai/turn.ts；决策入口是 actOnInstinct。 */
 function npcTurn(state: GameState): void {
   aiNpcTurn(aiHost, state);
   tickAllChase(state);
@@ -1099,7 +1094,6 @@ export function waitAction(state: GameState): boolean { return aiWaitAction(aiHo
 export function movePlayer(state: GameState, room: RoomId): boolean { return aiMovePlayer(aiHost, state, room); }
 export function lookAround(state: GameState): boolean { return aiLookAround(aiHost, state); }
 export function cancelLookSelection(state: GameState): boolean { return aiCancelLookSelection(aiHost, state); }
-export function recordRoutineObservation(state: GameState, room: RoomId): number { return aiRecordRoutineObservation(aiHost, state, room); }
 export function lookAtRoom(state: GameState, room: RoomId): boolean { return aiLookAtRoom(aiHost, state, room); }
 export function interactCabinet(state: GameState): boolean { return aiInteractCabinet(aiHost, state); }
 export function interactTotem(state: GameState, reward: 'draw' | 'energy'): boolean { return aiInteractTotem(aiHost, state, reward); }
@@ -1205,17 +1199,6 @@ export function getHuntOpportunities(state: GameState): HuntOpportunity[] {
         room: person.room,
         title: '暗处接近',
         detail: '目标所在区域没有照明，普通幸存者更难及时察觉接近。',
-      });
-    }
-    const routine = ROUTINE_PROFILE[person.archetype];
-    if (person.goal === 'routine' && person.routineObserved && person.activity === routine.activity) {
-      opportunities.push({
-        id: 'routine-' + person.id,
-        targetId: person.id,
-        targetName: person.name,
-        room: person.room,
-        title: '习惯性停留',
-        detail: routine.label + '：目标正按已确认的日常习惯停留在这里。',
       });
     }
     if (/修复|电闸|设施|处理/.test(person.activity)) {

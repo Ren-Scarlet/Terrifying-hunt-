@@ -165,32 +165,6 @@ export interface AccessoryDef {
 
 export type PersonRole = 'target' | 'civilian' | 'police';
 
-/**
- * 六种行为类型。决定这名 NPC 被惊动后做什么，而不是所有 NPC 都用同一套反应。
- *   alert    警觉型：发现杀手就逃，逃跑路上通知同伴
- *   defiant  反抗型：堵门、拿武器反击，会让你掉行动点
- *   caller   求救型：摸向电话/无线电报警
- *   rescuer  救援型：治疗受伤、拉起倒地的人
- *   hider    躲藏型：钻进柜子/床底，不搜出来就找不到
- *   brave    英勇型：找武器、聚人、正面挡路
- *   kiter    拉扯型：专门绕远路、抹脚印、丢烟雾，让玩家很难贴到他
- */
-export type Archetype = 'alert' | 'defiant' | 'caller' | 'rescuer' | 'hider' | 'brave' | 'kiter';
-
-/** 个人目的：决定他慌乱时往哪跑，是这一局 NPC 的行为主轴 */
-export type NpcGoal =
-  | 'phone'
-  | 'exit'
-  | 'hide'
-  | 'gather'
-  | 'weapon'
-  | 'panic'
-  | 'help'
-  /** 去道具箱翻一件能用的东西 */
-  | 'supply'
-  /** 按个人习惯在常去地点之间活动 */
-  | 'routine';
-
 /** 设陷者放置的捕兽夹；触发或被幸存者拆除后会变成未武装状态。 */
 export interface BearTrap {
   id: string;
@@ -216,8 +190,6 @@ export interface Person {
   marked: boolean;
   /** 本局随机选中的血祭品；仅作身份标记，供卡牌与能力引用 */
   bloodSacrifice: boolean;
-  /** 行为类型 */
-  archetype: Archetype;
   /** 警戒值 0–100：越高越容易报警、求助或寻找逃生点。 */
   alert: number;
   /** 恐惧值 0–100：满值后崩溃；此时再次受到攻击会直接倒地。 */
@@ -226,13 +198,6 @@ export interface Person {
   dialogue: string;
   /** 当前行为，用于档案与人物名单 */
   activity: string;
-  /** 个人目的 */
-  goal: NpcGoal;
-  /** 日常路线的当前停靠点、观察次数与是否已被玩家识破。 */
-  routineIndex?: number;
-  routineSightings?: number;
-  routineObserved?: boolean;
-  routineLastObservedTurn?: number;
   /** 被限制移动的剩余回合（支配、钉住、恐惧、夹子） */
   blockedTurns: number;
   /** 刚踩中捕兽夹：地图短暂显示红色人影。 */
@@ -367,7 +332,6 @@ export interface ScoreLine {
 
 /** 本局计划与专属能力使用记录，用于猎杀风格评价。 */
 export interface HuntStyleStats {
-  routineInsights: number;
   environmentActions: number;
   trapTriggers: number;
   hatchetHits: number;

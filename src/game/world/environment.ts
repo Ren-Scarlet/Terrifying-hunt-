@@ -134,11 +134,10 @@ export function triggerEnvironmentalEvent(host: NpcHost, state: GameState): void
 
   if (event === 'phone' && workingPhones(state).length) {
     const callers = npcs(state).filter((person) =>
-      person.hp > 0 && !person.hidden && person.archetype === 'alert' && person.goal !== 'phone',
+      person.hp > 0 && !person.hidden && !/电话|无线电/.test(person.activity),
     );
     if (callers.length) {
       const person = randomOf(callers);
-      person.goal = 'phone';
       person.alert = clamp(Math.max(45, person.alert + 18), 0, 100);
       person.activity = '被突然响起的电话吸引，正赶去求救';
       host.log(state, `【环境事件】电话突然响起。${person.name}听见铃声，正朝电话赶去——再不阻止，他可能会报警。`);

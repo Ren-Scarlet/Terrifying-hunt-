@@ -132,7 +132,6 @@ export function damagePerson(host: NpcHost, state: GameState, person: Person, am
   // 受到伤害后会惊慌逃跑；累计达到 2 点时，状态才正式变为受伤。
   person.alert = 100;
   person.activity = person.hp <= SURVIVOR_INJURED_HP ? '捂着伤口逃窜' : '受到攻击，惊慌逃窜';
-  person.goal = 'exit';
   if (before > SURVIVOR_INJURED_HP && person.hp <= SURVIVOR_INJURED_HP) host.log(state, `${person.name} 受伤了（${person.hp}/${SURVIVOR_MAX_HP}），丢下手里的东西就跑。`);
   else host.log(state, `${person.name} 受到 ${dmg} 点伤害（剩余 ${person.hp}/${SURVIVOR_MAX_HP}）。`);
   // 同屋目击者必须形成真实行为反应；邻近房间只通过喊声获得转述信息。
