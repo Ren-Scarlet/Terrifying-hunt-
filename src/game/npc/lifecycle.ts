@@ -117,7 +117,7 @@ export function damagePerson(host: NpcHost, state: GameState, person: Person, am
     person.hp = 0;
     person.downedTurns = 0;
     person.activity = '受到攻击，危险状态触发并立即倒地';
-    person.alert = 100;
+    applyAlertEvent(person, 'attacked');
     host.log(state, `${person.name} 处于危险状态，受到攻击后立即倒地！`);
     host.addAlarm(state, 4);
     host.npcWitnessEvent(state, person.room, 'attack', person.id);
@@ -128,8 +128,9 @@ export function damagePerson(host: NpcHost, state: GameState, person: Person, am
 
   const before = person.hp;
   if (affectFear) {
-    // 配件「命中恐惧」在这里统一加；基础值仍然只有一套。
-    person.fear = clamp(person.fear + Math.max(28, dmg * 24) + modifierValue(state, 'fearOnHit'), 0, 100);
+    // 配件「命中恐惧」在这里统一加；基础值走恐惧事件表。
+    const fearGain = Math.max(28, dmg * 24) + modifierValue(state, 'fearOnHit');
+    applyFearEvent(person, 'attacked', Math.max(1, Math.round(fearGain / 30)));
     if (person.fear >= 100) dmg = Math.max(dmg, before);
   }
   person.hidden = false;
@@ -148,7 +149,7 @@ export function damagePerson(host: NpcHost, state: GameState, person: Person, am
     person.hp = 0;
     person.downedTurns = 0;
     person.activity = '倒在地上，动不了';
-    person.alert = 100;
+    applyAlertEvent(person, 'attacked');
     host.log(state, `${person.name} 被打倒在地上。现在可以直接处决；如果暂时放过，同伴仍可能赶来救援。`);
     host.addAlarm(state, 4);
     host.npcWitnessEvent(state, person.room, 'attack', person.id);
@@ -156,7 +157,7 @@ export function damagePerson(host: NpcHost, state: GameState, person: Person, am
   }
 
   // 受到伤害后会惊慌逃跑；累计达到 2 点时，状态才正式变为受伤。
-  person.alert = 100;
+  applyAlertEvent(person, 'attacked');
   person.activity = person.hp <= SURVIVOR_INJURED_HP ? '捂着伤口逃窜' : '受到攻击，惊慌逃窜';
   if (before > SURVIVOR_INJURED_HP && person.hp <= SURVIVOR_INJURED_HP) host.log(state, `${person.name} 受伤了（${person.hp}/${SURVIVOR_MAX_HP}），丢下手里的东西就跑。`);
   else host.log(state, `${person.name} 受到 ${dmg} 点伤害（剩余 ${person.hp}/${SURVIVOR_MAX_HP}）。`);

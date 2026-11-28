@@ -177,8 +177,8 @@ function roomFeatures(state: GameState, roomId: RoomId): string {
     // 相邻可以砸；如果人就在这间屋里（比如被堵在里面），也允许砸开。
     const canBreak = ROOM_MAP[state.playerRoom].neighbors.includes(roomId) || state.playerRoom === roomId;
     const fixed = !state.barricades.includes(roomId);
-    const label = fixed ? '可破坏的墙壁' : '幸存者木板封门';
-    const inner = `<span class="room-feature pallet" title="${fixed ? '可被破坏的墙壁：靠近后可花费 1 AP 砸开' : '木板封门：靠近后可花费 1 AP 破坏'}">${icon(fixed ? 'wall' : 'obstacle', 'ui-icon tiny')}<b>${label}</b></span>`;
+    const label = fixed ? '木门 · 可破坏' : '木板封门';
+    const inner = `<span class="room-feature pallet" title="${fixed ? '木门：靠近后可花费 1 AP 砸开' : '木板封门：靠近后可花费 1 AP 破坏'}">${icon(fixed ? 'wall' : 'obstacle', 'ui-icon tiny')}<b>${label}</b></span>`;
     parts.push(canBreak
       ? `<span class="feature-anchor">${inner}<button type="button" class="feature-action" data-action="break-barricade" data-room="${roomId}" ${state.energy < 1 ? 'disabled' : ''} title="砸碎这扇门上的木板：1 AP">破坏木板 · 1 AP</button></span>`
       : inner);
@@ -488,8 +488,11 @@ function roomActionsHtml(state: GameState, roomId: RoomId): string {
 
   const dynamicBoard = state.barricades.includes(roomId);
   const fixedBoard = OBSTACLE_ROOMS.includes(roomId) && !state.clearedObstacles.includes(roomId) && !state.possessed;
-  if (adjacent && (dynamicBoard || fixedBoard)) {
+  if (adjacent && dynamicBoard) {
     actions.push(`<button class="btn" data-action="break-barricade" data-room="${roomId}" ${state.energy < 1 ? 'disabled' : ''} title="砸碎这扇门上的木板：1 AP">破坏木板 · 1 AP</button>`);
+  }
+  if (adjacent && fixedBoard) {
+    actions.push(`<button class="btn" data-action="break-barricade" data-room="${roomId}" ${state.energy < 1 ? 'disabled' : ''} title="砸开这扇木门：1 AP">破坏木门 · 1 AP</button>`);
   }
 
   if (adjacent && isLocked(state, roomId)) {
