@@ -1,0 +1,50 @@
+name: Build Windows desktop game
+
+on:
+  push:
+    branches: [main, feature/desktop-single-player]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install game dependencies
+        run: npm ci
+
+      - name: Run project checks
+        run: npm run check
+
+      - name: Build game assets
+        run: npm run build
+
+      - name: Prepare desktop app
+        run: node scripts/prepare-desktop.mjs
+
+      - name: Install desktop packaging tools
+        run: npm install --prefix desktop --no-audit --no-fund
+
+      - name: Package Windows installer and portable build
+        run: npm run dist:win --prefix desktop
+
+      - name: Upload Windows builds
+        uses: actions/upload-artifact@v4
+        with:
+          name: Nightfall-Windows
+          path: release/*.exe
+          if-no-files-found: error
+          retention-days: 30
