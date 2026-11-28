@@ -5,6 +5,7 @@
  * 对白仍然走原来的底层，所以切换风险最小。
  */
 import { roomDistance } from '../../navigation';
+import { roomName } from '../../missions';
 import { random, randomOf } from '../../random';
 import { ROOM_MAP } from '../../rooms';
 import type { GameState, Person } from '../../types';
@@ -51,6 +52,7 @@ function buildContext(state: GameState, person: Person): DecisionContext {
     atExit: state.escapeRooms.includes(person.room),
     canHideHere: cabinetRoomsFor(state).includes(person.room),
     canBarricadeHere: canPlaceBarricade(state, person),
+    canLockHere: !isRoomLit(state, person.room) ? false : (state.roomLocks[person.room] ?? 0) <= 0,
     chase,
   };
 }
@@ -109,6 +111,12 @@ function perform(host: NpcHost, state: GameState, person: Person, kind: ActionKi
     }
     case 'barricade':
       return host.barricadeRoom(state, person);
+    case 'lock':
+      if ((state.roomLocks[person.room] ?? 0) > 0) return false;
+      state.roomLocks[person.room] = 2;
+      person.activity = '反锁了房门';
+      host.log(state, `${person.name} 反锁了${roomName(person.room)}的房门，门锁会在两回合后失效。`);
+      return true;
     case 'hide':
       if (!cabinetRoomsFor(state).includes(person.room)) return false;
       person.hidden = true;

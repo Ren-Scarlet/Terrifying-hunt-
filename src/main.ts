@@ -40,6 +40,8 @@ import {
   bloodPointTotal,
   playCard,
   searchRoom,
+  sabotageSiteItem,
+  destroyItemBox,
   breakPhone,
   breakDoor,
   togglePowerCircuit,
@@ -590,10 +592,20 @@ function syncHuntAlerts(): void {
   if (top !== lastLogTop && /已抵达逃生点/.test(top)) {
     pushHuntAlert('有人已经跑到逃生点，下回合就会逃走！', 'warn');
   }
+  if (top !== lastLogTop && /攻击被躲开了/.test(top)) {
+    pushHuntAlert('攻击被躲开了', 'warn');
+  }
   lastLogTop = top;
   const turnsLeft = Math.max(0, game.mission.turns - game.turn + 1);
   if (turnsLeft <= 3 && turnsLeft < lastTurnsLeft) {
-    pushHuntAlert(turnsLeft <= 0 ? '契约回合已经耗尽！' : `只剩 ${turnsLeft} 个回合，主目标还没完成！`, turnsLeft <= 1 ? 'danger' : 'warn');
+    pushHuntAlert(
+      turnsLeft <= 0
+        ? '契约回合已经耗尽！'
+        : game.missionPrimaryCompleted
+          ? `还剩 ${turnsLeft} 个回合；主目标已完成，可以继续狩猎或直接结算。`
+          : `只剩 ${turnsLeft} 个回合，主目标还没完成！`,
+      turnsLeft <= 1 ? 'danger' : 'warn',
+    );
   }
   lastTurnsLeft = turnsLeft;
 }
@@ -1069,6 +1081,8 @@ function leaveToMenu(): void {
 function blockedByGameMode(action: string): boolean {
   if (!game) return true;
   if (isQteActive()) return true;
+  // 被警察枪击压制：只能结束回合，不能做其他动作。
+  if (game.playerSkipTurn) return action !== 'end-turn';
   // 超过手牌上限时，必须先逐张选择弃牌；禁止用结束回合或其他动作绕过。
   if (game.hand.length > 6) return action !== 'discard';
   if (game.nurseBlinkTargeting) return !['blink-select', 'power'].includes(action);
@@ -1269,6 +1283,16 @@ function createGameActions(): ActionTable {
 
     'break-phone': () => {
       if (breakPhone(currentGame())) playSfx('smash');
+      afterAction();
+    },
+
+    sabotage: () => {
+      if (sabotageSiteItem(currentGame())) playSfx('sabotage');
+      afterAction();
+    },
+
+    'destroy-item-box': ({ target }) => {
+      if (destroyItemBox(currentGame(), target.dataset.boxId)) playSfx('smash');
       afterAction();
     },
 

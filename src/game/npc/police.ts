@@ -19,6 +19,10 @@ import type { NpcHost } from './ai/host';
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
+
+function policeShootLog(host: NpcHost, state: GameState, officer: Person): void {
+  host.log(state, `${officer.name} 举枪射击！子弹擦着墙皮飞过（枪击 ${state.policeShots}/3）。`);
+}
 export function policeNextStep(host: NpcHost, state: GameState, police: Person): RoomId {
   const freshCrime = state.heatTurn >= state.turn - 1 || state.policeAssaulted;
   const caller = state.people.find((person) =>
@@ -60,6 +64,18 @@ export function policePhase(host: NpcHost, state: GameState): void {
   if (!officers.length) return;
 
   for (const police of officers) {
+    // 警察只在健康、未恐慌时主动追捕；受伤或恐慌会先退开。
+    if (police.hp <= 2 || police.fear >= 60) {
+      const retreat = ROOM_MAP[police.room].neighbors
+        .filter((room) => !isLocked(state, room) && room !== state.playerRoom)
+        .sort((a, b) => roomDistance(b, state.playerRoom) - roomDistance(a, state.playerRoom))[0];
+      if (retreat) {
+        police.room = retreat;
+        police.activity = '负伤后退，等待增援';
+        host.log(state, `${police.name} 负伤后退到${roomName(retreat)}。`);
+      }
+      continue;
+    }
     const next = policeNextStep(host, state, police);
     if (state.wiretap) host.log(state, `窃听：警察正在前往${roomName(next)}。`);
     if (state.policeBlocked) {
@@ -91,6 +107,19 @@ export function policePhase(host: NpcHost, state: GameState): void {
     host.addAlarm(state, 4);
     host.log(state, `${officerNearby.name}正在相邻区域搜查，警笛声惊动了附近的幸存者（警报 +4）。`);
     state.policeLock = 0;
+    return;
+  }
+
+  // 被袭击 / 警戒拉满 / 最终危机：警察开枪。累计 3 次，玩家下一回合无法行动。
+  if (state.policeAssaulted || officerInRoom.alert >= 100 || state.emergencyActive) {
+    state.policeShots += 1;
+    host.addAlarm(state, 8);
+    policeShootLog(host, state, officerInRoom);
+    if (state.policeShots >= 3) {
+      state.policeShots = 0;
+      state.playerSkipTurn = true;
+      host.log(state, '你被连续三次枪击压得抬不起头——下一回合无法行动，但幸存者仍会行动。');
+    }
     return;
   }
 

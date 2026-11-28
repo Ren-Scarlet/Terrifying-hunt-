@@ -10,6 +10,7 @@ import { roomDistance } from '../../navigation';
 import { ROOM_MAP } from '../../rooms';
 import type { GameState, Person } from '../../types';
 import { isLocked, isRoomLit, npcPeople as npcs, peopleInRoom } from '../../world/roomState';
+import { applyAlertEvent, applyFearEvent } from './model';
 import type { NpcHost } from './host';
 
 function clamp(value: number, min: number, max: number): number {
@@ -28,6 +29,14 @@ export function npcTurn(host: NpcHost, state: GameState): void {
       state.totems.splice(totemIndex, 1);
       host.log(state, `${person.name} 在${roomName(person.room)}发现并破坏了图腾。`);
       host.log(state, `【图腾被拆】${roomName(person.room)}的图腾已被幸存者拆毁，地图上不再显示。剩余 ${state.totems.length} 座。`);
+    }
+
+    // 看见尸体：一次性受惊，之后不再重复触发。
+    if (person.hp > 0 && state.corpseRooms.includes(person.room) && !(person.seenCorpseRooms ?? []).includes(person.room)) {
+      person.seenCorpseRooms = [...(person.seenCorpseRooms ?? []), person.room];
+      applyAlertEvent(person, 'see_corpse');
+      applyFearEvent(person, 'corpse_in_room');
+      host.log(state, `${person.name} 在${roomName(person.room)}看见了尸体，呼吸一下子乱了。`);
     }
 
     // 已被发现的捕兽夹可以被幸存者拆除，避免陷阱成为永久封路工具。
@@ -144,9 +153,12 @@ export function npcTurn(host: NpcHost, state: GameState): void {
       person.alert = Math.max(person.alert, 45);
     }
 
-    // 保命优先：救援、赶去救倒地的人，先于一切日常决策。
+    // 保命优先：救援、手里的道具、赶去救倒地的人，先于一切日常决策。
     if (host.tryRescue(state, person)) continue;
+    if (host.useSurvivorItem(state, person)) continue;
     if (person.alert < 75 && !/电话|无线电/.test(person.activity) && host.tryAidRun(state, person)) continue;
+    // 低警戒、没被追时才会顺手翻道具箱；追着人的时候没空。
+    if (person.alert < 40 && !state.chaseTargetId && host.tryTakeSupply(state, person)) continue;
 
     // 房门被封锁时，NPC 不能离开当前房间。
     if (isLocked(state, person.room)) {

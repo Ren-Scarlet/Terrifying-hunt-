@@ -10,10 +10,21 @@ import { roomName } from '../../game/missions';
 import { getPersonProfile, type PersonProfile } from '../../game/people';
 import { SURVIVOR_MAP } from '../../game/survivors';
 import { ALERT_LABEL, FEAR_LABEL, alertBand, fearBand } from '../../game/npc/ai/model';
-import type { AccessoryDef, GameState, Person, SaveData } from '../../game/types';
+import { SURVIVOR_ITEM_LABEL } from '../../game/items';
+import type { AccessoryDef, GameState, Person, SaveData, SurvivorItem } from '../../game/types';
 
 export const escape = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+
+const ITEM_ICON: Record<SurvivorItem, 'toolbox' | 'medkit' | 'flashlight'> = {
+  repair: 'toolbox',
+  medkit: 'medkit',
+  flashlight: 'flashlight',
+};
+
+export function itemIconHtml(item: SurvivorItem): string {
+  return `<img class="item-icon" src="${uiIcon(ITEM_ICON[item])}" alt="" aria-hidden="true" onerror="this.style.display='none'">`;
+}
 
 /** 卡牌描述中的机制名与状态名统一使用金色强调，方便快速扫读。 */
 export function cardTextHtml(text: string): string {
@@ -148,6 +159,9 @@ export function personChip(person: Person, attackable = false, carryable = false
   const highValueMark = person.highValue
     ? '<span class="chip-high-value" title="高价值目标：击杀后额外获得大量血点">◇ 高价值</span>'
     : '';
+  const itemMark = person.item
+    ? `<span class="chip-item" title="携带${SURVIVOR_ITEM_LABEL[person.item]}，剩余 ${person.itemUses} 次">${itemIconHtml(person.item)}${SURVIVOR_ITEM_LABEL[person.item]}</span>`
+    : '';
   const avatarHtml = img
     ? `<span class="person-avatar-wrap"><img class="person-avatar" src="${img}" alt="" onerror="this.style.display='none'">${person.bloodSacrifice ? `<img class="chip-sacrifice-mark" src="${uiIcon('obsession')}" alt="血祭品" title="本局血祭品">` : ''}</span>`
     : '';
@@ -203,7 +217,7 @@ export function personChip(person: Person, attackable = false, carryable = false
   return `<button type="button" class="person-chip ${cls} ${person.bloodSacrifice ? 'blood-sacrifice' : ''} ${person.trapTriggered ? 'trap-triggered' : ''} ${health === 'downed' ? 'is-downed' : ''} ${attackable ? 'can-hit' : ''} ${targetMode ? 'targeting-' + targetMode : ''}"${slotStyleAttr} data-action="${action}" data-person-id="${person.id}"${attackable ? ' data-attack="1"' : ''}
     title="${escape(person.name)} · ${HEALTH_LABEL[health]} · ${ALERT_LABEL[band]} ${person.alert}/100 · 恐惧 ${FEAR_LABEL[fearBand(person.fear)]} · 正在${escape(label)}${note}">
     ${avatarHtml}${trapHitMark}
-    ${dialogue}<span>${escape(person.name)}</span>${contractTargetMark}${highValueMark}${stateMark}<span class="person-status-row">${statusIcons}</span>${alertMark}${watchMark}
+    ${dialogue}<span>${escape(person.name)}</span>${contractTargetMark}${highValueMark}${itemMark}${stateMark}<span class="person-status-row">${statusIcons}</span>${alertMark}${watchMark}
   </button>`;
 }
 
@@ -247,6 +261,7 @@ export function personDetailHtml(state: GameState, personId: string): string {
     );
     if (person.dialogue) paras.push(`听见他说：“${person.dialogue}”`);
     if (person.marked) paras.push('契约情报：这是本局指定目标。');
+    if (person.item) paras.push(`携带道具：${SURVIVOR_ITEM_LABEL[person.item]}（剩余 ${person.itemUses} 次）。`);
     if (person.highValue) paras.push(`高价值目标：击杀后额外获得 ${BLOOD.highValueKill} 血点。`);
     if (person.bloodSacrifice) paras.push('特殊身份：本局血祭品。');
     if (isPersonVisible(state, person)) {

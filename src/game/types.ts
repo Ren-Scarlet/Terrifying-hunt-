@@ -165,6 +165,17 @@ export interface AccessoryDef {
 
 export type PersonRole = 'target' | 'civilian' | 'police';
 
+/** 幸存者道具：修理箱 / 手电筒 / 医疗箱 */
+export type SurvivorItem = 'repair' | 'flashlight' | 'medkit';
+
+/** 房间里的道具箱；被杀手砸坏后本局失效。 */
+export interface ItemBox {
+  id: string;
+  room: RoomId;
+  broken: boolean;
+  charges: number;
+}
+
 /** 设陷者放置的捕兽夹；触发或被幸存者拆除后会变成未武装状态。 */
 export interface BearTrap {
   id: string;
@@ -218,6 +229,9 @@ export interface Person {
   startleTurns?: number;
   /** 找到武器：反抗时能让玩家掉行动点 */
   armed: boolean;
+  /** 手里的幸存者道具与剩余次数 */
+  item: SurvivorItem | null;
+  itemUses: number;
   /** 随机高价值目标：击杀后获得大量额外血点 */
   highValue?: boolean;
   /** 老练的幸存者：有时能悄无声息地移动，仍会留下脚印，但不会惊动乌鸦 */
@@ -232,6 +246,8 @@ export interface Person {
   revealedActions?: number;
   /** 最近一次亲眼目击袭击、死亡或搬运事件的玩家行动时钟，防止同一动作重复行动。 */
   lastWitnessedEventClock?: number;
+  /** 已经看见过尸体的房间，避免反复受惊 */
+  seenCorpseRooms?: RoomId[];
   /** 最近一次听到谁呼喊；用于后续区分亲眼所见与他人告知。 */
   lastHeardFrom?: string;
   lastHeardRoom?: RoomId;
@@ -598,6 +614,14 @@ export interface GameState {
   escapeRooms: RoomId[];
   /** 本局幸存者总人数（不包含警察），用于判定是否全部逃离 */
   survivorTotal: number;
+  /** 本局随机摆放的道具箱：幸存者可领取道具，杀手可以砸毁 */
+  itemBoxes: ItemBox[];
+  /** 留下尸体的房间：幸存者进入后会看见 */
+  corpseRooms: RoomId[];
+  /** 警察累计枪击次数；满 3 次跳过玩家一个回合 */
+  policeShots: number;
+  /** 下一回合被警察压制，无法行动 */
+  playerSkipTurn: boolean;
   /** 独立区域电闸及其供电范围 */
   powerCircuits: PowerCircuit[];
 }

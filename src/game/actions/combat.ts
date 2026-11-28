@@ -140,6 +140,41 @@ export function attack(host: NpcHost, state: GameState, targetId?: string, optio
     return false;
   }
   const target = host.findVictim(state, state.playerRoom, Infinity, false, targetId)!;
+  // 警觉以上的幸存者可能侧身闪开这一刀；闪避会消耗这次攻击，但目标不会掉血。
+  if (target.role !== 'police' && target.hp > 0 && target.alert >= 40 && target.blockedTurns <= 0 && !target.watched
+    && !(state.alarm >= 100 && state.totems.length > 0)) {
+    const dodgeChance = target.alert >= 75 ? 0.18 : 0.1;
+    if (random() < dodgeChance) {
+      state.energy -= attackCost;
+      state.attackReady = false;
+      state.lastAttackedId = target.id;
+      host.log(state, `攻击被躲开了——${target.name} 侧身闪进门框的阴影里。`);
+      host.afterPlayerAction(state);
+      host.checkImmediateWin(state);
+      return false;
+    }
+  }
+  // 带手电筒的幸存者会冲过来照眼：这一刀落空，目标趁机逃走。
+  const flasher = npcs(state).find((person) =>
+    person.item === 'flashlight' &&
+    person.itemUses > 0 &&
+    person.hp > 0 &&
+    person.alert >= 40 &&
+    (person.room === state.playerRoom || ROOM_MAP[state.playerRoom].neighbors.includes(person.room)),
+  );
+  if (flasher && random() < 0.82) {
+    host.consumeItem(state, flasher);
+    if (flasher.room !== state.playerRoom) flasher.room = state.playerRoom;
+    host.interruptPlayer(state, `${flasher.name} 从旁边冲进来，手电筒正照着你的眼睛——这一刀落空了。`, flasher.id);
+    if (target.hp > 0 && state.people.some((person) => person.id === target.id)) {
+      host.fleeAway(state, target);
+      target.alert = 100;
+      host.log(state, `${target.name} 毫发无伤地跟着跑出了屋子。`);
+    }
+    host.afterPlayerAction(state);
+    host.checkImmediateWin(state);
+    return false;
+  }
   const heavy = state.possessed;
   const alone = npcs(state).every((person) =>
     person.id === target.id || person.room !== state.playerRoom || person.hp <= 0,
@@ -158,6 +193,8 @@ export function attack(host: NpcHost, state: GameState, targetId?: string, optio
     state.policeAssaulted = true;
     state.heatTurn = state.turn;
     state.policeLock = 1;
+    target.alert = 100;
+    target.fear = Math.max(target.fear, 40);
     host.addWanted(state, 6);
     host.addAlarm(state, 12);
     host.log(state, '你居然对警员动了刀——暴露度暴涨 +72，警察会立刻咬住你。');

@@ -36,6 +36,7 @@ import {
   markBloodEvent,
   missionTaskProgress,
 } from './bloodpoints';
+import { applyAlertEvent, applyFearEvent } from './npc/ai/model';
 export {
   BLOOD,
   BLOOD_CATEGORY_LABEL,
@@ -103,6 +104,7 @@ import {
 } from './npc/ai/predicates';
 export { canCoordinateRescue, canPlaceBarricade, fearBand, type FearBand } from './npc/ai/predicates';
 import { fleeAway as aiFleeAway, shout as aiShout } from './npc/ai/actions';
+import { consumeItem as aiConsumeItem, tryTakeSupply as aiTryTakeSupply, useSurvivorItem as aiUseSurvivorItem } from './npc/ai/items';
 import {
   barricadeRoom as aiBarricadeRoom,
   counterAttack as aiCounterAttack,
@@ -193,6 +195,9 @@ const aiHost: NpcHost = {
   barricadeRoom,
   tryCall,
   tryRescue,
+  consumeItem,
+  useSurvivorItem,
+  tryTakeSupply,
   addWanted,
   rescuePerson,
   healPerson,
@@ -390,7 +395,7 @@ function addWanted(state: GameState, amount: number): void {
   addAlarm(state, amount * WANTED_TO_ALARM);
 }
 
-/** 警报：正向变化会刷新本回合活动标记；60 开放逃生点，100 触发最终危机。 */
+/** 警报：正向变化会刷新本回合活动标记；100 触发最终危机并开放逃生点。 */
 function activateEmergency(state: GameState): void {
   if (state.emergencyActive || state.result) return;
   state.emergencyActive = true;
@@ -432,10 +437,6 @@ export function addAlarm(state: GameState, amount: number): void {
   const before = state.alarm;
   state.alarm = clamp(state.alarm + amount, 0, ALARM_MAX);
   syncWanted(state);
-  if (before < 60 && state.alarm >= 60 && state.escapeRooms.length === 0) {
-    state.escapeRooms = farthestRoomPair();
-    log(state, `警报升高！猎场出现逃生点：${state.escapeRooms.map(roomName).join('、')}。高度警戒的人开始寻找出口。`);
-  }
   if (state.alarm >= ALARM_MAX && !state.emergencyActive) activateEmergency(state);
 }
 
@@ -878,6 +879,9 @@ function shout(state: GameState, person: Person, base = 18): void {
 
 /** 支援类行动已搬到 npc/ai/support.ts；这里保留引擎侧入口（签名不变）。 */
 function counterAttack(state: GameState, person: Person): void { aiCounterAttack(aiHost, state, person); }
+function consumeItem(state: GameState, person: Person): void { aiConsumeItem(aiHost, state, person); }
+function useSurvivorItem(state: GameState, person: Person): boolean { return aiUseSurvivorItem(aiHost, state, person); }
+function tryTakeSupply(state: GameState, person: Person): boolean { return aiTryTakeSupply(aiHost, state, person); }
 function barricadeRoom(state: GameState, person: Person): boolean { return aiBarricadeRoom(aiHost, state, person); }
 function tryRescue(state: GameState, person: Person): boolean { return aiTryRescue(aiHost, state, person); }
 function tryAidRun(state: GameState, person: Person): boolean { return aiTryAidRun(aiHost, state, person); }
@@ -1236,11 +1240,44 @@ export function togglePowerCircuit(state: GameState, circuitId?: string): boolea
   if (!circuit) return false;
   state.energy -= BREAKER_SWITCH_COST;
   circuit.enabled = circuit.enabled === false;
+  if (!circuit.enabled) {
+    state.people
+      .filter((person) => person.role !== 'police' && person.hp > 0 && circuit.affectedRooms.includes(person.room))
+      .forEach((person) => {
+        applyAlertEvent(person, 'power_off_self');
+        applyFearEvent(person, 'darkness');
+      });
+  }
   awardBlood(state, 'control', `操作电闸 · ${circuit.name}`, BLOOD.breaker, { key: `breaker:${circuit.id}`, limit: 1 });
   addAlarm(state, 1);
   log(state, circuit.enabled
     ? `你合上了${circuit.name}电闸，供电恢复。`
     : `你拉下了${circuit.name}电闸，${circuit.affectedRooms.map(roomName).join('、')}陷入黑暗，受影响房间的电子门锁失效。`);
+  state.attackReady = true;
+  afterPlayerAction(state);
+  checkImmediateWin(state);
+  return true;
+}
+
+/** 砸毁当前房间的道具箱：本局这箱道具再也拿不到。 */
+export function destroyItemBox(state: GameState, boxId?: string): boolean {
+  if (state.phase !== 'playing') return false;
+  const box = state.itemBoxes.find((candidate) =>
+    !candidate.broken && candidate.room === state.playerRoom && (!boxId || candidate.id === boxId),
+  );
+  if (!box) {
+    log(state, '这间屋子没有还能砸的道具箱。');
+    return false;
+  }
+  if (state.energy < SABOTAGE_COST) {
+    log(state, `行动点不足：砸道具箱需要 ${SABOTAGE_COST} 点。`);
+    return false;
+  }
+  state.energy -= SABOTAGE_COST;
+  box.broken = true;
+  box.charges = 0;
+  log(state, `你砸烂了${roomName(box.room)}的道具箱——本局没人能再从这里翻到道具。`);
+  addAlarm(state, 3);
   state.attackReady = true;
   afterPlayerAction(state);
   checkImmediateWin(state);

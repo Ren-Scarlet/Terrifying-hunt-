@@ -41,6 +41,8 @@ function makePerson(
     callTurns: 0,
     hidden: false,
     armed: false,
+    item: null,
+    itemUses: 0,
     // 有名有姓、带威胁设定的角色更老练；再随机挑一些普通人，避免人人都好抓
     sneaky: SURVIVOR_MAP[s.id]?.threat ? true : random() < 0.28,
     trackedTurns: 0,
@@ -96,13 +98,13 @@ export function createPeople(mission: Mission): Person[] {
   const highValueTarget = people.length ? randomOf(people) : null;
   if (highValueTarget) highValueTarget.highValue = true;
 
-  // 柜子/床底机制对任何人都可能发生，不再指定固定的躲藏型。
-  people.push({
+  // 每张地图 1～2 名警察：基础 6 点生命，不参与幸存者人数统计。
+  const police: Person = {
     id: 'police-0',
     name: '巡逻警员',
     role: 'police',
     room: POLICE_START,
-    hp: 4,
+    hp: 6,
     marked: false,
     bloodSacrifice: false,
     alert: 0,
@@ -116,6 +118,8 @@ export function createPeople(mission: Mission): Person[] {
     callTurns: 0,
     hidden: false,
     armed: false,
+    item: null,
+    itemUses: 0,
     sneaky: false,
     trackedTurns: 0,
     lastSeenRoom: POLICE_START,
@@ -123,7 +127,11 @@ export function createPeople(mission: Mission): Person[] {
     watchValue: 0,
     watched: false,
     movesThisTurn: 0,
-  });
+  };
+  people.push(police);
+  if (random() < 0.5) {
+    people.push({ ...police, id: 'police-1', name: '增援警员' });
+  }
 
   return people;
 }

@@ -11,7 +11,7 @@ import type { Cond, Op, Who } from '../../effect';
 export interface NpcHost {
   /** 往对局日志写一行 */
   log(state: GameState, text: string): void;
-  /** 全局警报值变化（会自动处理 60/100 的阈值） */
+  /** 全局警报值变化（会自动处理 100 的最终危机阈值） */
   addAlarm(state: GameState, amount: number): void;
   /** 在地板上留一段脚印 */
   pushTrail(state: GameState, from: RoomId, to: RoomId, blood: boolean): void;
@@ -29,6 +29,12 @@ export interface NpcHost {
   tryCall(state: GameState, person: Person): boolean;
   /** 拉起同屋倒地的同伴 */
   tryRescue(state: GameState, person: Person): boolean;
+  /** 用掉一次手里道具 */
+  consumeItem(state: GameState, person: Person): void;
+  /** 用一件幸存者道具，返回是否真的用了 */
+  useSurvivorItem(state: GameState, person: Person): boolean;
+  /** 在道具箱翻一件道具 */
+  tryTakeSupply(state: GameState, person: Person): boolean;
   /** 全局报警进度（会折算成暴露度） */
   addWanted(state: GameState, amount: number): void;
   /** 拉起倒地的同伴 */

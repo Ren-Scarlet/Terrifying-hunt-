@@ -14,6 +14,11 @@ import { npcPeople as npcs } from '../world/roomState';
 import type { NpcHost } from '../npc/ai/host';
 export function endTurn(host: NpcHost, state: GameState): void {
   if (state.phase !== 'playing') return;
+  // 上一回合被警察枪击压制：这一回合玩家只能结束回合，NPC 仍正常行动。
+  if (state.playerSkipTurn) {
+    state.playerSkipTurn = false;
+    host.log(state, '你仍被枪声压得不敢抬头，这一回合只能看着他们行动。');
+  }
 
   const m = state.mission;
   if (state.nurseFatiguePending) {
@@ -139,6 +144,7 @@ export function endTurn(host: NpcHost, state: GameState): void {
     1,
     state.maxEnergy + state.bonusEnergyNextTurn + frenzyBonus - state.stunTurns,
   );
+  if (state.playerSkipTurn) state.energy = 0;
   state.bonusEnergyNextTurn = 0;
   state.stunTurns = 0;
   state.blindTurns = 0;

@@ -102,6 +102,13 @@ function roomFeatures(state: GameState, roomId: RoomId): string {
       ? `<button type="button" class="room-feature breaker ${circuitAt.broken || circuitAt.enabled === false ? 'broken' : ''}" data-action="toggle-breaker" data-circuit-id="${circuitAt.id}" ${breakerBlocked} title="${breakerTitle}。点击切换电闸（${BREAKER_SWITCH_COST} AP）">${icon('generator', 'ui-icon tiny')}<b>切换电闸</b></button>`
       : `<span class="room-feature breaker ${circuitAt.broken || circuitAt.enabled === false ? 'broken' : ''}" title="${breakerTitle}">${icon('generator', 'ui-icon tiny')}<b>电闸</b></span>`);
   }
+  state.itemBoxes.filter((box) => box.room === roomId).forEach((box) => {
+    const status = box.broken ? '已被砸烂' : box.charges > 0 ? `还能翻 ${box.charges} 件` : '已被翻空';
+    parts.push(`<span class="room-feature item-box ${box.broken ? 'broken' : ''}" title="道具箱：${status}。幸存者可以翻出修理箱、手电筒或医疗箱；杀手可以砸毁它。">${icon('itemBox', 'ui-icon tiny')}<b>道具箱</b></span>`);
+  });
+  if (state.corpseRooms.includes(roomId)) {
+    parts.push(`<span class="room-feature corpse" title="这里留下了尸体：幸存者进入后会看见，并增加警戒与恐惧。">${icon('statusKill', 'ui-icon tiny')}<b>尸体</b></span>`);
+  }
   const placedTraps = state.bearTraps.filter((trap) => trap.room === roomId);
   if (placedTraps.length) {
     const armedCount = placedTraps.filter((trap) => trap.armed).length;
@@ -271,6 +278,7 @@ function huntOpportunityHtml(state: GameState): string {
 
 function facilityOverviewHtml(state: GameState): string {
   const darkCircuits = state.powerCircuits.filter((circuit) => circuit.broken || circuit.enabled === false).length;
+  const itemBoxes = state.itemBoxes.filter((box) => !box.broken && box.charges > 0).length;
   const radioBroken = state.sabotage.includes('radio');
   const killerSupplies = state.killer === '设陷者'
     ? `<span class="facility-pill"><i>⚒</i><b>捕兽夹</b><strong>${state.trapInventory}/4 携带 · ${state.bearTraps.filter((trap) => trap.armed).length} 已布设 · ${state.trapCaches.length} 补给点</strong></span>`
@@ -280,6 +288,7 @@ function facilityOverviewHtml(state: GameState): string {
   return `<section class="facility-overview" aria-label="现场设施状态">
     <div class="facility-overview-heading"><b>现场设施</b><small>地图标记与当前状态</small></div>
     <div class="facility-overview-items">
+      <span class="facility-pill">${icon('itemBox', 'ui-icon tiny')}<b>道具箱</b><strong>${itemBoxes}/${state.itemBoxes.length}</strong></span>
       <span class="facility-pill">${icon('generator', 'ui-icon tiny')}<b>电闸</b><strong>${darkCircuits} 组断电</strong></span>
       
       <span class="facility-pill ${state.phoneCut || (state.brokenPhones ?? []).length >= (state.phones ?? []).length ? 'offline' : ''}"><b>电话线</b><strong>${state.phoneCut ? '中断' : '正常'}</strong></span>
@@ -372,7 +381,7 @@ function trailOverlay(state: GameState): string {
 
 /** 行动点下方的 buff / debuff 提示行：状态全部读自 GameState，后续卡牌加一条即可。 */
 function killerBuffsHtml(state: GameState): string {
-  const chips: Array<{ label: string; hint: string; tone: 'buff' | 'debuff' | 'neutral' }> = [];
+  const chips: Array<{ label: string; hint: string; tone: 'buff' | 'debuff' | 'neutral' | 'danger' }> = [];
   if (state.hexNoedActive && state.alarm >= ALARM_MAX && state.totems.length > 0) {
     chips.push({ label: '厄咒 · 难逃一死', hint: '警报已拉满，厄咒图腾仍在：攻击命中直接把幸存者击倒。', tone: 'buff' });
   }
@@ -405,6 +414,11 @@ function killerBuffsHtml(state: GameState): string {
   }
   if (state.blindTurns > 0) {
     chips.push({ label: `致盲 · ${state.blindTurns} 回合`, hint: '被手电筒致盲：视野与判断受影响。', tone: 'debuff' });
+  }
+  if (state.playerSkipTurn) {
+    chips.push({ label: '警察火力压制 · 本回合无法行动', hint: '被警察累计枪击三次：这一回合只能结束回合，幸存者仍会行动。', tone: 'danger' });
+  } else if (state.policeShots > 0) {
+    chips.push({ label: `警察枪击 · ${state.policeShots}/3`, hint: '再中一枪就会被压制一整回合。', tone: 'debuff' });
   }
   if (!chips.length) return '';
   return `<div class="killer-buffs" aria-label="当前增益与减益">${chips
@@ -454,7 +468,9 @@ export function renderGame(state: GameState, killer: KillerProfile): string {
     const done = value >= task.target;
     const targetNames = task.kind === 'marked_kill'
       ? `<small class="mission-target-names">${markedTargetNames.length ? `指定目标：${markedTargetNames.map(escape).join('、')}` : `已击杀指定目标 ${state.markedKilled} 人`}</small>`
-      : '';
+      : task.kind === 'break_circuit'
+        ? `<small class="mission-target-names">未破坏电闸：${state.powerCircuits.filter((circuit) => !circuit.broken).map((circuit) => roomName(circuit.breakerRoom)).join('、') || '全部已破坏'}</small>`
+        : '';
     const progressText = task.kind === 'alarm_below' ? `警报 ${state.alarm} / ≤${task.limit ?? 50}` : `${Math.min(value, task.target)}/${task.target}`;
     const rewardText = task.optional ? '<small class="mission-task-reward">+300 血点</small>' : '';
     return `<span class="mission-task ${done ? 'done' : ''} ${task.optional ? 'optional' : 'required'}"><b>${done ? '✓' : '○'}</b> ${escape(task.label)} <em>${progressText}</em>${rewardText}${targetNames}</span>`;
@@ -482,6 +498,16 @@ function roomActionsHtml(state: GameState, roomId: RoomId): string {
 
   if (here && phoneWorks(state, roomId)) {
     actions.push(`<button class="btn" data-action="break-phone" ${state.energy < 1 ? 'disabled' : ''} title="砸坏这间屋子的电话：1 AP">砸坏电话 · 1 AP</button>`);
+  }
+
+  const breakerHere = state.powerCircuits.find((circuit) => circuit.breakerRoom === roomId && !circuit.broken);
+  if (here && breakerHere) {
+    actions.push(`<button class="btn" data-action="sabotage" ${state.energy < SABOTAGE_COST ? 'disabled' : ''} title="砸毁${escape(breakerHere.name)}控制箱，使 ${breakerHere.affectedRooms.map(roomName).join('、')} 永久断电：${SABOTAGE_COST} AP">破坏电闸 · ${SABOTAGE_COST} AP</button>`);
+  }
+
+  const itemBox = state.itemBoxes.find((box) => box.room === roomId && !box.broken);
+  if (here && itemBox) {
+    actions.push(`<button class="btn" data-action="destroy-item-box" data-box-id="${itemBox.id}" ${state.energy < SABOTAGE_COST ? 'disabled' : ''} title="砸毁这间屋子的道具箱，本局无法再从这里翻到道具：${SABOTAGE_COST} AP">砸毁道具箱 · ${SABOTAGE_COST} AP</button>`);
   }
 
   return actions.length ? `<div class="room-actions">${actions.join('')}</div>` : '';
@@ -912,7 +938,7 @@ function personSlotStyle(roomId: RoomId, personId: string, index: number): strin
               ${left <= 3 ? `<div class="stat turn-warning ${left <= 1 ? 'final' : ''}" title="契约回合快用完了：回合耗尽会直接判猎场终止"><b>${left}</b><small>剩余回合</small></div>` : ''}
               <div class="stat alarm-stat ${state.alarm >= 70 ? 'hot' : state.alarm >= 40 ? 'warm' : ''}" tabindex="0" role="note" aria-label="警报值说明">
   <b>${state.alarm}<i>/${ALARM_MAX}</i></b><div class="alarm-track"><span style="width:${state.alarm}%"></span></div><small>警报 ⓘ</small>
-  <span class="alarm-tooltip-content"><strong>警报值（0–100）</strong><br>上升：被幸存者目击或发现、攻击/处决、成功报警或呼救，以及部分破坏和卡牌效果；电话或无线电求救会大幅增加。<br>降低：每回合结束通常 −6；本回合没有新的暴露度增加时额外 −4；部分卡牌和环境事件也能降低。<br>阈值：达到 60 会出现逃生点；达到 100 触发最终危机（普通杀手引来警察，灵异杀手迫使幸存者全面逃亡）。</span>
+  <span class="alarm-tooltip-content"><strong>警报值（0–100）</strong><br>上升：被幸存者目击或发现、攻击/处决、成功报警或呼救，以及部分破坏和卡牌效果；电话或无线电求救会大幅增加。<br>降低：每回合结束通常 −6；本回合没有新的暴露度增加时额外 −4；部分卡牌和环境事件也能降低。<br>阈值：达到 100 触发最终危机，并开放两个彼此最远的逃生点（普通杀手引来警察，灵异杀手迫使幸存者全面逃亡）。</span>
 </div>
               <div class="stat"><b>${state.kills}</b><small>击杀</small></div>
               <div class="stat survivor-count"><b>${state.people.filter((p) => p.role !== 'police' && p.hp > 0).length}/${state.survivorTotal}</b><small>存活</small></div>

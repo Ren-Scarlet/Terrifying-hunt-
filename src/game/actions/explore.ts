@@ -8,6 +8,7 @@ import { LOOK_COST, SEARCH_COST, SURVIVOR_INJURED_HP } from '../constants';
 import { BLOOD, awardBlood } from '../bloodpoints';
 import { drawCards } from '../deck';
 import { roomName } from '../missions';
+import { random } from '../random';
 import type { GameState, Person, RoomId } from '../types';
 import type { NpcHost } from '../npc/ai/host';
 import { ROOM_MAP } from '../rooms';
@@ -84,6 +85,30 @@ export function waitAction(host: NpcHost, state: GameState): boolean {
 }
 
 export function movePlayer(host: NpcHost, state: GameState, room: RoomId): boolean {
+  // 搬运倒地者时，附近的手电筒携带者会冲过来照眼，把猎物放回地面。
+  if (state.carryPersonId) {
+    const carrier = npcs(state).find((person) =>
+      person.item === 'flashlight' &&
+      person.itemUses > 0 &&
+      person.hp > 0 &&
+      person.alert >= 40 &&
+      (person.room === state.playerRoom || ROOM_MAP[state.playerRoom].neighbors.includes(person.room)),
+    );
+    if (carrier && random() < 0.5) {
+      const carried = state.people.find((person) => person.id === state.carryPersonId);
+      host.consumeItem(state, carrier);
+      if (carrier.room !== state.playerRoom) carrier.room = state.playerRoom;
+      state.carryPersonId = null;
+      state.carryDistance = 0;
+      if (carried) {
+        carried.room = state.playerRoom;
+        carried.activity = '被手电筒照得摔回地面';
+      }
+      host.interruptPlayer(state, `${carrier.name} 冲过来用手电筒照向你的眼睛，搬运被打断了！`, carrier.id);
+      host.afterPlayerAction(state);
+      return false;
+    }
+  }
   if (state.carryPersonId && state.carryDistance >= 3) {
     const carried = state.people.find((p) => p.id === state.carryPersonId);
     if (!host.rollD6Check(state, '远距离搬运', 4)) {

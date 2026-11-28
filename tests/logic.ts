@@ -40,6 +40,7 @@ import {
   executeDownedPerson,
   executeQtePerson,
   qteExecutionBlockReason,
+  destroyItemBox,
   executeBlockReason,
   carryPerson,
   canCoordinateRescue,
@@ -1090,9 +1091,11 @@ function caseAlarmThresholds(): void {
   s.alarm = 50;
   addAlarm(s, 10);
   check('S 正向警报增长会刷新本回合活动标记', s.heatTurn === s.turn);
-  check('S 警报值达到 60 后开放两个动态逃生点', s.escapeRooms.length === 2 && !s.emergencyActive);
-  addAlarm(s, -15);
-  check('S 警报值可以下降', s.alarm === 45 && s.escapeRooms.length === 2);
+  check('S 警报 60 不再提前开放逃生点', s.escapeRooms.length === 0 && !s.emergencyActive);
+  addAlarm(s, 40);
+  check('S 警报满 100 时开放两个最远逃生点', s.alarm === 100 && s.escapeRooms.length === 2 && s.emergencyActive);
+  addAlarm(s, -55);
+  check('S 警报值可以下降，逃生点保留', s.alarm === 45 && s.escapeRooms.length === 2);
   const solid = newGame();
   solid.alarm = 99;
   addAlarm(solid, 1);
@@ -1741,6 +1744,104 @@ function caseAchievements(): void {
 }
 
 caseAchievements();
+
+function caseSurvivorItems(): void {
+  const boxes = newGame();
+  check('道具箱：每局固定 2 个、初始 3 件', boxes.itemBoxes.length === 2 && boxes.itemBoxes.every((box) => !box.broken && box.charges === 3));
+  const box = boxes.itemBoxes[0];
+  const taker = boxes.people.find((person) => person.role !== 'police')!;
+  boxes.people.filter((person) => person.id !== taker.id).forEach((person) => { person.room = 'attic'; person.hidden = true; });
+  taker.room = box.room;
+  taker.alert = 0;
+  taker.item = null;
+  taker.itemUses = 0;
+  withRandomSource(() => 0.1, () => endTurn(boxes));
+  check('道具箱：幸存者会翻出道具并扣除箱子次数',
+    taker.item !== null && taker.itemUses > 0 && box.charges === 2,
+    `item=${taker.item} charges=${box.charges}`);
+
+  const heal = newGame();
+  heal.people.filter((person) => person.role !== 'police').slice(1).forEach((person) => { person.room = 'attic'; person.hidden = true; });
+  const medic = heal.people.find((person) => person.role !== 'police')!;
+  heal.playerRoom = 'garden';
+  medic.room = 'study';
+  medic.hp = 2;
+  medic.alert = 0;
+  medic.item = 'medkit';
+  medic.itemUses = 2;
+  withRandomSource(() => 0.99, () => endTurn(heal));
+  check('医疗箱：幸存者会给自己治疗并消耗一次', medic.hp === 4 && medic.itemUses === 1, `hp=${medic.hp} uses=${medic.itemUses}`);
+
+  const repair = newGame();
+  repair.people.filter((person) => person.role !== 'police').slice(1).forEach((person) => { person.room = 'attic'; person.hidden = true; });
+  const repairer = repair.people.find((person) => person.role !== 'police')!;
+  const circuit = repair.powerCircuits[0];
+  circuit.broken = true;
+  circuit.enabled = false;
+  repair.playerRoom = 'garden';
+  repairer.room = circuit.breakerRoom;
+  repairer.alert = 0;
+  repairer.item = 'repair';
+  repairer.itemUses = 2;
+  withRandomSource(() => 0.99, () => endTurn(repair));
+  check('修理箱：幸存者会修复被破坏的电闸', !circuit.broken && circuit.enabled === true, `broken=${circuit.broken}`);
+
+  const smash = newGame();
+  const smashBox = smash.itemBoxes[0];
+  smash.playerRoom = smashBox.room;
+  smash.energy = 4;
+  check('道具箱：杀手砸毁后本局失效', destroyItemBox(smash, smashBox.id) && smashBox.broken && smash.energy === 3);
+}
+
+caseSurvivorItems();
+
+function caseNpcChapterOne(): void {
+  const police = newGame();
+  const officers = police.people.filter((person) => person.role === 'police');
+  check('警察：每局 1～2 名、6 点生命',
+    officers.length >= 1 && officers.length <= 2 && officers.every((officer) => officer.hp === 6),
+    `count=${officers.length}`);
+
+  const dodge = newGame();
+  const target = dodge.people.find((person) => person.role !== 'police')!;
+  target.room = dodge.playerRoom;
+  target.hp = 4;
+  target.alert = 80;
+  dodge.energy = 4;
+  const beforeHp = target.hp;
+  withRandomSource(() => 0, () => attack(dodge));
+  check('闪避：高警戒目标会躲开攻击并显示提示',
+    target.hp === beforeHp && dodge.energy === 3 && dodge.log.some((line) => line.includes('攻击被躲开了')),
+    `hp=${target.hp} energy=${dodge.energy}`);
+
+  const corpse = newGame();
+  const victim = corpse.people.find((person) => person.role !== 'police')!;
+  victim.room = corpse.playerRoom;
+  victim.hp = 0;
+  corpse.energy = 4;
+  executeDownedPerson(corpse, victim.id);
+  const witness = corpse.people.find((person) => person.role !== 'police')!;
+  witness.room = victim.room;
+  witness.alert = 0;
+  check('尸体：击杀后房间留下尸体', corpse.corpseRooms.includes(victim.room));
+  withRandomSource(() => 0.99, () => endTurn(corpse));
+  check('尸体：幸存者看见尸体会提高警戒', witness.alert >= 40, `alert=${witness.alert}`);
+
+  const shots = newGame();
+  const shooter = shots.people.find((person) => person.role === 'police')!;
+  shots.policeAssaulted = true;
+  for (let i = 0; i < 3; i += 1) {
+    shooter.room = shots.playerRoom;
+    shooter.alert = 100;
+    shots.energy = 4;
+    endTurn(shots);
+  }
+  check('警察：累计三次枪击后跳过玩家一回合',
+    shots.playerSkipTurn && shots.policeShots === 0,
+    `skip=${shots.playerSkipTurn} shots=${shots.policeShots}`);
+}
+
+caseNpcChapterOne();
 
 /** AB：封锁房门必须同时阻止 NPC 进入和离开；脚印不应随机消失 */
 function caseNpcLocksAndPersistentTrails(): void {
@@ -2539,14 +2640,14 @@ function caseHexPhonesAndAlarm(): void {
     stridorPlayed && revealed.length === 1 && revealed[0] === humans[0],
     `played=${stridorPlayed} revealed=${revealed.length} fear=${humans.map((p) => p.fear).join(',')}`);
 
-  // 警报：60 开逃生点、100 触发最终危机、上限不会溢出
+  // 警报：100 才开逃生点并触发最终危机、上限不会溢出
   const alarm = createGame(STARTING_DECK, undefined, '设陷者');
   alarm.alarm = 0;
   alarm.escapeRooms = [];
   addAlarm(alarm, 60);
-  check('警报：到 60 开放两个逃生点', alarm.alarm === 60 && alarm.escapeRooms.length === 2, `alarm=${alarm.alarm}`);
+  check('警报：到 60 不开放逃生点', alarm.alarm === 60 && alarm.escapeRooms.length === 0, `alarm=${alarm.alarm}`);
   addAlarm(alarm, 999);
-  check('警报：上限 100 并进入最终危机', alarm.alarm === 100 && alarm.emergencyActive, `alarm=${alarm.alarm}`);
+  check('警报：上限 100、进入最终危机并开放两个逃生点', alarm.alarm === 100 && alarm.emergencyActive && alarm.escapeRooms.length === 2, `alarm=${alarm.alarm}`);
   addAlarm(alarm, -999);
   check('警报：不会降到 0 以下', alarm.alarm === 0, `alarm=${alarm.alarm}`);
 

@@ -46,6 +46,7 @@ export interface DecisionContext {
   atExit: boolean;
   canHideHere: boolean;
   canBarricadeHere: boolean;
+  canLockHere: boolean;
   chase: ChaseState;
 }
 
@@ -136,6 +137,7 @@ export function decide(ctx: DecisionContext, roll: () => number = () => 0.5): De
   // 被追：先放板/锁门/躲，再考虑硬跑
   if (ctx.chased) {
     if (ctx.canBarricadeHere && canDo('barricade')) return { kind: 'barricade', reason: 'chased' };
+    if (ctx.canLockHere && canDo('lock')) return { kind: 'lock', reason: 'chased' };
     if (ctx.canHideHere && canDo('hide')) return { kind: 'hide', reason: 'chased' };
     if (canDo('flee') && canFlee(ctx.chase)) return { kind: 'flee', reason: 'chased' };
     return { kind: 'idle', reason: 'chased_no_escape' };

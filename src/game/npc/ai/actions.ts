@@ -7,7 +7,7 @@
 import { SURVIVOR_INJURED_HP } from '../../constants';
 import { roomName } from '../../missions';
 import { roomDistance } from '../../navigation';
-import { randomOf } from '../../random';
+import { random, randomOf } from '../../random';
 import { ROOM_MAP } from '../../rooms';
 import type { GameState, Person } from '../../types';
 import { canStand, isLocked, peopleInRoom } from '../../world/roomState';
@@ -60,8 +60,9 @@ export function fleeAway(
   person.room = randomOf(best.filter((b) => b.d >= top - 1).map((b) => b.r));
   person.alert = Math.max(0, person.alert - 12);
   person.activity = '夺路而逃';
-  // 逃跑路线始终留下脚印；潜行者只是不制造额外声响。
-  host.pushTrail(state, fromId, person.room, person.hp <= SURVIVOR_INJURED_HP);
+  // 被追逐时有机会抹掉脚印；潜行者只降低声响，不一定藏脚印。
+  const hideTrail = state.chaseTargetId === person.id && person.alert >= 75 && random() < 0.35;
+  if (!hideTrail) host.pushTrail(state, fromId, person.room, person.hp <= SURVIVOR_INJURED_HP);
   if (!isQuietMove(state, person)) host.addDisturbance(state, person.room);
   if (!quiet) {
     host.log(state, `${person.name} 从${from}逃向${roomName(person.room)}。`);

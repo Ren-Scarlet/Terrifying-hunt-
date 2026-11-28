@@ -5,13 +5,14 @@ import { ACCESSORY_MAP, sanitizeAccessoryLoadout } from './accessories';
 import { modifiersForAccessories, modifierSummary } from './modifiers';
 import { generateMission } from './missions';
 import { createPeople } from './npc/factory';
+import { ITEM_BOX_CHARGES, ITEM_BOX_COUNT } from './items';
 import {
   BASE_AP, ESCAPE_ROOMS,
 } from './constants';
 import {
   ENTRY_ROOM, EXIT_ROOM, OBSTACLE_ROOMS, ROOM_MAP, ROOMS, TOTEM_ROOMS, buildLayout,
 } from './rooms';
-import type { CardInstance, GameState, Mission, RoomId } from './types';
+import type { CardInstance, GameState, ItemBox, Mission, RoomId } from './types';
 import { drawCards } from './deck';
 import { roomDistance } from './navigation';
 import { applyHuntingGround, getHuntingGround, type HuntingGroundId } from './maps';
@@ -243,6 +244,10 @@ export function createGame(
     disturbances: [],
     escapeRooms: [],
     survivorTotal: people.filter((person) => person.role !== 'police').length,
+    itemBoxes: [],
+    corpseRooms: [],
+    policeShots: 0,
+    playerSkipTurn: false,
     powerCircuits: [
       { id: 'main-floor', name: '主楼照明', breakerRoom: 'basement', affectedRooms: ['basement', 'hall', 'kitchen', 'dining', 'study'], broken: false, enabled: true },
       { id: 'upper-floor', name: '二层照明', breakerRoom: 'workshop', affectedRooms: ['workshop', 'bedroom', 'nursery', 'guestroom', 'attic'], broken: false, enabled: true },
@@ -270,6 +275,19 @@ export function createGame(
   }
 
 
+  // 道具箱：每局 2 个，幸存者可翻出修理箱 / 手电筒 / 医疗箱，杀手可以砸毁。
+  const itemBoxRooms = shuffle(ROOMS.map((room) => room.id).filter((room) =>
+    room !== ENTRY_ROOM && room !== EXIT_ROOM &&
+    !ESCAPE_ROOMS.includes(room) && !OBSTACLE_ROOMS.includes(room) &&
+    !breakerRooms.includes(room) && !state.trapCaches.includes(room),
+  )).slice(0, ITEM_BOX_COUNT);
+  state.itemBoxes = itemBoxRooms.map((room, index): ItemBox => ({
+    id: `item-box-${index}`,
+    room,
+    broken: false,
+    charges: ITEM_BOX_CHARGES,
+  }));
+
   drawCards(state, 5);
   log(state, `猎场：${ground.name} · ${ground.ruleName}：${ground.ruleDescription}`);
   log(state, `契约已接取：${activeMission.title}`);
@@ -282,6 +300,7 @@ export function createGame(
     ? `随身配件：${accessories.map((id) => ACCESSORY_MAP[id].name).join('、')}。配件买过即永久拥有，下次出发前可以重新搭配。`
     : '本局没有携带配件。想带配件的话，下次出发前在装配界面选好两件。');
   log(state, '留意每个人的恐惧值与警戒值：恐惧会使人崩溃，警戒会促使人报警或逃跑。');
+  if (state.itemBoxes.length) log(state, `屋里有 ${state.itemBoxes.length} 个道具箱：幸存者会去翻找道具，你可以砸毁它们。`);
   // 电话放在最后抽：不改变前面布局 / NPC 的随机序列，避免影响既有对局与测试。
   state.phones = pickPhoneRooms(state);
   state.crows = pickCrowRooms(state, state.phones);
