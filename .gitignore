@@ -5,3 +5,7 @@ dist/
 *.log
 .tmpshot/
 .workbuddy/
+desktop/node_modules/
+desktop/app/
+desktop/package-lock.json
+release/

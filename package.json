@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "import:assets": "python scripts/import_dbd_assets.py",
     "docs:cards": "node scripts/export_cards.mjs",
-    "check": "node scripts/check.mjs"
+    "check": "node scripts/check.mjs",
+    "desktop:build": "npm run build && node scripts/prepare-desktop.mjs && npm install --prefix desktop && npm run dist:win --prefix desktop"
   },
   "devDependencies": {
     "esbuild": "^0.25.12",

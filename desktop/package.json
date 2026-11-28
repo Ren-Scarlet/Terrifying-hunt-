@@ -1,0 +1,55 @@
+{
+  "name": "nightfall-desktop",
+  "version": "0.2.0",
+  "private": true,
+  "description": "暗夜杀机 Windows 单机桌面版",
+  "main": "main.cjs",
+  "scripts": {
+    "dist:win": "electron-builder --win nsis portable"
+  },
+  "devDependencies": {
+    "electron": "^38.2.1",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.renscarlet.nightfall",
+    "productName": "暗夜杀机",
+    "directories": {
+      "output": "../release"
+    },
+    "files": [
+      "main.cjs",
+      "app/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "compression": "normal",
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "deleteAppDataOnUninstall": false,
+      "artifactName": "${productName}-${version}-安装版.${ext}"
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-便携版.${ext}"
+    }
+  }
+}

@@ -146,6 +146,8 @@ function addonBlock(): string {
   `).join('');
 }
 
+const IS_OFFLINE_DESKTOP = window.location.protocol === 'file:';
+
 export type AdminTab = 'cards' | 'powers' | 'addons';
 
 let adminTab: AdminTab = 'cards';
@@ -169,7 +171,7 @@ export function renderAdmin(): string {
           <button class="btn" data-action="workshop-open">配件工坊</button>
           <button class="btn primary" data-action="admin-close">返回菜单</button>
         </div>
-        <div class="admin-cloud"><h2>云端同步</h2><p id="cloudStatus" role="status">${isCloudSignedIn() ? "GitHub 管理员已授权" : "尚未验证 GitHub 管理密钥"}</p><div class="admin-cloud-actions"><input id="githubToken" type="password" autocomplete="off" placeholder="粘贴 Fine-grained Personal Access Token"><button class="btn mini" data-action="cloud-login">验证密钥</button><button class="btn mini ghost" data-action="cloud-logout">退出授权</button><button class="btn mini" data-action="cloud-load">读取云端配置</button><button class="btn mini primary" data-action="cloud-save">上传当前配置</button></div><p>密钥只保存在当前页面内存中，刷新页面后需要重新验证。玩家无需密钥即可读取公开配置。</p></div><div class="admin-export admin-import">
+        <div class="admin-cloud" style="${IS_OFFLINE_DESKTOP ? 'display:none' : ''}"><h2>云端同步</h2><p id="cloudStatus" role="status">${isCloudSignedIn() ? "GitHub 管理员已授权" : "尚未验证 GitHub 管理密钥"}</p><div class="admin-cloud-actions"><input id="githubToken" type="password" autocomplete="off" placeholder="粘贴 Fine-grained Personal Access Token"><button class="btn mini" data-action="cloud-login">验证密钥</button><button class="btn mini ghost" data-action="cloud-logout">退出授权</button><button class="btn mini" data-action="cloud-load">读取云端配置</button><button class="btn mini primary" data-action="cloud-save">上传当前配置</button></div><p>密钥只保存在当前页面内存中，刷新页面后需要重新验证。玩家无需密钥即可读取公开配置。</p></div><div class="admin-export admin-import">
           <label for="adminImportText">导入 JSON 备份</label>
           <textarea id="adminImportText" rows="5" placeholder="把之前导出的 JSON 粘贴到这里"></textarea>
           <div class="admin-export-actions">
