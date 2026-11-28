@@ -30,4 +30,10 @@ export interface NpcHost {
   tryRescue(state: GameState, person: Person): boolean;
   /** 用掉手里的幸存者道具 */
   consumeItem(state: GameState, person: Person): void;
+  /** 全局报警进度（会折算成暴露度） */
+  addWanted(state: GameState, amount: number): void;
+  /** 拉起倒地的同伴 */
+  rescuePerson(state: GameState, person: Person): void;
+  /** 治疗受伤的同伴 */
+  healPerson(state: GameState, person: Person, amount?: number): void;
 }

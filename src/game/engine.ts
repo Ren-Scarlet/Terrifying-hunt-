@@ -111,6 +111,15 @@ import {
 export { canCoordinateRescue, canPlaceBarricade, fearBand, type FearBand } from './npc/ai/predicates';
 import { fleeAway as aiFleeAway, shout as aiShout } from './npc/ai/actions';
 import { actByArchetype as aiActByArchetype } from './npc/ai/decide';
+import {
+  barricadeRoom as aiBarricadeRoom,
+  consumeItem as aiConsumeItem,
+  counterAttack as aiCounterAttack,
+  finishCall as aiFinishCall,
+  tryAidRun as aiTryAidRun,
+  tryCall as aiTryCall,
+  tryRescue as aiTryRescue,
+} from './npc/ai/support';
 import type { NpcHost } from './npc/ai/host';
 
 /**
@@ -129,6 +138,9 @@ const aiHost: NpcHost = {
   tryCall,
   tryRescue,
   consumeItem,
+  addWanted,
+  rescuePerson,
+  healPerson,
 };
 import { SURVIVOR_MAP } from './survivors';
 import type {
@@ -202,19 +214,6 @@ const FRENZY_GAIN = 25;
 const FRENZY_LOSS = 20;
 
 /* ---------- 本轮新增：擦刀 / 守尸 / 追击热度 / 眩晕致盲 / 鬼面夜幕 ---------- */
-/** 每多追同一名幸存者一回合，其他人的工作效率 +25%，最多翻倍 */
-/** 同屋有倒地同伴时，各原型把人拉起来的意愿（0~1）：人人都可能救，只是有人更奋不顾身 */
-const RESCUE_EAGERNESS: Record<Archetype, number> = {
-  rescuer: 1,
-  brave: 0.85,
-  caller: 0.6,
-  alert: 0.55,
-  defiant: 0.45,
-  kiter: 0.4,
-  hider: 0.3,
-};
-/** 同伴倒地后主动「赶过去」的意愿，再打个折：有人会先保自己 */
-const AID_RUN_RATE = 0.8;
 /** 每击杀一名幸存者，其他人的干活效率加成（恐惧催出来的拼命） */
 const KILL_PRESSURE = 0.15;
 const KILL_PRESSURE_MAX = 0.6;
@@ -1481,32 +1480,15 @@ function npcOnPlayerEnter(state: GameState, barricadedEntry = false): void {
   recordTrails(state, before);
 }
 
-/** 反抗型 / 英勇型的正面反击：玩家下回合少走一步 */
-function counterAttack(state: GameState, person: Person): void {
-  // 手里有防身武器的人反手更狠：多拖一点行动点
-  const heavy = person.item === 'weapon' && person.itemUses > 0;
-  state.stunTurns += heavy ? 2 : 1;
-  if (heavy) consumeItem(state, person);
-  // 被反手推开：追势断了，杀戮清零
-  state.frenzy = 0;
-  state.frenzyStreak = 0;
-  person.alert = 100;
-  person.intent = 'wary';
-  person.activity = '握着刀挡在门口';
-  addAlarm(state, 4);
-  log(state, `${person.name} 抄起武器朝你扑过来——你被逼退了一步（下回合少 ${heavy ? 2 : 1} 点行动点）。`);
-}
+/** 支援类行动已搬到 npc/ai/support.ts；这里保留引擎侧入口（签名不变）。 */
+function counterAttack(state: GameState, person: Person): void { aiCounterAttack(aiHost, state, person); }
+function consumeItem(state: GameState, person: Person): void { aiConsumeItem(aiHost, state, person); }
+function barricadeRoom(state: GameState, person: Person): boolean { return aiBarricadeRoom(aiHost, state, person); }
+function tryRescue(state: GameState, person: Person): boolean { return aiTryRescue(aiHost, state, person); }
+function tryAidRun(state: GameState, person: Person): boolean { return aiTryAidRun(aiHost, state, person); }
+function tryCall(state: GameState, person: Person): boolean { return aiTryCall(aiHost, state, person); }
+function finishCall(state: GameState, person: Person, device: string): void { aiFinishCall(aiHost, state, person, device); }
 
-/** 消耗一次道具；次数用完就清空，医疗包的治疗进度也一起归零 */
-function consumeItem(state: GameState, person: Person): void {
-  if (!person.item) return;
-  person.itemUses = Math.max(0, person.itemUses - 1);
-  if (person.itemUses <= 0) {
-    person.item = null;
-    person.healTurns = 0;
-    person.healLastTurn = undefined;
-  }
-}
 
 /**
  * 玩家被打断（障碍伏击 / 手电筒致盲）：少 1 点行动点、刀收不回来、
@@ -1571,93 +1553,10 @@ function witnessInRoom(state: GameState, person: Person): boolean {
   return true;
 }
 
-function barricadeRoom(state: GameState, person: Person): boolean {
-  if (!canPlaceBarricade(state, person)) return false;
-  person.intent = 'barricade';
-  state.palletDropCount = (state.palletDropCount ?? 0) + 1;
-  person.activity = '放下木板堵住入口';
-  state.barricades.push(person.room);
-  log(state, person.name + ' 在原有障碍房间放下木板，封住了' + roomName(person.room) + '的入口！地图已标记木板位置。');
-  addAlarm(state, 2);
-  return true;
-}
 
-/** 同屋有倒地同伴就拉起他：任何人都会救，只是意愿不同；玩家在场时没人敢动手 */
-function tryRescue(state: GameState, person: Person): boolean {
-  if (person.room === state.playerRoom) return false;
-  if (person.blockedTurns > 0) return false;
-  if (random() > RESCUE_EAGERNESS[person.archetype]) return false;
-  const allies = peopleInRoom(state, person.room).filter(
-    (p) => p.id !== person.id && p.role !== 'police',
-  );
-  const downed = allies.find((p) => p.hp <= 0);
-  if (downed) {
-    rescuePerson(state, downed);
-    person.intent = 'rescue';
-    person.activity = `正在把 ${downed.name} 从地上拖起来`;
-    return true;
-  }
-  const injured = allies.find((p) => p.hp > 0 && p.hp <= SURVIVOR_INJURED_HP);
-  if (injured) {
-    healPerson(state, injured, 1);
-    person.intent = 'heal';
-    person.activity = `正在给 ${injured.name} 包扎`;
-    return true;
-  }
-  return false;
-}
 
-/** 有人倒地时，幸存者会主动赶过去：救援优先于日常目标，但没人敢闯玩家守着的房间 */
-function tryAidRun(state: GameState, person: Person): boolean {
-  if (person.hidden || person.blockedTurns > 0) return false;
-  if (random() > RESCUE_EAGERNESS[person.archetype] * AID_RUN_RATE) return false;
-  const downed = npcs(state)
-    .filter((p) => p.hp <= 0 && p.room !== state.playerRoom && canCoordinateRescue(state, person.room, p.room))
-    .sort((a, b) => roomDistance(person.room, a.room) - roomDistance(person.room, b.room))[0];
-  if (!downed || downed.room === person.room) return false;
-  const step = nextStepToward(state, person.room, downed.room, [state.playerRoom]);
-  if (!step) return false;
-  person.room = step;
-  person.intent = 'rescue';
-  person.activity = `朝${downed.name}倒下的地方赶去`;
-  return true;
-}
 
-/** 求救型：打电话（1 回合）或用无线电（2 回合）报警 */
-function tryCall(state: GameState, person: Person): boolean {
-  if (person.blockedTurns > 0) return false;
-  const canPhone = phoneWorks(state, person.room);
-  const canRadio = !state.sabotage.includes('radio') && RADIO_ROOMS.includes(person.room);
 
-  if (canPhone) {
-    person.intent = 'call';
-    person.activity = '按住电话线的手指在抖';
-    return true;
-  }
-  if (canRadio) {
-    person.callTurns += 1;
-    if (person.callTurns >= 2) {
-      finishCall(state, person, '无线电');
-      return true;
-    }
-    person.intent = 'call';
-    person.activity = '在无线电前调频，还差一回合';
-    log(state, `${person.name} 正在调无线电，再有一回合就能把消息发出去。`);
-    return true;
-  }
-  return false;
-}
-
-function finishCall(state: GameState, person: Person, device: string): void {
-  state.npcAlarmed = true;
-  addWanted(state, 3);
-  addAlarm(state, 15);
-  state.lastCrimeRoom = person.room;
-  person.intent = 'flee';
-  person.alert = 100;
-  person.callTurns = 0;
-  log(state, `${person.name} 用${device}联系上了外面：「他在${roomName(person.room)}！」暴露度大涨，警察正赶过去。`);
-}
 
 /** 按行为类型行动一步 */
 /** 主决策已经搬到 npc/ai/decide.ts；这里保留引擎侧入口（签名不变）。 */
