@@ -24,3 +24,6 @@ export const POSSESS_TURNS = 3;
  * 但它也不能太小，否则「警觉就跑得很远」只是一句台词。
  */
 export const REACT_MOVE_CAP = 3;
+
+/** 倒地后撑不过这么多回合就会自动流血而死 */
+export const BLEEDOUT_TURNS = 4;

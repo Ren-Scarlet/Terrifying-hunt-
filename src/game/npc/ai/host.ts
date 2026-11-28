@@ -5,7 +5,7 @@
  * 把「记日志、加警报、留脚印、留动静、踩夹子」这几件事通过接口传进来，
  * 依赖方向就变成 engine -> ai 单向，AI 才能真正独立出去。
  */
-import type { GameState, Person, RoomId } from '../../types';
+import type { GameState, Person, RoomId, SiteItem } from '../../types';
 
 export interface NpcHost {
   /** 往对局日志写一行 */
@@ -36,4 +36,30 @@ export interface NpcHost {
   rescuePerson(state: GameState, person: Person): void;
   /** 治疗受伤的同伴 */
   healPerson(state: GameState, person: Person, amount?: number): void;
+  /** 主决策：这一回合按本能做什么 */
+  actByArchetype(state: GameState, person: Person): void;
+  /** 同屋看到玩家时的即时反应（只改状态，不移动） */
+  sameRoomKillerReact(state: GameState, armed: boolean): void;
+  /** 造成伤害（会触发恐惧、逃跑与死亡结算） */
+  damagePerson(state: GameState, person: Person, amount: number, options?: { affectFear?: boolean; forceFlee?: boolean }): void;
+  /** 移除一名幸存者并结算死亡 */
+  killPerson(state: GameState, person: Person): void;
+  /** 用掉手里的幸存者道具，返回是否真的用了 */
+  useSurvivorItem(state: GameState, person: Person): boolean;
+  /** 在道具箱翻一件补给 */
+  tryTakeSupply(state: GameState, person: Person): boolean;
+  /** 结算这一轮移动踩到的捕兽夹 */
+  resolveTrapEntries(state: GameState, before: Map<string, RoomId>): void;
+  /** 刷新头顶对白 */
+  updateNpcDialogue(state: GameState): void;
+  /** 记录移动留下的脚印 */
+  recordTrails(state: GameState, before: Map<string, RoomId>): void;
+  /** 记录每个人移动前的房间 */
+  snapshotRooms(state: GameState): Map<string, RoomId>;
+  /** 正面反击：玩家下回合少走一步 */
+  counterAttack(state: GameState, person: Person): void;
+  /** 有人倒地时主动赶过去 */
+  tryAidRun(state: GameState, person: Person): boolean;
+  /** 还能领补给的道具箱 */
+  usableItemBoxes(state: GameState): SiteItem[];
 }
