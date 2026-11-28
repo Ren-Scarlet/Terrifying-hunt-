@@ -110,14 +110,22 @@ func _render() -> void:
 		var label := str(room.name)
 		if i == game.player_room: label = "◆ " + label + "\n【杀手】"
 		var people := game.people_in_room(i)
-		if not people.is_empty(): label += "\n幸存者：" + str(people.size())
+		if not people.is_empty():
+			var names: Array[String] = []
+			for person in people:
+				var person_name := str(person.name)
+				if person.marked: person_name = "★" + person_name
+				if person.downed: person_name += "（倒地）"
+				names.append(person_name)
+			label += "\n" + "、".join(names)
 		if i == selected_room: label = "▶ " + label
 		b.text = label
 		b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		b.disabled = not game.connected_rooms(game.player_room).has(i) and i != game.player_room
 		b.pressed.connect(_select_room.bind(i))
 		map_grid.add_child(b)
-	info_label.text = "[b]第 %d 回合[/b]　行动点 %d/%d　警报 %d/100　猎杀评分 %d　击杀 %d　\n契约：[color=#d9a86c]%s[/color]　目标：%s" % [game.turn, game.ap, game.max_ap, game.alarm, game.score, game.kills, game.contract.title, game.contract.description]
+	info_label.text = "[b]第 %d 回合[/b]　行动点 %d/%d　警报 %d/100　猎杀评分 %d　击杀 %d　血点 %d　\n契约：[color=#d9a86c]%s[/color]　目标：%s" % [game.turn, game.ap, game.max_ap, game.alarm, game.score, game.kills, SaveManager.bloodpoints, game.contract.title, game.contract.description]
+	settlement_button.disabled = not game.finished or SaveManager.was_settled
 	log_label.text = "\n".join(game.logs.slice(maxi(0, game.logs.size()-13)))
 	for child in action_box.get_children(): child.queue_free()
 	action_box.add_child(_button("移动到选中房间 · 1 AP", _move))
