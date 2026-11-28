@@ -93,4 +93,22 @@ export interface NpcHost {
   drawForPlayer(state: GameState, count: number): number;
   /** 主目标完成检查 */
   checkImmediateWin(state: GameState): void;
+  /** 玩家做完一个动作后的统一收尾（幸存者反应、计步、目标检查） */
+  afterPlayerAction(state: GameState): void;
+  /** 玩家踏进房间的瞬间 */
+  npcOnPlayerEnter(state: GameState, barricadedEntry?: boolean): void;
+  /** D6 检定：返回是否成功 */
+  rollD6Check(state: GameState, label: string, successOn?: number): boolean;
+  /** 标记房间已探索 */
+  markExplored(state: GameState, room: RoomId): void;
+  /** 让相邻房间暂时可见 */
+  scoutRoom(state: GameState, room: RoomId, turns?: number): void;
+  /** 玩家被打断时，全体幸存者各行动一次 */
+  survivorsActOnce(state: GameState, actorId: string): void;
+  /** 脚印追踪带来的杀戮值变化 */
+  updateFrenzy(state: GameState, from: RoomId, to: RoomId): void;
+  /** 女猎手飞斧回补 */
+  refillHuntressHatchets(state: GameState): boolean;
+  /** 目击事件：同屋的人看到攻击/死亡/被抱走 */
+  npcWitnessEvent(state: GameState, room: RoomId, event: 'attack' | 'murder' | 'abduction', subjectId: string): number;
 }

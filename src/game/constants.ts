@@ -41,3 +41,7 @@ export const FRENZY_AP_BONUS = 2;
 
 /** 鬼面「夜幕」每回合累积的监视值 */
 export const WATCH_GAIN = 34;
+
+/** 搜索 / 查看各自消耗的行动点 */
+export const SEARCH_COST = 1;
+export const LOOK_COST = 1;

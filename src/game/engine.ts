@@ -12,13 +12,13 @@ import {
   trapDamageOf,
   trapHoldTurns,
 } from './modifiers';
-import { ESCAPE_ROOMS, BASE_AP, SABOTAGE_COST, ITEM_BOX_CHARGES, POSSESS_TURNS, SURVIVOR_MAX_HP, SURVIVOR_INJURED_HP, REACT_MOVE_CAP, BLEEDOUT_TURNS, ALARM_MAX, HAND_LIMIT, FRENZY_THRESHOLD, FRENZY_AP_BONUS, WATCH_GAIN } from './constants';
+import { ESCAPE_ROOMS, BASE_AP, SABOTAGE_COST, ITEM_BOX_CHARGES, POSSESS_TURNS, SURVIVOR_MAX_HP, SURVIVOR_INJURED_HP, REACT_MOVE_CAP, BLEEDOUT_TURNS, ALARM_MAX, HAND_LIMIT, FRENZY_THRESHOLD, FRENZY_AP_BONUS, WATCH_GAIN, SEARCH_COST, LOOK_COST } from './constants';
 import { drawCards } from './deck';
 import { executeOps } from './effects/runtime';
 import { createGame } from './setup';
 export { drawCards } from './deck';
 export { createGame } from './setup';
-export { BASE_AP, SABOTAGE_COST, ITEM_BOX_CHARGES, POSSESS_TURNS, SURVIVOR_MAX_HP, SURVIVOR_INJURED_HP, BLEEDOUT_TURNS, ALARM_MAX, HAND_LIMIT, FRENZY_THRESHOLD, FRENZY_AP_BONUS } from './constants';
+export { BASE_AP, SABOTAGE_COST, ITEM_BOX_CHARGES, POSSESS_TURNS, SURVIVOR_MAX_HP, SURVIVOR_INJURED_HP, BLEEDOUT_TURNS, ALARM_MAX, HAND_LIMIT, FRENZY_THRESHOLD, FRENZY_AP_BONUS, SEARCH_COST, LOOK_COST } from './constants';
 import { ACTIVITIES, createPeople, itemUsesFor } from './npc/factory';
 import { ARCH_DESC, ARCH_LABEL, GOAL_LABEL, HEALTH_LABEL, INTENT_LABEL, ROUTINE_PROFILE, SITE_ITEM_LABEL, SURVIVOR_ITEM_LABEL } from './npc/catalog';
 export { ARCH_DESC, ARCH_LABEL, GOAL_LABEL, HEALTH_LABEL, INTENT_LABEL, SITE_ITEM_LABEL, SURVIVOR_ITEM_LABEL } from './npc/catalog';
@@ -140,6 +140,19 @@ import {
   witnessPhase as aiWitnessPhase,
 } from './turn/phases';
 import { endTurn as aiEndTurn } from './turn/ending';
+import {
+  breakBarricade as aiBreakBarricade,
+  breakDoor as aiBreakDoor,
+  cancelLookSelection as aiCancelLookSelection,
+  interactCabinet as aiInteractCabinet,
+  interactTotem as aiInteractTotem,
+  lookAround as aiLookAround,
+  lookAtRoom as aiLookAtRoom,
+  movePlayer as aiMovePlayer,
+  recordRoutineObservation as aiRecordRoutineObservation,
+  searchRoom as aiSearchRoom,
+  waitAction as aiWaitAction,
+} from './actions/explore';
 import type { NpcHost } from './npc/ai/host';
 
 /**
@@ -194,6 +207,15 @@ const aiHost: NpcHost = {
   triggerEnvironmentalEvent,
   drawForPlayer,
   checkImmediateWin,
+  afterPlayerAction,
+  npcOnPlayerEnter,
+  rollD6Check,
+  markExplored,
+  scoutRoom,
+  survivorsActOnce,
+  updateFrenzy,
+  refillHuntressHatchets,
+  npcWitnessEvent,
 };
 import { SURVIVOR_MAP } from './survivors';
 import type {
@@ -226,8 +248,6 @@ export const DOWNED_LOCK_TURNS = 0;
 const WANTED_TO_ALARM = 10;
 /** 挥刀 / 搜索各自消耗 1 点行动点：唯一的伤害来源，不能免费 */
 export const ATTACK_COST = 1;
-export const SEARCH_COST = 1;
-export const LOOK_COST = 1;
 /** 主动抽牌消耗的行动点；每次抽 1 张。 */
 export const DRAW_CARD_COST = 1;
 /** 被砍伤后当场夺路而逃的步数：一刀下去，他会连着跑两间屋 */
@@ -1425,165 +1445,21 @@ export function rollD6Check(state: GameState, label: string, successOn = 4): boo
   return success;
 }
 
-export function breakBarricade(state: GameState, room: RoomId): boolean {
-  const dynamicBoard = state.barricades.includes(room);
-  const fixedBoard = isObstacle(room) && !state.clearedObstacles.includes(room) && !state.possessed;
-  if (state.phase !== 'playing' || (!dynamicBoard && !fixedBoard) || !ROOM_MAP[state.playerRoom].neighbors.includes(room)) return false;
-  if (state.energy < 1) { log(state, '行动点不足：破坏木板需要 1 点。'); return false; }
-  state.energy -= 1;
-  if (dynamicBoard) state.barricades = state.barricades.filter((r) => r !== room);
-  if (fixedBoard) state.clearedObstacles.push(room);
-  log(state, `你花费 1 点行动点，将${roomName(room)}入口的木板砸碎。`);
-  // 砸开木板的巨响会直接惊动门后的人：以前只有一句日志，屋内幸存者的警戒几乎不动，不合理。
-  const inside = state.people.filter((person) => person.role !== 'police' && person.hp > 0 && !person.hidden && person.room === room);
-  inside.forEach((person) => {
-    person.alert = Math.max(person.alert, 55);
-    person.fear = clamp(person.fear + 12, 0, 100);
-    person.awareness = Math.max(person.awareness, 2);
-  });
-  if (inside.length) {
-    log(state, `木板碎裂的巨响让${inside.map((person) => person.name).join('、')}立刻警觉起来，${inside.length > 1 ? '他们' : '他'}开始死死盯住门口。`);
-  }
-  state.attackReady = true;
-  afterPlayerAction(state);
-  checkImmediateWin(state);
-  return true;
-}
+/** 探索动作已搬到 actions/explore.ts；这里保留引擎侧入口（签名不变）。 */
+export function breakBarricade(state: GameState, room: RoomId): boolean { return aiBreakBarricade(aiHost, state, room); }
+export function breakDoor(state: GameState, room: RoomId): boolean { return aiBreakDoor(aiHost, state, room); }
+export function waitAction(state: GameState): boolean { return aiWaitAction(aiHost, state); }
+export function movePlayer(state: GameState, room: RoomId): boolean { return aiMovePlayer(aiHost, state, room); }
+export function lookAround(state: GameState): boolean { return aiLookAround(aiHost, state); }
+export function cancelLookSelection(state: GameState): boolean { return aiCancelLookSelection(aiHost, state); }
+export function recordRoutineObservation(state: GameState, room: RoomId): number { return aiRecordRoutineObservation(aiHost, state, room); }
+export function lookAtRoom(state: GameState, room: RoomId): boolean { return aiLookAtRoom(aiHost, state, room); }
+export function interactCabinet(state: GameState): boolean { return aiInteractCabinet(aiHost, state); }
+export function interactTotem(state: GameState, reward: 'draw' | 'energy'): boolean { return aiInteractTotem(aiHost, state, reward); }
+export function searchRoom(state: GameState): boolean { return aiSearchRoom(aiHost, state); }
 
-/**
- * 破门：只对相邻、且确实上锁的门生效。
- * 和「破坏现场设施」分开，做成房间点位上的独立互动标记。
- */
-export function breakDoor(state: GameState, room: RoomId): boolean {
-  if (state.phase !== 'playing') return false;
-  if (!ROOM_MAP[state.playerRoom].neighbors.includes(room) || !isLocked(state, room)) {
-    log(state, '这里没有可以撞开的门锁。');
-    return false;
-  }
-  if (state.energy < 1) {
-    log(state, '行动点不足：破门需要 1 点。');
-    return false;
-  }
-  state.energy -= 1;
-  state.roomLocks[room] = 0;
-  log(state, `你用蛮力撞开通往${roomName(room)}的门锁，屋里的人被巨响惊动。`);
-  npcs(state).filter((person) => person.room === room && person.hp > 0).forEach((person) => {
-    person.alert = clamp(person.alert + 24, 0, 100);
-    person.fear = clamp(person.fear + 12, 0, 100);
-  });
-  addAlarm(state, 5);
-  state.attackReady = true;
-  afterPlayerAction(state);
-  checkImmediateWin(state);
-  return true;
-}
 
-export function waitAction(state: GameState): boolean {
-  if (state.phase !== 'playing') return false;
-  if (state.energy < 1) { log(state, '行动点不足，无法等待。'); return false; }
-  state.energy -= 1;
-  state.attackReady = true;
-  log(state, '你停下脚步，屏住呼吸观察周围。幸存者趁这个空档行动。');
-  survivorsActOnce(state, 'wait');
-  afterPlayerAction(state);
-  checkImmediateWin(state);
-  return true;
-}
 
-export function movePlayer(state: GameState, room: RoomId): boolean {
-  if (state.carryPersonId && state.carryDistance >= 3) {
-    const carried = state.people.find((p) => p.id === state.carryPersonId);
-    if (!rollD6Check(state, '远距离搬运', 4)) {
-      if (carried) {
-        carried.hp = SURVIVOR_INJURED_HP;
-        carried.downedTurns = 0;
-        carried.hidden = false;
-        carried.blockedTurns = 0;
-        carried.fear = Math.min(carried.fear, 70);
-        carried.alert = 100;
-        carried.intent = 'flee';
-        carried.activity = '挣脱搬运，带伤逃跑';
-        log(state, `${carried.name} 在搬运途中猛然挣脱，恢复为受伤状态并逃走！`);
-        state.carryPersonId = null;
-        state.carryDistance = 0;
-        fleeAway(state, carried);
-      }
-      state.energy = Math.max(0, state.energy - 1);
-      afterPlayerAction(state);
-      return false;
-    }
-  }
-  if (state.barricades.includes(room) && ROOM_MAP[state.playerRoom].neighbors.includes(room) && !isLocked(state, room) && !isLocked(state, state.playerRoom)) {
-    if (state.energy < 1) { log(state, '木板封住了入口；撞开它需要 1 点行动点。'); return false; }
-    state.energy -= 1;
-    state.barricades = state.barricades.filter((r) => r !== room);
-    log(state, `你试图撞开${roomName(room)}入口的木板，木板突然向你砸来！`);
-    interruptPlayer(state, '你撞上幸存者刚放下的木板，被重重砸晕！杀戮值清零。', state.chaseTargetId ?? 'dropped-pallet');
-    state.attackReady = true;
-    afterPlayerAction(state);
-    checkImmediateWin(state);
-    return true;
-  }
-  const staticBoard = isObstacle(room) && !state.clearedObstacles.includes(room) && !state.possessed;
-  if (staticBoard && ROOM_MAP[state.playerRoom].neighbors.includes(room) && !isLocked(state, room) && !isLocked(state, state.playerRoom)) {
-    log(state, `${roomName(room)}入口被木板封住了；点击地图上的「破坏木板」花费 1 点行动点。`);
-    return false;
-  }
-  const cost = state.freeMove ? 0 : moveCost(state, room);
-  if (!canMoveTo(state, room)) {
-    log(state, state.energy < cost ? '行动点不够，走不过去。' : '无法移动到那里：不是相邻房间，或路被堵住了。');
-    return false;
-  }
-
-  const from = state.playerRoom;
-  state.watchedRoom = from;
-  if (state.killer === '迈克尔·迈尔斯' && state.myersStalking) {
-    state.myersMovedThisTurn = true;
-    state.stalkTargetId = null;
-    state.stalkPressure = 0;
-  }
-  const fromRect = ROOM_MAP[from].rect;
-  const toRect = ROOM_MAP[room].rect;
-  const dx = toRect.left + toRect.width / 2 - (fromRect.left + fromRect.width / 2);
-  const dy = toRect.top + toRect.height / 2 - (fromRect.top + fromRect.height / 2);
-  const length = Math.hypot(dx, dy) || 1;
-  state.playerFacing = { x: dx / length, y: dy / length };
-  state.energy -= cost;
-  state.playerRoom = room;
-  markExplored(state, room);
-  if (state.carryPersonId) {
-    const carried = state.people.find((p) => p.id === state.carryPersonId);
-    if (carried) {
-      carried.room = room;
-      state.carryDistance += 1;
-    }
-  }
-  log(
-    state,
-    state.freeMove
-      ? `你借着潜行掠到${roomName(room)}（不耗行动点）。`
-      : `你移动到${roomName(room)}（消耗 ${cost} 点行动点${cost > 1 ? '，撞开了门' : ''}）。`,
-  );
-  const barricadedEntry = state.barricades.includes(room);
-  // 先让屋里的人对「推门」做反应；障碍伏击结算后再清掉路障。
-  npcOnPlayerEnter(state, barricadedEntry);
-  if (barricadedEntry) state.barricades = state.barricades.filter((r) => r !== room);
-  if (state.carryPersonId) {
-    const carried = state.people.find((person) => person.id === state.carryPersonId);
-    if (carried) npcWitnessEvent(state, room, 'abduction', carried.id);
-  }
-  if (isObstacle(room) && !state.clearedObstacles.includes(room)) {
-    state.clearedObstacles.push(room);
-    log(state, `你借着恶魔附身的力量撞碎${roomName(room)}入口的木板，强行闯入。`);
-  }
-  // 走出了第一步，刀就收回来了：边走边砍是这个游戏的基本节奏
-  state.attackReady = true;
-  updateFrenzy(state, from, room);
-  afterPlayerAction(state);
-
-  checkImmediateWin(state);
-  return true;
-}
 
 /** 基础条件检查（不消耗能量、不弃牌） */
 function precheckFailed(state: GameState, defId: string): string | null {
@@ -1989,133 +1865,13 @@ export function wipeBlade(state: GameState): boolean {
   return true;
 }
 
-/**
- * 开始选择查看目标。点击「查看」本身不消耗 AP，也不会自动替玩家选房间。
- * 玩家随后必须在地图上点选一个与当前位置直接相邻的房间。
- */
-export function lookAround(state: GameState): boolean {
-  if (state.phase !== 'playing') return false;
-  if (state.lookingAround) return cancelLookSelection(state);
-  if (state.energy < LOOK_COST) {
-    log(state, `行动点不足：查看需要 ${LOOK_COST} 点。`);
-    return false;
-  }
-  if (!ROOM_MAP[state.playerRoom].neighbors.length) {
-    log(state, '周围没有可以查看的相邻房间。');
-    return false;
-  }
-  state.lookingAround = true;
-  log(state, '请选择地图上一个相邻房间进行查看；确认目标后才会消耗 1 点行动点。');
-  return true;
-}
 
-/** 取消查看选房，不消耗行动点。 */
-export function cancelLookSelection(state: GameState): boolean {
-  if (!state.lookingAround) return false;
-  state.lookingAround = false;
-  log(state, '已取消查看。');
-  return true;
-}
 
 /** 只查看玩家明确点选的一个相邻房间，消耗 1 AP。 */
-/** 玩家每回合最多记录一次同一目标的习惯；连续两次观察才会确认完整路线。 */
-export function recordRoutineObservation(state: GameState, room: RoomId): number {
-  const observed = npcs(state).filter((person) =>
-    person.room === room && person.hp > 0 && !person.hidden && person.goal === 'routine',
-  );
-  let discovered = 0;
-  for (const person of observed) {
-    if (person.routineLastObservedTurn === state.turn) continue;
-    person.routineLastObservedTurn = state.turn;
-    person.routineSightings = (person.routineSightings ?? 0) + 1;
-    if (person.routineSightings >= 2 && !person.routineObserved) {
-      person.routineObserved = true;
-      discovered += 1;
-      log(state, `你已经看出${person.name}的日常规律：${ROUTINE_PROFILE[person.archetype].label}。`);
-    } else if (!person.routineObserved) {
-      log(state, `你记下了${person.name}在${roomName(room)}的行动习惯；再观察一次就能确认他的常去路线。`);
-    }
-  }
-  if (discovered > 0) state.huntStats.routineInsights += discovered;
-  return discovered;
-}
 
-export function lookAtRoom(state: GameState, room: RoomId): boolean {
-  if (state.phase !== 'playing' || !state.lookingAround) return false;
-  if (!ROOM_MAP[state.playerRoom].neighbors.includes(room)) {
-    log(state, '只能查看与当前位置直接相邻的房间。');
-    return false;
-  }
-  if (state.energy < LOOK_COST) {
-    state.lookingAround = false;
-    log(state, `行动点不足：查看需要 ${LOOK_COST} 点。`);
-    return false;
-  }
-  state.energy -= LOOK_COST;
-  state.lookingAround = false;
-  scoutRoom(state, room, 1);
-  recordRoutineObservation(state, room);
-  log(state, `你屏住呼吸查看了「${roomName(room)}」（消耗 ${LOOK_COST} 点行动点）。`);
-  state.attackReady = true;
-  afterPlayerAction(state);
-  checkImmediateWin(state);
-  return true;
-}
 
-/**
- * 搜索当前房间：把钻进柜子 / 床底的人翻出来。
- * 和走路、挥刀、出牌一样消耗 1 点行动点，也算一次玩家行动（世界跟着动）。
- */
-export function interactCabinet(state: GameState): boolean {
-  if (state.killer === '女猎手') return refillHuntressHatchets(state);
-  return searchRoom(state);
-}
 
-export function interactTotem(state: GameState, reward: 'draw' | 'energy'): boolean {
-  const room = state.playerRoom;
-  if (state.phase !== 'playing' || !state.totems.includes(room) || state.totemInteractions.includes(room)) return false;
-  state.totemInteractions.push(room);
-  if (reward === 'draw') {
-    drawCards(state, 1);
-    log(state, `你从${roomName(room)}的图腾余烬中获得一张卡牌。`);
-  } else {
-    state.energy += 1;
-    log(state, `你汲取图腾的力量，立即获得 1 点行动点。`);
-  }
-  state.attackReady = true;
-  afterPlayerAction(state);
-  checkImmediateWin(state);
-  return true;
-}
 
-export function searchRoom(state: GameState): boolean {
-  if (state.phase !== 'playing') return false;
-  if (state.energy < SEARCH_COST) {
-    log(state, `行动点不足：搜索需要 ${SEARCH_COST} 点。`);
-    return false;
-  }
-  state.energy -= SEARCH_COST;
-  const here = peopleInRoom(state, state.playerRoom).filter((p) => p.role !== 'police');
-  const found = here.filter((p) => p.hidden);
-  const hasCabinet = cabinetRoomsFor(state).includes(state.playerRoom) || (state.mapId === 'badham' && ['nursery', 'storage', 'guestroom'].includes(state.playerRoom));
-  log(state, `你翻查${roomName(state.playerRoom)}（消耗 ${SEARCH_COST} 点行动点）。`);
-  // 先无条件把藏着的人揪出来：卡牌可能把人挪到没有柜子的房间，不能让他白藏
-  found.forEach((p) => {
-    p.hidden = false;
-    p.alert = clamp(p.alert + 35, 0, 100);
-    p.intent = 'flee';
-    log(state, `${p.name} 被你从藏身处拖了出来。`);
-  });
-  if (!found.length) {
-    log(state, hasCabinet ? '柜子里空空的，只有旧衣服和灰。' : '这间屋子没有能藏人的柜子。');
-  }
-  scoutRoom(state, state.playerRoom, 1);
-  // 搜索也算「做了一件事」，刀可以收回来了
-  state.attackReady = true;
-  afterPlayerAction(state);
-  checkImmediateWin(state);
-  return true;
-}
 
 /* ==================================================================== */
 /*  杀手能力                                                            */
